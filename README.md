@@ -1,1 +1,159 @@
-PGRpdiBhbGlnbj0iY2VudGVyIj4KCjxpbWcgc3JjPSJkb2NzL3NjZW5lZm9yZ2UtYmFubmVyLnN2ZyIgYWx0PSJTY2VuZUZvcmdlIFN0dWRpbyDigJQgWW91ciBzdG9yeSwgZnJhbWUgYnkgZnJhbWUiIHdpZHRoPSIxMDAlIiAvPgoKIyBTY2VuZUZvcmdlIFN0dWRpbwoKKipUdXJuIHNjcmlwdHMsIGltYWdlcyBhbmQgbmFycmF0aW9uIGludG8gYSBmaW5pc2hlZCB2aWRlbyDigJQgb25lIHNjZW5lIGF0IGEgdGltZS4qKgoKIVtTdGF0dXNdKGh0dHBzOi8vaW1nLnNoaWVsZHMuaW8vYmFkZ2Uvc3RhdHVzLWRlc2t0b3BfcHJldmlldy03OTYzZTk/c3R5bGU9ZmxhdC1zcXVhcmUpCiFbUHl0aG9uXShodHRwczovL2ltZy5zaGllbGRzLmlvL2JhZGdlL2JhY2tlbmQtUHl0aG9uXzMuMTElMkItMzc3NkFCP3N0eWxlPWZsYXQtc3F1YXJlJmxvZ289cHl0aG9uJmxvZ29Db2xvcj13aGl0ZSkKIVtSZWFjdF0oaHR0cHM6Ly9pbWcuc2hpZWxkcy5pby9iYWRnZS9lZGl0b3ItUmVhY3RfJTJCX1R5cGVTY3JpcHQtMTQ5RUNBP3N0eWxlPWZsYXQtc3F1YXJlJmxvZ289cmVhY3QmbG9nb0NvbG9yPXdoaXRlKQohW0ZGbXBlZ10oaHR0cHM6Ly9pbWcuc2hpZWxkcy5pby9iYWRnZS9yZW5kZXJpbmctRkZtcGVnLTAwNzgwOD9zdHlsZT1mbGF0LXNxdWFyZSZsb2dvPWZmbXBlZyZsb2dvQ29sb3I9d2hpdGUpCgpbUXVpY2sgc3RhcnRdKCNxdWljay1zdGFydCkgwrcgW0VkaXRvcl0oI3RoZS1lZGl0b3IpIMK3IFtQcm92aWRlcnNdKCNpbWFnZS1hbmQtdm9pY2UtcHJvdmlkZXJzKSDCtyBbRWZmZWN0cyBndWlkZV0oZG9jcy9FRkZFQ1RTX0dVSURFLm1kKSDCtyBbUm9hZG1hcF0oI3JvYWRtYXApIMK3IFtDb250cmlidXRpbmddKENPTlRSSUJVVElORy5tZCkKCjwvZGl2PgoKU2NlbmVGb3JnZSBpcyBhIGxvY2FsIHdlYiBlZGl0b3IgZm9yIGRvY3VtZW50YXJ5LCBlZHVjYXRpb25hbCBhbmQgbmFycmF0ZWQtaW1hZ2UgdmlkZW9zLiBBcnJhbmdlIHBhcnRzIG9uIGEgdGltZWxpbmUsIGFkZCBjYW1lcmEgbW92ZW1lbnQsIGNhcHRpb25zIGFuZCBuYXJyYXRpb24sIHRoZW4gZXhwb3J0IG9uZSBNUDQuIEFyYWJpYyB0ZXh0IGFuZCBsb2NhbCBtdWx0aWxpbmd1YWwgbmFycmF0aW9uIGFyZSBwYXJ0IG9mIHRoZSB3b3JrZmxvdy4KCj4gKipDdXJyZW50IHJlbGVhc2U6IFRpbWVsaW5lIFN0dWRpby4qKiBUaGUgZWRpdG9yIHJ1bnMgaW4geW91ciBicm93c2VyIHdpdGggYSBsb2NhbCBQeXRob24gYmFja2VuZC4gQW4gRVhFL01TSSBpbnN0YWxsZXIsIGJ1bmRsZWQgcnVudGltZXMgYW5kIGF1dG9tYXRpYyBtb2RlbCBpbnN0YWxsYXRpb24gYXJlIHBsYW5uZWQsIG5vdCBpbmNsdWRlZC4gQ2xvdWQgZ2VuZXJhdGlvbiBpcyBvcHRpb25hbCBhbmQgdXNlcyB5b3VyIG93biBwcm92aWRlciBhY2NvdW50LgoKIyMgVGhlIGVkaXRvcgoKfCBXb3Jrc3BhY2UgfCBXaGF0IHlvdSBjYW4gZG8gfAp8LS0tfC0tLXwKfCBQcm9qZWN0IGxpYnJhcnkgfCBDcmVhdGUsIGZpbmQsIHJlbmFtZSBhbmQgZGVsZXRlIHByb2plY3RzIHwKfCBNZWRpYSB8IFVwbG9hZCBpbWFnZXMvY2xpcHMsIGdlbmVyYXRlIGltYWdlcywgcmV1c2UgZ2VuZXJhdGlvbiBoaXN0b3J5LCBzZWxlY3QgZml0IHwKfCBNb3Rpb24gfCBab29tLCBwYW4sIGNsb3NlLXVwLCBkaWFnb25hbCBtb3ZlcyBhbmQgY29tYmluZWQgcHVzaC9wYW4gb3IgcHVsbC9wYW4gfAp8IEVmZmVjdHMgfCBDb2xvciBsb29rcywgZmlsbSBncmFpbiwgZnVsbC1mcmFtZSBnbGl0Y2gsIHN0cmVuZ3RoIGFkanVzdG1lbnQgYW5kIHJlbmRlcmVkIHByZXZpZXcgfAp8IFRleHQgfCBBcmFiaWMtY2FwYWJsZSBmb250cywgY2FwdGlvbnMsIHRpbWVkIHRleHQgbGF5ZXJzIGFuZCB0eXBld3JpdGVyIHNvdW5kIHwKfCBBdWRpbyB8IENvbm5lY3QgbG9jYWwgQ2hhdHRlcmJveC9Lb2tvcm8gb3IgdXBsb2FkIHJlY29yZGVkIG5hcnJhdGlvbiB8CnwgVGltZWxpbmUgfCBBdXRvbWF0aWNhbGx5IGxpc3QgcGFydHMsIGRyYWcgdG8gcmVvcmRlciwgem9vbSB0aW1lIHNjYWxlIGFuZCBzZXQgaW5jb21pbmcgdHJhbnNpdGlvbnMgfAp8IEV4cG9ydCB8IFJlbmRlciBzY2VuZXMgYW5kIGNvbWJpbmUgdGhlbSBpbnRvIG9uZSBNUDQgd2l0aCBhdWRpbyBhbmQgdHJhbnNpdGlvbnMgfAoKVGhlIHRpbWVsaW5lIGlzIGEgKipzY2VuZSBhc3NlbWJseSB0aW1lbGluZSoqLCBub3QgYSBtdWx0aXRyYWNrIE5MRS4gSXRzIG5hcnJhdGlvbiBzdHJpcCBzaG93cyB3aGV0aGVyIGEgdGFrZSBpcyBzZWxlY3RlZDsgaXQgaXMgbm90IGEgd2F2ZWZvcm0uIFVzZSB0aGUgcmVuZGVyZWQgZXhwb3J0IHRvIHByZXZpZXcgdGhlIGNvbXBsZXRlIG1vdmllLiBFbXB0eSBzY2VuZXMgc3RheSBpbiB0aGUgYXdhaXRpbmctbWVkaWEgdHJheSBhbmQgY2FuIGJlIHNraXBwZWQgYXQgZXhwb3J0IHdpdGggY29uZmlybWF0aW9uLgoKIyMgUXVpY2sgc3RhcnQKCjxkZXRhaWxzIG9wZW4+CjxzdW1tYXJ5PjxzdHJvbmc+V2luZG93cyDCtyByZWNvbW1lbmRlZCBzZXR1cDwvc3Ryb25nPjwvc3VtbWFyeT4KCkluc3RhbGwgUHl0aG9uIDMuMTErLCBOb2RlLmpzIDIwKyBhbmQgRkZtcGVnL2ZmcHJvYmUsIGF2YWlsYWJsZSBvbiBQQVRILiBHaXQgaXMgbmVlZGVkIG9ubHkgZm9yIGNsb25pbmcuIFRoZW46CgpgYGBwb3dlcnNoZWxsCmdpdCBjbG9uZSBodHRwczovL2dpdGh1Yi5jb20vRXppb0RFVmlvL1NjZW5lRm9yZ2UuZ2l0CmNkIFNjZW5lRm9yZ2UKc2NyaXB0c1xzZXR1cC5iYXQKc2NyaXB0c1xzdGFydC5iYXQKYGBgCgpPcGVuICoqaHR0cDovLzEyNy4wLjAuMTo4MDAwKiouIEtlZXAgdGhlIHNlcnZlciB3aW5kb3cgb3BlbiB3aGlsZSBlZGl0aW5nLiBTdG9wIGl0IHdpdGggQ3RybCtDLgoKVGhlIHNldHVwIGNyZWF0ZXMgYGJhY2tlbmQvLnZlbnZgLCBpbnN0YWxscyBkZXBlbmRlbmNpZXMsIGFuZCBidWlsZHMgdGhlIGZyb250ZW5kLiBObyBwcm92aWRlciBrZXkgaXMgbmVlZGVkIHRvIHVwbG9hZCBtZWRpYSBhbmQgZXhwb3J0IHZpZGVvLgoKPC9kZXRhaWxzPgoKPGRldGFpbHM+CjxzdW1tYXJ5PjxzdHJvbmc+bWFjT1MgLyBMaW51eCDCtyBtYW51YWwgZGV2ZWxvcG1lbnQgc2V0dXA8L3N0cm9uZz48L3N1bW1hcnk+CgpJbnN0YWxsIFB5dGhvbiwgTm9kZSBhbmQgRkZtcGVnIGZpcnN0OgoKYGBgYmFzaApweXRob24zIC1tIHZlbnYgYmFja2VuZC8udmVudgpiYWNrZW5kLy52ZW52L2Jpbi9weXRob24gLW0gcGlwIGluc3RhbGwgLXIgYmFja2VuZC9yZXF1aXJlbWVudHMudHh0Cm5wbSAtLXByZWZpeCBmcm9udGVuZCBjaQpucG0gLS1wcmVmaXggZnJvbnRlbmQgcnVuIGJ1aWxkCmNkIGJhY2tlbmQKLnZlbnYvYmluL3B5dGhvbiAtbSB1dmljb3JuIGFwcC5tYWluOmFwcCAtLWhvc3QgMTI3LjAuMC4xIC0tcG9ydCA4MDAwCmBgYAoKVGhlIFdpbmRvd3MgbGF1bmNoZXJzIGFyZSB0aGUgcHJpbWFyeSBzdXBwb3J0ZWQgc3RhcnR1cCBwYXRoLiBMb2NhbCB2b2ljZSBlbmdpbmUgcGVyZm9ybWFuY2UgZGVwZW5kcyBvbiB5b3VyIGhhcmR3YXJlLgoKPC9kZXRhaWxzPgoKIyMjIFVwZGF0ZSBhbiBleGlzdGluZyBaSVAgaW5zdGFsbGF0aW9uCgpTdG9wIHRoZSBzZXJ2ZXIgYW5kIGJhY2sgdXAgYGJhY2tlbmQvZGF0YWAuIENvcHkgdGhlIHJlcG9zaXRvcnkncyBhcHAgZmlsZXMgaW50byB5b3VyIGV4aXN0aW5nIGFwcCByb290OyByZXRhaW4gaXRzIGBiYWNrZW5kL2RhdGFgIGFuZCBgLnZlbnZgLiBSdW4gc2V0dXAsIHJlc3RhcnQgYW5kIHJlZnJlc2ggd2l0aCBDdHJsK0Y1LiBEbyBub3QgcnVuIHR3byBjb3BpZXMgYWdhaW5zdCBwb3J0IDgwMDAuIGAvYXBpL2hlYWx0aGAgc2hvdWxkIHJlcG9ydCBgdGltZWxpbmUtc3R1ZGlvLTFgLiBPbGQgQVBQTFlfKiB1cGRhdGUgc2NyaXB0cyBhcmUgbm90IHJlcXVpcmVkLgoKIyMgTWFrZSB5b3VyIGZpcnN0IHZpZGVvCgoxLiBDcmVhdGUgYSBwcm9qZWN0IGFuZCBzZWxlY3QgaXRzIGFzcGVjdCByYXRpby4KMi4gQWRkIGFuIGltYWdlIG9yIGNsaXAgdG8gZWFjaCBwYXJ0LiBBZGQgbmFycmF0aW9uIG9yIGNob29zZSBubyBuYXJyYXRpb24uCjMuIENob29zZSBtb3Rpb24sIGFuIGVmZmVjdCBhbmQgb3B0aW9uYWwgY2FwdGlvbnMvdHlwZXdyaXRlciB0ZXh0Lgo0LiBBcnJhbmdlIHBhcnRzIG9uIHRoZSB0aW1lbGluZS4gU2VsZWN0IGFuIGluY29taW5nIHBhcnQgdG8gY2hvb3NlIGEgdHJhbnNpdGlvbi4KNS4gUmVuZGVyIGEgc2NlbmUgdG8gaW5zcGVjdCBleGFjdCBtb3Rpb24vZWZmZWN0cy9hdWRpby4KNi4gQ2hvb3NlICoqRXhwb3J0IHZpZGVvKiosIHRoZW4gcHJldmlldyBvciBkb3dubG9hZCB0aGUgZnVsbCBNUDQuCgpUcmFuc2l0aW9ucyBpbmNsdWRlIEN1dCwgRGlzc29sdmUsIEZhZGUgdGhyb3VnaCBibGFjay93aGl0ZSwgU2xpZGUgbGVmdC9yaWdodCwgV2lwZSBsZWZ0L3JpZ2h0IGFuZCBDaXJjbGUgcmV2ZWFsLiBBIHRyYW5zaXRpb24gbW92ZXMgd2l0aCBpdHMgaW5jb21pbmcgcGFydCB3aGVuIHJlb3JkZXJlZDsgdGhlIGZpcnN0IGV4cG9ydGVkIHBhcnQgaGFzIG5vIGluY29taW5nIHRyYW5zaXRpb24uIE92ZXJsYXAgaXMgY2FwcGVkIGF0IGhhbGYgb2YgZWFjaCBuZWlnaGJvdXJpbmcgc2NlbmUuIE5hcnJhdGlvbiBjcm9zc2ZhZGVzIHRvbywgc28gdXNlIHNob3J0IHRyYW5zaXRpb25zIG9yIHNpbGVudCBoYW5kbGVzLgoKVGltZWxpbmUgdGltaW5ncyBhcmUgZXN0aW1hdGVzIGRlcml2ZWQgZnJvbSB0aGUgc2VsZWN0ZWQgdGFrZSBvciBmaXhlZCBkdXJhdGlvbi4gRnJhbWUgcm91bmRpbmcgYW5kIHJlbmRlcmluZyBkZXRlcm1pbmUgdGhlIGZpbmFsIG91dHB1dCBsZW5ndGguIE1vdGlvbiBjdXJyZW50bHkgcmVxdWlyZXMgQ292ZXIgZml0OyBGaXQvQmx1ciBmaXQgcHJlc2VydmUgdGhlIGZ1bGwgc291cmNlIGltYWdlLgoKIyMgSW1hZ2UgYW5kIHZvaWNlIHByb3ZpZGVycwoKfCBTZXJ2aWNlIHwgUm9sZSB8IFNldHVwIC8gY29zdCBtb2RlbCB8CnwtLS18LS0tfC0tLXwKfCBPcGVuQUkgfCBJbWFnZSBnZW5lcmF0aW9uIHwgWW91ciBBUEkga2V5OyBwYWlkIHVzYWdlIHwKfCBHb29nbGUgR2VtaW5pIHwgSW1hZ2UgZ2VuZXJhdGlvbiB8IFlvdXIgQVBJIGtleSBhbmQgc3VwcG9ydGVkIGltYWdlIG1vZGVsIHwKfCBDbG91ZGZsYXJlIFdvcmtlcnMgQUkgfCBGTFVYLjEgU2NobmVsbCBpbWFnZXMgfCBBUEkgdG9rZW4gKyBBY2NvdW50IElEOyBsaW1pdGVkIGRhaWx5IGFsbG93YW5jZSB8CnwgSHVnZ2luZyBGYWNlIHwgUm91dGVkIGltYWdlIGdlbmVyYXRpb24gfCBIRiB0b2tlbjsgc21hbGwgbW9udGhseSBjcmVkaXRzLCBtb2RlbCBhdmFpbGFiaWxpdHkgdmFyaWVzIHwKfCBBVVRPTUFUSUMxMTExIHwgTG9jYWwgaW1hZ2UgZ2VuZXJhdGlvbiB8IExvY2FsIGltYWdlIG1vZGVsIGFuZCBlbmdpbmUgcnVubmluZyB3aXRoIGAtLWFwaWAgfAp8IENoYXR0ZXJib3ggfCBMb2NhbCBtdWx0aWxpbmd1YWwgbmFycmF0aW9uIHwgU2VwYXJhdGUgc2VydmljZTsgY3VycmVudCBsYXVuY2hlciB1c2VzIERvY2tlciBEZXNrdG9wIHwKfCBLb2tvcm8gfCBMb2NhbCBuYXJyYXRpb24gfCBTZXBhcmF0ZSBzZXJ2aWNlOyBjdXJyZW50IGxhdW5jaGVyIHVzZXMgRG9ja2VyIERlc2t0b3A7IG5vIEFyYWJpYyB8CnwgUmVjb3JkZWQgYXVkaW8gfCBOYXJyYXRpb24gfCBVcGxvYWQgV0FWLCBNUDMgb3Igb3RoZXIgc3VwcG9ydGVkIGF1ZGlvIHwKCioqQW50aHJvcGljOioqIENsYXVkZSBhbmFseXplcyBpbWFnZXMgYW5kIHdyaXRlcyBwcm9tcHRzLCBidXQgZG9lcyBub3Qgb2ZmZXIgcGhvdG8vaWxsdXN0cmF0aW9uIGdlbmVyYXRpb24uIEl0IGlzIG5vdCBwcmVzZW50ZWQgYXMgYW4gaW1hZ2UgZW5naW5lLiBTZWUgW0FudGhyb3BpYydzIGV4cGxhbmF0aW9uXShodHRwczovL3N1cHBvcnQuY2xhdWRlLmNvbS9lbi9hcnRpY2xlcy85MDAyNTA0LWNhbi1jbGF1ZGUtcHJvZHVjZS1pbWFnZXMpLgoKU2VlIFtwcm92aWRlciBzZXR1cF0oU1RBUlRfSEVSRV9FRElUT1JfUExVUy5tZCNpbWFnZS1wcm92aWRlci1zZXR1cCkuIEZyZWUgYWxsb3dhbmNlcyBhcmUgbm90IHVubGltaXRlZDsgY2hlY2sgW0Nsb3VkZmxhcmUgYmlsbGluZ10oaHR0cHM6Ly9kZXZlbG9wZXJzLmNsb3VkZmxhcmUuY29tL3dvcmtlcnMtYWkvcGxhdGZvcm0vcHJpY2luZy8pIGFuZCBbSEYgY3JlZGl0c10oaHR0cHM6Ly9odWdnaW5nZmFjZS5jby9kb2NzL2luZmVyZW5jZS1wcm92aWRlcnMvcHJpY2luZy8pLiBMb2NhbCBtb2RlbHMgYW5kIHRoZWlyIGxpY2Vuc2VzIGFyZSBzZXBhcmF0ZSBkb3dubG9hZHMuIEF6dXJlIGlzIG5vdCBpbnRlZ3JhdGVkLgoKIyMgQXJjaGl0ZWN0dXJlCgp8IERpcmVjdG9yeSB8IFJlc3BvbnNpYmlsaXR5IHwKfC0tLXwtLS18CnwgYGZyb250ZW5kL3NyY2AgfCBSZWFjdCBlZGl0b3IsIHRpbWVsaW5lIGFuZCBBUEkgY2xpZW50IHwKfCBgYmFja2VuZC9hcHAvYXBpYCB8IEZhc3RBUEkgZW5kcG9pbnRzIGFuZCB2YWxpZGF0aW9uIHwKfCBgYmFja2VuZC9hcHAvcmVuZGVyYCB8IEZGbXBlZyBmaWx0ZXJzLCBjYXB0aW9ucywgc291bmQsIHRyYW5zaXRpb25zIGFuZCBjYWNoZSBoYXNoZXMgfAp8IGBiYWNrZW5kL2FwcC93b3JrZXJzYCB8IFJlbmRlciBqb2JzLCBwcm9ncmVzcyBhbmQgY2FuY2VsbGF0aW9uIHwKfCBgYmFja2VuZC9hcHAvcHJvdmlkZXJzYCB8IEltYWdlIGdlbmVyYXRpb24gYW5kIGxvY2FsIG5hcnJhdGlvbiBhZGFwdGVycyB8CnwgYHNlcnZpY2VzYCB8IE9wdGlvbmFsIHZvaWNlIHNlcnZpY2UgY29udGFpbmVycyB8CnwgYGFzc2V0c2AgfCBCdW5kbGVkIGZvbnRzIGFuZCBzeW50aGV0aWMgdHlwZXdyaXRlciBzb3VuZCB8CnwgYHRlc3RzYCB8IEFQSS9yZW5kZXIgaW50ZWdyYXRpb24gdGVzdHMgfAp8IGBzY3JpcHRzYCB8IFdpbmRvd3Mgc2V0dXAgYW5kIGxhdW5jaGVycyB8CgpEYXRhIGxpdmVzIGluIGBiYWNrZW5kL2RhdGFgIGJ5IGRlZmF1bHQuIFNldCBgU0NFTkVGT1JHRV9EQVRBX0RJUmAgdG8gcmVsb2NhdGUgaXQuIERlbGV0aW5nIGEgcHJvamVjdCByZW1vdmVzIGl0cyBkYXRhYmFzZSByZWNvcmRzIGJ1dCByZXRhaW5zIG1lZGlhIGZpbGVzIG9uIGRpc2suIEJhY2sgdXAgdGhlIHdob2xlIGRhdGEgZm9sZGVyLCBub3QganVzdCB0aGUgU1FMaXRlIGRhdGFiYXNlLgoKUHJvdmlkZXIga2V5cyBjdXJyZW50bHkgdXNlIHJldmVyc2libGUgbG9jYWwgb2JmdXNjYXRpb24sICoqbm90IGFuIE9TIGNyZWRlbnRpYWwgdmF1bHQqKi4gS2VlcCB0aGUgYXBwIGJvdW5kIHRvIGxvY2FsaG9zdCBhbmQgcHJvdGVjdCB5b3VyIGRhdGEgZm9sZGVyLiBTZWUgW3NlY3VyaXR5IG5vdGVzXShTRUNVUklUWS5tZCkuCgojIyBEZXZlbG9wbWVudCBhbmQgdmFsaWRhdGlvbgoKYGBgYmFzaApucG0gLS1wcmVmaXggZnJvbnRlbmQgY2kKbnBtIC0tcHJlZml4IGZyb250ZW5kIHJ1biBidWlsZApucG0gLS1wcmVmaXggZnJvbnRlbmQgdGVzdApweXRob24gLW0gcGlwIGluc3RhbGwgLXIgYmFja2VuZC9yZXF1aXJlbWVudHMudHh0IG51bXB5IGh0dHB4CnB5dGhvbiB0ZXN0cy9pbnRlZ3JhdGlvbi90ZXN0X2NvbWJpbmVkLnB5CnB5dGhvbiB0ZXN0cy9pbnRlZ3JhdGlvbi90ZXN0X2VkaXRvcl9wbHVzLnB5CnB5dGhvbiB0ZXN0cy9pbnRlZ3JhdGlvbi90ZXN0X3RpbWVsaW5lLnB5CmBgYAoKUnVuIGludGVncmF0aW9uIHNjcmlwdHMgc2VxdWVudGlhbGx5OyBzb21lIHJlc2VydmUgYSBmaXhlZCBsb2NhbCBwb3J0LiBGRm1wZWcgbXVzdCBiZSBpbnN0YWxsZWQuIFJlYWN0IGNoZWNrcyB1c2UganNkb20sIG5vdCBicm93c2VyIHNjcmVlbnNob3RzLiBIb3N0ZWQgQVBJcyBhcmUgbW9ja2VkOyBubyBDSSBqb2Igc3BlbmRzIHByb3ZpZGVyIGNyZWRpdHMgb3IgZG93bmxvYWRzIGxhcmdlIHZvaWNlL2ltYWdlIG1vZGVscy4gU2VlIFt2YWxpZGF0aW9uIHNjb3BlXShkb2NzL1ZBTElEQVRJT04ubWQpLgoKIyMgUm9hZG1hcAoKLSBbeF0gTG9jYWwgc2NlbmUgZWRpdG9yLCBpbWFnZSBnZW5lcmF0aW9uLCBjYXB0aW9ucyBhbmQgZnVsbC12aWRlbyBleHBvcnQKLSBbeF0gTG9jYWwgdm9pY2Ugc2VydmljZSBjb25uZWN0aW9ucyBhbmQgYXVkaW8gdXBsb2FkCi0gW3hdIFByb2plY3QgZGVsZXRpb24gYW5kIHNlYXJjaAotIFt4XSBTY2VuZSB0aW1lbGluZSwgdHJhbnNpdGlvbiBwYWxldHRlIGFuZCBleHBhbmRlZCBtb3Rpb24KLSBbIF0gU2VsZWN0IGFkZGl0aW9uYWwgYWdlZC1maWxtIGVmZmVjdHMgZnJvbSB0aGUgW2VmZmVjdHMgZ3VpZGVdKGRvY3MvRUZGRUNUU19HVUlERS5tZCkKLSBbIF0gQ29udGludW91cyB0aW1lbGluZSBwbGF5YmFjaywgc2NydWJiaW5nLCB0cmltbWluZyBhbmQgYXVkaW8gd2F2ZWZvcm1zCi0gWyBdIERlc2t0b3Agc2hlbGwsIEVYRS9NU0kgaW5zdGFsbGF0aW9uIGFuZCBtYW5hZ2VkIG1vZGVsIGRvd25sb2FkcwotIFsgXSBPUy1iYWNrZWQgY3JlZGVudGlhbCBzdG9yYWdlIGFuZCBwcm9kdWN0aW9uIHJlbGVhc2UgaGFyZGVuaW5nCgojIyBDb250cmlidXRpbmcKClJlcG9ydCBidWdzIHdpdGggc3RlcHMsIGFwcCBidWlsZCwgT1MgYW5kIHJlZGFjdGVkIGxvZ3MuIEZvciByZW5kZXIgaXNzdWVzLCBpbmNsdWRlIGFzcGVjdCByYXRpbywgZHVyYXRpb24sIHNlbGVjdGVkIGVmZmVjdHMgYW5kIHdoZXRoZXIgbmFycmF0aW9uIGlzIHByZXNlbnQuIFNlZSBbQ09OVFJJQlVUSU5HLm1kXShDT05UUklCVVRJTkcubWQpLgoKIyMgTGljZW5zaW5nIGFuZCBhY2tub3dsZWRnZW1lbnRzCgpBIHByb2plY3Qtd2lkZSByZWRpc3RyaWJ1dGlvbiBsaWNlbnNlIGhhcyBub3QgeWV0IGJlZW4gc2VsZWN0ZWQuIERvIG5vdCBpbmZlciBvbmUgZnJvbSB0aGUgcmVwb3NpdG9yeSBiZWluZyBhY2Nlc3NpYmxlLiBCdW5kbGVkIE5vdG8gZm9udHMgY2FycnkgdGhlIFNJTCBPcGVuIEZvbnQgTGljZW5zZTsgc2VlIGBhc3NldHMvZm9udHMvT0ZMLUxJQ0VOU0UudHh0YC4gVGhlIHN5bnRoZXRpYyBrZXlzdHJva2Ugc291cmNlIGlzIGRvY3VtZW50ZWQgaW4gYGFzc2V0cy9zZngvU09VUkNFLm1kYC4gRkZtcGVnLCBkZXBlbmRlbmNpZXMgYW5kIG9wdGlvbmFsIG1vZGVscyByZXRhaW4gdGhlaXIgcmVzcGVjdGl2ZSBsaWNlbnNlcy4K
+<div align="center">
+
+<img src="docs/sceneforge-banner.svg" alt="SceneForge Studio — Your story, frame by frame" width="100%" />
+
+# SceneForge Studio
+
+**Turn scripts, images and narration into a finished video — one scene at a time.**
+
+![Status](https://img.shields.io/badge/status-desktop_preview-7963e9?style=flat-square)
+![Python](https://img.shields.io/badge/backend-Python_3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)
+![React](https://img.shields.io/badge/editor-React_%2B_TypeScript-149ECA?style=flat-square&logo=react&logoColor=white)
+![FFmpeg](https://img.shields.io/badge/rendering-FFmpeg-007808?style=flat-square&logo=ffmpeg&logoColor=white)
+
+[Quick start](#quick-start) · [Editor](#the-editor) · [Providers](#image-and-voice-providers) · [Effects guide](docs/EFFECTS_GUIDE.md) · [Roadmap](#roadmap) · [Contributing](CONTRIBUTING.md)
+
+</div>
+
+SceneForge is a local web editor for documentary, educational and narrated-image videos. Arrange parts on a timeline, add camera movement, captions and narration, then export one MP4. Arabic text and local multilingual narration are part of the workflow.
+
+> **Current release: Timeline Studio.** The editor runs in your browser with a local Python backend. An EXE/MSI installer, bundled runtimes and automatic model installation are planned, not included. Cloud generation is optional and uses your own provider account.
+
+## The editor
+
+| Workspace | What you can do |
+|---|---|
+| Project library | Create, find, rename and delete projects |
+| Media | Upload images/clips, generate images, reuse generation history, select fit |
+| Motion | Zoom, pan, close-up, diagonal moves and combined push/pan or pull/pan |
+| Effects | Color looks, film grain, full-frame glitch, strength adjustment and rendered preview |
+| Text | Arabic-capable fonts, captions, timed text layers and typewriter sound |
+| Audio | Connect local Chatterbox/Kokoro or upload recorded narration |
+| Timeline | Automatically list parts, drag to reorder, zoom time scale and set incoming transitions |
+| Export | Render scenes and combine them into one MP4 with audio and transitions |
+
+The timeline is a **scene assembly timeline**, not a multitrack NLE. Its narration strip shows whether a take is selected; it is not a waveform. Use the rendered export to preview the complete movie. Empty scenes stay in the awaiting-media tray and can be skipped at export with confirmation.
+
+## Quick start
+
+<details open>
+<summary><strong>Windows · recommended setup</strong></summary>
+
+Install Python 3.11+, Node.js 20+ and FFmpeg/ffprobe, available on PATH. Git is needed only for cloning. Then:
+
+```powershell
+git clone https://github.com/EzioDEVio/SceneForge.git
+cd SceneForge
+scripts\setup.bat
+scripts\start.bat
+```
+
+Open **http://127.0.0.1:8000**. Keep the server window open while editing. Stop it with Ctrl+C.
+
+The setup creates `backend/.venv`, installs dependencies, and builds the frontend. No provider key is needed to upload media and export video.
+
+</details>
+
+<details>
+<summary><strong>macOS / Linux · manual development setup</strong></summary>
+
+Install Python, Node and FFmpeg first:
+
+```bash
+python3 -m venv backend/.venv
+backend/.venv/bin/python -m pip install -r backend/requirements.txt
+npm --prefix frontend ci
+npm --prefix frontend run build
+cd backend
+.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+```
+
+The Windows launchers are the primary supported startup path. Local voice engine performance depends on your hardware.
+
+</details>
+
+### Update an existing ZIP installation
+
+Stop the server and back up `backend/data`. Copy the repository's app files into your existing app root; retain its `backend/data` and `.venv`. Run setup, restart and refresh with Ctrl+F5. Do not run two copies against port 8000. `/api/health` should report `timeline-studio-1`. Old APPLY_* update scripts are not required.
+
+## Make your first video
+
+1. Create a project and select its aspect ratio.
+2. Add an image or clip to each part. Add narration or choose no narration.
+3. Choose motion, an effect and optional captions/typewriter text.
+4. Arrange parts on the timeline. Select an incoming part to choose a transition.
+5. Render a scene to inspect exact motion/effects/audio.
+6. Choose **Export video**, then preview or download the full MP4.
+
+Transitions include Cut, Dissolve, Fade through black/white, Slide left/right, Wipe left/right and Circle reveal. A transition moves with its incoming part when reordered; the first exported part has no incoming transition. Overlap is capped at half of each neighbouring scene. Narration crossfades too, so use short transitions or silent handles.
+
+Timeline timings are estimates derived from the selected take or fixed duration. Frame rounding and rendering determine the final output length. Motion currently requires Cover fit; Fit/Blur fit preserve the full source image.
+
+## Image and voice providers
+
+| Service | Role | Setup / cost model |
+|---|---|---|
+| OpenAI | Image generation | Your API key; paid usage |
+| Google Gemini | Image generation | Your API key and supported image model |
+| Cloudflare Workers AI | FLUX.1 Schnell images | API token + Account ID; limited daily allowance |
+| Hugging Face | Routed image generation | HF token; small monthly credits, model availability varies |
+| AUTOMATIC1111 | Local image generation | Local image model and engine running with `--api` |
+| Chatterbox | Local multilingual narration | Separate service; current launcher uses Docker Desktop |
+| Kokoro | Local narration | Separate service; current launcher uses Docker Desktop; no Arabic |
+| Recorded audio | Narration | Upload WAV, MP3 or other supported audio |
+
+**Anthropic:** Claude analyzes images and writes prompts, but does not offer photo/illustration generation. It is not presented as an image engine. See [Anthropic's explanation](https://support.claude.com/en/articles/9002504-can-claude-produce-images).
+
+See [provider setup](START_HERE_EDITOR_PLUS.md#image-provider-setup). Free allowances are not unlimited; check [Cloudflare billing](https://developers.cloudflare.com/workers-ai/platform/pricing/) and [HF credits](https://huggingface.co/docs/inference-providers/pricing/). Local models and their licenses are separate downloads. Azure is not integrated.
+
+## Architecture
+
+| Directory | Responsibility |
+|---|---|
+| `frontend/src` | React editor, timeline and API client |
+| `backend/app/api` | FastAPI endpoints and validation |
+| `backend/app/render` | FFmpeg filters, captions, sound, transitions and cache hashes |
+| `backend/app/workers` | Render jobs, progress and cancellation |
+| `backend/app/providers` | Image generation and local narration adapters |
+| `services` | Optional voice service containers |
+| `assets` | Bundled fonts and synthetic typewriter sound |
+| `tests` | API/render integration tests |
+| `scripts` | Windows setup and launchers |
+
+Data lives in `backend/data` by default. Set `SCENEFORGE_DATA_DIR` to relocate it. Deleting a project removes its database records but retains media files on disk. Back up the whole data folder, not just the SQLite database.
+
+Provider keys currently use reversible local obfuscation, **not an OS credential vault**. Keep the app bound to localhost and protect your data folder. See [security notes](SECURITY.md).
+
+## Development and validation
+
+```bash
+npm --prefix frontend ci
+npm --prefix frontend run build
+npm --prefix frontend test
+python -m pip install -r backend/requirements.txt numpy httpx
+python tests/integration/test_combined.py
+python tests/integration/test_editor_plus.py
+python tests/integration/test_timeline.py
+```
+
+Run integration scripts sequentially; some reserve a fixed local port. FFmpeg must be installed. React checks use jsdom, not browser screenshots. Hosted APIs are mocked; no CI job spends provider credits or downloads large voice/image models. See [validation scope](docs/VALIDATION.md).
+
+## Roadmap
+
+- [x] Local scene editor, image generation, captions and full-video export
+- [x] Local voice service connections and audio upload
+- [x] Project deletion and search
+- [x] Scene timeline, transition palette and expanded motion
+- [ ] Select additional aged-film effects from the [effects guide](docs/EFFECTS_GUIDE.md)
+- [ ] Continuous timeline playback, scrubbing, trimming and audio waveforms
+- [ ] Desktop shell, EXE/MSI installation and managed model downloads
+- [ ] OS-backed credential storage and production release hardening
+
+## Contributing
+
+Report bugs with steps, app build, OS and redacted logs. For render issues, include aspect ratio, duration, selected effects and whether narration is present. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Licensing and acknowledgements
+
+A project-wide redistribution license has not yet been selected. Do not infer one from the repository being accessible. Bundled Noto fonts carry the SIL Open Font License; see `assets/fonts/OFL-LICENSE.txt`. The synthetic keystroke source is documented in `assets/sfx/SOURCE.md`. FFmpeg, dependencies and optional models retain their respective licenses.
+
