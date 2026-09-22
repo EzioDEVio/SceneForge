@@ -1,6 +1,9 @@
 from __future__ import annotations
 
 from pathlib import Path
+import os
+from app.config import RESOURCE_DIR
+from app.security.desktop import DesktopSessionMiddleware
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
@@ -22,6 +25,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+
+app.add_middleware(DesktopSessionMiddleware,token=os.environ.get("SCENEFORGE_DESKTOP_TOKEN", ""))
 
 @app.on_event("startup")
 def on_startup():
@@ -50,6 +55,6 @@ def health():
 # Serve the built frontend (npm run build -> frontend/dist) from the same
 # origin as the API, per spec section 7. In dev, run Vite separately
 # (scripts/dev.*) instead — this mount is a no-op until dist/ exists.
-_frontend_dist = Path(__file__).resolve().parents[2] / "frontend" / "dist"
+_frontend_dist = RESOURCE_DIR / "frontend" / "dist"
 if _frontend_dist.exists():
     app.mount("/", StaticFiles(directory=str(_frontend_dist), html=True), name="frontend")

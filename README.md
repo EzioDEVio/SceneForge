@@ -166,3 +166,5 @@ A project-wide redistribution license has not yet been selected. Do not infer on
 ## Desktop packaging
 
 See [Desktop Alpha plan](docs/DESKTOP_PLAN.md) for the proposed cross-platform installer, managed native AI components, hardware checks, and release gates. Installers are not included in Workspace 2.5.
+
+Windows Desktop Alpha development is on the desktop branch; see [core installer instructions](desktop/README.md). This branch retains the Workspace 2.5 web editor. Native model installation and public signed releases remain separate milestones.

@@ -165,7 +165,7 @@ def title_preview(body:TitlePreview):
     import tempfile,subprocess
     from PIL import Image,ImageColor
     from fastapi.responses import Response
-    from app.config import FFMPEG_BIN
+    from app.config import FFMPEG_BIN, RESOURCE_DIR
     from app.render.subtitles import write_ass_file
     from app.render.ffmpeg_utils import escape_path_for_filter
     if not _preview_lock.acquire(blocking=False):raise HTTPException(409,'A title preview is already rendering. Please wait.')
@@ -181,7 +181,7 @@ def title_preview(body:TitlePreview):
             for key in ('size','outline_width','shadow'):layer[key]=layer[key]*w/body.width
             layer['size']=max(1,round(layer['size']))
             ass=write_ass_file('preview','',int(body.duration*1000),{'layers':[layer]},w,h,str(root/'title.ass'))
-            fonts=Path(__file__).resolve().parents[3]/'assets'/'fonts'
+            fonts=RESOURCE_DIR/'assets'/'fonts'
             result=subprocess.run([FFMPEG_BIN,'-v','error','-y','-loop','1','-i',str(root/'bg.png'),'-t',str(body.duration),'-vf',f"ass='{escape_path_for_filter(ass)}':fontsdir='{escape_path_for_filter(str(fonts))}'",'-c:v','libx264','-preset','ultrafast','-pix_fmt','yuv420p','-movflags','+faststart',str(root/'preview.mp4')],capture_output=True,timeout=90)
             if result.returncode:raise HTTPException(500,'Title preview failed: '+result.stderr.decode(errors='replace')[-1500:])
             return Response((root/'preview.mp4').read_bytes(),media_type='video/mp4')
