@@ -37,7 +37,7 @@ with TestClient(app) as client:
  with patch('app.providers.image_options.requests.Session') as sess:
   sess.return_value.post.return_value=response({'images':[base64.b64encode(jpg).decode()]})
   r=client.post(f'/api/scenes/{scene}/generate-image',json={'prompt':'a garden','provider_id':local['id'],'size':'1536x1024'})
-  check('Local image routing uses requested composition',r.status_code==200 and sess.return_value.post.call_args.kwargs['json']['width']==1536)
+  check('Local SD 1.5 preserves landscape composition at model base size',r.status_code==200 and (sess.return_value.post.call_args.kwargs['json']['width'],sess.return_value.post.call_args.kwargs['json']['height'])==(768,512))
   check('Local connection bypasses corporate proxies',sess.return_value.trust_env is False)
  r=client.post('/api/providers',json={'capability':'image','name':'local_sd','api_key':'','base_url':'https://example.com'})
  check('Local engine cannot silently route to a remote host',r.status_code==400)
