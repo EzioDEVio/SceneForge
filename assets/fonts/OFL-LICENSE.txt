@@ -1,0 +1,12 @@
+Noto Naskh Arabic and Noto Sans Arabic
+Copyright 2022 The Noto Project Authors (https://github.com/notofonts/arabic)
+
+This Font Software is licensed under the SIL Open Font License, Version 1.1.
+This license is available with a FAQ at: https://openfontlicense.org
+
+Full license text: https://scripts.sil.org/OFL
+
+Bundled with SceneForge Studio solely to provide correct Arabic shaping
+(bidi/joining via HarfBuzz+FriBidi through libass) for on-screen captions.
+Redistribution of these unmodified font files under OFL 1.1 is permitted.
+No trademark rights to the "Noto" name are claimed or granted.

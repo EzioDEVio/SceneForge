@@ -1,0 +1,162 @@
+[
+  {
+    "check": "Gemini extracts actual binary image from response",
+    "passed": true
+  },
+  {
+    "check": "Gemini key stays in header and aspect uses documented response format",
+    "passed": true
+  },
+  {
+    "check": "Gemini no-image response is actionable error",
+    "passed": true
+  },
+  {
+    "check": "offline diagnostic receives full sentence as UTF-8, not individual letters",
+    "passed": true
+  },
+  {
+    "check": "default typewriter is slower for long captions",
+    "passed": true
+  },
+  {
+    "check": "all-empty export rejected before creating a job",
+    "passed": true
+  },
+  {
+    "check": "empty scene export gives clear preflight error",
+    "passed": true
+  },
+  {
+    "check": "local speech component connects without cloud key entry",
+    "passed": true
+  },
+  {
+    "check": "backend exposes matching release identity",
+    "passed": true
+  },
+  {
+    "check": "four independent provider profiles coexist",
+    "passed": true
+  },
+  {
+    "check": "editing Gemini preserves OpenAI profile",
+    "passed": true
+  },
+  {
+    "check": "voice discovery reaches local HTTP service",
+    "passed": true
+  },
+  {
+    "check": "natural voice audition returns playable asset without selecting a take",
+    "passed": true
+  },
+  {
+    "check": "natural narration creates accepted persistent take",
+    "passed": true
+  },
+  {
+    "check": "speaking speed and voice sent to service",
+    "passed": true
+  },
+  {
+    "check": "Arabic Kokoro request prevented with alternative guidance",
+    "passed": true
+  },
+  {
+    "check": "Chatterbox Arabic routing and one accepted take",
+    "passed": true
+  },
+  {
+    "check": "invalid text coordinates rejected",
+    "passed": true
+  },
+  {
+    "check": "text overlay appears only inside timing window",
+    "passed": true
+  },
+  {
+    "check": "glitch renders actual media",
+    "passed": true
+  },
+  {
+    "check": "glitch changes over time on a static image",
+    "passed": true
+  },
+  {
+    "check": "film_grain renders actual media",
+    "passed": true
+  },
+  {
+    "check": "high_contrast renders actual media",
+    "passed": true
+  },
+  {
+    "check": "faded renders actual media",
+    "passed": true
+  },
+  {
+    "check": "dream renders actual media",
+    "passed": true
+  },
+  {
+    "check": "cinematic renders actual media",
+    "passed": true
+  },
+  {
+    "check": "noir renders actual media",
+    "passed": true
+  },
+  {
+    "check": "sharpen renders actual media",
+    "passed": true
+  },
+  {
+    "check": "negative renders actual media",
+    "passed": true
+  },
+  {
+    "check": "cut export skips empty scene and mixes narrated/silent scenes",
+    "passed": true
+  },
+  {
+    "check": "dissolve export skips empty scene and mixes narrated/silent scenes",
+    "passed": true
+  },
+  {
+    "check": "fade_through_black export skips empty scene and mixes narrated/silent scenes",
+    "passed": true
+  },
+  {
+    "check": "fade_white export skips empty scene and mixes narrated/silent scenes",
+    "passed": true
+  },
+  {
+    "check": "slide export skips empty scene and mixes narrated/silent scenes",
+    "passed": true
+  },
+  {
+    "check": "slide_right export skips empty scene and mixes narrated/silent scenes",
+    "passed": true
+  },
+  {
+    "check": "wipe_left export skips empty scene and mixes narrated/silent scenes",
+    "passed": true
+  },
+  {
+    "check": "wipe_right export skips empty scene and mixes narrated/silent scenes",
+    "passed": true
+  },
+  {
+    "check": "circle_open export skips empty scene and mixes narrated/silent scenes",
+    "passed": true
+  },
+  {
+    "check": "populated project deletes with scenes, jobs and assets",
+    "passed": true
+  },
+  {
+    "check": "removing one image provider keeps the other",
+    "passed": true
+  }
+]

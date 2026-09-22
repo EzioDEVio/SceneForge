@@ -1,0 +1,126 @@
+"""Generate .ass subtitle files for caption burn-in.
+
+RTL/Arabic shaping is handled by libass (HarfBuzz + FriBidi), which this
+project's target FFmpeg build has compiled in (`--enable-libass
+--enable-libfribidi --enable-libharfbuzz`). We simply write correctly
+ordered *logical* UTF-8 text — libass performs bidi reordering and Arabic
+glyph joining at render time. We do NOT reverse characters ourselves,
+which is the classic mistake that breaks shaping.
+"""
+from __future__ import annotations
+
+from app.config import TMP_DIR
+from app.render.typewriter import reveal_schedule
+
+
+def _hex_to_ass_color(hex_color: str, alpha: int = 0) -> str:
+    """ASS colors are &HAABBGGRR. hex_color is '#RRGGBB'. alpha 0=opaque."""
+    hex_color = hex_color.lstrip("#")
+    if len(hex_color) != 6:
+        hex_color = "FFFFFF"
+    r, g, b = hex_color[0:2], hex_color[2:4], hex_color[4:6]
+    return f"&H{alpha:02X}{b}{g}{r}"
+
+
+_ALIGNMENT = {"bottom": 2, "top": 8, "middle": 5}
+
+
+def write_ass_file(
+    scene_id: str,
+    text: str,
+    duration_ms: int,
+    font_json: dict,
+    canvas_w: int,
+    canvas_h: int,
+    out_path: str | None = None,
+    typewriter: bool = False,
+) -> str:
+    family = font_json.get("family", "Noto Naskh Arabic")
+    size = int(font_json.get("size", 44))
+    primary = _hex_to_ass_color(font_json.get("color", "#FFFFFF"), alpha=0)
+    outline = _hex_to_ass_color(font_json.get("outline_color", "#000000"), alpha=0)
+    outline_w = int(font_json.get("outline_width", 2))
+    position = font_json.get("position", "bottom")
+    alignment = _ALIGNMENT.get(position, 2)
+    background = font_json.get("background", "none")
+    border_style = 3 if background == "box" else 1
+    back_color = _hex_to_ass_color("#000000", alpha=96) if background == "box" else "&H00000000"
+    margin_v = 60
+
+    def ts(ms: int) -> str:
+        cs = ms // 10
+        h = cs // 360000
+        m = (cs % 360000) // 6000
+        s = (cs % 6000) // 100
+        c = cs % 100
+        return f"{h:d}:{m:02d}:{s:02d}.{c:02d}"
+
+    header = f"""[Script Info]
+ScriptType: v4.00+
+PlayResX: {canvas_w}
+PlayResY: {canvas_h}
+ScaledBorderAndShadow: yes
+WrapStyle: 0
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,{family},{size},{primary},{primary},{outline},{back_color},0,0,0,0,100,100,0,0,{border_style},{outline_w},0,{alignment},40,40,{margin_v},1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+"""
+    def escape_text(value):
+        # Neutralize ASS override injection while retaining Arabic logical order.
+        return value.replace("\\", "＼").replace("{", "｛").replace("}", "｝").replace("\n", "\\N")
+    clean_text = escape_text(text)
+    if not typewriter or not text.strip():
+        events = [f"Dialogue: 0,{ts(0)},{ts(duration_ms)},Default,,0,0,0,,{clean_text}\n"]
+    else:
+        schedule = reveal_schedule(text, duration_ms, font_json)
+        events = []
+        for i, event in enumerate(schedule):
+            end = schedule[i + 1]['time_ms'] if i + 1 < len(schedule) else duration_ms
+            substr = escape_text(event['text'])
+            events.append(f"Dialogue: 0,{ts(event['time_ms'])},{ts(end)},Default,,0,0,0,,{substr}\n")
+
+    for index, layer in enumerate(font_json.get('layers', [])):
+        start = min(duration_ms, int(layer.get('start_ms', 0)))
+        end = min(duration_ms, int(layer.get('end_ms', 0)) or duration_ms)
+        if end <= start or not layer.get('text', '').strip(): continue
+        x = float(layer.get('x', 50)) * canvas_w / 100
+        y = float(layer.get('y', 50)) * canvas_h / 100
+        color = _hex_to_ass_color(layer.get('color', '#FFFFFF'))
+        animation = layer.get('animation', 'none')
+        span = end - start
+        exit_ms = min(span//2, int(layer.get('exit_ms', 0)))
+        anim_ms = max(1,min(span-exit_ms, int(layer.get('animation_ms', 800))))
+        position_tag = r'\pos(%.1f,%.1f)' % (x,y)
+        extra = r'\fad(0,%d)' % exit_ms
+        if animation == 'fade': extra = r'\fad(%d,%d)' % (anim_ms,exit_ms)
+        origins={'slide':(-canvas_w*.2,y),'slide-right':(canvas_w*1.2,y),'slide-up':(x,canvas_h*1.2),'slide-down':(x,-canvas_h*.2)}
+        if animation in origins:
+            ox,oy=origins[animation]
+            position_tag = r'\move(%.1f,%.1f,%.1f,%.1f,0,%d)' % (ox,oy,x,y,anim_ms)
+        if animation=='zoom': extra += r'\fscx30\fscy30\t(0,%d,\fscx100\fscy100)' % anim_ms
+        if animation=='blur': extra += r'\blur12\t(0,%d,\blur0)' % anim_ms
+        if animation=='reveal': extra += r'\clip(0,0,0,%d)\t(0,%d,\clip(0,0,%d,%d))' % (canvas_h,anim_ms,canvas_w,canvas_h)
+        if animation=='glitch':
+            extra += r'\fscx130\fax0.2\t(0,%d,\fscx85\fax-0.2)\t(%d,%d,\fscx100\fax0)' % (anim_ms//2,anim_ms//2,anim_ms)
+        align={'left':4,'center':5,'right':6}.get(layer.get('align','center'),5)
+        family=layer.get('family','Noto Naskh Arabic')
+        if family not in ('Noto Naskh Arabic','Noto Sans Arabic'): family='Noto Naskh Arabic'
+        overrides = r'{\an%d%s\fn%s\fs%d\c%s\b%d\bord%.1f\shad%.1f%s}' % (align,position_tag,family,layer.get('size',64),color,int(layer.get('bold',False)),layer.get('outline_width',0),layer.get('shadow',0),extra)
+        if animation == 'typewriter':
+            schedule = reveal_schedule(layer['text'],span,{'typewriter_delay_ms':0,'typewriter_duration_ms':anim_ms})
+            for j,event in enumerate(schedule):
+                stop = schedule[j+1]['time_ms'] if j+1<len(schedule) else span
+                event_overrides=overrides if j==len(schedule)-1 else overrides.replace(r'\fad(0,%d)' % exit_ms,'')
+                events.append(f"Dialogue: {index+1},{ts(start+event['time_ms'])},{ts(start+stop)},Default,,0,0,0,,{event_overrides}{escape_text(event['text'])}\n")
+        else:
+            events.append(f"Dialogue: {index+1},{ts(start)},{ts(end)},Default,,0,0,0,,{overrides}{escape_text(layer['text'])}\n")
+
+    path = out_path or str(TMP_DIR / f"{scene_id}_captions.ass")
+    with open(path, "w", encoding="utf-8-sig") as fh:
+        fh.write(header)
+        fh.writelines(events)
+    return path

@@ -1,0 +1,184 @@
+{
+  "id": "7897b69e-2c89-4ecd-878f-99813ba782f5",
+  "title": "Editor MVP1 regression",
+  "language": "ar",
+  "aspect": "16:9",
+  "fps": 30,
+  "width": 1920,
+  "height": 1080,
+  "revision": 1,
+  "default_font_json": {
+    "family": "Noto Naskh Arabic",
+    "size": 44,
+    "color": "#FFFFFF",
+    "outline_color": "#000000",
+    "outline_width": 2,
+    "background": "none",
+    "position": "bottom",
+    "captions_enabled": true,
+    "typewriter": false
+  },
+  "scenes": [
+    {
+      "id": "3bf566f2-ce40-4fdf-b11f-f63c6808b489",
+      "project_id": "7897b69e-2c89-4ecd-878f-99813ba782f5",
+      "order_index": 0,
+      "title": "Part-1",
+      "original_text": "A new chapter in personal computing.",
+      "spoken_text": "A new chapter in personal computing. Updated.",
+      "subtitle_text": "بداية الحاسوب الشخصي — 1975",
+      "timing_mode": "fixed",
+      "requested_duration_ms": 2000,
+      "lead_ms": 250,
+      "trail_ms": 400,
+      "effect_preset": "sepia",
+      "effect_intensity": 100,
+      "transition_in_json": {
+        "type": "cut",
+        "duration_ms": 0
+      },
+      "font_json": {
+        "family": "Noto Naskh Arabic",
+        "size": 40,
+        "color": "#FFFFFF",
+        "outline_color": "#000000",
+        "outline_width": 2,
+        "background": "none",
+        "position": "bottom",
+        "captions_enabled": true,
+        "typewriter": false
+      },
+      "revision": 6,
+      "rendered_plan_hash": "92157883ca3c3aff6b387c18b4828b54b00c32dfd25c88b037ec1f31f7fe4e75",
+      "rendered_asset_id": "73acf48d-6a36-463c-8faa-292264274fe6",
+      "measured_duration_ms": 2000,
+      "shots": [
+        {
+          "id": "f144d8f1-b0b5-46e0-a81f-a91524bda35f",
+          "asset_id": "4f03d157-5f21-44ec-ae7c-c7c5e20a9805",
+          "order_index": 0,
+          "fit": "contain",
+          "motion_json": {
+            "type": "zoom_in"
+          },
+          "source_in_ms": 0,
+          "source_out_ms": null,
+          "duration_ms": null,
+          "is_selected": true,
+          "asset": {
+            "id": "4f03d157-5f21-44ec-ae7c-c7c5e20a9805",
+            "type": "image",
+            "mime": "image/png",
+            "original_filename": "image1.png",
+            "width": 1600,
+            "height": 1000,
+            "duration_ms": null,
+            "origin": "upload",
+            "source_url": null,
+            "creator": null,
+            "license_note": null
+          }
+        }
+      ],
+      "voice_takes": [
+        {
+          "id": "99748486-1fd7-46b0-8f15-0f625652b17f",
+          "source": "upload",
+          "provider": null,
+          "voice": null,
+          "measured_duration_ms": 2000,
+          "accepted": true,
+          "stale": false,
+          "audio_asset": {
+            "id": "f3b0fda3-3bd5-44aa-bd75-2310e36c8e4f",
+            "type": "audio",
+            "mime": "audio/wav",
+            "original_filename": "narration.wav",
+            "width": null,
+            "height": null,
+            "duration_ms": 2000,
+            "origin": "upload",
+            "source_url": null,
+            "creator": null,
+            "license_note": null
+          }
+        }
+      ],
+      "is_stale": false
+    },
+    {
+      "id": "b3fae94d-38ab-4394-90ae-f767c8b7fa16",
+      "project_id": "7897b69e-2c89-4ecd-878f-99813ba782f5",
+      "order_index": 1,
+      "title": "Part-2",
+      "original_text": "",
+      "spoken_text": "",
+      "subtitle_text": "",
+      "timing_mode": "audio_driven",
+      "requested_duration_ms": null,
+      "lead_ms": 250,
+      "trail_ms": 400,
+      "effect_preset": "original",
+      "effect_intensity": 100,
+      "transition_in_json": {
+        "type": "cut",
+        "duration_ms": 0
+      },
+      "font_json": {
+        "family": "Noto Naskh Arabic",
+        "size": 44,
+        "color": "#FFFFFF",
+        "outline_color": "#000000",
+        "outline_width": 2,
+        "background": "none",
+        "position": "bottom",
+        "captions_enabled": true,
+        "typewriter": false
+      },
+      "revision": 1,
+      "rendered_plan_hash": null,
+      "rendered_asset_id": null,
+      "measured_duration_ms": null,
+      "shots": [],
+      "voice_takes": [],
+      "is_stale": true
+    },
+    {
+      "id": "b1cc1300-257c-40f5-b48a-b16a4d2f7cd3",
+      "project_id": "7897b69e-2c89-4ecd-878f-99813ba782f5",
+      "order_index": 2,
+      "title": "Part-3",
+      "original_text": "",
+      "spoken_text": "",
+      "subtitle_text": "",
+      "timing_mode": "audio_driven",
+      "requested_duration_ms": null,
+      "lead_ms": 250,
+      "trail_ms": 400,
+      "effect_preset": "original",
+      "effect_intensity": 100,
+      "transition_in_json": {
+        "type": "cut",
+        "duration_ms": 0
+      },
+      "font_json": {
+        "family": "Noto Naskh Arabic",
+        "size": 44,
+        "color": "#FFFFFF",
+        "outline_color": "#000000",
+        "outline_width": 2,
+        "background": "none",
+        "position": "bottom",
+        "captions_enabled": true,
+        "typewriter": false
+      },
+      "revision": 1,
+      "rendered_plan_hash": null,
+      "rendered_asset_id": null,
+      "measured_duration_ms": null,
+      "shots": [],
+      "voice_takes": [],
+      "is_stale": true
+    }
+  ]
+}

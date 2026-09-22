@@ -1,0 +1,14 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> sceneforge-frontend@0.2.0 build
+> tsc -b && vite build
+
+vite v5.4.21 building for production...
+transforming...
+✓ 1884 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                   0.41 kB │ gzip:  0.27 kB
+dist/assets/index-lECaaMVE.css   21.36 kB │ gzip:  5.28 kB
+dist/assets/index-CqtyTjNC.js   201.97 kB │ gzip: 61.72 kB
+✓ built in 1.51s

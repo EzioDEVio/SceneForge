@@ -1,0 +1,27 @@
+[
+  {
+    "name": "long_narration_synthesized",
+    "passed": true,
+    "detail": "22694ms"
+  },
+  {
+    "name": "render_ffmpeg_process_started",
+    "passed": true,
+    "detail": "pid=302"
+  },
+  {
+    "name": "cancel_request_accepted",
+    "passed": true,
+    "detail": "200"
+  },
+  {
+    "name": "job_reached_terminal_cancelled_state",
+    "passed": true,
+    "detail": "status=cancelled"
+  },
+  {
+    "name": "no_orphan_ffmpeg_process_after_cancel",
+    "passed": true,
+    "detail": "pid 302 still present=False"
+  }
+]

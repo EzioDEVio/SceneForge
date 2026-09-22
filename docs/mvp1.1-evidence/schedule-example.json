@@ -1,0 +1,17 @@
+[
+  {
+    "time_ms": 500,
+    "text": "A",
+    "sound": true
+  },
+  {
+    "time_ms": 1250,
+    "text": "A ",
+    "sound": false
+  },
+  {
+    "time_ms": 2000,
+    "text": "A B",
+    "sound": true
+  }
+]
