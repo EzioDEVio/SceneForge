@@ -1,0 +1,157 @@
+[
+  {
+    "check": "Arabic combining marks kept with base",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "emoji ZWJ and flag preserved",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "one schedule preserves silent whitespace",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "long captions get strictly increasing nonempty events",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "custom typing recording uploads as audio",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "sound cannot reference another project",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "invalid typing volume rejected",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "1: no typing audio before start delay",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "1: typing clicks follow every audible reveal",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "1: sound ends after final keystroke",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "1: clip has exact four-second duration",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "contain renders black side bars",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "contain preserves red top/bottom border",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "captions appear after synchronized delay",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "whitespace reveal has no audio click",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "fit change invalidates render",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "cover fills frame with no side bars",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "sound switch off produces silent output without narration",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "2: no typing audio before start delay",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "2: typing clicks follow every audible reveal",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "2: sound ends after final keystroke",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "2: clip has exact four-second duration",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "3: no typing audio before start delay",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "3: typing clicks follow every audible reveal",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "3: sound ends after final keystroke",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "3: clip has exact four-second duration",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "narration and typing both mix without clipping",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "clear narration preserves take for reuse",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "multi-scene export succeeds",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "export preserves each scene sound offset",
+    "passed": true,
+    "detail": null
+  },
+  {
+    "check": "export preserves silent scene lead-ins",
+    "passed": true,
+    "detail": null
+  }
+]

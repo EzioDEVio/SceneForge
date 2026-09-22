@@ -1,0 +1,32 @@
+PASS Arabic combining marks kept with base
+PASS emoji ZWJ and flag preserved
+PASS one schedule preserves silent whitespace
+PASS long captions get strictly increasing nonempty events
+PASS custom typing recording uploads as audio
+PASS sound cannot reference another project
+PASS invalid typing volume rejected
+PASS 1: no typing audio before start delay
+PASS 1: typing clicks follow every audible reveal
+PASS 1: sound ends after final keystroke
+PASS 1: clip has exact four-second duration
+PASS contain renders black side bars
+PASS contain preserves red top/bottom border
+PASS captions appear after synchronized delay
+PASS whitespace reveal has no audio click
+PASS fit change invalidates render
+PASS cover fills frame with no side bars
+PASS sound switch off produces silent output without narration
+PASS 2: no typing audio before start delay
+PASS 2: typing clicks follow every audible reveal
+PASS 2: sound ends after final keystroke
+PASS 2: clip has exact four-second duration
+PASS 3: no typing audio before start delay
+PASS 3: typing clicks follow every audible reveal
+PASS 3: sound ends after final keystroke
+PASS 3: clip has exact four-second duration
+PASS narration and typing both mix without clipping
+PASS clear narration preserves take for reuse
+PASS multi-scene export succeeds
+PASS export preserves each scene sound offset
+PASS export preserves silent scene lead-ins
+31 checks passed

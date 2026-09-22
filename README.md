@@ -17,7 +17,11 @@
 
 SceneForge is a local web editor for documentary, educational and narrated-image videos. Arrange parts on a timeline, add camera movement, captions and narration, then export one MP4. Arabic text and local multilingual narration are part of the workflow.
 
-> **Current release: Timeline Studio.** The editor runs in your browser with a local Python backend. An EXE/MSI installer, bundled runtimes and automatic model installation are planned, not included. Cloud generation is optional and uses your own provider account.
+> **Current release: Workspace 2.5.** The editor runs in your browser with a local Python backend. An EXE/MSI installer, bundled runtimes and automatic model installation are planned, not included. Cloud generation is optional and uses your own provider account.
+
+See [Workspace 2.5 setup and validation](START_HERE_WORKSPACE_2_5.md) for this release.
+
+![Workspace 2](docs/workspace-2.png)
 
 ## The editor
 
@@ -29,10 +33,12 @@ SceneForge is a local web editor for documentary, educational and narrated-image
 | Effects | Color looks, film grain, full-frame glitch, strength adjustment and rendered preview |
 | Text | Arabic-capable fonts, captions, timed text layers and typewriter sound |
 | Audio | Connect local Chatterbox/Kokoro or upload recorded narration |
-| Timeline | Automatically list parts, drag to reorder, zoom time scale and set incoming transitions |
+| Timeline | Resizable full-width dock, picture/narration/title lanes, source thumbnails, ruler seek, reordering and visible transitions |
 | Export | Render scenes and combine them into one MP4 with audio and transitions |
 
-The timeline is a **scene assembly timeline**, not a multitrack NLE. Its narration strip shows whether a take is selected; it is not a waveform. Use the rendered export to preview the complete movie. Empty scenes stay in the awaiting-media tray and can be skipped at export with confirmation.
+Workspace 2.5 adds a persistent Media Pool with explicit timeline insertion, automatic startup of installed voice containers, scene deletion, direct static-visual and confirmed rendered-scene splitting, transition undo/redo, slider and direct-manipulation crop/focal framing and scene-linked audio import. See the release guide for the precise limitations.
+
+The timeline is a **scene assembly timeline**, not a multitrack NLE. Its narration strip shows whether a take is selected; it is not a waveform. Use the rendered export to preview the complete movie. Empty scenes stay visible as dashed timeline placeholders and can be skipped at export with confirmation.
 
 ## Quick start
 
@@ -74,7 +80,7 @@ The Windows launchers are the primary supported startup path. Local voice engine
 
 ### Update an existing ZIP installation
 
-Stop the server and back up `backend/data`. Copy the repository's app files into your existing app root; retain its `backend/data` and `.venv`. Run setup, restart and refresh with Ctrl+F5. Do not run two copies against port 8000. `/api/health` should report `timeline-studio-1`. Old APPLY_* update scripts are not required.
+Stop the server and back up `backend/data`. Copy the repository's app files into your existing app root; retain its `backend/data` and `.venv`. Run setup, restart and refresh with Ctrl+F5. Do not run two copies against port 8000. `/api/health` should report `workspace-2.2`. Old APPLY_* update scripts are not required.
 
 ## Make your first video
 
@@ -104,7 +110,7 @@ Timeline timings are estimates derived from the selected take or fixed duration.
 
 **Anthropic:** Claude analyzes images and writes prompts, but does not offer photo/illustration generation. It is not presented as an image engine. See [Anthropic's explanation](https://support.claude.com/en/articles/9002504-can-claude-produce-images).
 
-See [provider setup](START_HERE_EDITOR_PLUS.md#image-provider-setup). Free allowances are not unlimited; check [Cloudflare billing](https://developers.cloudflare.com/workers-ai/platform/pricing/) and [HF credits](https://huggingface.co/docs/inference-providers/pricing/). Local models and their licenses are separate downloads. Azure is not integrated.
+See [provider setup](START_HERE_WORKSPACE_2_5.md). Free allowances are not unlimited; check [Cloudflare billing](https://developers.cloudflare.com/workers-ai/platform/pricing/) and [HF credits](https://huggingface.co/docs/inference-providers/pricing/). Local models and their licenses are separate downloads. Azure is not integrated.
 
 ## Architecture
 
@@ -157,3 +163,6 @@ Report bugs with steps, app build, OS and redacted logs. For render issues, incl
 
 A project-wide redistribution license has not yet been selected. Do not infer one from the repository being accessible. Bundled Noto fonts carry the SIL Open Font License; see `assets/fonts/OFL-LICENSE.txt`. The synthetic keystroke source is documented in `assets/sfx/SOURCE.md`. FFmpeg, dependencies and optional models retain their respective licenses.
 
+## Desktop packaging
+
+See [Desktop Alpha plan](docs/DESKTOP_PLAN.md) for the proposed cross-platform installer, managed native AI components, hardware checks, and release gates. Installers are not included in Workspace 2.5.

@@ -1,0 +1,87 @@
+[
+  {
+    "name": "project_reloadable_after_restart",
+    "passed": true,
+    "detail": "Fixture: Bell Labs"
+  },
+  {
+    "name": "three_parts_still_present",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "name": "part1_script_text_survived",
+    "passed": true,
+    "detail": "في مختبرات بيل، بدأت حكاية غيّرت العالم."
+  },
+  {
+    "name": "part1_has_rendered_asset_id",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "name": "part1_has_shots",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "name": "part1_has_accepted_voice_take",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "name": "part1_rendered_asset_still_decodes_after_restart",
+    "passed": true,
+    "detail": "duration=5.033333"
+  },
+  {
+    "name": "part2_script_text_survived",
+    "passed": true,
+    "detail": "Early transistor research equipment in m"
+  },
+  {
+    "name": "part2_has_rendered_asset_id",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "name": "part2_has_shots",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "name": "part2_has_accepted_voice_take",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "name": "part2_rendered_asset_still_decodes_after_restart",
+    "passed": true,
+    "detail": "duration=3.633333"
+  },
+  {
+    "name": "part3_script_text_survived",
+    "passed": true,
+    "detail": "التقى ويليام شوكلي بروبرت نويس وجوردون م"
+  },
+  {
+    "name": "part3_has_rendered_asset_id",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "name": "part3_has_shots",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "name": "part3_has_accepted_voice_take",
+    "passed": true,
+    "detail": ""
+  },
+  {
+    "name": "part3_rendered_asset_still_decodes_after_restart",
+    "passed": true,
+    "detail": "duration=5.033333"
+  }
+]

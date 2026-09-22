@@ -1,0 +1,135 @@
+{
+  "checks": [
+    {
+      "name": "create_project",
+      "passed": true,
+      "detail": "943ecba4-2b78-4165-ada4-b3e2a715371c"
+    },
+    {
+      "name": "test_canvas_downscaled_for_sandbox_cpu",
+      "passed": true,
+      "detail": "640x360 (prod default is 1920x1080)"
+    },
+    {
+      "name": "three_parts_auto_created",
+      "passed": true,
+      "detail": "got 3"
+    },
+    {
+      "name": "scripts_set",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "upload_image1",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "upload_video_clip",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "upload_image2",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "shots_attached",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "distinct_effects_and_transition_set",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "narration_synthesized",
+      "passed": true,
+      "detail": "durations=[4357, 2986, 4352]"
+    },
+    {
+      "name": "takes_accepted",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "part1_render_succeeded",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "part2_render_succeeded",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "part2_generate_did_not_touch_part1",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "part3_render_succeeded",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "part1_has_video_and_audio_streams",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "part1_decodes_start_mid_end",
+      "passed": true,
+      "detail": "duration=5.03s"
+    },
+    {
+      "name": "part2_has_video_and_audio_streams",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "part2_decodes_start_mid_end",
+      "passed": true,
+      "detail": "duration=3.63s"
+    },
+    {
+      "name": "part3_has_video_and_audio_streams",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "part3_decodes_start_mid_end",
+      "passed": true,
+      "detail": "duration=5.03s"
+    },
+    {
+      "name": "export_succeeded",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "export_has_audio_and_video",
+      "passed": true,
+      "detail": ""
+    },
+    {
+      "name": "export_decodes_start_mid_end",
+      "passed": true,
+      "detail": "export duration=13.20s"
+    },
+    {
+      "name": "export_duration_plausible",
+      "passed": true,
+      "detail": "13.20s"
+    },
+    {
+      "name": "changed_motion_marks_only_part1_stale",
+      "passed": true,
+      "detail": "p1=True p2=False p3=False"
+    }
+  ],
+  "failures": []
+}

@@ -1,0 +1,26 @@
+npm warn Unknown env config "http-proxy". This will stop working in the next major version of npm.
+
+> sceneforge-frontend@0.2.0 test
+> node tests/editor.mjs
+
+PASS project opens and only selected scene is visible
+PASS switching scenes flushes the draft to the correct scene
+PASS returning preserves edited narration
+PASS existing captions preserved when narration changes
+PASS independent Arabic caption editing
+PASS motion selection updates the selected media
+PASS effect search narrows visible choices
+PASS effect selection persists
+PASS font selection retains other font settings
+PASS explicit copy narration action
+PASS reordering retains selection
+PASS scene list collapses
+PASS added scene is selected
+PASS empty scene blocks rendering
+PASS save failure keeps the draft and blocks export
+PASS failed save can be retried
+PASS project title saves with accurate status
+PASS project aspect selection saves
+PASS existing provider settings still accessible
+PASS reopening restores persisted text
+20 component checks passed (mock API, not browser visual QA).

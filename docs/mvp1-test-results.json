@@ -1,0 +1,74 @@
+[
+  {
+    "check": "health",
+    "passed": true
+  },
+  {
+    "check": "create/open with three scenes",
+    "passed": true
+  },
+  {
+    "check": "separate narration and caption fields",
+    "passed": true
+  },
+  {
+    "check": "narration update preserves captions",
+    "passed": true
+  },
+  {
+    "check": "editing isolated to selected scene",
+    "passed": true
+  },
+  {
+    "check": "media/motion/fit persist",
+    "passed": true
+  },
+  {
+    "check": "font patch preserves family and size",
+    "passed": true
+  },
+  {
+    "check": "uploaded narration selected",
+    "passed": true
+  },
+  {
+    "check": "render/export job succeeded",
+    "passed": true
+  },
+  {
+    "check": "real MP4 has video and audio",
+    "passed": true
+  },
+  {
+    "check": "fixed duration respected",
+    "passed": true
+  },
+  {
+    "check": "render no longer stale",
+    "passed": true
+  },
+  {
+    "check": "effect change marks previous render stale",
+    "passed": true
+  },
+  {
+    "check": "reordering preserves scene identities",
+    "passed": true
+  },
+  {
+    "check": "render/export job succeeded",
+    "passed": true
+  },
+  {
+    "check": "export provides downloadable artifact",
+    "passed": true
+  },
+  {
+    "check": "project, media, captions and render survive restart",
+    "passed": true
+  },
+  {
+    "check": "unconfigured image provider reports a real error",
+    "passed": true
+  }
+]
