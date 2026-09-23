@@ -10,7 +10,9 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from app.api import assets, images, projects, providers, render, scenes, voice, local_speech
-from app.db.database import init_db
+from app.db.database import init_db, SessionLocal
+from app.db.models import ProviderProfile
+from app.security.secrets import obscure, reveal
 
 app = FastAPI(title="SceneForge Studio API", version="0.1.0-m1")
 
@@ -31,6 +33,16 @@ app.add_middleware(DesktopSessionMiddleware,token=os.environ.get("SCENEFORGE_DES
 @app.on_event("startup")
 def on_startup():
     init_db()
+    # One-time migration from RC1's reversible encoding into the OS vault.
+    with SessionLocal() as db:
+        for profile in db.query(ProviderProfile).all():
+            if profile.secret_ref and not profile.secret_ref.startswith("keyring:"):
+                try:
+                    plain = reveal(profile.secret_ref)
+                    profile.secret_ref = obscure(plain)
+                except Exception:
+                    pass
+        db.commit()
     import os,threading
     if os.name=='nt' and os.environ.get('SCENEFORGE_SD_AUTOSTART')!='0':
         from app.local_images import start, settings
