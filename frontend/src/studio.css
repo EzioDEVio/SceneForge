@@ -81,3 +81,5 @@
 .provider-form details input[type=checkbox]{width:auto;margin-right:8px}
 .take-row.accepted{background:#25392f;border-color:#54846c}
 .take-row audio{width:100%;flex-basis:100%}
+
+.editor-confirm{background:#262931;color:#eee;border:1px solid #555;border-radius:10px;max-width:440px;padding:24px}.editor-confirm::backdrop{background:#0009}.editor-confirm p{white-space:pre-wrap;line-height:1.5}.editor-confirm input{width:100%;margin-bottom:16px}.editor-confirm .button-row{justify-content:flex-end}

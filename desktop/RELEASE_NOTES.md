@@ -1,6 +1,14 @@
-# SceneForge Desktop 0.2.0 RC1
+# SceneForge Desktop 0.2.0 RC2
 
-## Changes
+## Editing fixes
+- Title text saves as you type and stays editable when switching inspector tabs.
+- Caption typewriter enables captions and can populate an empty caption from the narration script.
+- Direct Edit narration and Edit captions & titles actions reopen the editors.
+- Render text preview updates the rendered scene after text or animation changes. Title overlays use their own Animation selector.
+- Voice generation waits for the latest narration script to save. Regenerate narration after editing its script.
+- In-app confirmation dialogs restore editor focus after closing.
+
+## Earlier changes
 - Automatically starts an existing Stable Diffusion WebUI installation when enabled. The default folder is your user profile's `stable-diffusion-webui` folder.
 - **AI Engines → Choose Stable Diffusion folder** opens the native folder picker, saves the location and starts the service. **Generate image → Local engine setup** contains the automatic startup switch and editable path.
 - Reuses an already-running SD API. On exit, stops only an SD process launched by this app.

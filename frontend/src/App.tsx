@@ -1,3 +1,4 @@
+import {askConfirm} from "./dialogs";
 import {TitleDesigner,TitleDesign,ANIMATIONS} from './TitleDesigner';
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -317,7 +318,7 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
   </div></div>;
 }
 
-function VoicePanel({ scene, onChanged }: { scene: Scene; onChanged: () => void }) {
+function VoicePanel({ scene, onChanged, beforeGenerate }: { scene: Scene; onChanged: () => void; beforeGenerate: () => Promise<boolean> }) {
   const [providers,setProviders]=useState<ProviderProfile[]>([]);
   const [providerId,setProviderId]=useState("unselected");
   const [voices,setVoices]=useState<string[]>([]);
@@ -356,6 +357,7 @@ function VoicePanel({ scene, onChanged }: { scene: Scene; onChanged: () => void 
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function audition() {
+    if(!(await beforeGenerate()))return;
     setBusy(true);
     setErr(null);
     try {
@@ -369,6 +371,7 @@ function VoicePanel({ scene, onChanged }: { scene: Scene; onChanged: () => void 
   }
 
   async function generateLocalTake() {
+    if(!(await beforeGenerate()))return;
     setBusy(true);
     setErr(null);
     try {
@@ -442,7 +445,7 @@ function VoicePanel({ scene, onChanged }: { scene: Scene; onChanged: () => void 
                     </button>
                   )}
                   {t.accepted && <span>✓ selected</span>}
-                  <button className="btn" disabled={busy} aria-label="Delete audio take" onClick={async()=>{if(!confirm('Delete this audio take from the scene?'+(t.accepted?' The scene will have no narration until you choose another take.':'')))return;setBusy(true);setErr(null);try{await api.deleteTake(t.id);onChanged();}catch(e:any){setErr(e.message);}finally{setBusy(false);}}}>Delete</button>
+                  <button className="btn" disabled={busy} aria-label="Delete audio take" onClick={async()=>{if(!await askConfirm('Delete this audio take from the scene?'+(t.accepted?' The scene will have no narration until you choose another take.':'')))return;setBusy(true);setErr(null);try{await api.deleteTake(t.id);onChanged();}catch(e:any){setErr(e.message);}finally{setBusy(false);}}}>Delete</button>
                 </div>
               ))}
             </div>
@@ -484,8 +487,8 @@ function FontPanel({ scene, onChange }: { scene: Scene; onChange: (f: Partial<Sc
         Captions enabled
       </label>
       <label style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-        <input type="checkbox" checked={!!f.typewriter} onChange={(e) => onChange({ typewriter: e.target.checked })} />
-        Typewriter reveal
+        <input type="checkbox" checked={!!f.typewriter} onChange={(e) => onChange({ typewriter: e.target.checked, ...(e.target.checked ? {captions_enabled:true} : {}) })} />
+        Typewriter reveal (captions)
       </label>
       {!f.captions_enabled && (
         <small className="hint">Font changes have no visible effect while captions are disabled.</small>
@@ -496,14 +499,16 @@ function FontPanel({ scene, onChange }: { scene: Scene; onChange: (f: Partial<Sc
 }
 
 function TextLayers({scene,onChange}:{scene:Scene;onChange:(layers:NonNullable<Scene["font_json"]["layers"]>)=>void}) {
-  const layers=scene.font_json.layers||[];
-  const patch=(id:string,values:object)=>onChange(layers.map(l=>l.id===id?{...l,...values}:l));
-  return <section className="text-layers"><div className="section-heading"><h3>Text overlays</h3><span>{layers.length}/12</span></div><p className="hint">Add titles and labels independently of captions. Coordinates are percentages; end 0 means scene end. Preview shows all layers; render applies timing.</p>
-    {layers.map((l,i)=><article className="layer-card" key={l.id}><div className="section-heading"><strong>Layer {i+1}</strong><button className="text-btn" onClick={()=>onChange(layers.filter(v=>v.id!==l.id))}>Remove</button></div>
-    <textarea aria-label={`Layer ${i+1} text`} dir="auto" key={l.text} defaultValue={l.text} onBlur={e=>{if(e.target.value!==l.text)patch(l.id,{text:e.target.value});}}/>
+  const [layers,setLayers]=useState(scene.font_json.layers||[]);
+  const latest=useRef(layers);
+  const change=(next:typeof layers)=>{latest.current=next;setLayers(next);onChange(next);};
+  const patch=(id:string,values:object)=>change(latest.current.map(l=>l.id===id?{...l,...values}:l));
+  return <section className="text-layers"><div className="section-heading"><h3>Text overlays</h3><span>{layers.length}/12</span></div><p className="hint">Add titles and labels independently of captions. Coordinates are percentages; end 0 means scene end. Choose each title’s Animation here. Preview shows all layers; Render scene plays the animation.</p>
+    {layers.map((l,i)=><article className="layer-card" key={l.id}><div className="section-heading"><strong>Layer {i+1}</strong><button className="text-btn" onClick={()=>change(latest.current.filter(v=>v.id!==l.id))}>Remove</button></div>
+    <textarea aria-label={`Layer ${i+1} text`} dir="auto" value={l.text} onChange={e=>patch(l.id,{text:e.target.value})}/>
     <div className="layer-fields">{[{key:"x",label:"X (%)",max:100},{key:"y",label:"Y (%)",max:100},{key:"size",label:"Size",max:200},{key:"start_ms",label:"Start (ms)",max:3600000},{key:"end_ms",label:"End (ms)",max:3600000}].map(field=><label className="control-label" key={field.key}>{field.label}<input type="number" min={field.key==="size"?12:0} max={field.max} key={String(l[field.key as keyof typeof l])} defaultValue={Number(l[field.key as keyof typeof l])} onBlur={e=>{const n=Math.min(field.max,Math.max(field.key==="size"?12:0,Number(e.target.value)||0));if(n!==l[field.key as keyof typeof l])patch(l.id,{[field.key]:n});}}/></label>)}
     <label className="control-label">Font<select value={l.family||'Noto Naskh Arabic'} onChange={e=>patch(l.id,{family:e.target.value})}><option>Noto Naskh Arabic</option><option>Noto Sans Arabic</option></select></label><label className="control-label">Alignment<select value={l.align||'center'} onChange={e=>patch(l.id,{align:e.target.value})}>{['left','center','right'].map(v=><option key={v}>{v}</option>)}</select></label>{(['outline_width','shadow','exit_ms'] as const).map(k=><label key={k} className="control-label">{k==='exit_ms'?'Exit fade (ms)':k==='shadow'?'Shadow':'Outline'}<input type="number" min={0} max={k==='exit_ms'?10000:10} value={l[k]||0} onChange={e=>patch(l.id,{[k]:Math.max(0,Math.min(k==='exit_ms'?10000:10,+e.target.value))})}/></label>)}<label className="control-label">Animation<select aria-label={`Layer ${i+1} animation`} value={l.animation||'none'} onChange={e=>patch(l.id,{animation:e.target.value})}>{ANIMATIONS.map(v=><option key={v}>{v}</option>)}</select></label><label className="control-label">Animation ms<input type="number" min={100} max={10000} defaultValue={l.animation_ms||800} onBlur={e=>patch(l.id,{animation_ms:Math.max(100,Math.min(10000,Number(e.target.value)||800))})}/></label><label className="control-label">Color<input type="color" value={l.color} onChange={e=>patch(l.id,{color:e.target.value})}/></label></div><label className="check-label"><input type="checkbox" checked={l.bold} onChange={e=>patch(l.id,{bold:e.target.checked})}/>Bold</label></article>)}
-    <button className="btn" disabled={layers.length>=12} onClick={()=>onChange([...layers,{id:crypto.randomUUID(),text:"Your title",x:50,y:25,size:64,color:"#FFFFFF",start_ms:0,end_ms:0,bold:true}])}><Plus size={14}/> Add text overlay</button>
+    <button className="btn" disabled={layers.length>=12} onClick={()=>change([...latest.current,{id:crypto.randomUUID(),text:"Your title",x:50,y:25,size:64,color:"#FFFFFF",start_ms:0,end_ms:0,bold:true}])}><Plus size={14}/> Add text overlay</button>
   </section>;
 }
 
@@ -529,6 +534,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
   const [chatOpen, setChatOpen] = useState(false);
   const [text, setText] = useState(scene.spoken_text || scene.original_text);
   const [captions, setCaptions] = useState(scene.subtitle_text);
+  const [draftLayers,setDraftLayers]=useState(scene.font_json.layers||[]);
   const [search, setSearch] = useState("");
   const soundRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -597,12 +603,15 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
     return ok;
   }
   function draft(patch: Record<string, unknown>) {
-    pending.current = {...pending.current, ...patch};
+    pending.current = {...pending.current, ...patch,
+      ...((pending.current.font||patch.font)?{font:{...(pending.current.font as object||{}),...(patch.font as object||{})}}:{})};
+    setPreviewMode("source");
     onSaveState(scene.id, "Unsaved changes");
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => { void flush(); }, 500);
   }
   async function update(patch: Record<string, unknown>) {
+    setPreviewMode("source");
     if (await flush()) await run(() => api.updateScene(scene.id, patch));
   }
   async function upload(file: File) {
@@ -615,7 +624,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
   async function render() {
     setError(null);
     if (!(await flush())) return;
-    if (!scene.voice_takes.some(t => t.accepted) && !(scene.font_json.typewriter_sound && scene.font_json.typewriter && scene.font_json.captions_enabled && captions.trim()) && !confirm("No narration take is selected. Render this scene without narration?")) return;
+    if (!scene.voice_takes.some(t => t.accepted) && !(scene.font_json.typewriter_sound && scene.font_json.typewriter && scene.font_json.captions_enabled && captions.trim()) && !await askConfirm("No narration take is selected. Render this scene without narration?")) return;
     try { setJobId((await api.renderPart(scene.id)).job_id); }
     catch (e: any) { setError(e.message); }
   }
@@ -645,7 +654,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
           </div>
         </header>
         <div className="preview-card">
-          <div className="preview-toolbar">
+          <div className="preview-toolbar"><div className="button-row"><button className="btn" onClick={()=>{setPreviewMode("source");editorRef.current?.querySelector<HTMLTextAreaElement>('[aria-label="Narration script"]')?.focus();}}>Edit narration</button><button className="btn" onClick={()=>{setTab("Text");setPreviewMode("source");}}>Edit captions & titles</button></div>
             <div className="segmented" aria-label="Preview mode">
               <button aria-pressed={previewMode === "source"} onClick={() => setPreviewMode("source")}>Preview</button>
               <button aria-pressed={previewMode === "render"} disabled={!rendered} onClick={() => setPreviewMode("render")}>Rendered scene</button>
@@ -679,7 +688,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
         <section className="script-card">
           <div className="section-heading"><h3><FileText size={16}/> Narration script</h3><span className="subtle">{text.trim() ? text.trim().split(/\s+/).length : 0} words</span></div>
           <textarea aria-label="Narration script" dir="auto" className="script-box" value={text} onChange={e => {setText(e.target.value); draft({original_text: e.target.value, spoken_text: e.target.value});}} onBlur={() => void flush()} placeholder="Tell your story. Paste or write the narration for this scene…"/>
-          <div className="script-footer"><span>Changes save automatically. Captions are edited in Text.</span><button className="text-btn" onClick={async () => {if (await flush()) setTab("Audio");}}><Volume2 size={14}/> Voice & narration <ChevronRight size={14}/></button></div>
+          <div className="script-footer"><span>Changes save automatically. After editing narration, generate a new voice take.</span><button className="text-btn" onClick={async () => {if (await flush()) setTab("Audio");}}><Volume2 size={14}/> Voice & narration <ChevronRight size={14}/></button></div>
         </section>
       </div>
       <aside className="inspector" aria-label="Scene inspector">
@@ -705,7 +714,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
           {tab === "Motion" && <>{shot&&<FramingControls key={shot.id} shot={shot} save={run}/>}<h3>Camera movement</h3><p className="hint">Applied to {shot ? `media ${scene.shots.indexOf(shot)+1}` : "selected media"}. {shot?.fit !== "cover" ? "Motion requires Fill frame; Fit inside frame keeps the entire image still." : "Render to preview the movement."}</p><div className="motion-box">{MOTIONS.map(({key,label,Icon}) => <button key={key} className={`motion-btn ${activeMotion === key ? "selected" : ""}`} aria-pressed={activeMotion === key} disabled={!shot || saving || shot.fit !== "cover"} onClick={() => run(() => api.updateShot(shot.id,{motion:{type:key}}))}><Icon size={19}/><span>{label}</span></button>)}</div></>}
           {tab === "Effects" && <><h3>Image looks</h3><p className="hint">Choose a look for the whole scene.</p><label className="search-control"><Search size={15}/><input aria-label="Search effects" placeholder="Search effects…" value={search} onChange={e => setSearch(e.target.value)}/></label><div className="effects-grid">{EFFECTS.filter(f => f.label.toLowerCase().includes(search.toLowerCase())).map(fx => <button key={fx.key} className={`effect-tile ${scene.effect_preset === fx.key ? "selected" : ""}`} aria-pressed={scene.effect_preset === fx.key} disabled={saving} onClick={() => {setPreviewMode("source"); void update({effect_preset:fx.key});}}>
             <div className="effect-image">{shot?.asset?.type === "image" ? <img src={api.assetStreamUrl(shot.asset_id)} alt="" style={{filter:fx.swatch}}/> : <div className="effect-swatch" style={{filter:fx.swatch}}/>}{scene.effect_preset === fx.key && <CheckCircle2 size={17}/>}</div><span>{fx.label}</span></button>)}</div>{!EFFECTS.some(f => f.label.toLowerCase().includes(search.toLowerCase())) && <p className="hint">No matching effects.</p>}<p className="hint">Thumbnails are approximate. Glitch adds full-frame RGB separation and tearing across the top, middle and bottom. Render to check the exact result.</p><button className="btn" disabled={!shot||saving||isGenerating} onClick={render}><Play size={14}/> Render effect preview</button><label className="control-label">Effect strength · {scene.effect_intensity}%<input aria-label="Effect strength" type="range" min={0} max={100} step={5} disabled={saving||scene.effect_preset==="original"} key={scene.effect_intensity} defaultValue={scene.effect_intensity} onChange={e=>draft({effect_intensity:Number(e.target.value)})} onBlur={()=>void flush()}/></label><button className="text-btn" disabled={saving || scene.effect_preset === "original"} onClick={() => {setPreviewMode("source"); void update({effect_preset:"original"});}}>Reset to original</button></>}
-          {tab === "Text" && <><h3>On-screen captions</h3><p className="hint">Caption text is independent of narration.</p><textarea aria-label="On-screen captions" dir="auto" className="caption-box" value={captions} onChange={e => {setCaptions(e.target.value); draft({subtitle_text:e.target.value});}} onBlur={() => void flush()} placeholder="Write the text to appear on your video…"/><button className="text-btn" onClick={() => {setCaptions(text); draft({subtitle_text:text});}}><Copy size={13}/> Copy narration to captions</button><fieldset disabled={saving}><FontPanel scene={scene} onChange={f => update({font:f})}/><TextLayers scene={scene} onChange={layers=>update({font:{layers}})}/></fieldset><section className="typewriter-controls"><h3>Typewriter timing & sound</h3>
+          {tab === "Text" && <><h3>On-screen captions</h3><p className="hint">Caption text is independent of narration.</p><textarea aria-label="On-screen captions" dir="auto" className="caption-box" value={captions} onChange={e => {setCaptions(e.target.value); draft({subtitle_text:e.target.value});}} onBlur={() => void flush()} placeholder="Write the text to appear on your video…"/><button className="text-btn" onClick={() => {setCaptions(text); draft({subtitle_text:text});}}><Copy size={13}/> Copy narration to captions</button><fieldset><FontPanel scene={scene} onChange={f => {if(f.typewriter&&!captions.trim()&&text.trim()){setCaptions(text);draft({subtitle_text:text});}void update({font:f});}}/><TextLayers scene={{...scene,font_json:{...scene.font_json,layers:draftLayers}}} onChange={layers=>{setDraftLayers(layers);draft({font:{layers}});}}/></fieldset><button className="btn btn-primary" disabled={!shot||isGenerating} onClick={render}>Render text preview</button><p className="hint">Caption typewriter applies to On-screen captions. For a title, choose typewriter under its Text overlay Animation. Render text preview to see the result.</p><section className="typewriter-controls"><h3>Typewriter timing & sound</h3>
             <p className="hint">Enable Captions and Typewriter reveal above. Sound follows each reveal, not the original recording’s rhythm.</p>
             <label className="check-label"><input type="checkbox" checked={!!scene.font_json.typewriter_sound} disabled={saving} onChange={e=>update({font:{typewriter_sound:e.target.checked}})}/> Synchronized keystrokes</label>
             <div className="button-row">{[{label:"Slow",ms:220},{label:"Natural",ms:160},{label:"Fast",ms:80}].map(p=><button className="btn" disabled={saving} key={p.label} onClick={()=>update({font:{typewriter_duration_ms:Math.min(120000,Math.max(100,(Array.from(captions).length-1)*p.ms))}})}>{p.label}</button>)}</div><button className="text-btn" disabled={saving} onClick={()=>update({timing_mode:"fixed",requested_duration_ms:Math.max(scene.requested_duration_ms||4000,(scene.font_json.typewriter_delay_ms||0)+(scene.font_json.typewriter_duration_ms||Math.max(200,(Array.from(captions).length-1)*160))+1000)})}>Extend scene to fit typing + 1s hold</button>
@@ -713,12 +722,12 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
             <label className="control-label">Reveal time (seconds)<input aria-label="Typing reveal time" type="number" min={.1} max={120} step={.1} key={scene.font_json.typewriter_duration_ms} defaultValue={scene.font_json.typewriter_duration_ms ? scene.font_json.typewriter_duration_ms/1000 : ''} placeholder="Auto" onBlur={e=>{if(e.target.value){const v=Math.min(120,Math.max(.1,Number(e.target.value)||3))*1000;void update({font:{typewriter_duration_ms:v}});}}}/></label></div>
             <p className="hint">Short scenes compress the reveal and make typing faster. Choose Slow, then Extend scene to preserve the slower speed. This switches duration to Fixed; narration may be trimmed to that duration.</p>
             <label className="control-label">Keystroke volume (%)<input aria-label="Keystroke volume" type="number" min={0} max={100} key={scene.font_json.typewriter_volume} defaultValue={scene.font_json.typewriter_volume??50} onBlur={e=>{const v=Math.min(100,Math.max(0,Number(e.target.value)||0));if(v!==(scene.font_json.typewriter_volume??50))void update({font:{typewriter_volume:v}});}}/></label>
-            <p className="hint">{scene.font_json.typewriter_sound_asset_id ? 'Sound: uploaded recording (a short keystroke is extracted).' : 'Sound: keystroke extracted from your supplied typewriter MP3.'}</p>
+            <p className="hint">{scene.font_json.typewriter_sound_asset_id ? 'Sound: uploaded recording (a short keystroke is extracted).' : 'Sound: included keystroke.'}</p>
             <button className="btn upload-btn" disabled={saving} onClick={()=>soundRef.current?.click()}><Upload size={14}/> Upload typewriter sound</button>
             {scene.font_json.typewriter_sound_asset_id && <button className="text-btn" disabled={saving} onClick={()=>update({font:{typewriter_sound_asset_id:null}})}>Use included keystroke</button>}
             <p className="hint">If this recording was previously uploaded as narration, choose Audio → Use no narration to avoid hearing it twice.</p>
           </section><p className="hint">Render the scene to preview captions and synchronized sound together.</p></>}
-          {tab === "Audio" && <><h3>Voice & narration</h3><p className="hint">Connect a local speech component or upload a recording. Select a take before rendering.</p><VoicePanel scene={scene} onChanged={refresh}/></>}
+          {tab === "Audio" && <><h3>Voice & narration</h3><p className="hint">Connect a local speech component or upload a recording. Select a take before rendering.</p><VoicePanel scene={{...scene,spoken_text:text}} onChanged={refresh} beforeGenerate={flush}/></>}
           <section className="timing-section"><h3><Clock size={15}/> Scene duration</h3><label className="control-label">Timing mode<select aria-label="Timing mode" value={scene.timing_mode} disabled={saving} onChange={e => update({timing_mode:e.target.value})}><option value="audio_driven">Match narration</option><option value="fixed">Fixed duration</option></select></label>
           {scene.timing_mode === "fixed" && <label className="control-label">Seconds<input aria-label="Scene duration in seconds" type="number" min={1} max={120} step={0.5} defaultValue={(scene.requested_duration_ms || 5000)/1000} key={scene.requested_duration_ms} onBlur={e => {const v=Math.max(1,Math.min(120,Number(e.target.value)||5)); if (v*1000 !== scene.requested_duration_ms) void update({requested_duration_ms:Math.round(v*1000)});}}/></label>}
           <p className="hint">{scene.timing_mode === "fixed" ? "Narration is trimmed or padded to fit this length." : "Uses the selected narration take, including lead and trail padding."}</p></section>
@@ -808,7 +817,7 @@ export default function App() {
     if(!project||busy||dirty||exporting)return;
     await action(async()=>{const empty=project.scenes.filter(s=>!s.shots.length);
       if(!project.scenes.some(s=>s.shots.length))return;
-      if(empty.length&&!confirm(`Skip ${empty.length} empty scene(s) and render all scenes with media?`))return;
+      if(empty.length&&!await askConfirm(`Skip ${empty.length} empty scene(s) and render all scenes with media?`))return;
       setExportPanel(true);setExportExpanded(false);setExportScenes(structuredClone(project.scenes));
       setExportJobId((await api.exportProject(project.id,empty.length>0)).job_id);
     });
@@ -827,7 +836,7 @@ export default function App() {
     await action(async () => {const p=await api.getProject(id); projectRef.current=p; setProject(p);setMediaVersion(v=>v+1);setImportStatus(''); setTitleDraft(p.title); setSelectedId(p.scenes[0]?.id||""); setStates({}); setExportJobId(null);setHistory([]);setFuture([]);});
   }
   async function removeProject(p:Project) {
-    if(!confirm(`Delete “${p.title}” and its scenes? This cannot be undone. Original and cached media files are retained on disk.`))return;
+    if(!await askConfirm(`Delete “${p.title}” and its scenes? This cannot be undone. Original and cached media files are retained on disk.`))return;
     await action(async()=>{await api.deleteProject(p.id);setProjects(old=>old.filter(x=>x.id!==p.id));});
   }
   async function createProject() {
@@ -836,7 +845,7 @@ export default function App() {
   async function resizeDuration(id:string,ms:number){
     const scene=project?.scenes.find(s=>s.id===id);if(!scene)return;
     const take=scene.voice_takes.find(t=>t.accepted);
-    if(take&&ms<(take.measured_duration_ms||0)+(scene.lead_ms||0)+(scene.trail_ms||0)&&!confirm('This duration may cut narration short. Switch to fixed timing?'))return;
+    if(take&&ms<(take.measured_duration_ms||0)+(scene.lead_ms||0)+(scene.trail_ms||0)&&!await askConfirm('This duration may cut narration short. Switch to fixed timing?'))return;
     await record('duration',()=>api.updateScene(id,{timing_mode:scene.timing_mode,requested_duration_ms:scene.requested_duration_ms}),()=>api.updateScene(id,{timing_mode:'fixed',requested_duration_ms:ms}));
   }
   const [titleCard,setTitleCard]=useState(false);
@@ -864,7 +873,7 @@ export default function App() {
     await action(async () => {[ids[i],ids[j]]=[ids[j],ids[i]]; await api.reorderScenes(project.id,ids); await refresh();});
   }
   async function deleteScene(id:string) {
-    if(!confirm("Delete this scene and its media references?")) return;
+    if(!await askConfirm("Delete this scene and its media references?")) return;
     await action(async () => {await api.deleteScene(id); setStates(prev => {const next={...prev}; delete next[id]; return next;});setHistory([]);setFuture([]); await refresh();});
   }
   async function saveTitle() {

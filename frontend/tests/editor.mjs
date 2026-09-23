@@ -130,6 +130,16 @@ try{
  const layerText=visibleEditor().getByRole('textbox',{name:'Layer 1 text'});
  await user.clear(layerText);await user.type(layerText,'A chapter title');await user.tab();await saved();
  check('overlay text persists independently of captions',project.scenes.find(s=>s.id===firstId).font_json.layers[0].text==='A chapter title');
+ await user.click(screen.getByRole('checkbox',{name:'Captions enabled'}));await saved();
+ await user.click(screen.getByRole('checkbox',{name:/Typewriter reveal/}));await saved();
+ check('typewriter enables captions without overwriting their text',project.scenes.find(s=>s.id===firstId).font_json.captions_enabled&&project.scenes.find(s=>s.id===firstId).font_json.typewriter&&project.scenes.find(s=>s.id===firstId).subtitle_text==='An edited narration.');
+ await user.click(screen.getByRole('button',{name:'Edit captions & titles'}));
+ const reopened=visibleEditor().getByRole('textbox',{name:'Layer 1 text'});
+ await user.clear(reopened);await user.type(reopened,'Revised title');await saved();
+ check('title saves while focused and remains editable',document.activeElement===reopened&&project.scenes.find(s=>s.id===firstId).font_json.layers[0].text==='Revised title');
+ await user.click(screen.getByRole('tab',{name:'Audio',exact:true}));
+ await user.click(screen.getByRole('button',{name:'Edit captions & titles'}));
+ check('title can be reopened without deleting the scene',visibleEditor().getByRole('textbox',{name:'Layer 1 text'}).value==='Revised title');
  check('explicit copy narration action',project.scenes.find(s=>s.id===firstId).subtitle_text==='An edited narration.');
  await user.click(screen.getByRole('button',{name:'Move scene down'}));await waitFor(()=>assert.equal(project.scenes[1].id,firstId));
  check('reordering retains selection',screen.getByRole('button',{name:'Select scene 2: Part-1'}).getAttribute('aria-current')==='true');
