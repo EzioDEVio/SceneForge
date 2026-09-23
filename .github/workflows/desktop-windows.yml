@@ -32,6 +32,7 @@ jobs:
           npm --prefix desktop test
       - name: Bundle private Python backend and rendering tools
         run: |
+          python tests/integration/test_release_cleanup.py
           python desktop/scripts/fetch_ffmpeg.py
           python desktop/scripts/build_backend.py
       - name: Test packaged backend and real render
@@ -62,5 +63,6 @@ jobs:
           path: |
             desktop/release/*Setup.exe
             desktop/README.md
+            desktop/RELEASE_NOTES.md
             desktop/THIRD_PARTY.md
           if-no-files-found: error

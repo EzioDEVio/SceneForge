@@ -165,6 +165,9 @@ function ImageChatDrawer({
 
   const imageProvider = providers?.find((p) => p.capability === "image" && (!providerId || p.id===providerId));
   const configured = !!imageProvider;
+  const [localSetup,setLocalSetup]=useState({folder:"",autostart:true});
+  const [setupMessage,setSetupMessage]=useState("");
+  useEffect(()=>{fetch("/api/local-image-settings").then(r=>r.ok?r.json():Promise.reject()).then(setLocalSetup).catch(()=>setSetupMessage("Could not load local engine settings."));},[]);
   const [engineStatus,setEngineStatus]=useState('');
   const [engineLog,setEngineLog]=useState<string|null>(null);
   const [startingEngine,setStartingEngine]=useState(false);
@@ -214,7 +217,7 @@ function ImageChatDrawer({
           narration or voice settings.
         </small></p>
         <div className="provider-form"><label className="control-label">Image provider<select aria-label="Image provider" value={imageProvider?.id||""} onChange={e=>setProviderId(e.target.value)}>{providers?.filter(p=>p.capability==="image").map(p=><option value={p.id} key={p.id}>{p.name} · {p.model}</option>)}</select></label><label className="control-label">Composition<select disabled={imageProvider?.name==="cloudflare"} aria-label="Image composition" value={size} onChange={e=>setSize(e.target.value)}><option value="1024x1024">Square</option><option value="1536x1024">Landscape</option><option value="1024x1536">Portrait</option></select></label></div>
-        {imageProvider?.name==='local_sd'&&<fieldset className="provider-form"><legend>Local image quality</legend><div className="engine-actions"><button className="btn" disabled={startingEngine} onClick={()=>void engineAction('start')}>Start / retry engine</button><button className="btn" onClick={()=>void engineAction('log')}>View startup log</button></div>{engineLog!==null&&<div><button className="text-btn" onClick={()=>setEngineLog(null)}>Close log</button><pre className="engine-log">{engineLog}</pre></div>}<button type="button" onClick={()=>void checkEngine()}>Check engine</button><p role="status" className="hint">{engineStatus}</p>
+        {imageProvider?.name==='local_sd'&&<fieldset className="provider-form"><legend>Local image quality</legend><details><summary>Local engine setup</summary><label>Stable Diffusion installation folder<input value={localSetup.folder} onChange={e=>setLocalSetup({...localSetup,folder:e.target.value})}/></label><label><input type="checkbox" checked={localSetup.autostart} onChange={e=>setLocalSetup({...localSetup,autostart:e.target.checked})}/>Start with SceneForge</label><p className="hint">Choose the folder containing webui-user.bat. Keep --api in its launch options. Your existing models will be reused.</p><button className="btn" disabled={startingEngine} onClick={async()=>{try{const r=await fetch('/api/local-image-settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(localSetup)});const d=await r.json();if(!r.ok)throw Error(d.detail);setLocalSetup(d);setSetupMessage('Saved. Starting your local engine…');await engineAction('start');}catch(e:any){setSetupMessage(e.message)}}}>Save and start</button><p role="status" className="hint">{setupMessage}</p></details><div className="engine-actions"><button className="btn" disabled={startingEngine} onClick={()=>void engineAction('start')}>Start / retry engine</button><button className="btn" onClick={()=>void engineAction('log')}>View startup log</button></div>{engineLog!==null&&<div><button className="text-btn" onClick={()=>setEngineLog(null)}>Close log</button><pre className="engine-log">{engineLog}</pre></div>}<button type="button" onClick={()=>void checkEngine()}>Check engine</button><p role="status" className="hint">{engineStatus}</p>
           <label>Checkpoint family<select value={sd.family} onChange={e=>setSd({...sd,family:e.target.value})}><option value="sd15">SD 1.5 · 512 base</option><option value="sdxl">SDXL · 1024 base (requires SDXL checkpoint)</option></select></label>
           <label>Sampling steps<input type="number" min="10" max="60" value={sd.steps} onChange={e=>setSd({...sd,steps:Number(e.target.value)})}/></label>
           <label>Guidance (CFG)<input type="number" min="1" max="15" step="0.5" value={sd.cfg_scale} onChange={e=>setSd({...sd,cfg_scale:Number(e.target.value)})}/></label>
@@ -225,7 +228,7 @@ function ImageChatDrawer({
         </fieldset>}
         {imageProvider&&<p className="hint">{PROVIDER_NOTES[imageProvider.name]}</p>}
         <textarea
-          placeholder="e.g. Bell Labs, 1947, black-and-white archival photo style, wide shot of a workbench..."
+          placeholder="Describe your subject, setting, composition, lighting, and style…"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
         />
@@ -400,7 +403,7 @@ function VoicePanel({ scene, onChanged }: { scene: Scene; onChanged: () => void 
       </div>
       {open && (
         <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
-          <section className="local-voice-component"><h3>Local voice engines</h3><p className="hint">Natural speech runs on this computer after the engine and model are installed. No AI provider key is required.</p><div className="button-row"><button className="btn" disabled={busy} onClick={()=>connectEngine("chatterbox")}>Connect Chatterbox · Arabic + multilingual</button><button className="btn" disabled={busy} onClick={()=>connectEngine("kokoro")}>Connect Kokoro</button></div><p className="hint">First-time setup: run START_CHATTERBOX_VOICE.bat or START_KOKORO_VOICE.bat from your app folder. The launcher installs/starts the local component using Docker Desktop.</p>{localStatus&&<p role="status">{localStatus}</p>}</section>
+          <section className="local-voice-component"><h3>Local voice engines</h3><p className="hint">Natural speech runs on this computer after the engine and model are installed. No AI provider key is required.</p><div className="button-row"><button className="btn" disabled={busy} onClick={()=>connectEngine("chatterbox")}>Connect Chatterbox · Arabic + multilingual</button><button className="btn" disabled={busy} onClick={()=>connectEngine("kokoro")}>Connect Kokoro</button></div><p className="hint">Connect to your installed voice service. For a Docker installation, keep its engine and voice container running. Enter narration text before generating audio.</p>{localStatus&&<p role="status">{localStatus}</p>}</section>
           <fieldset disabled={busy} className="provider-form"><label className="control-label">Narration engine<select aria-label="Narration engine" value={providerId} onChange={e=>connect(e.target.value)}><option value="unselected">Select a local engine…</option><option value="">Diagnostic voice — robotic (espeak)</option>{providers.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
           <label className="control-label">Language<select aria-label="Narration language" value={language} onChange={e=>setLanguage(e.target.value)}>{(selectedEngine==="kokoro"?["en","fr","es","it","pt","ja","zh","hi"]:["en","ar","fr","es","de","it","pt","ja","zh","hi","ko","ru","tr"]).map(v=><option value={v} key={v}>{{en:"English",ar:"Arabic",fr:"French",es:"Spanish",de:"German",it:"Italian",pt:"Portuguese",ja:"Japanese",zh:"Chinese",hi:"Hindi",ko:"Korean",ru:"Russian",tr:"Turkish"}[v]}</option>)}</select></label>
           {providerId&&<><label className="control-label">Voice<select aria-label="Narration voice" value={voice} onChange={e=>setVoice(e.target.value)}>{availableVoices.map(v=><option key={v}>{v}</option>)}</select></label><button className="text-btn" onClick={()=>connect(providerId)}>Refresh voices / test connection</button><label className="control-label">Speaking speed · {speed.toFixed(2)}×<input aria-label="Speaking speed" type="range" min={.5} max={2} step={.05} value={speed} onChange={e=>setSpeed(Number(e.target.value))}/></label></>}
@@ -420,6 +423,7 @@ function VoicePanel({ scene, onChanged }: { scene: Scene; onChanged: () => void 
               onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadTake(f); }} />
           </div>
           <small className="hint">
+            {!scene.spoken_text.trim() && <strong style={{display:"block"}}>Enter narration text to enable voice generation.</strong>}
             Select a local engine above. The diagnostic espeak voice is robotic and must be chosen explicitly. Narration is sent as continuous text, separately from typewriter animation.
           </small>
           {previewUrl && <audio controls src={previewUrl} style={{ width: "100%" }} />}
@@ -438,6 +442,7 @@ function VoicePanel({ scene, onChanged }: { scene: Scene; onChanged: () => void 
                     </button>
                   )}
                   {t.accepted && <span>✓ selected</span>}
+                  <button className="btn" disabled={busy} aria-label="Delete audio take" onClick={async()=>{if(!confirm('Delete this audio take from the scene?'+(t.accepted?' The scene will have no narration until you choose another take.':'')))return;setBusy(true);setErr(null);try{await api.deleteTake(t.id);onChanged();}catch(e:any){setErr(e.message);}finally{setBusy(false);}}}>Delete</button>
                 </div>
               ))}
             </div>
@@ -728,7 +733,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
 
 function BuildNotice() {
   const [message,setMessage]=useState("");
-  useEffect(()=>{api.health().then(h=>{if(h.build!=="workspace-2.5")setMessage("Backend update required: this interface is connected to a different backend version. Stop the existing server, install the Workspace 2.5 release into that installation, restart scripts/start.bat, then Ctrl+F5.");}).catch(()=>setMessage("Cannot verify backend version. Check that the SceneForge server is running."));},[]);
+  useEffect(()=>{api.health().then(h=>{if(h.build!=="workspace-2.5")setMessage("Backend update required: this interface is connected to a different backend version. Close SceneForge and reopen the latest installed version.");}).catch(()=>setMessage("Cannot verify backend version. Check that the SceneForge server is running."));},[]);
   return message?<div className="error-box" role="alert">{message}</div>:null;
 }
 export default function App() {
@@ -908,7 +913,7 @@ export default function App() {
       {libraryTab==='Scenes'&&<><p className="sidebar-hint">PROJECT BIN · Select a part to edit</p><div className="scene-list">{project.scenes.map((s,i)=><button key={s.id} className={`scene-nav ${selected?.id===s.id?"selected":""}`} aria-label={`Select scene ${i+1}: ${s.title}`} aria-current={selected?.id===s.id?"true":undefined} onClick={()=>setSelectedId(s.id)}><div className="scene-thumb">{s.shots[0]?.asset?.type==="image"?<img src={api.assetStreamUrl(s.shots[0].asset_id)} alt=""/>:<Film size={22}/>}<span>{String(i+1).padStart(2,"0")}</span></div><div className="scene-nav-meta"><strong>{s.title}</strong><span>{durationLabel(s)} · {s.shots.length} media</span></div></button>)}</div><button className="btn add-scene" disabled={busy||dirty||exporting} onClick={()=>setTitleCard(true)}><Type size={16}/> Add title card</button><button className="btn add-scene" disabled={busy} onClick={addPart}><Plus size={16}/> Add scene</button></>}
       {libraryTab==='Effects'&&<><p className="sidebar-hint">APPLY TO · {selected?.title||'Select a part'}</p><div className="library-presets">{EFFECTS.map(fx=><button key={fx.key} aria-pressed={selected?.effect_preset===fx.key} disabled={!selected?.shots.length||busy||dirty||exporting} onClick={()=>selected&&action(async()=>{await api.updateScene(selected.id,{effect_preset:fx.key});await refresh();})}><div className="preset-sample" style={{filter:fx.swatch}}>{selected?.shots[0]?.asset?.type==='image'?<img src={api.assetStreamUrl(selected.shots[0].asset_id)} alt=""/>:<Palette size={24}/>}</div><span>{fx.label}</span></button>)}</div></>}
       {libraryTab==='Transitions'&&<><p className="sidebar-hint">INCOMING TO · {selected?.title||'Select a part'}</p><div className="library-presets transition-presets">{TRANSITIONS.map(([key,label])=><button key={key} aria-pressed={selected?.transition_in_json.type===key} disabled={!selected?.shots.length||selected.id===project.scenes.find(s=>s.shots.length)?.id||busy||dirty||exporting} onClick={()=>selected&&record('transition',()=>api.updateScene(selected.id,{transition_in:selected.transition_in_json}),()=>api.updateScene(selected.id,{transition_in:{type:key,duration_ms:key==='cut'?0:(selected.transition_in_json.duration_ms||500)}}))}><div aria-hidden="true" className={`transition-sample sample-${key}`}><span>A</span><span>B</span></div><span>{label}</span></button>)}</div><p className="hint">Select the incoming part, then a transition. Adjust its duration above the tracks.</p></>}
-      </div><div className="sidebar-bottom"><span className="status-dot"/> Local workspace<span>Workspace 2.5 · Scene editor</span></div></>}
+      </div><div className="sidebar-bottom"><span className="status-dot"/> Local workspace<span>Scene editor</span></div></>}
       </nav>
       <main className="editing-area">
         {project.scenes.map((scene,i)=><PartRow key={`${scene.id}-${editorEpoch}`} scene={scene} project={project} index={i} total={project.scenes.length} active={selected?.id===scene.id} refresh={refresh} onMove={dir=>moveScene(scene.id,dir)} onDelete={()=>deleteScene(scene.id)} onOpenSettings={()=>setSettingsOpen(true)} onSaveState={(id,state)=>setStates(prev=>({...prev,[id]:state}))}/>)}

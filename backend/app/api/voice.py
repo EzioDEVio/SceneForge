@@ -232,3 +232,21 @@ def voice_from_asset(scene_id:str,body:dict,db:Session=Depends(get_db)):
     for take in scene.voice_takes:take.accepted=False
     take=VoiceTake(scene_id=scene_id,source='upload',audio_asset_id=asset.id,spoken_text_hash=_text_hash(scene.spoken_text),measured_duration_ms=asset.duration_ms,accepted=True)
     db.add(take);scene.revision+=1;db.commit();db.refresh(take);return take
+
+@router.delete('/api/voice-takes/{take_id}')
+def delete_voice_take(take_id: str, db: Session = Depends(get_db)):
+    from app.db.models import RenderJob
+    take = db.get(VoiceTake, take_id)
+    if not take: raise HTTPException(404, 'Voice take not found')
+    scene = take.scene
+    active = db.query(RenderJob).filter(RenderJob.project_id == scene.project_id, RenderJob.status.in_(['queued','running'])).first()
+    if active: raise HTTPException(409, 'Wait for the project render to finish before deleting audio.')
+    if take.accepted:
+        scene.revision += 1
+        scene.rendered_asset_id = None
+        scene.rendered_plan_hash = None
+        scene.measured_duration_ms = None
+    # Retain the asset: it may also be used by another scene or the media pool.
+    db.delete(take)
+    db.commit()
+    return {'deleted': True}

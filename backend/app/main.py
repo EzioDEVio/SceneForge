@@ -33,8 +33,9 @@ def on_startup():
     init_db()
     import os,threading
     if os.name=='nt' and os.environ.get('SCENEFORGE_SD_AUTOSTART')!='0':
-        from app.local_images import start
-        threading.Thread(target=start,daemon=True).start()
+        from app.local_images import start, settings
+        if settings()['autostart']:
+            threading.Thread(target=start,daemon=True).start()
 
 
 app.include_router(projects.router)
@@ -58,3 +59,8 @@ def health():
 _frontend_dist = RESOURCE_DIR / "frontend" / "dist"
 if _frontend_dist.exists():
     app.mount("/", StaticFiles(directory=str(_frontend_dist), html=True), name="frontend")
+
+@app.on_event("shutdown")
+def stop_owned_image_engine():
+    from app.local_images import stop
+    stop()

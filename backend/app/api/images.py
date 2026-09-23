@@ -186,3 +186,23 @@ def title_preview(body:TitlePreview):
             if result.returncode:raise HTTPException(500,'Title preview failed: '+result.stderr.decode(errors='replace')[-1500:])
             return Response((root/'preview.mp4').read_bytes(),media_type='video/mp4')
     finally:_preview_lock.release()
+
+class LocalEngineSettings(BaseModel):
+    folder: str
+    autostart: bool = True
+
+@router.get('/api/local-image-settings')
+def read_local_settings():
+    from app.local_images import settings
+    return settings()
+
+@router.put('/api/local-image-settings')
+def write_local_settings(body: LocalEngineSettings):
+    from app.local_images import save_settings
+    try: return save_settings(body.folder, body.autostart)
+    except ValueError as e: raise HTTPException(400, str(e))
+
+@router.post('/api/local-image-start')
+def start_saved_image_engine():
+    from app.local_images import start
+    return start()

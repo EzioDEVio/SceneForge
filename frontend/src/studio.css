@@ -73,3 +73,11 @@
 
 /* Workspace 2.5 editor controls */
 .range-control{display:block;margin:12px 0;font-size:12px}.range-control>div{display:flex;align-items:center;gap:8px}.range-control input[type=range]{flex:1;min-width:40px;accent-color:#ad93ed}.range-control input[type=number]{width:65px!important}.range-control button{background:#353944;color:#ddd;border:1px solid #515564;border-radius:4px}.crop-map,.focal-map{margin:12px 0;overflow:hidden;border:1px solid #505667;border-radius:5px}.focal-map{max-height:150px}.focal-map img{max-height:150px;object-fit:fill}.title-designer{width:620px!important;max-width:95vw}.title-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin:18px 0}.title-presets button{display:flex;flex-direction:column;gap:8px;border:1px solid #5c5870;padding:14px 6px;border-radius:8px}.title-presets strong{font-size:24px}.title-preview{width:100%;aspect-ratio:16/9;object-fit:contain;overflow:hidden;border:1px solid #595564;border-radius:8px;container-type:inline-size;margin-bottom:12px}.designer-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin:18px 0}.designer-grid label{display:flex;flex-direction:column;gap:6px}.designer-grid input[type=range]{width:100%;accent-color:#ad93ed}.title-designer textarea{width:100%;min-height:90px}.engine-actions{display:flex;gap:8px;flex-wrap:wrap}.engine-log{max-height:240px;overflow:auto;white-space:pre-wrap;overflow-wrap:anywhere;background:#101216;padding:10px;font-size:11px}
+
+/* Compact engine setup and readable voice take states. */
+.provider-form details{padding:10px;border:1px solid var(--line);border-radius:6px;margin-bottom:12px}
+.provider-form summary{cursor:pointer;font-weight:600;margin-bottom:8px}
+.provider-form details label{display:block;margin:8px 0}
+.provider-form details input[type=checkbox]{width:auto;margin-right:8px}
+.take-row.accepted{background:#25392f;border-color:#54846c}
+.take-row audio{width:100%;flex-basis:100%}

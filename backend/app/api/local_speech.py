@@ -19,7 +19,7 @@ def connect(engine: str, db: Session = Depends(get_db)):
         profile = ProviderProfile(capability='speech',name=engine,base_url=url,model=model,secret_ref='')
     try: voices = list_voices(profile)
     except ValueError:
-        raise HTTPException(503, f'{engine.title()} is not running. Run START_{engine.upper()}_VOICE.bat in your app folder, then retry. The first installation downloads the engine and model; later narration runs locally.')
+        raise HTTPException(503, f'{engine.title()} is unavailable at {url}. Start your installed voice service, then retry. If you use Docker, check that its engine and voice container are running.')
     if not voices: raise HTTPException(503, 'The speech service has no available voices.')
     db.add(profile);db.commit();db.refresh(profile)
     return {'profile': _to_out(profile), 'voices': voices, 'status': 'service_reachable',

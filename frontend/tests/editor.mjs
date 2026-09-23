@@ -174,7 +174,7 @@ try{
  await user.click(screen.getByRole('button',{name:'Generate image',exact:true}));
  await waitFor(()=>assert.equal(screen.getByRole('combobox',{name:'Image provider'}).value,'provider-gemini'));
  await user.selectOptions(screen.getByRole('combobox',{name:'Image composition'}),'1536x1024');
- await user.type(screen.getByPlaceholderText(/e.g. Bell Labs/),'A green landscape');
+ await user.type(screen.getByPlaceholderText(/Describe your subject/),'A green landscape');
  await user.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Generate image'}));
  await screen.findByRole('button',{name:'Use this image'});
  check('image studio sends chosen provider and composition',requests.some(r=>r.path.endsWith('/generate-image')&&r.body.provider_id==='provider-gemini'&&r.body.size==='1536x1024'));

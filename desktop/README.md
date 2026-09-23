@@ -10,7 +10,7 @@ This milestone packages the working Workspace 2.5 editor as a Windows x64 deskto
 - Uninstall preserves application data. Back up the workspace before testing any update.
 - Unsigned private evaluation build. Windows may show publisher/reputation warnings. Production signing is not configured.
 
-This is the **core installer milestone**. Native Chatterbox/Stable Diffusion runtime packs, model download/repair UI, automatic updates, MSI and macOS/Linux installers are not implemented here. Existing local AI endpoints still work when separately installed/running. The desktop shell disables automatic SD startup so it does not own or unexpectedly launch an external developer installation. Start/retry remains an explicit advanced control in the image drawer. Speech fallback requires its existing external setup.
+This is the **core installer milestone**. Native Chatterbox/Stable Diffusion runtime packs, model download/repair UI, automatic updates, MSI and macOS/Linux installers are not implemented here. Existing local AI endpoints still work when separately installed/running. Existing SD installations can start automatically. Choose the installation under AI Engines or change its folder and automatic startup setting under Generate image → Local engine setup. SceneForge stops only an SD process that it launched. Speech fallback requires its existing external setup.
 
 ## Existing projects
 Close the old web server and desktop app first. Back up both folders. On an empty desktop workspace, copy the contents of the old `backend/data` folder into the desktop workspace. Do not merge two nonempty databases; retain the original backup. Media and rendered files must accompany the database. Reopen the desktop app and check a project before removing any old copy. An automated migration wizard is not part of this alpha.
@@ -42,3 +42,7 @@ This alpha uses Electron's bundled Chromium to reduce video-player differences f
 Windows is the only packaged target here. The Python resource paths and API session layer also run on Linux for automated tests, but the desktop executable paths and FFmpeg package are explicitly Windows-specific. Do not advertise macOS/Linux installers from this milestone.
 
 Read `THIRD_PARTY.md` before any public redistribution. Production gates include signing, corresponding-source/notices review, OS credential storage, native component supervision, migration and rollback tests.
+
+## Current release candidate
+
+See [0.2.0 RC1 release notes](RELEASE_NOTES.md) for saved Stable Diffusion startup settings, audio-take deletion and remaining limitations. Existing SD installations can now start automatically; engine/model installation is still separate.

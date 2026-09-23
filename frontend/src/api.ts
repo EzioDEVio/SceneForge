@@ -188,6 +188,7 @@ export const api = {
       body: JSON.stringify({ text, voice }),
     }),
   clearNarration: (sceneId: string) => req(`/api/scenes/${sceneId}/voice-takes/clear-selection`, {method: "POST"}),
+  deleteTake: (takeId: string) => req(`/api/voice-takes/${takeId}`, {method:"DELETE"}),
   selectTake: (takeId: string) => req<VoiceTake>(`/api/voice-takes/${takeId}/select`, { method: "POST" }),
 
   renderPart: (sceneId: string) => req<{ job_id: string }>(`/api/scenes/${sceneId}/render`, { method: "POST" }),

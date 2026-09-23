@@ -9,7 +9,7 @@ function startBackend({executable,args=[],resources,dataDir,ffmpegDir,timeoutMs=
  const log=fs.createWriteStream(path.join(dataDir,'logs','desktop-backend.log'),{flags:'a'});
  const token=crypto.randomBytes(32).toString('hex');
  const ext=process.platform==='win32'?'.exe':'';
- const child=spawn(executable,args,{windowsHide:true,stdio:['pipe','pipe','pipe'],env:{...process.env,SCENEFORGE_DESKTOP_TOKEN:token,SCENEFORGE_DATA_DIR:dataDir,SCENEFORGE_RESOURCE_DIR:resources,SCENEFORGE_FFMPEG:path.join(ffmpegDir,'ffmpeg'+ext),SCENEFORGE_FFPROBE:path.join(ffmpegDir,'ffprobe'+ext),SCENEFORGE_SD_AUTOSTART:'0',PYTHONUNBUFFERED:'1'}});
+ const child=spawn(executable,args,{windowsHide:true,stdio:['pipe','pipe','pipe'],env:{...process.env,SCENEFORGE_DESKTOP_TOKEN:token,SCENEFORGE_DATA_DIR:dataDir,SCENEFORGE_RESOURCE_DIR:resources,SCENEFORGE_FFMPEG:path.join(ffmpegDir,'ffmpeg'+ext),SCENEFORGE_FFPROBE:path.join(ffmpegDir,'ffprobe'+ext),SCENEFORGE_SD_AUTOSTART:process.env.SCENEFORGE_SD_AUTOSTART||'1',PYTHONUNBUFFERED:'1'}});
  let stopping=false,buffer='',ready=false,timer;
  const launched=new Promise((resolve,reject)=>{
   timer=setTimeout(()=>reject(Error('The local editor did not become ready within 45 seconds. See desktop-backend.log.')),timeoutMs);
