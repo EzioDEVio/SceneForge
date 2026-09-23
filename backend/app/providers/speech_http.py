@@ -8,7 +8,7 @@ def connection(profile):
     if not base.endswith('/v1'): base += '/v1'
     key = reveal(profile.secret_ref or '')
     if profile.name == 'elevenlabs':
-        return base, ({'xi-api-key': key} if key else {})
+        return 'https://api.elevenlabs.io/v1', ({'xi-api-key': key} if key else {})
     return base, ({'Authorization': f'Bearer {key}'} if key else {})
 
 
@@ -34,11 +34,17 @@ def list_voices(profile):
 def synthesize(profile, text, voice, language, speed):
     if profile.name == 'elevenlabs':
         base, headers = connection(profile)
+        import re
+        if not re.fullmatch(r'[A-Za-z0-9_-]+', voice or ''):
+            raise ValueError('Select an ElevenLabs voice first.')
+        if not .7 <= speed <= 1.2:
+            raise ValueError('ElevenLabs speaking speed must be between 0.70 and 1.20.')
         try:
             res = requests.post(base + '/text-to-speech/' + voice,
+                params={'output_format': 'mp3_44100_128'},
                 json={'text': text, 'model_id': profile.model or 'eleven_multilingual_v2',
                       'voice_settings': {'stability': 0.45, 'similarity_boost': 0.8, 'speed': speed}},
-                headers={**headers, 'Accept': 'audio/wav', 'Content-Type': 'application/json'},
+                headers={**headers, 'Accept': 'audio/mpeg', 'Content-Type': 'application/json'},
                 timeout=(10, 600), allow_redirects=False)
             if not res.ok: raise ValueError(f'ElevenLabs returned HTTP {res.status_code}. Check key, voice and quota.')
             return res.content

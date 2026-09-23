@@ -12,7 +12,7 @@ from fastapi.staticfiles import StaticFiles
 from app.api import assets, images, projects, providers, render, scenes, voice, local_speech
 from app.db.database import init_db, SessionLocal
 from app.db.models import ProviderProfile
-from app.security.secrets import obscure, reveal
+from app.security.secrets import migrate_credentials
 
 app = FastAPI(title="SceneForge Studio API", version="0.1.0-m1")
 
@@ -33,16 +33,7 @@ app.add_middleware(DesktopSessionMiddleware,token=os.environ.get("SCENEFORGE_DES
 @app.on_event("startup")
 def on_startup():
     init_db()
-    # One-time migration from RC1's reversible encoding into the OS vault.
-    with SessionLocal() as db:
-        for profile in db.query(ProviderProfile).all():
-            if profile.secret_ref and not profile.secret_ref.startswith("keyring:"):
-                try:
-                    plain = reveal(profile.secret_ref)
-                    profile.secret_ref = obscure(plain)
-                except Exception:
-                    pass
-        db.commit()
+    app.state.credential_migration_failures = migrate_credentials()
     import os,threading
     if os.name=='nt' and os.environ.get('SCENEFORGE_SD_AUTOSTART')!='0':
         from app.local_images import start, settings
@@ -62,7 +53,15 @@ app.include_router(local_speech.router)
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "build": "workspace-2.5", "features": ["local_speech", "combined_effects"]}
+    return {"status": "ok", "build": "workspace-2.5", "credential_warning": 'Some saved credentials could not be secured. Unlock your OS credential store, restart, or re-enter the keys in Settings.' if getattr(app.state,'credential_migration_failures',0) else '', "features": ["local_speech", "combined_effects"]}
+
+
+@app.get('/api/close-status')
+def close_status():
+    from app.db.models import RenderJob
+    with SessionLocal() as db:
+        active = db.query(RenderJob).filter(RenderJob.status.in_(['queued','running','cancelling'])).count()
+    return {'ready': active == 0}
 
 
 # Serve the built frontend (npm run build -> frontend/dist) from the same

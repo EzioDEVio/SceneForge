@@ -7,7 +7,7 @@ tmp=tempfile.TemporaryDirectory();os.environ['SCENEFORGE_DATA_DIR']=tmp.name;os.
 sys.path.insert(0,str(root/'backend'))
 from fastapi.testclient import TestClient
 from app.main import app
-from app.db.database import SessionLocal
+from app.db.database import SessionLocal, engine
 from app.db.models import Asset, Scene, VoiceTake, RenderJob
 from app import local_images
 with TestClient(app) as c:
@@ -47,3 +47,5 @@ with TestClient(app) as c:
    assert local_images._process.poll() is None
    local_images.stop();local_images._process.wait(timeout=5)
   print('PASS Windows background launcher and owned process-tree shutdown')
+engine.dispose()
+tmp.cleanup()

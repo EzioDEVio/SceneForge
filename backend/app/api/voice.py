@@ -200,7 +200,8 @@ def create_service_take(scene_id: str, body: SpeechRequest, db: Session = Depend
     except ValueError as exc: raise HTTPException(502, str(exc))
     folder = Path(MEDIA_DIR) / scene.project_id
     folder.mkdir(parents=True, exist_ok=True)
-    path = folder / f'narration_{uuid.uuid4().hex}.wav'
+    suffix = 'mp3' if profile.name == 'elevenlabs' else 'wav'
+    path = folder / f'narration_{uuid.uuid4().hex}.{suffix}'
     path.write_bytes(audio)
     try:
         info = probe(str(path))
@@ -209,7 +210,7 @@ def create_service_take(scene_id: str, body: SpeechRequest, db: Session = Depend
         path.unlink(missing_ok=True)
         raise HTTPException(502, 'Voice service returned invalid audio.')
     asset = Asset(project_id=scene.project_id, type=AssetType.AUDIO, content_hash=hashlib.sha256(audio).hexdigest(),
-        storage_key=str(path.relative_to(MEDIA_DIR)), mime='audio/wav', original_filename=path.name,
+        storage_key=str(path.relative_to(MEDIA_DIR)), mime='audio/mpeg' if suffix == 'mp3' else 'audio/wav', original_filename=path.name,
         duration_ms=info.duration_ms, origin=AssetOrigin.LOCAL_TTS, creator=profile.name)
     db.add(asset); db.flush()
     if body.audition:

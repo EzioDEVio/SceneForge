@@ -37,7 +37,7 @@ def generate_image_for_scene(scene_id: str, body: schemas.GenerateImageRequest, 
             400,
             "No image-generation provider is configured. Add your API key in Settings \u2192 Providers first.",
         )
-    if profile.name not in ("openai", "gemini", "cloudflare", "huggingface", "local_sd"):
+    if profile.name not in ("openai", "gemini", "cloudflare", "huggingface", "together", "local_sd"):
         raise HTTPException(400, "Unsupported image provider")
 
     try:
@@ -46,7 +46,7 @@ def generate_image_for_scene(scene_id: str, body: schemas.GenerateImageRequest, 
         raise HTTPException(500, "Stored provider key could not be read. Please re-enter it in Settings.")
 
     try:
-        if profile.name in ("cloudflare", "huggingface", "local_sd"):
+        if profile.name in ("cloudflare", "huggingface", "together", "local_sd"):
             from app.providers.image_options import generate
             image_bytes = generate(profile, api_key, body.prompt, body.size, body.local_options.model_dump() if body.local_options else None)
         elif profile.name == "gemini":

@@ -1,4 +1,6 @@
 import {askConfirm} from "./dialogs";
+import {registerCloseSave,saveBeforeClose} from "./closeGuard";
+import {hasActiveWrites} from "./api";
 import {TitleDesigner,TitleDesign,ANIMATIONS} from './TitleDesigner';
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -556,6 +558,12 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
   const writes = useRef(0);
   const alive = useRef(true);
   const job = useJobProgress(jobId);
+  const closeSaveRef=useRef<()=>Promise<boolean>>(async()=>false);
+  closeSaveRef.current=async()=>{
+    if(job&&['queued','running','cancelling'].includes(job.status))return false;
+    return flush();
+  };
+  useEffect(()=>registerCloseSave(scene.id,()=>closeSaveRef.current()),[scene.id]);
   const shot = scene.shots.find(s => s.id === selectedShotId) || scene.shots[0];
   useEffect(()=>{
     const handler=(event:Event)=>{const {sceneId,timeMs}=(event as CustomEvent).detail;if(sceneId!==scene.id)return;
@@ -746,7 +754,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
 
 function BuildNotice() {
   const [message,setMessage]=useState("");
-  useEffect(()=>{api.health().then(h=>{if(h.build!=="workspace-2.5")setMessage("Backend update required: this interface is connected to a different backend version. Close SceneForge and reopen the latest installed version.");}).catch(()=>setMessage("Cannot verify backend version. Check that the SceneForge server is running."));},[]);
+  useEffect(()=>{api.health().then(h=>{if(h.build!=="workspace-2.5")setMessage("Backend update required: this interface is connected to a different backend version. Close SceneForge and reopen the latest installed version.");else if(h.credential_warning)setMessage(h.credential_warning);}).catch(()=>setMessage("Cannot verify backend version. Check that the SceneForge server is running."));},[]);
   return message?<div className="error-box" role="alert">{message}</div>:null;
 }
 export default function App() {
@@ -808,6 +816,18 @@ export default function App() {
   const failed = Object.values(states).some(s => s === "Save failed");
   const status = failed ? "Save failed" : dirty ? "Saving changes…" : "All changes saved";
   const selected = project?.scenes.find(s => s.id === selectedId) || project?.scenes[0];
+  const closeRef=useRef<()=>Promise<boolean>>(async()=>false);
+  closeRef.current=async()=>{
+    if(busy||exporting)return false;
+    if(!(await saveBeforeClose()))return false;
+    if(!(await saveTitle())||hasActiveWrites())return false;
+    return (await api.closeStatus()).ready;
+  };
+  useEffect(()=>{
+    const target=window as Window & {__sceneForgePrepareClose?:()=>Promise<boolean>};
+    target.__sceneForgePrepareClose=()=>closeRef.current();
+    return()=>{delete target.__sceneForgePrepareClose;};
+  },[]);
   projectRef.current = project;
   useEffect(() => {api.listProjects().then(setProjects).catch(e => setError(e.message)).finally(() => setLoading(false));}, []);
   useEffect(() => {
@@ -881,12 +901,13 @@ export default function App() {
     await action(async () => {await api.deleteScene(id); setStates(prev => {const next={...prev}; delete next[id]; return next;});setHistory([]);setFuture([]); await refresh();});
   }
   async function saveTitle() {
-    if(!project) return;
-    if(titleDraft===project.title) {setStates(prev=>({...prev,title:"Saved"})); return;}
+    if(!project) return true;
+    if(titleDraft===project.title) {setStates(prev=>({...prev,title:"Saved"})); return true;}
     const title=titleDraft.trim()||"Untitled documentary";
     const ok=await action(async () => {await api.updateProject(project.id,{title}); await refresh();});
     if(ok) setTitleDraft(title);
     setStates(prev=>({...prev,title:ok?"Saved":"Save failed"}));
+    return ok;
   }
   if(!project) return <main className="project-home"><BuildNotice/>
     <div className="brand"><span className="brand-mark"><Film size={22}/></span> SceneForge <span className="version-chip">STUDIO</span></div>

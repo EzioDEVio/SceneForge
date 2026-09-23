@@ -15,7 +15,7 @@ await build({entryPoints:['src/App.tsx'],outfile:'node_modules/.cache/editor-tes
 const require=createRequire(import.meta.url);
 const React=require('react');
 const {default:App}=require('../node_modules/.cache/editor-test.cjs');
-const {render,screen,within,waitFor,cleanup}=await import('@testing-library/react');
+const {render,screen,within,waitFor,cleanup,act}=await import('@testing-library/react');
 const {default:userEvent}=await import('@testing-library/user-event');
 const user=userEvent.setup();
 const fixture=JSON.parse(readFileSync('../tests/ui-project-fixture.json','utf8'));
@@ -26,12 +26,14 @@ let next=10;
 let profiles=[];
 let healthBuild="workspace-2.5";
 let failLocal=true;
+let closeReady=true;
 const clone=x=>structuredClone(x);
 globalThis.fetch=async(path,init={})=>{
  const method=init.method||'GET'; const body=typeof init.body==='string'?JSON.parse(init.body):init.body;
  requests.push({path,method,body});
  let result;
  if(path==='/api/health')result={status:'ok',build:healthBuild};
+ else if(path==='/api/close-status')result={ready:closeReady};
  else if(path==='/api/projects'&&method==='GET') result=[project];
  else if(path===`/api/projects/${project.id}`&&method==='GET') result=project;
  else if(path===`/api/projects/${project.id}`&&method==='PATCH'){Object.assign(project,body); result=project;}
@@ -161,6 +163,20 @@ try{
  await user.type(screen.getByRole('textbox',{name:'Project name',exact:true}),'Renamed project');
  await user.tab();await saved();
  check('project title saves with accurate status',project.title==='Renamed project');
+ await user.type(visibleEditor().getByRole('textbox',{name:'Narration script'}),' before exit');
+ let canClose;
+ await act(async()=>{canClose=await window.__sceneForgePrepareClose();});
+ check('desktop close flushes focused narration before exiting',canClose&&project.scenes.find(s=>s.id===firstId).spoken_text.endsWith(' before exit'));
+ await user.type(visibleEditor().getByRole('textbox',{name:'Narration script'}),' keep draft');
+ failNextPatch=true;
+ await act(async()=>{canClose=await window.__sceneForgePrepareClose();});
+ check('desktop close refuses failed save and preserves draft',!canClose&&visibleEditor().getByRole('textbox',{name:'Narration script'}).value.endsWith(' keep draft'));
+ await act(async()=>{canClose=await window.__sceneForgePrepareClose();});
+ check('desktop close can retry failed save',canClose);
+ closeReady=false;
+ await act(async()=>{canClose=await window.__sceneForgePrepareClose();});
+ check('desktop close refuses active backend render',!canClose);
+ closeReady=true;
  await user.selectOptions(screen.getByRole('combobox',{name:'Project aspect ratio'}),'9:16');await saved();
  check('project aspect selection saves',project.aspect==='9:16');
  await user.click(screen.getByRole('button',{name:'Provider settings',exact:true}));
@@ -193,7 +209,7 @@ try{
  render(React.createElement(App));
  await user.click(await screen.findByRole('button',{name:/Renamed project Open project/}));
  await user.click(screen.getByRole('button',{name:'Select scene 2: Part-1'}));
- check('reopening restores persisted text',visibleEditor().getByRole('textbox',{name:'Narration script'}).value==='Recoverable draft');
+ check('reopening restores persisted text',visibleEditor().getByRole('textbox',{name:'Narration script'}).value==='Recoverable draft before exit keep draft');
  await user.click(screen.getByRole('button',{name:'SceneForge'}));
  await user.click(await screen.findByRole('button',{name:'Delete project Renamed project'}));
  await screen.findByText('Your saved projects will appear here.');

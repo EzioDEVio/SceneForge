@@ -2,17 +2,27 @@
 const {app,BrowserWindow,Menu,dialog,session,shell}=require('electron');
 const path=require('node:path'),fs=require('node:fs');
 const {startBackend,isOwnURL}=require('./backend-process.cjs');
+const {createCloseController}=require('./close-controller.cjs');
 let window,backend,quitting=false,origin;
 const smoke=process.argv.includes('--smoke-test');
+let failedStartup=false;
+const requestClose=createCloseController({
+ confirm:async()=>smoke||failedStartup||(await dialog.showMessageBox(window,{type:'question',title:'Close SceneForge?',message:'Save your project and exit?',detail:'SceneForge saves automatically. Save and exit also waits for any pending project edits. Changes already saved will be kept.',buttons:['Save and exit','Cancel'],defaultId:1,cancelId:1,noLink:true})).response===0,
+ save:async()=>smoke||failedStartup||!origin||await window.webContents.executeJavaScript('typeof window.__sceneForgePrepareClose === "function" ? window.__sceneForgePrepareClose() : false'),
+ stop:()=>Promise.resolve(backend?.stop()),
+ exit:()=>{quitting=true;window?.webContents.on('will-prevent-unload',e=>e.preventDefault());app.quit();},
+ report:message=>dialog.showMessageBox(window,{type:'warning',title:'SceneForge is still open',message})
+});
 const gotLock=app.requestSingleInstanceLock();
 if(!gotLock)app.quit();
 else{
  app.on('second-instance',()=>{if(window){if(window.isMinimized())window.restore();window.focus()}});
  app.on('window-all-closed',()=>app.quit());
- app.on('before-quit',e=>{if(quitting)return;e.preventDefault();quitting=true;Promise.resolve(backend?.stop()).finally(()=>app.quit())});
+ app.on('before-quit',e=>{if(quitting)return;e.preventDefault();void requestClose();});
  app.whenReady().then(boot).catch(fail);
 }
 function fail(e){
+ failedStartup=true;
  if(smoke&&process.env.SCENEFORGE_SMOKE_REPORT)fs.writeFileSync(process.env.SCENEFORGE_SMOKE_REPORT,JSON.stringify({ok:false,error:String(e)}));
  else dialog.showErrorBox('SceneForge could not start',String(e.message||e));
  app.quit();
@@ -24,6 +34,7 @@ async function boot(){
  const ffmpegDir=app.isPackaged?path.join(process.resourcesPath,'ffmpeg','bin'):path.join(__dirname,'vendor/ffmpeg/bin');
  for(const f of [binary,path.join(ffmpegDir,'ffmpeg.exe'),path.join(ffmpegDir,'ffprobe.exe')])if(!fs.existsSync(f))throw Error('Missing packaged component: '+path.basename(f)+'. Repair the installation.');
  window=new BrowserWindow({title:'SceneForge',width:1500,height:950,minWidth:1100,minHeight:720,show:!smoke,backgroundColor:'#202329',webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,partition:'sceneforge-desktop'}});
+ window.on('close',e=>{if(quitting)return;e.preventDefault();void requestClose();});
  window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
  window.webContents.on('will-navigate',(e,url)=>{if(!origin||!isOwnURL(url,origin))e.preventDefault()});
  window.webContents.session.setPermissionRequestHandler((_wc,_permission,callback)=>callback(false));

@@ -1,6 +1,6 @@
 {
   "name": "sceneforge-desktop",
-  "version": "0.2.0-rc.2",
+  "version": "0.2.0-rc.3",
   "private": true,
   "description": "SceneForge Desktop Alpha \u2014 local video editor",
   "author": "SceneForge",
@@ -24,6 +24,7 @@
     "files": [
       "main.cjs",
       "backend-process.cjs",
+      "close-controller.cjs",
       "welcome.html",
       "package.json"
     ],

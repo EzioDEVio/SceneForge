@@ -1,4 +1,12 @@
-# SceneForge Desktop 0.2.0 RC2
+# SceneForge Desktop 0.2.0 RC3
+
+## Close and credential fixes
+- X, Alt+F4 and File → Quit ask **Save and exit** or **Cancel**. Pending narration, captions, titles and project-name changes are saved before stopping the backend. Failed saves and active renders keep the app open.
+- Provider credentials use the native Windows credential vault (macOS Keychain / Linux Secret Service in source installs). Legacy Base64 keys migrate on startup; failed migration is reported and the legacy key cannot be used. No plaintext fallback is permitted.
+- Migration scrubs the active SQLite database and WAL. Older backups remain outside this migration; keep them private or rotate keys if they were shared.
+- Linux CI starts a real Secret Service for credential tests. Windows build commands now stop immediately on a failed command.
+- Corrects Together image routing and ElevenLabs audio file format. Cloud provider calls are tested with fixtures; live billable generation is not performed in CI.
+
 
 ## Editing fixes
 - Title text saves as you type and stays editable when switching inspector tabs.

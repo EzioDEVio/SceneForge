@@ -119,7 +119,12 @@ export type ProviderProfile = {
 
 const BASE = "";
 
+let activeWrites=0;
+export const hasActiveWrites=()=>activeWrites>0;
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  const write=!!init?.method&&init.method!=="GET";
+  if(write)activeWrites++;
+  try {
   const res = await fetch(`${BASE}${path}`, {
     headers: init?.body && !(init.body instanceof FormData) ? { "Content-Type": "application/json" } : undefined,
     ...init,
@@ -135,7 +140,8 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(detail);
   }
   if (res.status === 204) return undefined as unknown as T;
-  return res.json();
+  return await res.json();
+  } finally {if(write)activeWrites--;}
 }
 
 export const api = {
@@ -208,7 +214,8 @@ export const api = {
   assetStreamUrl: (assetId: string) => `/api/assets/${assetId}/stream`,
   assetDownloadUrl: (assetId: string) => `/api/assets/${assetId}/stream?download=1`,
 
-  health: () => req<{status:string;build?:string}>("/api/health"),
+  health: () => req<{status:string;build?:string;credential_warning?:string}>("/api/health"),
+  closeStatus:()=>req<{ready:boolean}>("/api/close-status"),
   connectLocalSpeech: (engine:string) => req<{profile:ProviderProfile;voices:string[];message:string}>(`/api/local-speech/${engine}/connect`, {method:"POST"}),
   imageHistory: (sceneId:string) => req<{id:string;prompt:string;provider:string}[]>(`/api/scenes/${sceneId}/image-history`),
   providerVoices: (id:string) => req<{voices:string[]}>(`/api/providers/profile/${id}/voices`),
