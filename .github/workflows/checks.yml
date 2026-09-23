@@ -26,7 +26,7 @@ jobs:
             printf "%s" "ci-disposable-keyring" | gnome-keyring-daemon --unlock --components=secrets
             python tests/integration/test_credentials.py
             python tests/integration/test_combined.py
+            python tests/integration/test_editor_plus.py
+            python tests/integration/test_hosted_adapters.py
+            python tests/integration/test_timeline.py
           '
-      - run: python tests/integration/test_editor_plus.py
-      - run: python tests/integration/test_hosted_adapters.py
-      - run: python tests/integration/test_timeline.py
