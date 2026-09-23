@@ -7,10 +7,20 @@ def connection(profile):
     base = (profile.base_url or '').rstrip('/')
     if not base.endswith('/v1'): base += '/v1'
     key = reveal(profile.secret_ref or '')
+    if profile.name == 'elevenlabs':
+        return base, ({'xi-api-key': key} if key else {})
     return base, ({'Authorization': f'Bearer {key}'} if key else {})
 
 
 def list_voices(profile):
+    if profile.name == 'elevenlabs':
+        base, headers = connection(profile)
+        try:
+            res = requests.get(base + '/voices', headers=headers, timeout=(5, 20), allow_redirects=False)
+            if not res.ok: raise ValueError(f'ElevenLabs returned HTTP {res.status_code}. Check the API key.')
+            return [str(v['voice_id']) for v in res.json().get('voices', []) if v.get('voice_id')]
+        except (requests.RequestException, KeyError, TypeError):
+            raise ValueError('ElevenLabs voice list unavailable. Check the API key.')
     base, headers = connection(profile)
     try:
         res = requests.get(base + '/audio/voices', headers=headers, timeout=(5, 15), allow_redirects=False)
@@ -22,6 +32,18 @@ def list_voices(profile):
 
 
 def synthesize(profile, text, voice, language, speed):
+    if profile.name == 'elevenlabs':
+        base, headers = connection(profile)
+        try:
+            res = requests.post(base + '/text-to-speech/' + voice,
+                json={'text': text, 'model_id': profile.model or 'eleven_multilingual_v2',
+                      'voice_settings': {'stability': 0.45, 'similarity_boost': 0.8, 'speed': speed}},
+                headers={**headers, 'Accept': 'audio/wav', 'Content-Type': 'application/json'},
+                timeout=(10, 600), allow_redirects=False)
+            if not res.ok: raise ValueError(f'ElevenLabs returned HTTP {res.status_code}. Check key, voice and quota.')
+            return res.content
+        except requests.RequestException:
+            raise ValueError('ElevenLabs is unavailable or timed out.')
     if profile.name == 'kokoro' and (language == 'ar' or any('\u0600' <= c <= '\u06ff' for c in text)):
         raise ValueError('Kokoro does not support Arabic. Select Chatterbox Multilingual for Arabic narration.')
     if any('\u0600' <= c <= '\u06ff' for c in text) and language != 'ar':

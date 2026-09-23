@@ -15,13 +15,30 @@ call site that needs it to make a provider request.
 from __future__ import annotations
 
 import base64
+import hashlib
+
+SERVICE = "SceneForge"
 
 
 def obscure(secret: str) -> str:
-    return base64.b64encode(secret.encode("utf-8")).decode("ascii")
+    """Store credentials in the OS credential vault, never SQLite."""
+    if not secret:
+        return ""
+    import keyring
+    ref = hashlib.sha256(secret.encode("utf-8")).hexdigest()
+    keyring.set_password(SERVICE, ref, secret)
+    return "keyring:" + ref
 
 
 def reveal(stored: str) -> str:
+    if stored.startswith("keyring:"):
+        import keyring
+        value = keyring.get_password(SERVICE, stored[8:])
+        if value is None:
+            raise ValueError("Provider credential is missing from the operating-system credential store.")
+        return value
+    # Migration support for credentials saved by RC1. They are never written
+    # again; the next save moves them to the OS vault.
     return base64.b64decode(stored.encode("ascii")).decode("utf-8")
 
 

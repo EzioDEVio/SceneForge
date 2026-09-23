@@ -12,8 +12,8 @@ from app.security.secrets import mask_for_display, obscure, reveal
 router = APIRouter(prefix="/api/providers", tags=["providers"])
 
 SUPPORTED = {
-    "image": {"openai", "gemini", "cloudflare", "huggingface", "local_sd"},
-    "speech": {"kokoro", "chatterbox"},
+    "image": {"openai", "gemini", "cloudflare", "huggingface", "together", "local_sd"},
+    "speech": {"kokoro", "chatterbox", "elevenlabs"},
 }
 
 
@@ -62,7 +62,8 @@ def upsert_provider(body: schemas.ProviderProfileCreate, db: Session = Depends(g
         existing.name = body.name
         existing.model = body.model
         existing.base_url = body.base_url
-        existing.secret_ref = obscure(body.api_key)
+        if body.api_key.strip():
+            existing.secret_ref = obscure(body.api_key)
         profile = existing
     else:
         profile = ProviderProfile(
