@@ -12,13 +12,32 @@ def connection(profile):
     return base, ({'Authorization': f'Bearer {key}'} if key else {})
 
 
-def list_voices(profile):
+def list_voice_details(profile):
     if profile.name == 'elevenlabs':
         base, headers = connection(profile)
         try:
             res = requests.get(base + '/voices', headers=headers, timeout=(5, 20), allow_redirects=False)
-            if not res.ok: raise ValueError(f'ElevenLabs returned HTTP {res.status_code}. Check the API key.')
-            return [str(v['voice_id']) for v in res.json().get('voices', []) if v.get('voice_id')]
+            if not res.ok:
+                detail = ''
+                try:
+                    value = res.json().get('detail', {})
+                    detail = value.get('message', '') if isinstance(value, dict) else str(value)
+                except ValueError:
+                    pass
+                raise ValueError(f'ElevenLabs returned HTTP {res.status_code}' + (f': {detail}' if detail else '. Check the API key and Voices read permission.'))
+            details = []
+            for voice in res.json().get('voices', []):
+                if not isinstance(voice, dict) or not voice.get('voice_id'):
+                    continue
+                labels = voice.get('labels') if isinstance(voice.get('labels'), dict) else {}
+                details.append({'id': str(voice['voice_id']), 'name': str(voice.get('name') or voice['voice_id']),
+                    'language': str(labels.get('language') or voice.get('language') or ''),
+                    'accent': str(labels.get('accent') or voice.get('accent') or ''),
+                    'gender': str(labels.get('gender') or voice.get('gender') or ''),
+                    'age': str(labels.get('age') or voice.get('age') or ''),
+                    'description': str(voice.get('description') or ''),
+                    'preview_url': str(voice.get('preview_url') or '')})
+            return details
         except (requests.RequestException, KeyError, TypeError):
             raise ValueError('ElevenLabs voice list unavailable. Check the API key.')
     base, headers = connection(profile)
@@ -26,9 +45,13 @@ def list_voices(profile):
         res = requests.get(base + '/audio/voices', headers=headers, timeout=(5, 15), allow_redirects=False)
         if not res.ok: raise ValueError(f'Voice service returned HTTP {res.status_code}. Check the service URL.')
         values = res.json().get('voices', [])
-        return [v if isinstance(v, str) else str(v['id']) for v in values]
+        return [{'id': v if isinstance(v, str) else str(v['id']), 'name': v if isinstance(v, str) else str(v['id'])} for v in values]
     except (requests.RequestException, KeyError, TypeError):
         raise ValueError('Voice service unavailable. Start it and check its address in Settings.')
+
+
+def list_voices(profile):
+    return [voice['id'] for voice in list_voice_details(profile)]
 
 
 def synthesize(profile, text, voice, language, speed):

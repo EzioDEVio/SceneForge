@@ -10,7 +10,7 @@ import {
   FileText, ImageIcon, Clock, Palette, Type, Wand2, Film, Settings, Key, Check,
   ChevronRight, Layers, Copy, PanelLeftClose, PanelLeftOpen, Search, CheckCircle2,
 } from "lucide-react";
-import { api, subscribeJob, Project, Scene, Shot, Job, VoiceTake, ProviderProfile, Asset } from "./api";
+import { api, subscribeJob, Project, Scene, Shot, Job, VoiceTake, ProviderProfile, Asset, VoiceOption } from "./api";
 
 import {MediaPool} from "./MediaPool";
 import {FramingControls} from "./FramingControls";
@@ -306,13 +306,13 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
   };
   async function save() {
     setBusy(true);setMessage("");
-    try {await api.upsertProvider(choice.capability,name,key,model,url);setKey("");await refresh();setMessage("Provider saved.");}
+    try {await api.upsertProvider(choice.capability,name,key,model,url);setKey("");await refresh();window.dispatchEvent(new Event("sceneforge:providers-changed"));setMessage("Provider saved.");}
     catch(e:any){setMessage(e.message);}finally{setBusy(false);}
   }
   return <div className="drawer-backdrop" onClick={onClose}><div className="drawer provider-studio" ref={drawerRef} role="dialog" aria-modal="true" aria-label="Editor panel" tabIndex={-1} onClick={e=>e.stopPropagation()}>
     <button className="icon-btn drawer-close" aria-label="Close panel" onClick={onClose}><X size={16}/></button>
     <h3>Settings — Providers</h3><p className="hint">Anthropic Claude analyzes images and writes prompts, but does not provide a photo-generation API. Choose an image engine below.</p><p className="hint">Connect image-generation services. Local narration engines are managed separately under Audio → Local voice engines.</p>
-    <div className="provider-list">{providers.filter(p=>p.capability==="image").map(p=><article className="provider-card" key={p.id}><strong>{PROVIDER_OPTIONS.find(o=>o.name===p.name)?.label||p.name}</strong><small>{p.model} · {p.masked_key||"No key required"}</small><div className="button-row"><button className="text-btn" disabled={busy} onClick={()=>select(p.name)}>Edit</button><button className="text-btn" disabled={busy} onClick={async()=>{try{await api.deleteProviderProfile(p.id);await refresh();}catch(e:any){setMessage(e.message);}}}>Remove</button></div></article>)}</div>
+    <div className="provider-list">{providers.filter(p=>PROVIDER_OPTIONS.some(o=>o.name===p.name)).map(p=><article className="provider-card" key={p.id}><strong>{PROVIDER_OPTIONS.find(o=>o.name===p.name)?.label||p.name}</strong><small>{p.capability} · {p.model} · {p.masked_key||"No key required"}</small><div className="button-row"><button className="text-btn" disabled={busy} onClick={()=>select(p.name)}>Edit</button><button className="text-btn" disabled={busy} onClick={async()=>{try{await api.deleteProviderProfile(p.id);await refresh();window.dispatchEvent(new Event("sceneforge:providers-changed"));}catch(e:any){setMessage(e.message);}}}>Remove</button></div></article>)}</div>
     <fieldset disabled={busy} className="provider-form"><label className="control-label">Provider<select aria-label="Provider" value={name} onChange={e=>select(e.target.value)}>{PROVIDER_OPTIONS.map(o=><option value={o.name} key={o.name}>{o.label}</option>)}</select></label>
     <p className="hint">{PROVIDER_NOTES[name]}</p>
     {(name==="cloudflare"||name==="local_sd"||name==="elevenlabs")&&<label className="control-label">{name==="cloudflare"?"Cloudflare account ID":name==="elevenlabs"?"ElevenLabs API URL":"Local engine URL"}<input aria-label="Provider connection" value={url} onChange={e=>setUrl(e.target.value)}/></label>}
@@ -327,7 +327,7 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
 function VoicePanel({ scene, onChanged, beforeGenerate }: { scene: Scene; onChanged: () => void; beforeGenerate: () => Promise<boolean> }) {
   const [providers,setProviders]=useState<ProviderProfile[]>([]);
   const [providerId,setProviderId]=useState("unselected");
-  const [voices,setVoices]=useState<string[]>([]);
+  const [voices,setVoices]=useState<VoiceOption[]>([]);
   const [voice,setVoice]=useState("af_heart");
   const [language,setLanguage]=useState(/[\u0600-\u06ff]/.test(scene.spoken_text)?"ar":"en");
   const [speed,setSpeed]=useState(1);
@@ -337,7 +337,7 @@ function VoicePanel({ scene, onChanged, beforeGenerate }: { scene: Scene; onChan
     try {
       const result=await api.connectLocalSpeech(engine);
       setProviders(old=>[...old.filter(p=>p.id!==result.profile.id),result.profile]);
-      setProviderId(result.profile.id);setVoices(result.voices);setVoice(result.voices[0]);
+      setProviderId(result.profile.id);setVoices(result.voices.map(v=>typeof v === "string" ? {id:v,name:v} : v));setVoice(result.voices[0] || "");
       if(engine==="chatterbox"&&/[\u0600-\u06ff]/.test(scene.spoken_text))setLanguage("ar");
       if(engine==="kokoro"&&!['en','es','fr','hi','it','ja','pt','zh'].includes(language))setLanguage("en");
       setLocalStatus(result.message);
@@ -346,14 +346,14 @@ function VoicePanel({ scene, onChanged, beforeGenerate }: { scene: Scene; onChan
   }
   const selectedEngine=providers.find(p=>p.id===providerId)?.name;
   const voicePrefix:Record<string,string>={en:"ab",es:"e",fr:"f",hi:"h",it:"i",ja:"j",pt:"p",zh:"z"};
-  const availableVoices=selectedEngine==="kokoro"?voices.filter(v=>(voicePrefix[language]||"").includes(v[0])):voices;
-  useEffect(()=>{if(availableVoices.length&&!availableVoices.includes(voice))setVoice(availableVoices[0]);},[language,voices,providerId]);
-  useEffect(()=>{api.listProviders().then(p=>setProviders(p.filter(v=>v.capability==="speech"))).catch(()=>{});},[]);
+  const availableVoices=selectedEngine==="kokoro"?voices.filter(v=>(voicePrefix[language]||"").includes(v.id[0])):voices;
+  useEffect(()=>{if(availableVoices.length&&!availableVoices.some(v=>v.id===voice))setVoice(availableVoices[0].id);},[language,voices,providerId]);
+  useEffect(()=>{const refreshProviders=()=>api.listProviders().then(p=>setProviders(p.filter(v=>v.capability==="speech"))).catch(()=>{});void refreshProviders();window.addEventListener("sceneforge:providers-changed",refreshProviders);return()=>window.removeEventListener("sceneforge:providers-changed",refreshProviders);},[]);
   async function connect(id:string){
     setProviderId(id);setVoices([]);setErr(null);if(providers.find(p=>p.id===id)?.name==="kokoro"&&!voicePrefix[language])setLanguage("en");
     if(!id)return;
     setBusy(true);
-    try{const result=await api.providerVoices(id);setVoices(result.voices);setVoice(result.voices[0]||"default");}
+    try{const result=await api.providerVoices(id);const next=result.voices.map(v=>typeof v === "string" ? {id:v,name:v} : v);setVoices(next);setVoice(next[0]?.id||"");}
     catch(e:any){setErr(e.message);}finally{setBusy(false);}
   }
   const [open, setOpen] = useState(true);
@@ -413,9 +413,9 @@ function VoicePanel({ scene, onChanged, beforeGenerate }: { scene: Scene; onChan
       {open && (
         <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
           <section className="local-voice-component"><h3>Local voice engines</h3><p className="hint">Natural speech runs on this computer after the engine and model are installed. No AI provider key is required.</p><div className="button-row"><button className="btn" disabled={busy} onClick={()=>connectEngine("chatterbox")}>Connect Chatterbox · Arabic + multilingual</button><button className="btn" disabled={busy} onClick={()=>connectEngine("kokoro")}>Connect Kokoro</button></div><p className="hint">Connect to your installed voice service. For a Docker installation, keep its engine and voice container running. Enter narration text before generating audio.</p>{localStatus&&<p role="status">{localStatus}</p>}</section>
-          <fieldset disabled={busy} className="provider-form"><label className="control-label">Narration engine<select aria-label="Narration engine" value={providerId} onChange={e=>connect(e.target.value)}><option value="unselected">Select a local engine…</option><option value="">Diagnostic voice — robotic (espeak)</option>{providers.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
+          <fieldset disabled={busy} className="provider-form"><label className="control-label">Narration engine<select aria-label="Narration engine" value={providerId} onChange={e=>connect(e.target.value)}><option value="unselected">Select a narration engine…</option><option value="">Diagnostic voice — robotic (espeak)</option>{providers.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
           <label className="control-label">Language<select aria-label="Narration language" value={language} onChange={e=>setLanguage(e.target.value)}>{(selectedEngine==="kokoro"?["en","fr","es","it","pt","ja","zh","hi"]:["en","ar","fr","es","de","it","pt","ja","zh","hi","ko","ru","tr"]).map(v=><option value={v} key={v}>{{en:"English",ar:"Arabic",fr:"French",es:"Spanish",de:"German",it:"Italian",pt:"Portuguese",ja:"Japanese",zh:"Chinese",hi:"Hindi",ko:"Korean",ru:"Russian",tr:"Turkish"}[v]}</option>)}</select></label>
-          {providerId&&<><label className="control-label">Voice<select aria-label="Narration voice" value={voice} onChange={e=>setVoice(e.target.value)}>{availableVoices.map(v=><option key={v}>{v}</option>)}</select></label><button className="text-btn" onClick={()=>connect(providerId)}>Refresh voices / test connection</button><label className="control-label">Speaking speed · {speed.toFixed(2)}×<input aria-label="Speaking speed" type="range" min={.5} max={2} step={.05} value={speed} onChange={e=>setSpeed(Number(e.target.value))}/></label></>}
+          {providerId&&<><label className="control-label">Voice<select aria-label="Narration voice" value={voice} onChange={e=>setVoice(e.target.value)}>{availableVoices.map(v=><option key={v.id} value={v.id}>{v.name}{[v.language,v.accent,v.gender].filter(Boolean).length?` · ${[v.language,v.accent,v.gender].filter(Boolean).join(" · ")}`:""}</option>)}</select></label><button className="text-btn" onClick={()=>connect(providerId)}>Refresh voices / test connection</button><label className="control-label">Speaking speed · {speed.toFixed(2)}×<input aria-label="Speaking speed" type="range" min={.5} max={2} step={.05} value={speed} onChange={e=>setSpeed(Number(e.target.value))}/></label></>}
           </fieldset>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button className="btn" onClick={audition} disabled={busy || !scene.spoken_text.trim() || (!!providerId&&!availableVoices.length)}>

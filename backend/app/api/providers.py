@@ -119,8 +119,8 @@ def _forget_unshared(profile, db):
 
 @router.get("/profile/{profile_id}/voices")
 def voices(profile_id: str, db: Session = Depends(get_db)):
-    from app.providers.speech_http import list_voices
+    from app.providers.speech_http import list_voice_details
     profile = db.get(ProviderProfile, profile_id)
     if not profile or profile.capability != "speech": raise HTTPException(404, "Speech provider not found")
-    try: return {"voices": list_voices(profile)}
+    try: return {"voices": list_voice_details(profile)}
     except ValueError as exc: raise HTTPException(502, str(exc))

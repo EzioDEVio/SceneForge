@@ -24,6 +24,19 @@ with TestClient(app) as c:
         assert post.call_args.args[0]=='https://api.together.xyz/v1/images/generations'
         assert post.call_count==1
     profile=SimpleNamespace(name='elevenlabs',base_url='https://untrusted.example',secret_ref='',model='eleven_multilingual_v2')
+    with patch.object(speech_http.requests,'get') as get:
+        get.return_value=SimpleNamespace(ok=True,json=lambda:{'voices':[{'voice_id':'Voice123','name':'Test narrator','labels':{'accent':'Iraqi','language':'ar','gender':'male'}}]})
+        details=speech_http.list_voice_details(profile)
+        assert details[0]['name']=='Test narrator' and details[0]['accent']=='Iraqi'
+        assert speech_http.list_voices(profile)==['Voice123']
+        local=SimpleNamespace(name='kokoro',base_url='http://127.0.0.1:8880',secret_ref='')
+        get.return_value=SimpleNamespace(ok=True,json=lambda:{'voices':['af_heart',{'id':'am_adam'}]})
+        assert speech_http.list_voices(local)==['af_heart','am_adam']
+        assert speech_http.list_voice_details(local)[0]['id']=='af_heart'
+        get.return_value=SimpleNamespace(ok=False,status_code=401,json=lambda:{'detail':{'message':'Missing voices_read permission'}})
+        try:speech_http.list_voice_details(profile)
+        except ValueError as exc:assert 'voices_read' in str(exc)
+        else:raise AssertionError('Permission error swallowed')
     with patch.object(speech_http.requests,'post') as post:
         post.return_value=SimpleNamespace(ok=True,content=b'fixture-mp3')
         assert speech_http.synthesize(profile,'Hello','Voice123','en',1)==b'fixture-mp3'

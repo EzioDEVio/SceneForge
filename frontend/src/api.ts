@@ -116,6 +116,7 @@ export type ProviderProfile = {
   masked_key: string;
   configured: boolean;
 };
+export type VoiceOption = { id: string; name: string; language?: string; accent?: string; gender?: string; age?: string; description?: string; preview_url?: string };
 
 const BASE = "";
 
@@ -218,7 +219,7 @@ export const api = {
   closeStatus:()=>req<{ready:boolean}>("/api/close-status"),
   connectLocalSpeech: (engine:string) => req<{profile:ProviderProfile;voices:string[];message:string}>(`/api/local-speech/${engine}/connect`, {method:"POST"}),
   imageHistory: (sceneId:string) => req<{id:string;prompt:string;provider:string}[]>(`/api/scenes/${sceneId}/image-history`),
-  providerVoices: (id:string) => req<{voices:string[]}>(`/api/providers/profile/${id}/voices`),
+  providerVoices: (id:string) => req<{voices:VoiceOption[]}>(`/api/providers/profile/${id}/voices`),
   deleteProviderProfile: (id:string) => req(`/api/providers/profile/${id}`, {method:"DELETE"}),
   serviceTts: (sceneId:string, providerId:string, voice:string, language:string, speed:number, audition=false) => req<any>(`/api/scenes/${sceneId}/voice-takes/service`, {method:"POST",body:JSON.stringify({provider_id:providerId,voice,language,speed,audition})}),
   listProviders: () => req<ProviderProfile[]>("/api/providers"),
