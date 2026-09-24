@@ -97,8 +97,9 @@ def build_cover_motion_chain(
     d = max(total_frames, 1)
     denom = max(d - 1, 1)
 
-    # t: normalized progress through the shot, 0..1, keyed to frame number
-    t = f"(n/{denom})"
+    # t: normalized progress through the shot, 0..1, keyed to frame number,
+    # shaped by the easing curve (default ease-in-out: starts and ends gently).
+    t = ease_expr(f"(n/{denom})", getattr(plan, "easing", "ease_in_out"))
     zt = f"({z0}+({z1}-{z0})*{t})"
     fx = f"({plan.fx0}+({plan.fx1}-{plan.fx0})*{t})"
     fy = f"({plan.fy0}+({plan.fy1}-{plan.fy0})*{t})"
@@ -113,6 +114,20 @@ def build_cover_motion_chain(
     stage_b = f"scale=w='ceil(iw*({zt})/2)*2':h='ceil(ih*({zt})/2)*2':eval=frame"
     stage_c = f"crop={out_w}:{out_h}:x='{x_expr}':y='{y_expr}'"
     return f"{stage_a},{stage_b},{stage_c}"
+
+
+EASINGS = ("linear", "ease_in_out", "ease_in", "ease_out")
+
+
+def ease_expr(t: str, easing: str) -> str:
+    """FFmpeg expression for an easing curve over t in 0..1."""
+    if easing == "linear":
+        return t
+    if easing == "ease_in":
+        return f"({t}*{t})"
+    if easing == "ease_out":
+        return f"(1-(1-{t})*(1-{t}))"
+    return f"(0.5-0.5*cos(PI*{t}))"
 
 
 def build_contain_chain(out_w: int, out_h: int, blurred_bg: bool) -> str:
@@ -251,8 +266,8 @@ def build_adjust_chain(adjust: dict | None) -> tuple[str | None, str | None]:
 # ---------------------------------------------------------------------------
 FILM_TONES = ("color", "faded", "sepia", "bw")
 FILM_FPS = (0, 16, 18, 24)          # 0 = keep the project frame rate
-FILM_AMOUNTS = ("scratches", "dust", "flicker", "weave")
-FILM_DEFAULTS = {"scratches": 60, "dust": 50, "flicker": 40, "weave": 35, "fps": 18, "tone": "bw"}
+FILM_AMOUNTS = ("scratches", "dust", "flicker", "weave", "sound")
+FILM_DEFAULTS = {"scratches": 60, "dust": 50, "flicker": 40, "weave": 35, "sound": 0, "fps": 18, "tone": "bw"}
 
 
 def clean_film(raw: dict | None) -> dict:
@@ -404,6 +419,9 @@ def build_shot_video_chain(
     fragments with commas and semicolons.
     """
     plan = resolve_motion(motion_json)
+    # Easing is stored with the motion; unknown values fall back to ease-in-out.
+    easing = (motion_json or {}).get("easing", "ease_in_out")
+    plan.easing = easing if easing in EASINGS else "ease_in_out"
     warning = overscan_warning(plan)
     look = look or {}
     effect_chain = build_effect_chain(effect_preset, effect_intensity, look.get("glitch"), out_w)

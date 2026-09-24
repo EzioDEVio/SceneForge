@@ -1,3 +1,31 @@
+# SceneForge Desktop 0.2.0 RC5 (in progress) — transitions, motion, captions, music, film extras
+
+## Transitions and motion
+- 20 scene transitions: adds Circle close, Zoom in, Smooth slide left/right, Clock wipe, Pixelate, Blur, Diagonal wipe, Squeeze, Fade through grey, and **Film burn** (a hot orange flare that blooms across the cut).
+- **Speed curve** for camera movement (Motion tab): Smooth (ease in and out, the default), Ease in, Ease out, or Constant speed.
+
+## Word-by-word captions
+- Text tab → **Word-by-word highlight**: each word changes to the highlight colour as it is spoken, following the narration. Timing is shared across the narration by word length.
+
+## Music & finishing (Audio tab, whole video, applied on export)
+- **Background music**: loops to the length of the video, with volume and fades, and **gets quieter automatically under narration** (sidechain ducking).
+- **Level loudness for YouTube**: EBU R128 to -14 LUFS / -1.5 dBTP.
+- **Film countdown leader**: 5-4-3-2 with a rotating sweep and the one-frame "2-pop" beep, added before the video (5 s).
+
+## Old film
+- **Projector sound**: clatter at the film frame rate with motor hum, mixed under Old film scenes. The three film styles set it.
+
+## Fixes
+- The motion speed-curve picker read its value after the save was queued, so a choice could be replaced by the previous one. Fixed.
+- Export finishing tolerates older callers without finishing settings.
+
+## Upgrade notes
+- Existing databases gain `projects.finishing_json` automatically. Build ID is now `rc5-finishing-4`.
+
+## Tests
+- `tests/integration/test_finishing.py` (in CI): all 19 transitions render; film burn colour; easing curves; word timing and highlight on real libass frames; easing validation; film burn export length; music looping and ducking; measured loudness; leader length, picture and beep; projector clatter rate.
+- 5 new component checks (92 total).
+
 # SceneForge Desktop 0.2.0 RC5 (in progress) — Old film effect
 
 ## Old film (Effects → Old film)

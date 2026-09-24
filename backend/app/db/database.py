@@ -41,6 +41,7 @@ def init_db() -> None:
 _ADDED_COLUMNS = {
     "scenes": {"look_json": "JSON NOT NULL DEFAULT '{}'"},
     "voice_takes": {"edit_json": "JSON NOT NULL DEFAULT '{}'"},
+    "projects": {"finishing_json": "JSON NOT NULL DEFAULT '{}'"},
 }
 
 

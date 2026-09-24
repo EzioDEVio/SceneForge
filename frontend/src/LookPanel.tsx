@@ -144,7 +144,7 @@ export function LookPanel({scene, disabled, onDraft, onSaveNow}: Props) {
         {FILM_STYLES.map(st => <button key={st.name} className={`btn ${film && JSON.stringify(film) === JSON.stringify(st.film) ? 'selected' : ''}`} title={st.hint} disabled={disabled} onClick={() => setFilmLook({...st.film})}>{st.name}</button>)}
       </div>
       {film && <>
-        {([['scratches', 'Scratches'], ['dust', 'Dust & hair'], ['flicker', 'Flicker'], ['weave', 'Gate weave']] as const).map(([key, label]) =>
+        {([['scratches', 'Scratches'], ['dust', 'Dust & hair'], ['flicker', 'Flicker'], ['weave', 'Gate weave'], ['sound', 'Projector sound']] as const).map(([key, label]) =>
           <div key={key} className={`adjust-row ${film[key] ? 'changed' : ''}`}>
             <label htmlFor={`film-${key}`}>{label}</label>
             <input id={`film-${key}`} aria-label={`Film ${label}`} type="range" min={0} max={100} value={film[key]} disabled={disabled} onChange={e => setFilmLook({...film, [key]: Number(e.target.value)})}/>

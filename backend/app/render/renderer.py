@@ -292,6 +292,8 @@ def mux_audio_and_captions(
             scene.id, scene.subtitle_text if scene.font_json.get("captions_enabled", True) else "", total_duration_ms, scene.font_json, out_w, out_h,
             out_path=str(work_dir / f"{scene.id}_captions.ass"),
             typewriter=bool(scene.font_json.get("typewriter", False)),
+            speech_start_ms=lead_ms if narration_path else 0,
+            speech_ms=(total_duration_ms - lead_ms - (scene.trail_ms if scene.trail_ms is not None else 400)) if narration_path else None,
         )
         fonts_dir = escape_path_for_filter(str(BUNDLED_FONT_PATH.parent))
         ass_escaped = escape_path_for_filter(ass_path)
@@ -406,6 +408,12 @@ def render_part(
         final_path = mux_audio_and_captions(
             scene, project, visual_path, total_ms, narration_path, lead_ms, work_dir, ctx
         )
+        film = (scene.look_json or {}).get("film")
+        if film and int(film.get("sound", 0)) > 0:
+            from app.render.finishing import add_projector_sound
+            from app.render.filters import clean_film, film_fps_for
+            f = clean_film(film)
+            final_path = add_projector_sound(final_path, f["sound"], film_fps_for(f, project.fps), work_dir, ctx.cancel_check)
         if progress_cb:
             progress_cb("finalize", 90)
 
@@ -432,7 +440,26 @@ def render_part(
 # Full export with inter-part transitions
 # ---------------------------------------------------------------------------
 
-def render_export(
+# Scene transitions -> FFmpeg xfade. "film_burn" is a custom expression: a
+# hot orange-white flare that blooms across the cut in organic streaks, like
+# film melting in the projector gate. P runs 1 -> 0 during the transition.
+_BURN_HEAT = "clip((1-abs(2*P-1))*1.7*(0.55+0.45*sin(X/W*9+Y/H*5+P*7)*sin(Y/H*7-X/W*3+P*4)),0,1)"
+FILM_BURN_EXPR = (
+    f"if(eq(PLANE,0),(A*P+B*(1-P))+({_BURN_HEAT})*(240-(A*P+B*(1-P))),"
+    f"if(eq(PLANE,1),(A*P+B*(1-P))+({_BURN_HEAT})*(62-(A*P+B*(1-P))),"
+    f"(A*P+B*(1-P))+({_BURN_HEAT})*(192-(A*P+B*(1-P)))))"
+)
+XFADE_NAMES = {
+    "fade_through_black": "fadeblack", "dissolve": "dissolve", "slide": "slideleft",
+    "slide_right": "slideright", "wipe_left": "wipeleft", "wipe_right": "wiperight",
+    "fade_white": "fadewhite", "circle_open": "circleopen", "circle_close": "circleclose",
+    "zoom_in": "zoomin", "smooth_left": "smoothleft", "smooth_right": "smoothright",
+    "radial": "radial", "pixelize": "pixelize", "blur": "hblur", "diagonal": "diagtl",
+    "squeeze": "squeezeh", "fade_grays": "fadegrays", "film_burn": f"custom:expr='{FILM_BURN_EXPR}'",
+}
+
+
+def _render_export_core(
     project: Project,
     scenes: list[Scene],
     scene_paths: dict[str, str],
@@ -498,11 +525,7 @@ def render_export(
             vraw, araw = f"v{i}raw", f"a{i}raw"
             vout, aout = f"v{i}", f"a{i}"
             vnext, anext = f"vn{i}", f"an{i}"
-            xfade_transition = {
-                "fade_through_black": "fadeblack", "dissolve": "dissolve", "slide": "slideleft",
-                "slide_right": "slideright", "wipe_left": "wipeleft", "wipe_right": "wiperight",
-                "fade_white": "fadewhite", "circle_open": "circleopen",
-            }.get(ttype, "fade")
+            xfade_transition = XFADE_NAMES.get(ttype, "fade")
             if dur_ms <= 0:
                 filter_parts.append(f"[{v_label}][{vnext}]concat=n=2:v=1:a=0[{vraw}]")
                 filter_parts.append(f"[{a_label}][{anext}]concat=n=2:v=0:a=1[{araw}]")
@@ -540,3 +563,12 @@ def render_export(
 
 def cancel_running(ctx: RenderContext) -> None:
     ctx.cancel_requested = True
+
+
+def render_export(project: Project, scenes: list[Scene], scene_paths: dict[str, str], *args, **kwargs) -> str:
+    """Assemble the parts, then apply project finishing: countdown leader,
+    background music with ducking, and loudness levelling."""
+    from app.render.finishing import finish_export
+    out_path = _render_export_core(project, scenes, scene_paths, *args, **kwargs)
+    ctx = kwargs.get("ctx") or next((a for a in args if isinstance(a, RenderContext)), None)
+    return finish_export(out_path, project, ctx.cancel_check if ctx else None)

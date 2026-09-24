@@ -30,7 +30,7 @@ dust=generate_frames(320,180,18,0,0.8,seed=3)
 check('dust changes every frame',np.mean([np.abs(dust[i].astype(float)-dust[i-1]).mean()>0 for i in range(1,72)])>0.95)
 
 # --- settings validation ----------------------------------------------------
-check('film settings fill in defaults and clamp',clean_film({'scratches':150,'fps':12,'tone':'x'})=={'scratches':100,'dust':50,'flicker':40,'weave':35,'fps':18,'tone':'bw'})
+check('film settings fill in defaults and clamp',clean_film({'scratches':150,'fps':12,'tone':'x'})=={'scratches':100,'dust':50,'flicker':40,'weave':35,'sound':0,'fps':18,'tone':'bw'})
 p=client.post('/api/projects',json={'title':'Film','aspect':'16:9'}).json();pid=p['id']
 # detailed test picture with colour, so tone and weave are measurable
 subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i','testsrc2=s=640x360','-frames:v','1',str(t/'src.png')],check=True)

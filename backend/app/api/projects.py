@@ -67,6 +67,12 @@ def update_project(project_id: str, body: schemas.ProjectUpdate, db: Session = D
         project.title = body.title
     if body.language is not None:
         project.language = body.language
+    if body.finishing is not None:
+        from app.render.finishing import FinishingError, clean_finishing
+        try:
+            project.finishing_json = clean_finishing(body.finishing, project.id, db)
+        except FinishingError as e:
+            raise HTTPException(400, str(e))
     project.revision += 1
     db.commit()
     db.refresh(project)

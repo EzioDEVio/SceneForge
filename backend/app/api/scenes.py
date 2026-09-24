@@ -179,7 +179,11 @@ def update_shot(shot_id: str, body: dict, db: Session = Depends(get_db)):
         if field in body:
             setattr(shot, field, body[field])
     if "motion" in body:
-        shot.motion_json = body["motion"]
+        from app.render.filters import EASINGS
+        motion = body["motion"]
+        if not isinstance(motion, dict) or motion.get("easing", "ease_in_out") not in EASINGS:
+            raise HTTPException(400, "Motion easing must be one of: " + ", ".join(EASINGS) + ".")
+        shot.motion_json = motion
     if "crop" in body:
         shot.crop_json = body["crop"]
     shot.scene.revision += 1

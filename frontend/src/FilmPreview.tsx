@@ -2,11 +2,11 @@ import React, {useEffect, useRef} from 'react';
 import type {FilmLook} from './api';
 
 // Mirrors FILM_DEFAULTS in backend/app/render/filters.py.
-export const FILM_DEFAULTS: FilmLook = {scratches: 60, dust: 50, flicker: 40, weave: 35, fps: 18, tone: 'bw'};
+export const FILM_DEFAULTS: FilmLook = {scratches: 60, dust: 50, flicker: 40, weave: 35, sound: 0, fps: 18, tone: 'bw'};
 export const FILM_STYLES: {name: string; hint: string; film: FilmLook}[] = [
-  {name: 'WWII newsreel', hint: 'Black & white, heavy scratches, strong flicker', film: {scratches: 75, dust: 60, flicker: 55, weave: 45, fps: 18, tone: 'bw'}},
-  {name: '8mm home movie', hint: 'Faded colour, dust, hand-held projector wobble', film: {scratches: 35, dust: 55, flicker: 35, weave: 60, fps: 18, tone: 'faded'}},
-  {name: 'Silent era', hint: 'Sepia, 16 fps, worn print', film: {scratches: 85, dust: 75, flicker: 70, weave: 55, fps: 16, tone: 'sepia'}},
+  {name: 'WWII newsreel', hint: 'Black & white, heavy scratches, strong flicker', film: {scratches: 75, dust: 60, flicker: 55, weave: 45, sound: 40, fps: 18, tone: 'bw'}},
+  {name: '8mm home movie', hint: 'Faded colour, dust, hand-held projector wobble', film: {scratches: 35, dust: 55, flicker: 35, weave: 60, sound: 50, fps: 18, tone: 'faded'}},
+  {name: 'Silent era', hint: 'Sepia, 16 fps, worn print', film: {scratches: 85, dust: 75, flicker: 70, weave: 55, sound: 45, fps: 16, tone: 'sepia'}},
 ];
 
 export function filmToneFilter(film?: FilmLook | null): string {

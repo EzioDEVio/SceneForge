@@ -46,6 +46,8 @@ class Project(Base):
     height: Mapped[int] = mapped_column(Integer, default=1080)
     revision: Mapped[int] = mapped_column(Integer, default=1)
     default_font_json: Mapped[dict] = mapped_column(JSON, default=lambda: DEFAULT_FONT.copy())
+    # Export finishing: {"music": {...}, "loudnorm": bool, "leader": bool}
+    finishing_json: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 

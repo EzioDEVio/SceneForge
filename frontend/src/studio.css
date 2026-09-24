@@ -153,3 +153,4 @@
 .film-option{display:grid;grid-template-columns:78px minmax(0,1fr);align-items:center;gap:6px;margin-top:8px}.film-option>span{font-size:11px;color:#c3c9d6}
 .look-panel .film-option .segmented{display:flex;gap:2px;padding:2px}.look-panel .film-option .segmented button{flex:1;border:0;background:transparent;border-radius:3px;font-size:11px;padding:4px 6px}
 .switch-label{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#c3c9d6;cursor:pointer}.switch-label input{accent-color:#a58fe9}
+.finishing-panel{margin-bottom:14px;border-bottom:1px solid var(--line)}.finishing-toggle{display:flex;margin:10px 0 0;line-height:1.3}

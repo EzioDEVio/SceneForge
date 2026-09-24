@@ -62,7 +62,7 @@ export type FontSettings = {
 };
 
 /** Must match BUILD_ID in backend/app/main.py. */
-export const BUILD_ID = "rc5-old-film-3";
+export const BUILD_ID = "rc5-finishing-4";
 
 export type Adjust = Partial<Record<'exposure'|'contrast'|'highlights'|'shadows'|'temperature'|'tint'|'saturation'|'vibrance'|'sharpen'|'vignette'|'grain', number>>;
 export type Look = {
@@ -71,7 +71,8 @@ export type Look = {
   lut?: {asset_id: string; strength: number} | null;
   film?: FilmLook | null;
 };
-export type FilmLook = {scratches: number; dust: number; flicker: number; weave: number; fps: 0 | 16 | 18 | 24; tone: 'color' | 'faded' | 'sepia' | 'bw'};
+export type Finishing = {music?: {asset_id: string; volume: number; duck: number; fade_in_ms: number; fade_out_ms: number} | null; loudnorm?: boolean; leader?: boolean};
+export type FilmLook = {scratches: number; dust: number; flicker: number; weave: number; sound: number; fps: 0 | 16 | 18 | 24; tone: 'color' | 'faded' | 'sepia' | 'bw'};
 
 export type Scene = {
   id: string;
@@ -109,6 +110,7 @@ export type Project = {
   height: number;
   revision: number;
   default_font_json: FontSettings;
+  finishing_json?: Finishing;
   scenes: Scene[];
 };
 
@@ -168,7 +170,7 @@ export const api = {
   deleteProject: (id:string) => req<{ok:boolean}>(`/api/projects/${id}`, {method:"DELETE"}),
   listProjects: () => req<Project[]>("/api/projects"),
   getProject: (id: string) => req<Project>(`/api/projects/${id}`),
-  updateProject: (id: string, body: Partial<{ title: string; aspect: string }>) =>
+  updateProject: (id: string, body: Partial<{ title: string; aspect: string; finishing: Finishing }>) =>
     req<Project>(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   addScene: (projectId: string) =>
     req<Scene>(`/api/projects/${projectId}/scenes`, { method: "POST", body: JSON.stringify({}) }),

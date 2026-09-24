@@ -41,6 +41,8 @@ def write_ass_file(
     canvas_h: int,
     out_path: str | None = None,
     typewriter: bool = False,
+    speech_start_ms: int = 0,
+    speech_ms: int | None = None,
 ) -> str:
     family = font_json.get("family", "Noto Naskh Arabic")
     size = int(font_json.get("size", 44))
@@ -85,7 +87,25 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         first, tagged = tag_runs(value, chosen_family, escape_text)
         return "{\\fn%s}%s" % (first, tagged) if tagged else ""
 
-    if not typewriter or not text.strip():
+    if font_json.get("karaoke") and text.strip() and not typewriter:
+        # Word-by-word highlight: each word switches from the caption colour
+        # to the highlight colour as it is spoken. No word timings are
+        # available from the voice engines, so the narration span is shared
+        # out by word length (plus a small constant for the gap), which tracks
+        # natural speech closely for captions.
+        start = max(0, int(speech_start_ms))
+        span = max(500, int(speech_ms if speech_ms else duration_ms - start))
+        words = text.split()
+        weights = [len(w) + 2 for w in words]
+        total = sum(weights)
+        hi = _hex_to_ass_color(font_json.get("highlight_color", "#FFD84D"), alpha=0)
+        lead_cs = start // 10
+        parts = [f"{{\\1c{hi}\\2c{primary}\\k{lead_cs}}}"]
+        for i, (word, weight) in enumerate(zip(words, weights)):
+            first, tagged = tag_runs(word + (" " if i < len(words) - 1 else ""), family, escape_text)
+            parts.append(f"{{\\k{max(1, round(span * weight / total / 10))}\\fn{first}}}{tagged}")
+        events = [f"Dialogue: 0,{ts(0)},{ts(duration_ms)},Default,,0,0,0,,{''.join(parts)}\n"]
+    elif not typewriter or not text.strip():
         events = [f"Dialogue: 0,{ts(0)},{ts(duration_ms)},Default,,0,0,0,,{runs(text, family)}\n"]
     else:
         schedule = reveal_schedule(text, duration_ms, font_json)

@@ -94,6 +94,17 @@ class TransitionType(str, Enum):
     WIPE_RIGHT = "wipe_right"
     FADE_WHITE = "fade_white"
     CIRCLE_OPEN = "circle_open"
+    CIRCLE_CLOSE = "circle_close"
+    ZOOM_IN = "zoom_in"
+    SMOOTH_LEFT = "smooth_left"
+    SMOOTH_RIGHT = "smooth_right"
+    RADIAL = "radial"
+    PIXELIZE = "pixelize"
+    BLUR = "blur"
+    DIAGONAL = "diagonal"
+    SQUEEZE = "squeeze"
+    FADE_GRAYS = "fade_grays"
+    FILM_BURN = "film_burn"
 
 
 class TimingMode(str, Enum):

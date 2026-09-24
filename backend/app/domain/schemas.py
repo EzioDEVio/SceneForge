@@ -21,6 +21,7 @@ class ProjectOut(BaseModel):
     height: int
     revision: int
     default_font_json: dict
+    finishing_json: dict = {}
 
     class Config:
         from_attributes = True
@@ -30,6 +31,7 @@ class ProjectUpdate(BaseModel):
     title: str | None = None
     aspect: str | None = None
     language: str | None = None
+    finishing: dict | None = None
 
 
 class AssetOut(BaseModel):
