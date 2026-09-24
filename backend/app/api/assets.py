@@ -144,18 +144,18 @@ async def import_lut(project_id: str, file: UploadFile, db: Session = Depends(ge
     """Import a 3D .cube LUT. It is validated fully before it is stored and
     is never passed to FFmpeg directly: renders bake it into a generated
     grade LUT (render/grade.py)."""
-    from app.render.grade import MAX_CUBE_BYTES, CubeError, decode_cube, parse_cube
+    from app.render.grade import MAX_CUBE_BYTES, CubeError, decode_cube, parse_lut
     if not db.get(Project, project_id):
         raise HTTPException(404, "Project not found")
     if Path(file.filename or "").suffix.lower() != ".cube":
         raise HTTPException(400, "Choose a .cube LUT file.")
     data = await file.read(MAX_CUBE_BYTES + 1)
     if len(data) > MAX_CUBE_BYTES:
-        raise HTTPException(413, "This LUT is larger than 12 MB. Use a LUT of 65 points or fewer.")
+        raise HTTPException(413, "This LUT is larger than 32 MB. Use a LUT of 65 points or fewer.")
     if b"\x00" in data[:4096]:
         raise HTTPException(400, "This .cube file is not plain text.")
     try:
-        table, _, _ = parse_cube(decode_cube(data))
+        lut = parse_lut(decode_cube(data))
     except CubeError as e:
         raise HTTPException(400, f"This LUT could not be read: {e}")
     digest = hashlib.sha256(data).hexdigest()
@@ -168,7 +168,7 @@ async def import_lut(project_id: str, file: UploadFile, db: Session = Depends(ge
     (project_dir / dest_name).write_bytes(data)
     asset = Asset(project_id=project_id, type="lut", content_hash=digest, storage_key=f"{project_id}/{dest_name}",
                   mime="text/plain", original_filename=Path(file.filename or "look.cube").name[:255],
-                  width=table.shape[0], origin=AssetOrigin.UPLOAD)
+                  width=lut.size, origin=AssetOrigin.UPLOAD)
     db.add(asset)
     db.commit()
     db.refresh(asset)

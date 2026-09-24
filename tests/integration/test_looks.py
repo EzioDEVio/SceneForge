@@ -17,7 +17,7 @@ sys.path.insert(0,str(root/'backend'))
 from fastapi.testclient import TestClient
 from app.main import app
 from app.render.filters import build_shot_video_chain
-from app.render.grade import parse_cube,CubeError,build_grade_lut
+from app.render.grade import parse_cube,parse_lut,CubeError,build_grade_lut
 n=0
 def check(name,ok):
  global n
@@ -58,7 +58,7 @@ def cube(fn,size=17,extra=''):
 swap=cube(lambda c:c[:,[2,1,0]])                        # swaps red and blue
 table,_,_=parse_cube(swap)
 check('cube parser reads a valid 17-point LUT (red fastest)',table.shape==(17,17,17,3) and np.allclose(table[0,0,16],[0,0,1]))
-for bad,why in [('LUT_1D_SIZE 1024\n0 0 0\n','1D'),('TITLE "x"\n','missing size'),('LUT_3D_SIZE 2\n0 0 0\n','too few rows'),('LUT_3D_SIZE 99\n','size range'),(swap.replace('0.000000 0.000000 0.000000','nan 0 0',1),'non-finite')]:
+for bad,why in [('LUT_1D_SIZE 1024\n0 0 0\n','a 1D LUT with too few rows'),('TITLE "x"\n','missing size'),('LUT_3D_SIZE 2\n0 0 0\n','too few rows'),('LUT_3D_SIZE 99\n','size range'),(swap.replace('0.000000 0.000000 0.000000','nan 0 0',1),'non-finite')]:
  try:parse_cube(bad);ok=False
  except CubeError:ok=True
  check('cube parser rejects '+why,ok)
@@ -116,6 +116,30 @@ check('LUT with a Latin-1 title imports',client.post('/api/assets/lut',params={'
 check('binary files are refused as .cube',client.post('/api/assets/lut',params={'project_id':pid},files={'file':('x.cube',b'\x00\x01LUT')}).status_code==400)
 _,lo,hi=parse_cube(cube(lambda c:c,extra='LUT_3D_INPUT_RANGE 0.0 1.0\n'))
 check('Resolve LUT_3D_INPUT_RANGE is honoured',list(lo)==[0,0,0] and list(hi)==[1,1,1])
+# 1D and DaVinci Resolve "1D shaper + 3D" LUTs.
+def oned(fn,size=1024,rng=None):
+ x=np.linspace(0,1,size);rows=np.stack([fn(x)]*3,1);buf=io.StringIO()
+ buf.write(f'# 1D test\nLUT_1D_SIZE {size}\n'+(f'LUT_1D_INPUT_RANGE {rng[0]} {rng[1]}\n' if rng else ''));np.savetxt(buf,rows,fmt='%.6f');return buf.getvalue()
+g22=parse_lut(oned(lambda x:x**(1/2.2)))
+check('1D LUT parses and applies its curve (gamma 2.2 at 0.5 = 0.730)',g22.kind=='1D' and abs(g22.apply(np.array([[.5,.5,.5]]))[0,0]-0.5**(1/2.2))<0.002)
+check('1D input range stretches the input',abs(parse_lut(oned(lambda x:x,rng=(0,2))).apply(np.array([[1.,1.,1.]]))[0,0]-0.5)<0.002)
+def shaper3d():
+ # shaper squares the input, 3D table swaps red and blue: result = swap(x^2)
+ x=np.linspace(0,1,256);sh=np.stack([x**2]*3,1);g=np.linspace(0,1,9);b,gg,r=np.meshgrid(g,g,g,indexing='ij')
+ t=np.stack([b,gg,r],-1).reshape(-1,3);buf=io.StringIO();buf.write('LUT_1D_SIZE 256\nLUT_1D_INPUT_RANGE 0.0 1.0\n\nLUT_3D_SIZE 9\nLUT_3D_INPUT_RANGE 0.0 1.0\n\n')
+ np.savetxt(buf,sh,fmt='%.6f');np.savetxt(buf,t,fmt='%.6f');return buf.getvalue()
+sl=parse_lut(shaper3d());o=sl.apply(np.array([[0.8,0.5,0.2]]))[0]
+check('Resolve shaper + 3D LUT: shaper runs first, then the 3D table',sl.kind=='1D shaper + 3D' and np.allclose(o,[0.04,0.25,0.64],atol=0.01))
+for name,text in [('gamma.cube',oned(lambda x:x**(1/2.2))),('shaper.cube',shaper3d())]:
+ r=client.post('/api/assets/lut',params={'project_id':pid},files={'file':(name,text.encode())})
+ check(f'{name} imports through the API',r.status_code==200 and r.json()['type']=='lut')
+ if name=='gamma.cube':gamma_id=r.json()['id']
+client.patch(f"/api/scenes/{scene['id']}",json={'look':{'adjust':None,'lut':{'asset_id':gamma_id,'strength':100}}})
+brighter=render_scene()
+check('1D gamma LUT brightens the render as expected',all(brighter[i]>plain[i]+15 for i in range(3)))
+gb=np.linspace(0,1,65);bb,bg,br=np.meshgrid(gb,gb,gb,indexing='ij');bigbuf=io.StringIO();bigbuf.write('LUT_3D_SIZE 65\n')
+np.savetxt(bigbuf,np.stack([br,bg,bb],-1).reshape(-1,3),fmt='%.14f');big=bigbuf.getvalue()
+check('a 65-point LUT written with long decimals (over 12 MB) imports',len(big.encode())>12*1024*1024 and client.post('/api/assets/lut',params={'project_id':pid},files={'file':('big.cube',big.encode())}).status_code==200)
 # Graded preview frame matches the render.
 client.patch(f"/api/scenes/{scene['id']}",json={'look':{'adjust':None,'lut':{'asset_id':lut['id'],'strength':100}}})
 r=client.get(f"/api/scenes/{scene['id']}/graded-frame",params={'w':320})

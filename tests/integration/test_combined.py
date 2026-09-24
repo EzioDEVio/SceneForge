@@ -90,7 +90,7 @@ try:
             profiles[name]=call('POST','/api/providers',json={'capability':cap,'name':name,'api_key':'fixture-key' if cap=='image' else '', 'base_url':f'http://127.0.0.1:{server.server_port}','model':name})
         connected=call('POST','/api/local-speech/kokoro/connect')
         check('local speech component connects without cloud key entry',connected['status']=='service_reachable' and connected['profile']['id']==profiles['kokoro']['id'])
-        check('backend exposes matching release identity',call('GET','/api/health')['build']=='workspace-2.5')
+        check('backend exposes matching release identity',call('GET','/api/health')['build']==__import__('app.main',fromlist=['BUILD_ID']).BUILD_ID)
         check('four independent provider profiles coexist',len(call('GET','/api/providers'))==4)
         call('POST','/api/providers',json={'capability':'image','name':'gemini','api_key':'fixture-key','model':'new-model'})
         check('editing Gemini preserves OpenAI profile',len(call('GET','/api/providers'))==4 and next(p for p in call('GET','/api/providers') if p['name']=='openai')['id']==profiles['openai']['id'])

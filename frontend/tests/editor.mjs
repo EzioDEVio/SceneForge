@@ -25,7 +25,7 @@ let failNextPatch=false;
 let requests=[];
 let next=10;
 let profiles=[];
-let healthBuild="workspace-2.5";
+let healthBuild="rc5-looks-audio-2";let oldBackend=false;
 let failLocal=true;
 let closeReady=true;
 const clone=x=>structuredClone(x);
@@ -45,6 +45,7 @@ globalThis.fetch=async(path,init={})=>{
  else if(path.endsWith('/voices'))result={voices:['af_heart','default']};
  else if(path.endsWith('/image-history'))result=[];
  else if(path.startsWith('/api/assets/luts'))result=[];
+ else if(path.startsWith('/api/assets/lut?')&&method==='POST'){const f=body.get('file');if(/broken/.test(f.name))return {ok:false,status:400,statusText:'Bad',json:async()=>({detail:'This LUT could not be read: Expected 35937 entries, found 3.'})};result={id:'lut-'+next++,type:'lut',original_filename:f.name,width:33};}
  else if(path.startsWith('/api/assets/upload')&&method==='POST'){const f=body.get('file');result={id:'up-'+next++,type:/\.(mp4|mov)$/i.test(f.name)?'video':'image',original_filename:f.name,width:640,height:360,duration_ms:null};}
  else if(/\/api\/scenes\/[^/]+\/voice-takes\/upload$/.test(path)){const sc=project.scenes.find(s=>s.id===path.split('/')[3]);const take={id:'take-'+next++,accepted:true,voice:'Uploaded audio',source:'upload',measured_duration_ms:5200,stale:false,edit_json:{},effective_duration_ms:5200,audio_asset:{id:'aud-'+next++,type:'audio',original_filename:body.get('file').name}};sc.voice_takes.forEach(t=>t.accepted=false);sc.voice_takes.push(take);result=take;}
  else if(/\/api\/voice-takes\/[^/]+\/select$/.test(path))result={ok:true};
@@ -63,7 +64,7 @@ globalThis.fetch=async(path,init={})=>{
   await new Promise(r=>setTimeout(r,25));
   if(failNextPatch){failNextPatch=false;return {ok:false,status:503,statusText:'Unavailable',json:async()=>({detail:'Save failed for test'})};}
   const s=project.scenes.find(s=>s.id===path.split('/').at(-1));
-  const {font,...fields}=body;Object.assign(s,fields);if(body.transition_in)s.transition_in_json=body.transition_in;if(font)Object.assign(s.font_json,font);s.is_stale=true;result=s;
+  const {font,look,...fields}=body;Object.assign(s,fields);if(look&&!oldBackend){s.look_json={...(s.look_json||{})};for(const [k,v] of Object.entries(look)){if(v===null)delete s.look_json[k];else s.look_json[k]=v;}}if(body.transition_in)s.transition_in_json=body.transition_in;if(font)Object.assign(s.font_json,font);s.is_stale=true;result=s;
  }
  else if(path.startsWith('/api/scenes/')&&method==='DELETE'){project.scenes=project.scenes.filter(s=>s.id!==path.split('/').at(-1));result={ok:true};}
  else throw Error(`Unhandled test API: ${method} ${path}`);
@@ -155,6 +156,23 @@ try{
  fireEvent.change(screen.getByRole('slider',{name:'Glitch speed'}),{target:{value:'2.5'}});await saved();
  check('glitch speed and block size save',requests.some(r=>r.body?.look?.glitch?.block==='large'&&r.body.look.glitch.speed===2.5));
  check('LUT import control is offered',!!screen.getByRole('button',{name:/Import .cube/})&&!!screen.getByRole('combobox',{name:'Color LUT'}));
+ const folderFiles=[new File(['x'],'Rec709 Kodak 2383 D65.cube'),new File(['x'],'Canon Log to Rec709.ilut'),new File(['x'],'LMT Day for Night.xml'),new File(['x'],'broken.cube'),new File(['x'],'Linear to sRGB.cube')];
+ const folderInput=screen.getByLabelText('Import LUT folder');Object.defineProperty(folderInput,'files',{value:folderFiles,configurable:true});fireEvent.change(folderInput);
+
+ await screen.findByText(/2 LUTs imported · 2 other files skipped \(only \.cube is supported\)/);
+ check('importing a folder imports every .cube and reports the rest',requests.filter(r=>r.path.startsWith('/api/assets/lut?')).length===3);
+ check('a broken LUT in the folder is reported by name',!!screen.getByText(/Could not import 1: broken\.cube: Expected 35937 entries/));
+ await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.body?.look?.lut?.asset_id?.startsWith('lut-'))));
+ check('the first imported LUT is applied to the scene',true);
+ check('both imported LUTs are offered in the picker',within(screen.getByRole('combobox',{name:'Color LUT'})).getAllByRole('option').length===3);
+ oldBackend=true;
+ const lutOptions=within(screen.getByRole('combobox',{name:'Color LUT'})).getAllByRole('option');
+ await user.selectOptions(screen.getByRole('combobox',{name:'Color LUT'}),lutOptions[2].value);
+ await screen.findByText(/The LUT was not saved because this SceneForge backend is out of date/);
+ check('an old backend that ignores the LUT is reported, not silently accepted',true);
+ oldBackend=false;
+ await user.selectOptions(screen.getByRole('combobox',{name:'Color LUT'}),'');await saved();
+ check('after a failed save, the next LUT change still saves',requests.filter(r=>r.method==='PATCH'&&r.body?.look&&'lut' in r.body.look).at(-1).body.look.lut===null&&screen.getByRole('status').textContent==='All changes saved');
  await user.click(screen.getByRole('button',{name:'Original',exact:true}));await saved();
  const narration=screen.getAllByRole('button').filter(b=>b.className.includes('narration-clip'))[0];
  const dt=(files)=>({dataTransfer:{types:['Files'],files,items:[],dropEffect:'',getData:()=>''}});

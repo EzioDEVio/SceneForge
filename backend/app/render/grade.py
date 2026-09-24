@@ -20,7 +20,9 @@ from pathlib import Path
 import numpy as np
 
 GRID = 33
-MAX_CUBE_BYTES = 12 * 1024 * 1024
+# A 65-point 3D table (274,625 rows) plus a 65,536-row 1D shaper, written
+# with long decimals as some camera vendors do, stays well under this.
+MAX_CUBE_BYTES = 32 * 1024 * 1024
 COLOR_KEYS = ("exposure", "highlights", "shadows", "contrast", "saturation", "vibrance", "temperature", "tint")
 _LUMA = np.array([0.2126, 0.7152, 0.0722])
 _locks: dict[str, threading.Lock] = {}
@@ -31,14 +33,60 @@ class CubeError(ValueError):
     pass
 
 
-def parse_cube(text: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-    """Parse and validate an Adobe/Resolve .cube 3D LUT.
+class Lut:
+    """A parsed .cube: optional 1D curve (per channel), optional 3D table.
 
-    Returns (table[b, g, r, 3], domain_min[3], domain_max[3]). Red varies
-    fastest in the file, as the format requires.
+    Supports the three layouts found in the wild, including DaVinci Resolve's
+    own LUT folder:
+      * 3D only (LUT_3D_SIZE)
+      * 1D only (LUT_1D_SIZE), e.g. gamma/log conversions
+      * 1D "shaper" + 3D (both sizes), Resolve's HDR/ACES format: the 1D rows
+        come first and reshape the input before the 3D lookup.
     """
-    size = None
-    dmin, dmax = np.zeros(3), np.ones(3)
+
+    def __init__(self, shaper, shaper_range, table, domain):
+        self.shaper = shaper              # (n, 3) or None
+        self.shaper_range = shaper_range  # (lo[3], hi[3])
+        self.table = table                # (n, n, n, 3) indexed [b, g, r] or None
+        self.domain = domain              # (lo[3], hi[3]) for the 3D table
+
+    @property
+    def kind(self) -> str:
+        if self.shaper is not None and self.table is not None:
+            return "1D shaper + 3D"
+        return "3D" if self.table is not None else "1D"
+
+    @property
+    def size(self) -> int:
+        return self.table.shape[0] if self.table is not None else self.shaper.shape[0]
+
+    def apply(self, rgb: np.ndarray) -> np.ndarray:
+        out = rgb
+        if self.shaper is not None:
+            lo, hi = self.shaper_range
+            x = np.clip((out - lo) / (hi - lo), 0, 1)
+            grid = np.linspace(0, 1, self.shaper.shape[0])
+            out = np.stack([np.interp(x[:, c], grid, self.shaper[:, c]) for c in range(3)], axis=1)
+        if self.table is not None:
+            out = sample_cube(out, self.table, *self.domain)
+        return out
+
+
+def _three(line: str, head: str) -> np.ndarray:
+    try:
+        values = np.array([float(v) for v in line.split()[1:4]])
+    except ValueError:
+        raise CubeError(f"{head} must contain three numbers.") from None
+    if values.size != 3:
+        raise CubeError(f"{head} must contain three numbers.")
+    return values
+
+
+def parse_lut(text: str) -> Lut:
+    """Parse and validate a .cube file (see Lut for supported layouts)."""
+    size1 = size3 = None
+    r1 = (np.zeros(3), np.ones(3))
+    r3 = [np.zeros(3), np.ones(3)]
     rows: list[list[float]] = []
     text = text.lstrip("\ufeff")  # byte-order mark written by some Windows tools
     for raw in text.splitlines():
@@ -48,35 +96,37 @@ def parse_cube(text: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
         head = line.split()[0].upper()
         if head == "TITLE":
             continue
-        if head == "LUT_1D_SIZE":
-            raise CubeError("This is a 1D LUT. SceneForge supports 3D .cube LUTs (LUT_3D_SIZE).")
-        if head == "LUT_3D_SIZE":
+        if head in ("LUT_1D_SIZE", "LUT_3D_SIZE"):
             try:
-                size = int(line.split()[1])
+                n = int(line.split()[1])
             except (IndexError, ValueError):
-                raise CubeError("LUT_3D_SIZE is not a whole number.") from None
-            if not 2 <= size <= 65:
-                raise CubeError("LUT_3D_SIZE must be between 2 and 65.")
+                raise CubeError(f"{head} is not a whole number.") from None
+            if head == "LUT_3D_SIZE":
+                if not 2 <= n <= 65:
+                    raise CubeError("LUT_3D_SIZE must be between 2 and 65.")
+                size3 = n
+            else:
+                if not 2 <= n <= 65536:
+                    raise CubeError("LUT_1D_SIZE must be between 2 and 65536.")
+                size1 = n
             continue
-        if head == "LUT_3D_INPUT_RANGE":
-            # Resolve/Premiere variant of DOMAIN_MIN/MAX: one range for all channels.
+        if head in ("LUT_1D_INPUT_RANGE", "LUT_3D_INPUT_RANGE"):
+            # Resolve/Premiere: one range for all channels.
             try:
                 lo, hi = (float(v) for v in line.split()[1:3])
             except ValueError:
-                raise CubeError("LUT_3D_INPUT_RANGE must contain two numbers.") from None
-            dmin, dmax = np.full(3, lo), np.full(3, hi)
-            continue
-        if head in ("DOMAIN_MIN", "DOMAIN_MAX"):
-            try:
-                values = np.array([float(v) for v in line.split()[1:4]])
-            except ValueError:
-                raise CubeError(f"{head} must contain three numbers.") from None
-            if values.size != 3:
-                raise CubeError(f"{head} must contain three numbers.")
-            if head == "DOMAIN_MIN":
-                dmin = values
+                raise CubeError(f"{head} must contain two numbers.") from None
+            rng = (np.full(3, lo), np.full(3, hi))
+            if head == "LUT_1D_INPUT_RANGE":
+                r1 = rng
             else:
-                dmax = values
+                r3 = list(rng)
+            continue
+        if head == "DOMAIN_MIN":
+            r3[0] = _three(line, head)
+            continue
+        if head == "DOMAIN_MAX":
+            r3[1] = _three(line, head)
             continue
         if head.isalpha() or "_" in head:
             continue  # other keywords (e.g. LUT_IN_VIDEO_RANGE) are informational
@@ -87,16 +137,28 @@ def parse_cube(text: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
             rows.append([float(v) for v in parts])
         except ValueError:
             raise CubeError("The LUT contains a value that is not a number.") from None
-    if size is None:
-        raise CubeError("Missing LUT_3D_SIZE. Is this a 3D .cube file?")
-    if len(rows) != size ** 3:
-        raise CubeError(f"Expected {size ** 3} entries for a {size}-point LUT, found {len(rows)}.")
-    if np.any(dmax <= dmin):
-        raise CubeError("DOMAIN_MAX must be greater than DOMAIN_MIN.")
-    table = np.asarray(rows, dtype=np.float64)
-    if not np.all(np.isfinite(table)):
+    if size1 is None and size3 is None:
+        raise CubeError("Missing LUT_3D_SIZE or LUT_1D_SIZE. Is this a .cube LUT?")
+    expected = (size1 or 0) + (size3 or 0) ** 3
+    if len(rows) != expected:
+        raise CubeError(f"Expected {expected} entries, found {len(rows)}.")
+    data = np.asarray(rows, dtype=np.float64)
+    if not np.all(np.isfinite(data)):
         raise CubeError("The LUT contains non-finite values.")
-    return table.reshape(size, size, size, 3), dmin, dmax
+    for lo, hi in (r1, r3):
+        if np.any(hi <= lo):
+            raise CubeError("The LUT input range maximum must be greater than its minimum.")
+    shaper = data[:size1] if size1 else None
+    table = data[size1 or 0:].reshape(size3, size3, size3, 3) if size3 else None
+    return Lut(shaper, r1, table, (r3[0], r3[1]))
+
+
+def parse_cube(text: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+    """3D-only view used by older callers: (table[b, g, r, 3], dmin, dmax)."""
+    lut = parse_lut(text)
+    if lut.table is None or lut.shaper is not None:
+        raise CubeError("This is a 1D or shaper LUT; use parse_lut().")
+    return lut.table, lut.domain[0], lut.domain[1]
 
 
 def decode_cube(data: bytes) -> str:
@@ -195,8 +257,7 @@ def _write_grade(out: Path, adjust: dict, lut_bytes: bytes, lut_strength: int) -
     rgb = np.stack([r, gg, b], axis=-1).reshape(-1, 3)
     graded = apply_adjustments(rgb, adjust)
     if lut_bytes:
-        table, dmin, dmax = parse_cube(decode_cube(lut_bytes))
-        looked = np.clip(sample_cube(graded, table, dmin, dmax), 0, 1)
+        looked = np.clip(parse_lut(decode_cube(lut_bytes)).apply(graded), 0, 1)
         s = lut_strength / 100
         graded = graded * (1 - s) + looked * s
     tmp = out.with_name(f"{out.stem}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp")

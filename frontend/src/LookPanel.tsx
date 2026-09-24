@@ -85,15 +85,34 @@ export function LookPanel({scene, disabled, onDraft, onSaveNow}: Props) {
     setGlitch(next);
     onDraft({glitch: next});
   }
-  async function importLut(file?: File) {
-    if (!file) return;
-    setLutError(''); setLutBusy(true);
+  const [lutNote, setLutNote] = useState('');
+  const lutFolder = useRef<HTMLInputElement>(null);
+  /** Import one or many LUT files (a whole folder works). Only .cube files are
+   *  imported; other Resolve formats are listed as skipped. The first imported
+   *  LUT is applied to this scene when none is set yet. */
+  async function importLuts(list: FileList | null) {
+    const files = Array.from(list || []);
+    if (!files.length) return;
+    setLutError(''); setLutNote(''); setLutBusy(true);
+    const cubes = files.filter(f => /\.cube$/i.test(f.name)).sort((a, b) => a.name.localeCompare(b.name, undefined, {numeric: true}));
+    const skipped = files.length - cubes.length;
+    const failed: string[] = [];
+    let first: Asset | null = null, count = 0;
     try {
-      const asset = await api.importLut(scene.project_id, file);
-      setLuts(l => l.some(x => x.id === asset.id) ? l : [...l, asset]);
-      await onSaveNow({lut: {asset_id: asset.id, strength: look.lut?.strength ?? 100}});
-    } catch (e: any) {setLutError(e.message || 'This LUT could not be imported.');}
-    finally {setLutBusy(false); if (lutFile.current) lutFile.current.value = '';}
+      for (const file of cubes) {
+        try {
+          const asset = await api.importLut(scene.project_id, file);
+          count++; first = first || asset;
+          setLuts(l => l.some(x => x.id === asset.id) ? l : [...l, asset]);
+        } catch (e: any) {failed.push(`${file.name}: ${String(e.message || e).replace(/^This LUT could not be read: /, '')}`);}
+      }
+      if (first && (cubes.length === 1 || !lut)) await onSaveNow({lut: {asset_id: first.id, strength: lut?.strength ?? 100}});
+      const parts = [`${count} LUT${count === 1 ? '' : 's'} imported`];
+      if (skipped) parts.push(`${skipped} other file${skipped === 1 ? '' : 's'} skipped (only .cube is supported)`);
+      if (cubes.length > 1 || skipped) setLutNote(parts.join(' · ') + (count > 1 ? '. Choose one from the list above.' : '.'));
+      if (failed.length) setLutError(`Could not import ${failed.length}: ${failed.slice(0, 3).join('; ')}${failed.length > 3 ? '…' : ''}`);
+      if (!cubes.length) setLutError('No .cube files were found. SceneForge imports .cube LUTs (3D, 1D, or 1D shaper + 3D).');
+    } finally {setLutBusy(false); if (lutFile.current) lutFile.current.value = ''; if (lutFolder.current) lutFolder.current.value = '';}
   }
   const active = ADJUSTMENTS.filter(a => adjust[a.key]).length;
   const lut = look.lut;
@@ -131,15 +150,18 @@ export function LookPanel({scene, disabled, onDraft, onSaveNow}: Props) {
 
     <section className="look-section" aria-label="Color LUT">
       <h3><Palette size={15}/> Color LUT</h3>
-      <p className="hint">Apply a .cube colour grade, such as one exported from DaVinci Resolve or bought as a film look.</p>
+      <p className="hint">Apply a .cube colour grade: 3D, 1D, or DaVinci Resolve’s shaper LUTs. Film looks and camera LUTs (Log to Rec709) expect log footage and look very strong on normal video.</p>
       <div className="lut-row">
         <select aria-label="Color LUT" value={lut?.asset_id || ''} disabled={disabled || lutBusy} onChange={e => void onSaveNow({lut: e.target.value ? {asset_id: e.target.value, strength: lut?.strength ?? 100} : null})}>
           <option value="">None</option>
           {luts.map(l => <option key={l.id} value={l.id}>{l.original_filename.replace(/\.cube$/i, '')}</option>)}
         </select>
         <button className="btn" disabled={disabled || lutBusy} onClick={() => lutFile.current?.click()}><Upload size={14}/> {lutBusy ? 'Importing…' : 'Import .cube'}</button>
-        <input ref={lutFile} type="file" accept=".cube" hidden aria-label="Import LUT file" onChange={e => void importLut(e.target.files?.[0])}/>
+        <input ref={lutFile} type="file" accept=".cube" multiple hidden aria-label="Import LUT file" onChange={e => void importLuts(e.target.files)}/>
+        <input ref={lutFolder} type="file" hidden aria-label="Import LUT folder" {...{webkitdirectory: '', directory: ''} as any} onChange={e => void importLuts(e.target.files)}/>
       </div>
+      <button className="text-btn" disabled={disabled || lutBusy} onClick={() => lutFolder.current?.click()}><Upload size={12}/> Import a whole folder of LUTs</button>
+      {lutNote && <p className="hint" aria-live="polite">{lutNote}</p>}
       {lut && <label className="control-label">LUT strength · {lut.strength}%
         <input aria-label="LUT strength" type="range" min={0} max={100} step={5} defaultValue={lut.strength} key={lut.asset_id} disabled={disabled}
           onChange={e => onDraft({lut: {asset_id: lut.asset_id, strength: Number(e.target.value)}})}/></label>}

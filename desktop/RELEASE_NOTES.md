@@ -1,3 +1,14 @@
+# SceneForge Desktop 0.2.0 RC5 (in progress) — LUT compatibility
+
+## LUTs from DaVinci Resolve
+- **1D LUTs** (`LUT_1D_SIZE`, e.g. gamma, log and HDR conversions) and Resolve's **1D shaper + 3D** LUTs (e.g. ACES LMT) now import and render. Previously they were rejected. All 108 `.cube` files in Resolve's LUT folder import.
+- **Import a whole folder of LUTs** (Effects → Color LUT). Only `.cube` files are imported; other Resolve formats (`.ilut`, `.olut`, `.xml`, `.dat`) are listed as skipped, and broken files are named with the reason. Several files can also be chosen at once in the file picker.
+- The LUT size limit is raised from 12 MB to 32 MB (Resolve's "Samsung Log to Rec709" is a legal 65-point LUT of 12.9 MB).
+- If the backend does not keep a LUT choice, the panel now says so instead of silently doing nothing. Choosing a LUT is no longer blocked by an earlier failed save.
+
+## Version check
+- The backend build ID is now `rc5-looks-audio-2` and is shared with the interface (`BUILD_ID`). A new interface connected to an older backend (for example a `start.bat` window from a previous version that is still open) shows "Backend update required" instead of silently dropping new settings.
+
 # SceneForge Desktop 0.2.0 RC5 (in progress) — audio clip editing, LUT preview
 
 ## Scene audio editor
