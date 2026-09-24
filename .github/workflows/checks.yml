@@ -31,4 +31,5 @@ jobs:
             python tests/integration/test_timeline.py
             python tests/integration/test_text_thumbs.py
             python tests/integration/test_looks.py
+            python tests/integration/test_audio_edit.py
           '

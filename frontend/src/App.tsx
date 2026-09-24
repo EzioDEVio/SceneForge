@@ -5,7 +5,9 @@ import { previewFontFamily } from "./fonts";
 import {Thumb} from "./Thumb";
 import {planPoolInsert} from "./poolPlan";
 import {planFileDrop, DraggedAsset} from "./timelineDrop";
-import {LookPanel, adjustPreviewFilter, WhiteBalanceFilter, PreviewFinish} from "./LookPanel";
+import {LookPanel, adjustPreviewFilter, WhiteBalanceFilter, PreviewFinish, gradeKey} from "./LookPanel";
+import {AudioClipEditor, removeSceneAudio} from "./AudioClipEditor";
+import {sceneDuration} from "./duration";
 import {TitleDesigner,TitleDesign,ANIMATIONS} from './TitleDesigner';
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -433,7 +435,7 @@ function VoicePanel({ scene, onChanged, beforeGenerate }: { scene: Scene; onChan
             <button className="btn" onClick={() => fileRef.current?.click()} disabled={busy}>
               Upload recorded audio
             </button>
-            <button className="btn" disabled={busy || !scene.voice_takes.some(t => t.accepted)} onClick={async () => {setBusy(true); setErr(null); try {await api.clearNarration(scene.id); onChanged();} catch(e:any) {setErr(e.message);} finally {setBusy(false);}}}>Use no narration</button>
+            <button className="btn" disabled={busy || !scene.voice_takes.some(t => t.accepted)} onClick={async () => {setBusy(true); setErr(null); try {await removeSceneAudio(scene); onChanged();} catch(e:any) {setErr(e.message);} finally {setBusy(false);}}}>Use no narration</button>
             <input ref={fileRef} type="file" accept="audio/*" style={{ display: "none" }}
               onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadTake(f); }} />
           </div>
@@ -531,7 +533,9 @@ const INSPECTOR_TABS: {name: InspectorTab; Icon: typeof Film}[] = [
 ];
 
 function durationLabel(scene: Scene) {
-  const ms = scene.timing_mode === "fixed" ? scene.requested_duration_ms : scene.measured_duration_ms;
+  // Current length (trimmed audio + padding), not the length of the last render.
+  const ms = scene.timing_mode === "fixed" ? scene.requested_duration_ms
+    : scene.voice_takes.some(t => t.accepted) ? sceneDuration(scene) : scene.measured_duration_ms;
   return ms ? `${(ms / 1000).toFixed(1)}s` : "Auto";
 }
 
@@ -581,6 +585,9 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
   },[scene.id,previewMode,shot?.id,shot?.source_in_ms]);
   const isGenerating = !!job && ["queued", "running", "cancelling"].includes(job.status);
   const rendered = scene.rendered_asset_id;
+  const acceptedTake = scene.voice_takes.find(t => t.accepted);
+  // Timeline narration clicks open this scene's Audio tab.
+  useEffect(() => {const open = (e: Event) => {const d = (e as CustomEvent).detail; if (d?.sceneId === scene.id && d.tab) setTab(d.tab);}; window.addEventListener('sceneforge-open-tab', open); return () => window.removeEventListener('sceneforge-open-tab', open);}, [scene.id]);
 
   useEffect(() => { if (!active) editorRef.current?.querySelectorAll<HTMLMediaElement>("video, audio").forEach(media => media.pause()); }, [active]);
   useEffect(() => {
@@ -656,7 +663,10 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
   });
   const liveAdjust = ((pending.current.look as any)?.adjust ?? scene.look_json?.adjust) || undefined;
   const wbFilterId = `sf-wb-${scene.id}`;
-  const mediaFilter = [previewFilter, adjustPreviewFilter(liveAdjust, wbFilterId)].filter(Boolean).join(' ') || undefined;
+  // With a LUT, the preview shows a server-graded frame (exact colour: LUT +
+  // colour sliders), so only the look preset stays as a CSS approximation.
+  const gradedSrc = scene.look_json?.lut && shot ? api.gradedFrameUrl(scene.id, gradeKey(scene.look_json), 1280, shot.id) : null;
+  const mediaFilter = (gradedSrc ? previewFilter : [previewFilter, adjustPreviewFilter(liveAdjust, wbFilterId)].filter(Boolean).join(' ')) || undefined;
   const canvasRatio = project.aspect.split(':').map(Number).reduce((a,b)=>a/b);
   async function uploadSound(file: File) {
     await run(async () => {
@@ -686,8 +696,8 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
           <div className="canvas-viewport">
             <div className="preview-canvas" style={{aspectRatio: project.aspect.replace(":", "/"), width: `min(${zoom}%, calc((var(--stage-height) - 40px) * ${canvasRatio * zoom / 100}))`}}><WhiteBalanceFilter id={wbFilterId} adjust={liveAdjust}/>{previewMode !== "render" && shot && <PreviewFinish adjust={liveAdjust}/>}
               {previewMode === "render" && rendered ? <video ref={videoRef} className="canvas-media" controls preload="metadata" src={api.assetStreamUrl(rendered)}/> :
-                shot ? shot.asset?.type === "image" ? (shot.crop_json?<svg className="canvas-media" role="img" aria-label={`Cropped source for ${scene.title}`} viewBox={`${shot.crop_json.x*(shot.asset.width||1)} ${shot.crop_json.y*(shot.asset.height||1)} ${shot.crop_json.width*(shot.asset.width||1)} ${shot.crop_json.height*(shot.asset.height||1)}`} preserveAspectRatio={shot.fit==='cover'?'xMidYMid slice':'xMidYMid meet'} style={{filter:mediaFilter}}><image href={api.assetStreamUrl(shot.asset_id)} width={shot.asset.width||1} height={shot.asset.height||1}/></svg>:<img className="canvas-media" src={api.assetStreamUrl(shot.asset_id)} alt={`Source media for ${scene.title}`} style={{objectFit: shot.fit === "cover" ? "cover" : "contain", filter:mediaFilter}}/>) :
-                  <video ref={videoRef} className="canvas-media" controls preload="metadata" src={api.assetStreamUrl(shot.asset_id)} style={{objectFit:shot.fit === "cover" ? "cover" : "contain",filter:mediaFilter}}/> :
+                shot ? shot.asset?.type === "image" ? (shot.crop_json?<svg className="canvas-media" role="img" aria-label={`Cropped source for ${scene.title}`} viewBox={`${shot.crop_json.x*(shot.asset.width||1)} ${shot.crop_json.y*(shot.asset.height||1)} ${shot.crop_json.width*(shot.asset.width||1)} ${shot.crop_json.height*(shot.asset.height||1)}`} preserveAspectRatio={shot.fit==='cover'?'xMidYMid slice':'xMidYMid meet'} style={{filter:mediaFilter}}><image href={gradedSrc||api.assetStreamUrl(shot.asset_id)} width={shot.asset.width||1} height={shot.asset.height||1}/></svg>:<img className="canvas-media" src={gradedSrc||api.assetStreamUrl(shot.asset_id)} alt={`Source media for ${scene.title}`} style={{objectFit: shot.fit === "cover" ? "cover" : "contain", filter:mediaFilter}}/>) :
+                  <video ref={videoRef} className="canvas-media" controls preload="metadata" poster={gradedSrc||undefined} src={api.assetStreamUrl(shot.asset_id)} style={{objectFit:shot.fit === "cover" ? "cover" : "contain",filter:mediaFilter}}/> :
                   <div className="canvas-empty"><div className="empty-icon"><ImageIcon size={30}/></div><h3>Start with a visual</h3><p>Add an image or video to bring this scene to life.</p><button className="btn btn-primary" onClick={() => fileRef.current?.click()}><Plus size={15}/> Add media</button><button className="text-btn" onClick={() => setChatOpen(true)}><Sparkles size={14}/> Or generate an image</button></div>}
               {previewMode==="source"&&shot?.asset?.type==="image"&&scene.effect_preset==="glitch"&&strength>0&&<img aria-hidden="true" className="canvas-media glitch-slice glitch-full" src={api.assetStreamUrl(shot.asset_id)} alt="" style={{objectFit:shot.fit==="cover"?"cover":"contain",opacity:strength}}/>}
               {previewMode==="source"&&shot&&(scene.font_json.layers||[]).map(l=><div className="canvas-text-layer" key={l.id} dir="auto" style={{left:`${l.x}%`,top:`${l.y}%`,fontSize:`${l.size/project.width*100}cqw`,color:l.color,fontFamily:previewFontFamily(l.family||scene.font_json.family),fontWeight:l.bold?700:400,textAlign:(l.align||"center") as any,transform:`translate(${l.align==="left"?0:l.align==="right"?-100:-50}%,-50%)`,WebkitTextStroke:`${(l.outline_width||0)/project.width*100}cqw black`,textShadow:l.shadow?`${l.shadow/project.width*100}cqw ${l.shadow/project.width*100}cqw black`:"none"}}>{l.text}</div>)}
@@ -749,7 +759,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
             {scene.font_json.typewriter_sound_asset_id && <button className="text-btn" disabled={saving} onClick={()=>update({font:{typewriter_sound_asset_id:null}})}>Use included keystroke</button>}
             <p className="hint">If this recording was previously uploaded as narration, choose Audio → Use no narration to avoid hearing it twice.</p>
           </section><p className="hint">Render the scene to preview captions and synchronized sound together.</p></>}
-          {tab === "Audio" && <><h3>Voice & narration</h3><p className="hint">Connect a local speech component or upload a recording. Select a take before rendering.</p><VoicePanel scene={{...scene,spoken_text:text}} onChanged={refresh} beforeGenerate={flush}/></>}
+          {tab === "Audio" && <>{acceptedTake?.audio_asset && <AudioClipEditor key={acceptedTake.id} scene={scene} take={acceptedTake} disabled={saving} onChanged={refresh} onRemove={()=>run(()=>removeSceneAudio(scene))}/>}<h3>Voice & narration</h3><p className="hint">Connect a local speech component or upload a recording. Select a take before rendering.</p><VoicePanel scene={{...scene,spoken_text:text}} onChanged={refresh} beforeGenerate={flush}/></>}
           <section className="timing-section"><h3><Clock size={15}/> Scene duration</h3><label className="control-label">Timing mode<select aria-label="Timing mode" value={scene.timing_mode} disabled={saving} onChange={e => update({timing_mode:e.target.value})}><option value="audio_driven">Match narration</option><option value="fixed">Fixed duration</option></select></label>
           {scene.timing_mode === "fixed" && <label className="control-label">Seconds<input aria-label="Scene duration in seconds" type="number" min={1} max={120} step={0.5} defaultValue={(scene.requested_duration_ms || 5000)/1000} key={scene.requested_duration_ms} onBlur={e => {const v=Math.max(1,Math.min(120,Number(e.target.value)||5)); if (v*1000 !== scene.requested_duration_ms) void update({requested_duration_ms:Math.round(v*1000)});}}/></label>}
           <p className="hint">{scene.timing_mode === "fixed" ? "Narration is trimmed or padded to fit this length." : "Uses the selected narration take, including lead and trail padding."}</p></section>
@@ -922,7 +932,7 @@ export default function App() {
   async function resizeDuration(id:string,ms:number){
     const scene=project?.scenes.find(s=>s.id===id);if(!scene)return;
     const take=scene.voice_takes.find(t=>t.accepted);
-    if(take&&ms<(take.measured_duration_ms||0)+(scene.lead_ms||0)+(scene.trail_ms||0)&&!await askConfirm('This duration may cut narration short. Switch to fixed timing?'))return;
+    if(take&&ms<(take.effective_duration_ms??take.measured_duration_ms??0)+(scene.lead_ms||0)+(scene.trail_ms||0)&&!await askConfirm('This duration may cut narration short. Switch to fixed timing?'))return;
     await record('duration',()=>api.updateScene(id,{timing_mode:scene.timing_mode,requested_duration_ms:scene.requested_duration_ms}),()=>api.updateScene(id,{timing_mode:'fixed',requested_duration_ms:ms}));
   }
   const [titleCard,setTitleCard]=useState(false);
@@ -1007,7 +1017,7 @@ export default function App() {
         <div id="sequence-viewer"/>
       </main>
     </div>
-    <ProjectTimeline notice={importStatus} onDropFiles={(id,files)=>void dropFilesOnTimeline(id,files)} onDropAssets={(id,assets)=>void dropAssetsOnTimeline(id,assets)} onDuration={resizeDuration} onRender={()=>void renderFullVideo()} exportScenes={exportScenes} exportAsset={exportJob?.status==="succeeded"?exportJob.artifact_asset_id:null} project={project} selectedId={selected?.id||""} disabled={busy||dirty||exporting} onSelect={setSelectedId} onAdd={addPart} onReorder={ids=>record('scene order',()=>api.reorderScenes(project.id,project.scenes.map(s=>s.id)),()=>api.reorderScenes(project.id,ids))} onUpdate={(id,patch)=>record('transition',()=>api.updateScene(id,{transition_in:project.scenes.find(s=>s.id===id)!.transition_in_json}),()=>api.updateScene(id,patch))} onDelete={()=>selected&&void deleteScene(selected.id)} onAudio={()=>audioImportRef.current?.click()} onRemoveAudio={()=>selected&&void action(async()=>{await api.clearNarration(selected.id);await refresh();})} onUndo={undoTimeline} onRedo={redoTimeline} canUndo={!!history.length} canRedo={!!future.length} onSplit={(at,baked)=>selected&&void action(async()=>{const right=await api.splitScene(selected.id,at,baked);setEditorEpoch(v=>v+1);setHistory([]);setFuture([]);await refresh();setSelectedId(right.id);})}/>
+    <ProjectTimeline notice={importStatus} onDropFiles={(id,files)=>void dropFilesOnTimeline(id,files)} onDropAssets={(id,assets)=>void dropAssetsOnTimeline(id,assets)} onDuration={resizeDuration} onRender={()=>void renderFullVideo()} exportScenes={exportScenes} exportAsset={exportJob?.status==="succeeded"?exportJob.artifact_asset_id:null} project={project} selectedId={selected?.id||""} disabled={busy||dirty||exporting} onSelect={setSelectedId} onAdd={addPart} onReorder={ids=>record('scene order',()=>api.reorderScenes(project.id,project.scenes.map(s=>s.id)),()=>api.reorderScenes(project.id,ids))} onUpdate={(id,patch)=>record('transition',()=>api.updateScene(id,{transition_in:project.scenes.find(s=>s.id===id)!.transition_in_json}),()=>api.updateScene(id,patch))} onDelete={()=>selected&&void deleteScene(selected.id)} onAudio={()=>audioImportRef.current?.click()} onRemoveAudio={()=>selected&&void action(async()=>{await removeSceneAudio(selected);await refresh();})} onRemoveSceneAudio={id=>{const s=project.scenes.find(x=>x.id===id);if(s)void action(async()=>{await removeSceneAudio(s);await refresh();setImportStatus(`Audio removed from ${s.title}. Its picture is unchanged.`);});}} onUndo={undoTimeline} onRedo={redoTimeline} canUndo={!!history.length} canRedo={!!future.length} onSplit={(at,baked)=>selected&&void action(async()=>{const right=await api.splitScene(selected.id,at,baked);setEditorEpoch(v=>v+1);setHistory([]);setFuture([]);await refresh();setSelectedId(right.id);})}/>
     {settingsOpen&&<SettingsPanel onClose={()=>setSettingsOpen(false)}/>}
   </div>;
 }

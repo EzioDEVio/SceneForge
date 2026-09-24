@@ -234,6 +234,25 @@ def voice_from_asset(scene_id:str,body:dict,db:Session=Depends(get_db)):
     take=VoiceTake(scene_id=scene_id,source='upload',audio_asset_id=asset.id,spoken_text_hash=_text_hash(scene.spoken_text),measured_duration_ms=asset.duration_ms,accepted=True)
     db.add(take);scene.revision+=1;db.commit();db.refresh(take);return take
 
+@router.patch('/api/voice-takes/{take_id}/edit', response_model=schemas.VoiceTakeOut)
+def edit_voice_take(take_id: str, body: dict, db: Session = Depends(get_db)):
+    """Trim, level and fade a take without touching the source file."""
+    from app.render.audio_edit import AudioEditError, clean_edit, is_default
+    take = db.get(VoiceTake, take_id)
+    if not take:
+        raise HTTPException(404, 'Audio take not found')
+    if not isinstance(body, dict):
+        raise HTTPException(400, 'Audio settings must be an object.')
+    try:
+        edit = clean_edit({**(take.edit_json or {}), **body}, take.measured_duration_ms)
+    except AudioEditError as e:
+        raise HTTPException(400, str(e))
+    take.edit_json = {} if is_default(edit) else edit
+    take.scene.revision += 1
+    db.commit(); db.refresh(take)
+    return take
+
+
 @router.delete('/api/voice-takes/{take_id}')
 def delete_voice_take(take_id: str, db: Session = Depends(get_db)):
     from app.db.models import RenderJob

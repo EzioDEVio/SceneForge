@@ -3,6 +3,8 @@ import React, {useEffect, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {ArrowLeft, ArrowRight, Film, Plus, GripVertical, Play, Pause, Square, SkipBack, SkipForward, Volume2, Type, Maximize2, X, ChevronLeft, ChevronRight, Trash2, Scissors, Undo2, Redo2, Upload, StepBack, StepForward, Clapperboard, ArrowLeftRight, ChevronUp, ChevronDown, Captions} from 'lucide-react';
 import {api, Project, Scene} from './api';
+import {sceneDuration} from './duration';
+import {NarrationWave} from './NarrationWave';
 import {ASSET_DRAG_TYPE, DraggedAsset, collectDroppedFiles, isMediaDrag} from './timelineDrop';
 
 export const TRANSITIONS = [
@@ -10,12 +12,7 @@ export const TRANSITIONS = [
   ['fade_white','Fade through white'], ['slide','Slide left'], ['slide_right','Slide right'],
   ['wipe_left','Wipe left'], ['wipe_right','Wipe right'], ['circle_open','Circle reveal'],
 ];
-export function sceneDuration(scene:Scene) {
-  if(scene.timing_mode==='fixed'&&scene.requested_duration_ms)return scene.requested_duration_ms;
-  const take=scene.voice_takes.find(t=>t.accepted);
-  if(take?.measured_duration_ms)return take.measured_duration_ms+(scene.lead_ms??250)+(scene.trail_ms??400);
-  return scene.measured_duration_ms||scene.requested_duration_ms||4000;
-}
+export {sceneDuration} from './duration';
 export function sequenceClips(scenes:Scene[]) {
   let cursor=0;
   return scenes.map((scene,i)=>{
@@ -30,8 +27,8 @@ export const timecode=(ms:number,fps=30)=>{
   const f=Math.max(0,Math.floor(ms/1000*fps));
   return [Math.floor(f/fps/3600),Math.floor(f/fps/60)%60,Math.floor(f/fps)%60,f%fps].map(n=>String(n).padStart(2,'0')).join(':');
 };
-export function ProjectTimeline({project,selectedId,disabled,onDuration,onRender,onSelect,onAdd,onReorder,onUpdate,exportAsset,exportScenes,onDelete,onAudio,onRemoveAudio,onUndo,onRedo,canUndo,canRedo,onSplit,onDropFiles,onDropAssets,notice}:{
-  notice?:string;onDropFiles?:(sceneId:string|null,files:File[])=>void;onDropAssets?:(sceneId:string|null,assets:DraggedAsset[])=>void;
+export function ProjectTimeline({project,selectedId,disabled,onDuration,onRender,onSelect,onAdd,onReorder,onUpdate,exportAsset,exportScenes,onDelete,onAudio,onRemoveAudio,onUndo,onRedo,canUndo,canRedo,onSplit,onDropFiles,onDropAssets,notice,onRemoveSceneAudio}:{
+  onRemoveSceneAudio?:(sceneId:string)=>void;notice?:string;onDropFiles?:(sceneId:string|null,files:File[])=>void;onDropAssets?:(sceneId:string|null,assets:DraggedAsset[])=>void;
   onDuration?:(id:string,ms:number)=>void;onRender?:()=>void;onDelete?:()=>void;onAudio?:()=>void;onRemoveAudio?:()=>void;onUndo?:()=>void;onRedo?:()=>void;canUndo?:boolean;canRedo?:boolean;onSplit?:(at:number,baked?:boolean)=>void;
   exportScenes?:Scene[];exportAsset?:string|null;project:Project;selectedId:string;disabled:boolean;onSelect:(id:string)=>void;onAdd:()=>void;
   onReorder:(ids:string[])=>Promise<unknown>;onUpdate:(id:string,patch:any)=>Promise<unknown>;
@@ -126,6 +123,7 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onRender
     else if(e.key==='ArrowRight'){e.preventDefault();if(e.shiftKey)seek(clips.find(c=>c.start>position+1)?.start??length,true);else seek(position+frame,true);}
     else if(e.key==='Home'){e.preventDefault();seek(0,true);}
     else if(e.key==='End'){e.preventDefault();seek(length,true);}
+    else if((e.key==='Delete'||e.key==='Backspace')&&t?.classList.contains('narration-clip')&&!disabled){e.preventDefault();const id=t.dataset.sceneId;if(id&&scenes.find(x=>x.id===id)?.voice_takes.some(v=>v.accepted))onRemoveSceneAudio?.(id);}
     else if((e.key==='Delete'||e.key==='Backspace')&&selected&&!disabled){e.preventDefault();onDelete?.();}
   };
   useEffect(()=>{const h=(e:KeyboardEvent)=>shortcut.current(e);window.addEventListener('keydown',h);return()=>window.removeEventListener('keydown',h);},[]);
@@ -198,7 +196,7 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onRender
               {overlap>0&&<button disabled={disabled} className={`clip-transition ${selectedId===s.id?'selected':''}`} style={{left:start/1000*scale,width:Math.max(20,overlap/1000*scale)}} aria-label={`Edit ${s.title} transition`} title={`${TRANSITIONS.find(t=>t[0]===s.transition_in_json.type)?.[1]} · ${(overlap/1000).toFixed(2)}s (effective overlap)`} onClick={()=>{onSelect(s.id);seek(start);}}><span>⋈</span></button>}
             </React.Fragment>)}
           </div>
-          <div className="narration-track" aria-label="Narration track">{clips.map(({scene:s,start,duration})=>{const take=s.voice_takes.find(t=>t.accepted);return <button key={s.id} onDragOver={e=>{dragOverMedia(e,'a:'+s.id);}} onDragLeave={()=>setDropTarget('')} onDrop={e=>{dropMedia(e,s.id);}} className={`narration-clip ${take?'has-take':''} ${dropTarget==='a:'+s.id?'drop-target':''}`} style={{left:start/1000*scale,width:Math.max(4,duration/1000*scale-2)}} onClick={()=>onSelect(s.id)} title={take?`${take.voice||'Narration'} · ${((take.measured_duration_ms||0)/1000).toFixed(1)}s · drop audio here to replace`:'Drop an audio file here to add sound to this scene'}><Volume2 size={13}/>{take?take.voice||'Narration':dropTarget==='a:'+s.id?'Drop to add audio':'No narration'}</button>})}</div>
+          <div className="narration-track" aria-label="Narration track">{clips.map(({scene:s,start,duration})=>{const take=s.voice_takes.find(t=>t.accepted);return <button key={s.id} onDragOver={e=>{dragOverMedia(e,'a:'+s.id);}} onDragLeave={()=>setDropTarget('')} onDrop={e=>{dropMedia(e,s.id);}} data-scene-id={s.id} className={`narration-clip ${take?'has-take':''} ${dropTarget==='a:'+s.id?'drop-target':''}`} style={{left:start/1000*scale,width:Math.max(4,duration/1000*scale-2)}} onClick={()=>{onSelect(s.id);if(take)window.dispatchEvent(new CustomEvent('sceneforge-open-tab',{detail:{sceneId:s.id,tab:'Audio'}}));}} title={take?`${take.audio_asset?.original_filename||take.voice||'Narration'} · ${((take.effective_duration_ms??take.measured_duration_ms??0)/1000).toFixed(1)}s · click to edit, Delete to remove, drop audio to replace`:'Drop an audio file here to add sound to this scene'}><Volume2 size={13}/>{take?.audio_asset&&<NarrationWave take={take}/>}<span className="narration-label">{take?take.audio_asset?.original_filename||take.voice||'Narration':dropTarget==='a:'+s.id?'Drop to add audio':'No narration'}</span></button>})}</div>
           <div className="titles-track" aria-label="Text track">{clips.map(({scene:s,start,duration})=>{const caption=s.font_json.captions_enabled&&s.subtitle_text?s.subtitle_text:'';const layers=s.font_json.layers?.length||0;const summary=[caption&&`Caption: ${caption}`,layers&&`${layers} title${layers>1?'s':''}`].filter(Boolean).join(' · ')||'No captions or titles';return <button key={s.id} className={`title-clip ${caption||layers?'has-title':''}`} style={{left:start/1000*scale,width:Math.max(4,duration/1000*scale-2)}} onClick={()=>onSelect(s.id)} title={summary} aria-label={`${s.title} text: ${summary}`}>{layers>0&&<span className="lane-titles"><Type size={11}/>{layers}</span>}{caption?<span className="lane-caption"><Captions size={12}/>{caption}</span>:layers?null:<span className="lane-empty"><Type size={12}/>No text</span>}</button>})}</div>
         </div>
       </div>

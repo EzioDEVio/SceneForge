@@ -12,6 +12,9 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
+import threading
+import uuid
 from pathlib import Path
 
 import numpy as np
@@ -20,6 +23,8 @@ GRID = 33
 MAX_CUBE_BYTES = 12 * 1024 * 1024
 COLOR_KEYS = ("exposure", "highlights", "shadows", "contrast", "saturation", "vibrance", "temperature", "tint")
 _LUMA = np.array([0.2126, 0.7152, 0.0722])
+_locks: dict[str, threading.Lock] = {}
+_locks_guard = threading.Lock()
 
 
 class CubeError(ValueError):
@@ -35,6 +40,7 @@ def parse_cube(text: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     size = None
     dmin, dmax = np.zeros(3), np.ones(3)
     rows: list[list[float]] = []
+    text = text.lstrip("\ufeff")  # byte-order mark written by some Windows tools
     for raw in text.splitlines():
         line = raw.strip()
         if not line or line.startswith("#"):
@@ -51,6 +57,14 @@ def parse_cube(text: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
                 raise CubeError("LUT_3D_SIZE is not a whole number.") from None
             if not 2 <= size <= 65:
                 raise CubeError("LUT_3D_SIZE must be between 2 and 65.")
+            continue
+        if head == "LUT_3D_INPUT_RANGE":
+            # Resolve/Premiere variant of DOMAIN_MIN/MAX: one range for all channels.
+            try:
+                lo, hi = (float(v) for v in line.split()[1:3])
+            except ValueError:
+                raise CubeError("LUT_3D_INPUT_RANGE must contain two numbers.") from None
+            dmin, dmax = np.full(3, lo), np.full(3, hi)
             continue
         if head in ("DOMAIN_MIN", "DOMAIN_MAX"):
             try:
@@ -83,6 +97,15 @@ def parse_cube(text: str) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
     if not np.all(np.isfinite(table)):
         raise CubeError("The LUT contains non-finite values.")
     return table.reshape(size, size, size, 3), dmin, dmax
+
+
+def decode_cube(data: bytes) -> str:
+    """.cube files are ASCII by spec, but titles and comments from real tools
+    may be UTF-8 (with or without BOM) or Latin-1."""
+    try:
+        return data.decode("utf-8-sig")
+    except UnicodeDecodeError:
+        return data.decode("latin-1")
 
 
 def sample_cube(rgb: np.ndarray, table: np.ndarray, dmin: np.ndarray, dmax: np.ndarray) -> np.ndarray:
@@ -155,20 +178,29 @@ def build_grade_lut(adjust: dict | None, lut_path: str | None, lut_strength: int
     key = hashlib.sha256(json.dumps([adjust, lut_strength, GRID]).encode() + lut_bytes).hexdigest()[:24]
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / f"grade_{key}.cube"
-    if out.exists():
-        return str(out)
+    with _locks_guard:
+        lock = _locks.setdefault(key, threading.Lock())
+    # Preview requests and renders may ask for the same grade at once: one
+    # builds it, the others wait and reuse it.
+    with lock:
+        if out.exists():
+            return str(out)
+        _write_grade(out, adjust, lut_bytes, lut_strength)
+    return str(out)
+
+
+def _write_grade(out: Path, adjust: dict, lut_bytes: bytes, lut_strength: int) -> None:
     g = np.linspace(0, 1, GRID)
     b, gg, r = np.meshgrid(g, g, g, indexing="ij")
     rgb = np.stack([r, gg, b], axis=-1).reshape(-1, 3)
     graded = apply_adjustments(rgb, adjust)
     if lut_bytes:
-        table, dmin, dmax = parse_cube(lut_bytes.decode("utf-8", errors="strict"))
+        table, dmin, dmax = parse_cube(decode_cube(lut_bytes))
         looked = np.clip(sample_cube(graded, table, dmin, dmax), 0, 1)
         s = lut_strength / 100
         graded = graded * (1 - s) + looked * s
-    tmp = out.with_suffix(".tmp")
+    tmp = out.with_name(f"{out.stem}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp")
     with open(tmp, "w", encoding="ascii") as fh:
         fh.write(f"TITLE \"SceneForge grade\"\nLUT_3D_SIZE {GRID}\n")
         np.savetxt(fh, graded, fmt="%.6f")
-    tmp.replace(out)
-    return str(out)
+    os.replace(tmp, out)

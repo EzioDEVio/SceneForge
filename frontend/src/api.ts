@@ -37,7 +37,11 @@ export type VoiceTake = {
   accepted: boolean;
   stale: boolean;
   audio_asset?: Asset;
+  edit_json?: AudioEdit;
+  effective_duration_ms?: number | null;
 };
+export type AudioEdit = {in_ms?: number; out_ms?: number | null; volume?: number; fade_in_ms?: number; fade_out_ms?: number};
+export type Waveform = {duration_ms: number; peaks: number[]; peak: number};
 
 export type FontSettings = {
   family: string;
@@ -205,6 +209,8 @@ export const api = {
       body: JSON.stringify({ text, voice }),
     }),
   clearNarration: (sceneId: string) => req(`/api/scenes/${sceneId}/voice-takes/clear-selection`, {method: "POST"}),
+  editTake: (takeId: string, edit: AudioEdit) => req<VoiceTake>(`/api/voice-takes/${takeId}/edit`, {method: "PATCH", body: JSON.stringify(edit)}),
+  waveform: (assetId: string, points = 600) => req<Waveform>(`/api/assets/${assetId}/waveform?points=${points}`),
   deleteTake: (takeId: string) => req(`/api/voice-takes/${takeId}`, {method:"DELETE"}),
   selectTake: (takeId: string) => req<VoiceTake>(`/api/voice-takes/${takeId}/select`, { method: "POST" }),
 
@@ -224,6 +230,7 @@ export const api = {
 
   assetStreamUrl: (assetId: string) => `/api/assets/${assetId}/stream`,
   assetThumbUrl: (assetId: string, width = 320) => `/api/assets/${assetId}/thumbnail?w=${width}`,
+  gradedFrameUrl: (sceneId: string, key: string, width = 1280, shotId?: string) => `/api/scenes/${sceneId}/graded-frame?w=${width}&k=${key}${shotId ? `&shot_id=${shotId}` : ''}`,
   assetDownloadUrl: (assetId: string) => `/api/assets/${assetId}/stream?download=1`,
 
   health: () => req<{status:string;build?:string;credential_warning?:string}>("/api/health"),

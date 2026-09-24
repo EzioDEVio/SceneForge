@@ -144,7 +144,7 @@ async def import_lut(project_id: str, file: UploadFile, db: Session = Depends(ge
     """Import a 3D .cube LUT. It is validated fully before it is stored and
     is never passed to FFmpeg directly: renders bake it into a generated
     grade LUT (render/grade.py)."""
-    from app.render.grade import MAX_CUBE_BYTES, CubeError, parse_cube
+    from app.render.grade import MAX_CUBE_BYTES, CubeError, decode_cube, parse_cube
     if not db.get(Project, project_id):
         raise HTTPException(404, "Project not found")
     if Path(file.filename or "").suffix.lower() != ".cube":
@@ -152,11 +152,10 @@ async def import_lut(project_id: str, file: UploadFile, db: Session = Depends(ge
     data = await file.read(MAX_CUBE_BYTES + 1)
     if len(data) > MAX_CUBE_BYTES:
         raise HTTPException(413, "This LUT is larger than 12 MB. Use a LUT of 65 points or fewer.")
-    try:
-        text = data.decode("utf-8")
-        table, _, _ = parse_cube(text)
-    except UnicodeDecodeError:
+    if b"\x00" in data[:4096]:
         raise HTTPException(400, "This .cube file is not plain text.")
+    try:
+        table, _, _ = parse_cube(decode_cube(data))
     except CubeError as e:
         raise HTTPException(400, f"This LUT could not be read: {e}")
     digest = hashlib.sha256(data).hexdigest()
@@ -181,6 +180,25 @@ def list_luts(project_id: str, db: Session = Depends(get_db)):
     if not db.get(Project, project_id):
         raise HTTPException(404, "Project not found")
     return db.query(Asset).filter(Asset.project_id == project_id, Asset.type == "lut").order_by(Asset.created_at).all()
+
+
+@router.get("/{asset_id}/waveform")
+def asset_waveform(asset_id: str, points: int = 600, db: Session = Depends(get_db)):
+    """Peak envelope (0..1) for drawing an audio clip. Cached on disk."""
+    from app.render.waveform import WaveformError, waveform
+    asset = db.get(Asset, asset_id)
+    if not asset:
+        raise HTTPException(404, "Asset not found")
+    if asset.type not in ("audio", "video"):
+        raise HTTPException(415, "Waveforms are available for audio and video only.")
+    base = Path(RENDERS_DIR if asset.origin == AssetOrigin.RENDER_OUTPUT else MEDIA_DIR).resolve()
+    path = (base / asset.storage_key).resolve()
+    if base not in path.parents or not path.exists():
+        raise HTTPException(404, "Asset file missing on disk")
+    try:
+        return waveform(asset.id, path, points)
+    except WaveformError as e:
+        raise HTTPException(422, str(e))
 
 
 @router.get("/{asset_id}/thumbnail")

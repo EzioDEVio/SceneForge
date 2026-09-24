@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import model_validator, BaseModel, Field
 
 
 class ProjectCreate(BaseModel):
@@ -86,6 +86,15 @@ class VoiceTakeOut(BaseModel):
     accepted: bool
     stale: bool
     audio_asset: AssetOut | None = None
+    edit_json: dict = {}
+    # Length after trimming; this is what "Match narration" uses.
+    effective_duration_ms: int | None = None
+
+    @model_validator(mode="after")
+    def _effective(self):
+        from app.render.audio_edit import effective_ms
+        self.effective_duration_ms = effective_ms(self.measured_duration_ms, self.edit_json)
+        return self
 
     class Config:
         from_attributes = True

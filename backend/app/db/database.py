@@ -40,6 +40,7 @@ def init_db() -> None:
 # and existing rows get the default, so older databases open unchanged.
 _ADDED_COLUMNS = {
     "scenes": {"look_json": "JSON NOT NULL DEFAULT '{}'"},
+    "voice_takes": {"edit_json": "JSON NOT NULL DEFAULT '{}'"},
 }
 
 

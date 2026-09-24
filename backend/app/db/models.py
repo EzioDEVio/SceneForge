@@ -188,6 +188,8 @@ class VoiceTake(Base):
     settings_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     audio_asset_id: Mapped[str | None] = mapped_column(ForeignKey("assets.id"), nullable=True)
     measured_duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Non-destructive trim/volume/fade (render/audio_edit.py).
+    edit_json: Mapped[dict] = mapped_column(JSON, default=dict)
     accepted: Mapped[bool] = mapped_column(Boolean, default=False)
     stale: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)

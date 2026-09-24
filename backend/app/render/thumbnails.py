@@ -15,7 +15,7 @@ from pathlib import Path
 from app.config import FFMPEG_BIN, PROXIES_DIR
 
 THUMB_DIR = PROXIES_DIR / "thumbs"
-ALLOWED_WIDTHS = (160, 320, 640)
+ALLOWED_WIDTHS = (160, 320, 640, 1280)
 _locks: dict[str, threading.Lock] = {}
 _locks_guard = threading.Lock()
 
@@ -46,7 +46,7 @@ def thumbnail_path(asset_id: str, source: Path, kind: str, duration_ms: int | No
     with _lock_for(key):
         if out.exists() and out.stat().st_mtime >= source.stat().st_mtime and out.stat().st_size > 0:
             return out
-        tmp = out.with_suffix(".tmp.jpg")
+        tmp = out.with_name(f"{out.stem}.{os.getpid()}.{threading.get_ident()}.tmp.jpg")
         args = [FFMPEG_BIN, "-y", "-hide_banner", "-nostdin", "-loglevel", "error"]
         if kind == "video":
             args += ["-ss", f"{poster_offset_s(duration_ms):.3f}"]
@@ -62,5 +62,27 @@ def thumbnail_path(asset_id: str, source: Path, kind: str, duration_ms: int | No
         if result.returncode != 0 or not tmp.exists() or tmp.stat().st_size == 0:
             tmp.unlink(missing_ok=True)
             raise ThumbnailError("This file could not be decoded to make a preview frame.")
+        os.replace(tmp, out)
+        return out
+
+
+def graded_frame(thumb: Path, grade_lut: str, key: str) -> Path:
+    """Apply a baked grade LUT to a thumbnail: an exact colour preview of the
+    render (same LUT, same interpolation), made in a fraction of a second."""
+    from app.render.ffmpeg_utils import escape_path_for_filter
+    out_dir = THUMB_DIR / "graded"
+    out_dir.mkdir(parents=True, exist_ok=True)
+    out = out_dir / f"{key}.jpg"
+    with _lock_for(str(out)):
+        if out.exists() and out.stat().st_size > 0:
+            return out
+        tmp = out.with_name(f"{out.stem}.{os.getpid()}.{threading.get_ident()}.tmp.jpg")
+        flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0  # type: ignore[attr-defined]
+        vf = f"format=gbrp,lut3d=file='{escape_path_for_filter(grade_lut)}':interp=tetrahedral"
+        result = subprocess.run([FFMPEG_BIN, "-y", "-hide_banner", "-nostdin", "-loglevel", "error", "-i", str(thumb),
+                                 "-vf", vf, "-frames:v", "1", "-q:v", "3", str(tmp)], capture_output=True, timeout=30, creationflags=flags)
+        if result.returncode != 0 or not tmp.exists():
+            tmp.unlink(missing_ok=True)
+            raise ThumbnailError("The graded preview could not be made.")
         os.replace(tmp, out)
         return out

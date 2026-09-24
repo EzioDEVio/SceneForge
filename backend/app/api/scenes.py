@@ -348,3 +348,48 @@ def _validated_look(scene, look: dict, db) -> dict:
                 raise HTTPException(400, "LUT strength must be between 0 and 100.")
             merged["lut"] = {"asset_id": asset.id, "strength": int(strength)}
     return merged
+
+
+@router.get("/{scene_id}/graded-frame")
+def graded_frame_endpoint(scene_id: str, w: int = 1280, shot_id: str | None = None, db: Session = Depends(get_db)):
+    """A still of the scene's media with its colour grade (adjustment
+    sliders + LUT) applied exactly as the renderer will, for the editor
+    preview. Look presets, glitch, sharpen, vignette and grain are not
+    included; the editor previews those separately."""
+    from pathlib import Path
+    import hashlib
+    from fastapi.responses import FileResponse
+    from app.config import MEDIA_DIR, PROXIES_DIR, RENDERS_DIR
+    from app.db.models import Asset
+    from app.render.grade import CubeError, build_grade_lut
+    from app.render.thumbnails import ThumbnailError, graded_frame, thumbnail_path
+    scene = db.get(Scene, scene_id)
+    if not scene:
+        raise HTTPException(404, "Scene not found")
+    shots = [s for s in scene.shots if s.asset and s.asset.type in ("image", "video")]
+    shot = next((s for s in shots if s.id == shot_id), shots[0] if shots else None)
+    if not shot:
+        raise HTTPException(404, "This scene has no image or video to preview.")
+    look = scene.look_json or {}
+    lut = look.get("lut") or {}
+    lut_path = None
+    if lut.get("asset_id"):
+        lut_asset = db.get(Asset, lut["asset_id"])
+        if not lut_asset or lut_asset.type != "lut":
+            raise HTTPException(404, "The LUT chosen for this scene is missing.")
+        lut_path = str(Path(MEDIA_DIR) / lut_asset.storage_key)
+    try:
+        grade = build_grade_lut(look.get("adjust"), lut_path, int(lut.get("strength", 100)), Path(PROXIES_DIR) / "grades")
+    except CubeError as e:
+        raise HTTPException(422, f"The LUT could not be read: {e}")
+    asset = shot.asset
+    base = Path(RENDERS_DIR if asset.origin == "render_output" else MEDIA_DIR)
+    try:
+        thumb = thumbnail_path(asset.id, base / asset.storage_key, asset.type, asset.duration_ms, w)
+        if not grade:
+            return FileResponse(thumb, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
+        key = hashlib.sha256(f"{thumb.name}|{thumb.stat().st_mtime}|{Path(grade).name}".encode()).hexdigest()[:24]
+        out = graded_frame(thumb, grade, key)
+    except ThumbnailError as e:
+        raise HTTPException(422, str(e))
+    return FileResponse(out, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=3600"})

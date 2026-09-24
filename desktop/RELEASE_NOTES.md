@@ -1,3 +1,27 @@
+# SceneForge Desktop 0.2.0 RC5 (in progress) — audio clip editing, LUT preview
+
+## Scene audio editor
+- Click a scene's audio clip on the timeline (or open Audio) to edit it: waveform with draggable trim handles (arrow keys nudge 0.1 s), Start/End in seconds, Volume 0–200%, Fade in and Fade out, **Play clip** to audition the trimmed, levelled and faded result, and **Reset edits**.
+- Edits are non-destructive: the original file is never changed. **Match narration** uses the trimmed length.
+- **Remove from scene** takes the audio off without touching the picture. The scene keeps its current length, and the audio stays in the takes list and the Media Pool. With a timeline audio clip focused, Delete removes only the audio.
+- Timeline audio clips show their waveform and file name.
+
+## LUT fixes
+- The editor preview now shows the LUT (and colour sliders) exactly as the render will, and Effects → Color LUT shows a before/after comparison. Previously LUTs were only visible after rendering, which made them look like they did nothing.
+- .cube files with a UTF-8 byte-order mark or accented titles now import; `LUT_3D_INPUT_RANGE` is honoured.
+- Fixed a race when the preview and a render built the same grade at the same time.
+
+## Other fixes
+- A lead or trail of 0 now renders as zero; previously it rendered the defaults (0.25 s / 0.4 s), so the render was longer than the timeline showed.
+- Scene cards and the settings header show the scene's current length rather than the length of its last render.
+
+## Upgrade notes
+- Existing databases gain `voice_takes.edit_json` automatically; existing takes keep their data.
+
+## Tests
+- `tests/integration/test_audio_edit.py` (26 checks, in CI): trim, volume, fades and length measured on rendered audio; waveform; removal keeps picture and file; database upgrade.
+- `test_looks.py` now 40 checks, including the graded preview matching the render; 7 new component checks.
+
 # SceneForge Desktop 0.2.0 RC5 (in progress) — looks, grading and timeline drops
 
 ## Glitch

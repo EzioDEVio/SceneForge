@@ -120,3 +120,29 @@
 .sequence-dock .narration-clip.drop-target{background:#2f5a47}
 .sequence-dock .picture-track.drop-target{background:repeating-linear-gradient(135deg,#ffffff08 0 8px,transparent 8px 16px);box-shadow:inset 0 0 0 1px #8472c1}
 .pool-grid article[draggable=true]{cursor:grab}
+/* Audio clip editor (Audio tab) */
+.audio-clip-editor{padding:2px 0 14px;margin-bottom:14px;border-bottom:1px solid var(--line)}
+.audio-clip-name{font-size:11px;color:#c3c9d6;margin:0 0 8px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.audio-wave{position:relative;height:64px;border-radius:5px;background:#1b2a24;border:1px solid #2f4a3d;overflow:hidden;touch-action:none;user-select:none}
+.audio-wave-svg{position:absolute;inset:4px 0;width:100%;height:calc(100% - 8px)}.audio-wave-svg path{stroke:#6fd3a4;stroke-width:1}
+.audio-wave-empty{display:grid;place-items:center;height:100%;font-size:11px;color:var(--muted)}
+.audio-trimmed{position:absolute;top:0;bottom:0;background:#11151acc;pointer-events:none}
+.audio-fade{position:absolute;top:0;bottom:0;pointer-events:none}
+.audio-fade.in{background:linear-gradient(90deg,#11151a99,transparent)}.audio-fade.out{background:linear-gradient(90deg,transparent,#11151a99)}
+.audio-handle{position:absolute;top:0;bottom:0;width:12px;margin-left:-6px;cursor:ew-resize;z-index:2}
+.audio-handle::before{content:"";position:absolute;left:5px;top:0;bottom:0;width:2px;background:#e6dcff}
+.audio-handle::after{content:"";position:absolute;left:1px;top:calc(50% - 9px);width:10px;height:18px;border-radius:3px;background:#e6dcff}
+.audio-handle:focus-visible{outline:2px solid #a699f0;outline-offset:0}
+.audio-head{position:absolute;top:0;bottom:0;width:2px;background:#ff6b6b;pointer-events:none;z-index:1}
+.audio-times{display:flex;gap:8px;align-items:flex-end;margin:10px 0 2px}
+.audio-times label{display:flex;flex-direction:column;gap:3px;font-size:10px;color:var(--muted)}
+.audio-times input{width:72px;padding:4px 6px;font-size:11px;background:#1d2026;border:1px solid var(--line);color:var(--text);border-radius:4px}
+.audio-times .btn{margin-left:auto;font-size:11px;padding:6px 10px}
+.audio-fades{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:10px}.audio-fades input[type=range],.audio-clip-editor input[type=range]{width:100%;min-width:0}.audio-fades .control-label{margin-top:4px}
+.audio-actions{justify-content:space-between;margin:6px 0}.audio-actions .btn{font-size:11px;padding:6px 10px}
+/* Waveform inside timeline narration clips */
+.sequence-dock .narration-clip{overflow:hidden} /* stays position:absolute from the track layout */
+.narration-wave{position:absolute;inset:3px 0;width:100%;height:calc(100% - 6px);pointer-events:none;opacity:.55}.narration-wave path{stroke:#8fe3bb;stroke-width:1}
+.narration-clip .narration-label,.narration-clip svg:not(.narration-wave){position:relative;z-index:1}
+.narration-clip .narration-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.lut-compare{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0 4px}.lut-compare figure{margin:0}.lut-compare img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:4px;display:block;background:#1b1d22}.lut-compare figcaption{font-size:10px;color:var(--muted);margin-top:3px}

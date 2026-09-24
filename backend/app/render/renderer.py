@@ -96,11 +96,10 @@ def _narration_duration_ms(scene: Scene) -> tuple[int | None, str | None]:
     take = _accepted_take(scene)
     if not take or not take.audio_asset:
         return None, None
+    from app.render.audio_edit import effective_ms
     audio_path = _resolve_asset_path(take.audio_asset)
-    if take.measured_duration_ms:
-        return take.measured_duration_ms, audio_path
-    p = probe(audio_path)
-    return (p.duration_ms or FALLBACK_SCENE_DURATION_MS), audio_path
+    measured = take.measured_duration_ms or probe(audio_path).duration_ms or FALLBACK_SCENE_DURATION_MS
+    return effective_ms(measured, take.edit_json), audio_path
 
 
 def _canvas(project: Project) -> tuple[int, int]:
@@ -311,10 +310,17 @@ def mux_audio_and_captions(
 
     final_path = str(work_dir / "part_final.mp4")
     total_s = total_duration_ms / 1000.0
+    # Trim/volume/fade for the accepted take, applied before placement.
+    from app.render.audio_edit import effective_ms, narration_filter
+    take = _accepted_take(scene)
+    edit = (take.edit_json if take else None) or {}
+    clip_ms = effective_ms(take.measured_duration_ms, edit) if take and take.measured_duration_ms else total_duration_ms
+    pre = narration_filter(edit, clip_ms or total_duration_ms)
+    pre = f"{pre}," if pre else ""
     if typing_path:
         if narration_path:
             inputs = ['-i', captioned_path, '-i', narration_path, '-i', typing_path]
-            graph = (f'[1:a]adelay={lead_ms}|{lead_ms},apad,atrim=duration={total_s:.3f}[voice];'
+            graph = (f'[1:a]{pre}adelay={lead_ms}|{lead_ms},apad,atrim=duration={total_s:.3f}[voice];'
                      f'[2:a]apad,atrim=duration={total_s:.3f}[keys];'
                      '[voice][keys]amix=inputs=2:duration=longest:normalize=0,alimiter=limit=0.95:latency=1[aout]')
             args = [*inputs, '-filter_complex', graph, '-map', '0:v', '-map', '[aout]']
@@ -327,7 +333,7 @@ def mux_audio_and_captions(
             "-i", captioned_path,
             "-i", narration_path,
             "-filter_complex",
-            f"[1:a]adelay={lead_ms}|{lead_ms},apad=whole_dur={trail_s:.3f}[aout]",
+            f"[1:a]{pre}adelay={lead_ms}|{lead_ms},apad=whole_dur={trail_s:.3f}[aout]",
             "-map", "0:v", "-map", "[aout]",
             "-t", f"{total_s:.3f}",
             "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
@@ -357,7 +363,10 @@ def render_part(
     work_dir.mkdir(parents=True, exist_ok=True)
     try:
         narration_ms, narration_path = _narration_duration_ms(scene)
-        lead_ms, trail_ms = scene.lead_ms or DEFAULT_LEAD_MS, scene.trail_ms or DEFAULT_TRAIL_MS
+        # 0 is a valid choice (no padding) and must match the timeline,
+        # which also treats 0 as zero; only a missing value uses the default.
+        lead_ms = DEFAULT_LEAD_MS if scene.lead_ms is None else scene.lead_ms
+        trail_ms = DEFAULT_TRAIL_MS if scene.trail_ms is None else scene.trail_ms
         if scene.timing_mode == "fixed" and scene.requested_duration_ms:
             # User explicitly chose a clip duration — this takes priority
             # over narration length. If narration is present it is muxed

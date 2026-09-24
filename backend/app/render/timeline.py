@@ -65,6 +65,7 @@ def audio_hash_of(scene: Scene) -> str:
         "take_id": accepted.id,
         "audio_asset_hash": accepted.audio_asset.content_hash if accepted.audio_asset else None,
         "measured_duration_ms": accepted.measured_duration_ms,
+        "edit": accepted.edit_json or {},
     })
 
 

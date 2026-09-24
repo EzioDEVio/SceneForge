@@ -20,6 +20,14 @@ const BLOCKS: {key: 'small' | 'medium' | 'large'; label: string}[] = [
   {key: 'small', label: 'Fine'}, {key: 'medium', label: 'Medium'}, {key: 'large', label: 'Chunky'},
 ];
 
+/** Short cache key for a scene's colour grade, so preview URLs change
+ *  exactly when the grade changes. */
+export function gradeKey(look?: Look): string {
+  const text = JSON.stringify({a: look?.adjust || {}, l: look?.lut || null});
+  let h = 5381; for (let i = 0; i < text.length; i++) h = ((h << 5) + h + text.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
+}
+
 /** CSS approximation of the adjustments for the editing preview. The exact
  *  result comes from the renderer's baked grade LUT. */
 export function adjustPreviewFilter(a: Adjust | undefined, wbFilterId: string): string {
@@ -137,7 +145,11 @@ export function LookPanel({scene, disabled, onDraft, onSaveNow}: Props) {
           onChange={e => onDraft({lut: {asset_id: lut.asset_id, strength: Number(e.target.value)}})}/></label>}
       {lut && <button className="text-btn" disabled={disabled} onClick={() => void onSaveNow({lut: null})}><X size={12}/> Remove LUT</button>}
       {lutError && <p className="form-error" role="alert">{lutError}</p>}
-      {lut && <p className="hint">LUTs appear in the rendered scene, not in this preview.</p>}
+      {lut && scene.shots[0] && <div className="lut-compare" aria-label="LUT before and after">
+        <figure><img src={api.assetThumbUrl(scene.shots[0].asset_id, 320)} alt="Before LUT"/><figcaption>Before</figcaption></figure>
+        <figure><img src={api.gradedFrameUrl(scene.id, gradeKey(look), 320)} alt="After LUT"/><figcaption>After · {lut.strength}%</figcaption></figure>
+      </div>}
+      {lut && <p className="hint">The preview shows the LUT’s colour. Render the scene for the final result with motion and effects.</p>}
     </section>
   </div>;
 }

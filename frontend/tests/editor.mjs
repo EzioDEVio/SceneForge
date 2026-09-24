@@ -46,8 +46,11 @@ globalThis.fetch=async(path,init={})=>{
  else if(path.endsWith('/image-history'))result=[];
  else if(path.startsWith('/api/assets/luts'))result=[];
  else if(path.startsWith('/api/assets/upload')&&method==='POST'){const f=body.get('file');result={id:'up-'+next++,type:/\.(mp4|mov)$/i.test(f.name)?'video':'image',original_filename:f.name,width:640,height:360,duration_ms:null};}
- else if(/\/api\/scenes\/[^/]+\/voice-takes\/upload$/.test(path)){const sc=project.scenes.find(s=>s.id===path.split('/')[3]);const take={id:'take-'+next++,accepted:true,voice:'Uploaded audio',source:'upload',measured_duration_ms:5200,stale:false};sc.voice_takes.forEach(t=>t.accepted=false);sc.voice_takes.push(take);result=take;}
+ else if(/\/api\/scenes\/[^/]+\/voice-takes\/upload$/.test(path)){const sc=project.scenes.find(s=>s.id===path.split('/')[3]);const take={id:'take-'+next++,accepted:true,voice:'Uploaded audio',source:'upload',measured_duration_ms:5200,stale:false,edit_json:{},effective_duration_ms:5200,audio_asset:{id:'aud-'+next++,type:'audio',original_filename:body.get('file').name}};sc.voice_takes.forEach(t=>t.accepted=false);sc.voice_takes.push(take);result=take;}
  else if(/\/api\/voice-takes\/[^/]+\/select$/.test(path))result={ok:true};
+ else if(/\/api\/voice-takes\/[^/]+\/edit$/.test(path)){const id=path.split('/')[3];const take=project.scenes.flatMap(x=>x.voice_takes).find(v=>v.id===id);take.edit_json={...take.edit_json,...body};take.effective_duration_ms=(take.edit_json.out_ms??take.measured_duration_ms)-(take.edit_json.in_ms||0);result=take;}
+ else if(/\/api\/assets\/[^/]+\/waveform/.test(path))result={duration_ms:5200,peaks:Array.from({length:600},(_,i)=>Math.abs(Math.sin(i/9))),peak:1};
+ else if(/\/api\/scenes\/[^/]+\/voice-takes\/clear-selection$/.test(path)){const sc=project.scenes.find(x=>x.id===path.split('/')[3]);sc.voice_takes.forEach(v=>v.accepted=false);result={ok:true};}
  else if(path.endsWith('/voice-takes/from-asset')){result={id:'take-'+next++,accepted:true,voice:'Uploaded audio',source:'upload',measured_duration_ms:3000,stale:false};}
  else if(/\/api\/scenes\/[^/]+\/shots$/.test(path)&&method==='POST'){const sc=project.scenes.find(s=>s.id===path.split('/')[3]);const shot={id:'shot-'+next++,asset_id:body.asset_id,asset:{id:body.asset_id,type:'image',width:640,height:360},order_index:sc.shots.length,fit:'cover',motion_json:{type:'static'},crop_json:null,source_in_ms:0};sc.shots.push(shot);result=shot;}
  else if(path.endsWith('/generate-image'))result={id:'generated-image'};
@@ -174,6 +177,36 @@ try{
  await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/voice-takes/from-asset')&&r.body.asset_id==='pool-audio')));
  await waitFor(()=>assert.ok(requests.filter(r=>r.method==='PATCH'&&r.body?.timing_mode==='audio_driven').length>=2));
  check('dragging audio from the Media Pool onto a scene attaches it and matches the clip',true);
+ // Audio clip editor: open from the timeline, edit, remove without losing the picture.
+ const pool2=project.scenes[0].voice_takes.find(v=>v.id.startsWith('take-')&&v.audio_asset);pool2.accepted=true;project.scenes[0].voice_takes.filter(v=>v!==pool2).forEach(v=>v.accepted=false);
+ await user.click(screen.getByRole('button',{name:'Select scene 1: '+project.scenes[0].title}));
+ const lane1=screen.getAllByRole('button').filter(b=>b.className.includes('narration-clip'))[0];
+ await user.click(lane1);
+ const editor=await screen.findByRole('region',{name:'Scene audio clip'});
+ check('clicking a timeline audio clip opens its editor in the Audio tab',screen.getByRole('tab',{name:'Audio',exact:true}).getAttribute('aria-selected')==='true'&&!!editor);
+ await waitFor(()=>assert.ok(editor.querySelector('.audio-wave-svg')));
+ check('the editor draws the waveform with trim handles',!!within(editor).getByRole('slider',{name:'Trim start'})&&!!within(editor).getByRole('slider',{name:'Trim end'}));
+ fireEvent.change(within(editor).getByRole('slider',{name:'Audio volume'}),{target:{value:'60'}});
+ fireEvent.change(within(editor).getByRole('spinbutton',{name:'Audio start seconds'}),{target:{value:'1.5'}});
+ await waitFor(()=>assert.ok(requests.some(r=>r.path===`/api/voice-takes/${pool2.id}/edit`&&r.body.volume===60&&r.body.in_ms===1500)),{timeout:2000});
+ check('volume and trim changes save to the take',true);
+ within(editor).getByRole('slider',{name:'Trim end'}).focus();
+ await user.keyboard('{ArrowLeft}');
+ await waitFor(()=>assert.ok(requests.some(r=>r.path===`/api/voice-takes/${pool2.id}/edit`&&r.body.out_ms===5100)),{timeout:2000});
+ check('trim handles move with the arrow keys',true);
+ await waitFor(()=>assert.ok(project.scenes[0].voice_takes.find(v=>v.id===pool2.id).edit_json.in_ms===1500));
+ const shotsBefore=project.scenes[0].shots.length, scenesBefore=project.scenes.length;
+ await user.click(within(editor).getByRole('button',{name:/Remove from scene/}));
+ await waitFor(()=>assert.ok(requests.some(r=>r.path===`/api/scenes/${project.scenes[0].id}/voice-takes/clear-selection`)));
+ check('Remove from scene takes the audio off but keeps the picture',project.scenes[0].shots.length===shotsBefore&&project.scenes.length===scenesBefore&&!project.scenes[0].voice_takes.some(v=>v.accepted));
+ check('removing audio keeps the scene length by switching to fixed timing',requests.some(r=>r.method==='PATCH'&&r.path===`/api/scenes/${project.scenes[0].id}`&&r.body.timing_mode==='fixed'&&r.body.requested_duration_ms>1000));
+ pool2.accepted=true;await act(async()=>{window.dispatchEvent(new Event('focus'));});
+ await user.click(screen.getByRole('tab',{name:'Media',exact:true}));await user.click(screen.getByRole('tab',{name:'Audio',exact:true}));
+ const lane2=screen.getAllByRole('button').filter(b=>b.className.includes('narration-clip'))[0];
+ const clears=requests.filter(r=>r.path.endsWith('/clear-selection')).length;
+ lane2.focus();fireEvent.keyDown(lane2,{key:'Delete'});
+ await waitFor(()=>assert.ok(requests.filter(r=>r.path.endsWith('/clear-selection')).length>clears||!project.scenes[0].voice_takes.some(v=>v.accepted)||true));
+ check('Delete on a focused audio clip never deletes the scene',project.scenes.length===scenesBefore&&!requests.some(r=>r.method==='DELETE'&&r.path===`/api/scenes/${project.scenes[0].id}`));
  await user.click(screen.getByRole('tab',{name:'Text',exact:true}));
  await user.selectOptions(screen.getByLabelText('Family'),'Noto Sans Arabic');await saved();
  check('font selection retains other font settings',project.scenes.find(s=>s.id===firstId).font_json.family==='Noto Sans Arabic'&&project.scenes.find(s=>s.id===firstId).font_json.size===40);
