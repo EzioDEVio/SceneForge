@@ -1,3 +1,4 @@
+import {askConfirm,askText} from "./dialogs";
 import React, {useEffect, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {ArrowLeft, ArrowRight, Film, Plus, GripVertical, Play, Pause, Square, SkipBack, SkipForward, Volume2, Type, Maximize2, X, ChevronLeft, ChevronRight, Trash2, Scissors, Undo2, Redo2, Upload} from 'lucide-react';
@@ -51,16 +52,16 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onRender
   const [toolMessage,setToolMessage]=useState('');
   const needsBake=!!selected&&(selected.shots.length!==1||selected.voice_takes.some(t=>t.accepted)||!!selected.subtitle_text||!!selected.font_json.layers?.length||(selected.shots[0]?.motion_json.type||'static')!=='static'||(selected.shots[0]?.asset?.type==='video'&&(selected.shots[0].asset.duration_ms||0)<(selected.shots[0].source_in_ms||0)+sceneDuration(selected)));
   const canSplit=!!selected?.shots.length&&!monitor;
-  function split(){
+  async function split(){
     if(!selected||!selectedClip)return;
     if(needsBake&&(!selected.rendered_asset_id||selected.is_stale)){setToolMessage('Render this scene first. Its current motion, captions and sound must be included in the cut.');return;}
     const local=position-selectedClip.start;
     const suggested=local>0&&local<selectedClip.duration?local:selectedClip.duration/2;
-    const value=window.prompt(`Split “${selected.title}” at seconds from its start (length ${(selectedClip.duration/1000).toFixed(2)}s):`,(suggested/1000).toFixed(3));
+    const value=await askText(`Split “${selected.title}” at seconds from its start (length ${(selectedClip.duration/1000).toFixed(2)}s):`,(suggested/1000).toFixed(3));
     if(value===null)return;
     const seconds=Number(value),frameMs=1000/project.fps,at=Math.round(Math.round(seconds*project.fps)*frameMs);
     if(!value.trim()||!Number.isFinite(seconds)||at<Math.round(frameMs)||at>selectedClip.duration-Math.round(frameMs)){setToolMessage('Choose a cut at least one frame from either end.');return;}
-    if(needsBake&&!window.confirm('Split the rendered scene? Motion, text and sound will be baked into the two clips and cannot be edited separately afterward. Original media files remain on disk. This split cannot be undone.'))return;
+    if(needsBake&&!await askConfirm('Split the rendered scene? Motion, text and sound will be baked into the two clips and cannot be edited separately afterward. Original media files remain on disk. This split cannot be undone.'))return;
     setToolMessage('');onSplit?.(at,needsBake);
   }
 

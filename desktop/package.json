@@ -1,0 +1,70 @@
+{
+  "name": "sceneforge-desktop",
+  "version": "0.2.0-rc.4",
+  "private": true,
+  "description": "SceneForge Desktop Alpha \u2014 local video editor",
+  "author": "SceneForge",
+  "license": "UNLICENSED",
+  "main": "main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "test": "node --test tests/*.test.cjs",
+    "dist:win": "electron-builder --win nsis --x64 --publish never"
+  },
+  "devDependencies": {
+    "electron": "44.4.3",
+    "electron-builder": "26.15.3"
+  },
+  "build": {
+    "appId": "io.eziodevio.sceneforge",
+    "productName": "SceneForge Desktop Alpha",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "main.cjs",
+      "backend-process.cjs",
+      "close-controller.cjs",
+      "welcome.html",
+      "package.json"
+    ],
+    "extraResources": [
+      {
+        "from": "build/backend/sceneforge-backend",
+        "to": "backend"
+      },
+      {
+        "from": "../frontend/dist",
+        "to": "app-resources/frontend/dist"
+      },
+      {
+        "from": "../assets",
+        "to": "app-resources/assets"
+      },
+      {
+        "from": "vendor/ffmpeg",
+        "to": "ffmpeg"
+      },
+      {
+        "from": "THIRD_PARTY.md",
+        "to": "THIRD_PARTY.md"
+      }
+    ],
+    "win": {
+      "target": [
+        "nsis"
+      ],
+      "artifactName": "SceneForge-Desktop-Alpha-${version}-${arch}-Setup.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false,
+      "runAfterFinish": false
+    },
+    "publish": null
+  }
+}

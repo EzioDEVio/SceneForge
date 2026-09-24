@@ -94,7 +94,7 @@ try:
         check('four independent provider profiles coexist',len(call('GET','/api/providers'))==4)
         call('POST','/api/providers',json={'capability':'image','name':'gemini','api_key':'fixture-key','model':'new-model'})
         check('editing Gemini preserves OpenAI profile',len(call('GET','/api/providers'))==4 and next(p for p in call('GET','/api/providers') if p['name']=='openai')['id']==profiles['openai']['id'])
-        check('voice discovery reaches local HTTP service',call('GET',f'/api/providers/profile/{profiles["kokoro"]["id"]}/voices')['voices']==['af_heart','default'])
+        check('voice discovery reaches local HTTP service',[v['id'] for v in call('GET',f'/api/providers/profile/{profiles["kokoro"]["id"]}/voices')['voices']]==['af_heart','default'])
         call('PATCH',f'/api/scenes/{sid}',json={'spoken_text':'Hello world'})
         body={'provider_id':profiles['kokoro']['id'],'voice':'af_heart','language':'en','speed':.8,'audition':True}
         audition=call('POST',f'/api/scenes/{sid}/voice-takes/service',json=body)

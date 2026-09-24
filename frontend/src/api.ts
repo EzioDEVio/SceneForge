@@ -116,10 +116,16 @@ export type ProviderProfile = {
   masked_key: string;
   configured: boolean;
 };
+export type VoiceOption = { id: string; name: string; language?: string; accent?: string; gender?: string; age?: string; description?: string; preview_url?: string };
 
 const BASE = "";
 
+let activeWrites=0;
+export const hasActiveWrites=()=>activeWrites>0;
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  const write=!!init?.method&&init.method!=="GET";
+  if(write)activeWrites++;
+  try {
   const res = await fetch(`${BASE}${path}`, {
     headers: init?.body && !(init.body instanceof FormData) ? { "Content-Type": "application/json" } : undefined,
     ...init,
@@ -135,7 +141,8 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(detail);
   }
   if (res.status === 204) return undefined as unknown as T;
-  return res.json();
+  return await res.json();
+  } finally {if(write)activeWrites--;}
 }
 
 export const api = {
@@ -188,6 +195,7 @@ export const api = {
       body: JSON.stringify({ text, voice }),
     }),
   clearNarration: (sceneId: string) => req(`/api/scenes/${sceneId}/voice-takes/clear-selection`, {method: "POST"}),
+  deleteTake: (takeId: string) => req(`/api/voice-takes/${takeId}`, {method:"DELETE"}),
   selectTake: (takeId: string) => req<VoiceTake>(`/api/voice-takes/${takeId}/select`, { method: "POST" }),
 
   renderPart: (sceneId: string) => req<{ job_id: string }>(`/api/scenes/${sceneId}/render`, { method: "POST" }),
@@ -207,10 +215,11 @@ export const api = {
   assetStreamUrl: (assetId: string) => `/api/assets/${assetId}/stream`,
   assetDownloadUrl: (assetId: string) => `/api/assets/${assetId}/stream?download=1`,
 
-  health: () => req<{status:string;build?:string}>("/api/health"),
+  health: () => req<{status:string;build?:string;credential_warning?:string}>("/api/health"),
+  closeStatus:()=>req<{ready:boolean}>("/api/close-status"),
   connectLocalSpeech: (engine:string) => req<{profile:ProviderProfile;voices:string[];message:string}>(`/api/local-speech/${engine}/connect`, {method:"POST"}),
   imageHistory: (sceneId:string) => req<{id:string;prompt:string;provider:string}[]>(`/api/scenes/${sceneId}/image-history`),
-  providerVoices: (id:string) => req<{voices:string[]}>(`/api/providers/profile/${id}/voices`),
+  providerVoices: (id:string) => req<{voices:VoiceOption[]}>(`/api/providers/profile/${id}/voices`),
   deleteProviderProfile: (id:string) => req(`/api/providers/profile/${id}`, {method:"DELETE"}),
   serviceTts: (sceneId:string, providerId:string, voice:string, language:string, speed:number, audition=false) => req<any>(`/api/scenes/${sceneId}/voice-takes/service`, {method:"POST",body:JSON.stringify({provider_id:providerId,voice,language,speed,audition})}),
   listProviders: () => req<ProviderProfile[]>("/api/providers"),

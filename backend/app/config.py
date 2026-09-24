@@ -9,6 +9,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+RESOURCE_DIR = Path(os.environ.get("SCENEFORGE_RESOURCE_DIR", Path(__file__).resolve().parents[2]))
+
 # Root data directory. Overridable via SCENEFORGE_DATA_DIR for tests/CI.
 # Defaults to backend/data (this file is backend/app/config.py, so
 # parents[1] is backend/).
@@ -58,4 +60,4 @@ FFPROBE_BIN = os.environ.get("SCENEFORGE_FFPROBE", "ffprobe")
 X264_PRESET = os.environ.get("SCENEFORGE_X264_PRESET", "ultrafast")
 X264_CRF = os.environ.get("SCENEFORGE_X264_CRF", "21")
 
-BUNDLED_FONT_PATH = Path(__file__).resolve().parents[2] / "assets" / "fonts" / "NotoNaskhArabic-Regular.ttf"
+BUNDLED_FONT_PATH = RESOURCE_DIR / "assets" / "fonts" / "NotoNaskhArabic-Regular.ttf"
