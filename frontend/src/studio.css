@@ -146,3 +146,10 @@
 .narration-clip .narration-label,.narration-clip svg:not(.narration-wave){position:relative;z-index:1}
 .narration-clip .narration-label{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .lut-compare{display:grid;grid-template-columns:1fr 1fr;gap:6px;margin:10px 0 4px}.lut-compare figure{margin:0}.lut-compare img{width:100%;aspect-ratio:16/9;object-fit:cover;border-radius:4px;display:block;background:#1b1d22}.lut-compare figcaption{font-size:10px;color:var(--muted);margin-top:3px}
+/* Old film */
+.film-preview{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;z-index:3}
+.preview-canvas{overflow:hidden}
+.film-styles{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.film-styles .btn{font-size:11px;padding:5px 9px}.film-styles .btn.selected{background:#464151;border-color:#8472c1;color:#f0e8ff}
+.film-option{display:grid;grid-template-columns:78px minmax(0,1fr);align-items:center;gap:6px;margin-top:8px}.film-option>span{font-size:11px;color:#c3c9d6}
+.look-panel .film-option .segmented{display:flex;gap:2px;padding:2px}.look-panel .film-option .segmented button{flex:1;border:0;background:transparent;border-radius:3px;font-size:11px;padding:4px 6px}
+.switch-label{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#c3c9d6;cursor:pointer}.switch-label input{accent-color:#a58fe9}

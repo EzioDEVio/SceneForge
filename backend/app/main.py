@@ -55,7 +55,7 @@ app.include_router(local_speech.router)
 # new interface connected to an old backend (e.g. a still-running old
 # start.bat window) shows "Backend update required" instead of silently
 # losing settings the old backend does not know.
-BUILD_ID = "rc5-looks-audio-2"
+BUILD_ID = "rc5-old-film-3"
 
 
 @app.get("/api/health")

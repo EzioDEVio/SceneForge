@@ -297,8 +297,8 @@ def _validated_look(scene, look: dict, db) -> dict:
     from copy import deepcopy
     from app.db.models import Asset
     from app.render.filters import ADJUST_RANGES, GLITCH_BLOCKS, clean_adjust
-    if not isinstance(look, dict) or set(look) - {"glitch", "adjust", "lut"}:
-        raise HTTPException(400, "Look settings may only contain glitch, adjust and lut.")
+    if not isinstance(look, dict) or set(look) - {"glitch", "adjust", "lut", "film"}:
+        raise HTTPException(400, "Look settings may only contain glitch, adjust, lut and film.")
     merged = deepcopy(scene.look_json or {})
     if "glitch" in look:
         g = look["glitch"]
@@ -333,6 +333,23 @@ def _validated_look(scene, look: dict, db) -> dict:
                 merged["adjust"] = cleaned
             else:
                 merged.pop("adjust", None)
+    if "film" in look:
+        from app.render.filters import FILM_AMOUNTS, FILM_FPS, FILM_TONES, FILM_DEFAULTS
+        f = look["film"]
+        if f is None:
+            merged.pop("film", None)
+        else:
+            if not isinstance(f, dict) or set(f) - set(FILM_DEFAULTS):
+                raise HTTPException(400, "Old film settings may only contain: " + ", ".join(FILM_DEFAULTS) + ".")
+            for key in FILM_AMOUNTS:
+                v = f.get(key, FILM_DEFAULTS[key])
+                if isinstance(v, bool) or not isinstance(v, (int, float)) or not 0 <= v <= 100:
+                    raise HTTPException(400, f"Old film {key} must be between 0 and 100.")
+            if f.get("fps", FILM_DEFAULTS["fps"]) not in FILM_FPS:
+                raise HTTPException(400, "Old film frame rate must be 16, 18, 24, or 0 to keep the project rate.")
+            if f.get("tone", FILM_DEFAULTS["tone"]) not in FILM_TONES:
+                raise HTTPException(400, "Old film tone must be one of: " + ", ".join(FILM_TONES) + ".")
+            merged["film"] = {**FILM_DEFAULTS, **{k: (int(v) if k != "tone" else v) for k, v in f.items()}}
     if "lut" in look:
         l = look["lut"]
         if l is None:

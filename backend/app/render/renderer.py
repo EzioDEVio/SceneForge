@@ -169,6 +169,21 @@ def render_scene_visual(
     return concat_out
 
 
+def _film_damage_for(scene: Scene, width: int, height: int, fps: int) -> str | None:
+    """Scratch/dust clip for the old-film look, seeded by the scene so each
+    scene gets its own damage but re-renders are identical."""
+    import zlib
+    from app.config import PROXIES_DIR
+    from app.render.film_damage import damage_clip
+    from app.render.filters import clean_film, film_fps_for
+    raw = (scene.look_json or {}).get("film")
+    if not raw:
+        return None
+    film = clean_film(raw)
+    return damage_clip(width, height, film_fps_for(film, fps), film["scratches"], film["dust"],
+                       zlib.crc32(scene.id.encode()), Path(PROXIES_DIR) / "film")
+
+
 def _grade_lut_for(scene: Scene) -> str | None:
     """Bake the scene's colour sliders and imported LUT into one cached LUT."""
     from app.config import PROXIES_DIR
@@ -231,6 +246,7 @@ def _render_single_shot(
         effect_intensity=int(scene.effect_intensity),
         look=scene.look_json or {},
         grade_lut_path=_grade_lut_for(scene),
+        film_damage_path=_film_damage_for(scene, out_w, out_h, fps),
     )
     if pre_filters:
         # prepend a normalization stage (fps/rotation) onto the graph's input

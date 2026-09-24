@@ -7,6 +7,7 @@ import {planPoolInsert} from "./poolPlan";
 import {planFileDrop, DraggedAsset} from "./timelineDrop";
 import {LookPanel, adjustPreviewFilter, WhiteBalanceFilter, PreviewFinish, gradeKey} from "./LookPanel";
 import {AudioClipEditor, removeSceneAudio} from "./AudioClipEditor";
+import {FilmPreview, filmToneFilter} from "./FilmPreview";
 import {sceneDuration} from "./duration";
 import {TitleDesigner,TitleDesign,ANIMATIONS} from './TitleDesigner';
 import React, { useEffect, useRef, useState } from "react";
@@ -666,7 +667,12 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
   // With a LUT, the preview shows a server-graded frame (exact colour: LUT +
   // colour sliders), so only the look preset stays as a CSS approximation.
   const gradedSrc = scene.look_json?.lut && shot ? api.gradedFrameUrl(scene.id, gradeKey(scene.look_json), 1280, shot.id) : null;
-  const mediaFilter = (gradedSrc ? previewFilter : [previewFilter, adjustPreviewFilter(liveAdjust, wbFilterId)].filter(Boolean).join(' ')) || undefined;
+  const liveFilm = (pending.current.look as any)?.film !== undefined ? (pending.current.look as any).film : scene.look_json?.film;
+  // "none" (the Original look) is not combinable with other CSS filter
+  // functions: joined into a list it makes the whole value invalid, and the
+  // browser then drops every filter. Keep only real filter functions.
+  const presetFilter = previewFilter === "none" ? "" : previewFilter;
+  const mediaFilter = [presetFilter, gradedSrc ? "" : adjustPreviewFilter(liveAdjust, wbFilterId), filmToneFilter(liveFilm)].filter(Boolean).join(' ') || undefined;
   const canvasRatio = project.aspect.split(':').map(Number).reduce((a,b)=>a/b);
   async function uploadSound(file: File) {
     await run(async () => {
@@ -694,7 +700,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
             <span className="aspect-badge">{project.aspect}</span>
           </div>
           <div className="canvas-viewport">
-            <div className="preview-canvas" style={{aspectRatio: project.aspect.replace(":", "/"), width: `min(${zoom}%, calc((var(--stage-height) - 40px) * ${canvasRatio * zoom / 100}))`}}><WhiteBalanceFilter id={wbFilterId} adjust={liveAdjust}/>{previewMode !== "render" && shot && <PreviewFinish adjust={liveAdjust}/>}
+            <div className="preview-canvas" style={{aspectRatio: project.aspect.replace(":", "/"), width: `min(${zoom}%, calc((var(--stage-height) - 40px) * ${canvasRatio * zoom / 100}))`}}><WhiteBalanceFilter id={wbFilterId} adjust={liveAdjust}/>{previewMode !== "render" && shot && <PreviewFinish adjust={liveAdjust}/>}{previewMode !== "render" && shot && liveFilm && <FilmPreview film={liveFilm}/>}
               {previewMode === "render" && rendered ? <video ref={videoRef} className="canvas-media" controls preload="metadata" src={api.assetStreamUrl(rendered)}/> :
                 shot ? shot.asset?.type === "image" ? (shot.crop_json?<svg className="canvas-media" role="img" aria-label={`Cropped source for ${scene.title}`} viewBox={`${shot.crop_json.x*(shot.asset.width||1)} ${shot.crop_json.y*(shot.asset.height||1)} ${shot.crop_json.width*(shot.asset.width||1)} ${shot.crop_json.height*(shot.asset.height||1)}`} preserveAspectRatio={shot.fit==='cover'?'xMidYMid slice':'xMidYMid meet'} style={{filter:mediaFilter}}><image href={gradedSrc||api.assetStreamUrl(shot.asset_id)} width={shot.asset.width||1} height={shot.asset.height||1}/></svg>:<img className="canvas-media" src={gradedSrc||api.assetStreamUrl(shot.asset_id)} alt={`Source media for ${scene.title}`} style={{objectFit: shot.fit === "cover" ? "cover" : "contain", filter:mediaFilter}}/>) :
                   <video ref={videoRef} className="canvas-media" controls preload="metadata" poster={gradedSrc||undefined} src={api.assetStreamUrl(shot.asset_id)} style={{objectFit:shot.fit === "cover" ? "cover" : "contain",filter:mediaFilter}}/> :

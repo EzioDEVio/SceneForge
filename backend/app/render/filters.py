@@ -246,6 +246,86 @@ def build_adjust_chain(adjust: dict | None) -> tuple[str | None, str | None]:
     return detail, (",".join(finishing) or None)
 
 
+# ---------------------------------------------------------------------------
+# Old film: projector frame rate, gate weave, flicker, tone and damage.
+# ---------------------------------------------------------------------------
+FILM_TONES = ("color", "faded", "sepia", "bw")
+FILM_FPS = (0, 16, 18, 24)          # 0 = keep the project frame rate
+FILM_AMOUNTS = ("scratches", "dust", "flicker", "weave")
+FILM_DEFAULTS = {"scratches": 60, "dust": 50, "flicker": 40, "weave": 35, "fps": 18, "tone": "bw"}
+
+
+def clean_film(raw: dict | None) -> dict:
+    film = {**FILM_DEFAULTS, **(raw or {})}
+    out = {k: int(max(0, min(100, round(float(film[k]))))) for k in FILM_AMOUNTS}
+    out["fps"] = int(film["fps"]) if int(film["fps"]) in FILM_FPS else FILM_DEFAULTS["fps"]
+    out["tone"] = film["tone"] if film["tone"] in FILM_TONES else FILM_DEFAULTS["tone"]
+    return out
+
+
+def film_fps_for(film: dict, out_fps: int) -> int:
+    return film["fps"] if film["fps"] and film["fps"] < out_fps else out_fps
+
+
+def _frame_hash(k: float) -> str:
+    """Deterministic pseudo-random 0..1 per frame (n) for FFmpeg expressions."""
+    return f"mod(abs(sin(n*12.9898+{k})*43758.5453),1)"
+
+
+_FILM_TONE = {
+    "color": "",
+    "faded": "curves=all='0/0.07 0.5/0.52 1/0.93',eq=saturation=0.6,colorbalance=rm=0.05:gm=-0.01:bm=-0.05",
+    "sepia": "colorchannelmixer=.393:.769:.189:0:.349:.686:.168:0:.272:.534:.131:0,eq=contrast=1.08",
+    "bw": "hue=s=0,eq=contrast=1.22:brightness=-0.02",
+}
+
+
+def build_film_chain(film: dict, out_w: int, out_h: int, out_fps: int, damage_path: str | None, total_frames: int | None = None) -> str:
+    """Old-film stage: jerky projector frame rate, gate weave (wobble plus
+    the odd frame slip), exposure flicker, tone, scratches/dust/hairs from the
+    damage clip, and a soft gate vignette. Deterministic per frame."""
+    from app.render.ffmpeg_utils import escape_path_for_filter
+    f = clean_film(film)
+    ffps = film_fps_for(f, out_fps)
+    parts: list[str] = []
+    if ffps != out_fps:
+        parts.append(f"fps={ffps}")
+    if f["weave"]:
+        a = f["weave"] / 100
+        amp_x, amp_y = out_w * 0.004 * a, out_h * 0.006 * a
+        slip = out_h * 0.04 * a
+        margin = 1 + 0.02 * a + 0.02                       # zoom in slightly so edges never show
+        x = f"(iw-ow)/2+{amp_x:.2f}*(0.6*sin(n*0.37+1.3)+0.8*({_frame_hash(1)}-0.5))"
+        y = f"(ih-oh)/2+{amp_y:.2f}*(0.6*sin(n*0.29)+0.8*({_frame_hash(2)}-0.5))+{slip:.2f}*gt({_frame_hash(7)},{0.992 - 0.01 * a:.4f})"
+        parts.append(f"scale=ceil(iw*{margin:.3f}/2)*2:ceil(ih*{margin:.3f}/2)*2,crop={out_w}:{out_h}:x='{x}':y='{y}'")
+    if f["flicker"]:
+        b = f["flicker"] / 100
+        parts.append(f"eq=eval=frame:brightness='{0.09 * b:.4f}*({_frame_hash(3)}-0.5)*2+{0.025 * b:.4f}*sin(n*0.9)'")
+    if _FILM_TONE[f["tone"]]:
+        parts.append(_FILM_TONE[f["tone"]])
+    # Period lenses and stock: slightly soft, heavy moving grain. Both scale
+    # with the damage amount so a light setting stays close to the source.
+    wear = max(f["scratches"], f["dust"]) / 100
+    if wear:
+        parts.append(f"gblur=sigma={0.4 + 0.6 * wear:.2f}")
+        parts.append(f"noise=alls={int(6 + 16 * wear)}:allf=t")
+    parts.append("format=yuv420p")
+    chain = ",".join(parts)
+    if damage_path:
+        chain += (f"[fmain];movie='{escape_path_for_filter(damage_path)}':loop=0,setpts=N/({ffps}*TB),"
+                  f"format=yuv420p,scale={out_w}:{out_h}:flags=bicubic[fdirt];"
+                  f"[fmain][fdirt]blend=all_mode=grainmerge:shortest=1")
+    # Gate vignette whose strength "breathes" with the projector lamp.
+    chain += f",vignette=eval=frame:angle='0.5+{0.06 * f['flicker'] / 100:.3f}*sin(n*1.7)'"
+    if ffps != out_fps:
+        chain += f",fps={out_fps}"
+        if total_frames:
+            # Dropping to the film rate loses the tail; hold the last film
+            # frame so the shot keeps its exact length (audio and cuts stay in sync).
+            chain += f",tpad=stop_mode=clone:stop={out_fps},trim=end_frame={total_frames}"
+    return chain
+
+
 def build_grade_chain(grade_lut_path: str | None) -> str | None:
     """One lut3d pass (planar RGB is the fastest input for lut3d)."""
     from app.render.ffmpeg_utils import escape_path_for_filter
@@ -314,6 +394,7 @@ def build_shot_video_chain(
     in_label: str = "0:v",
     look: dict | None = None,
     grade_lut_path: str | None = None,
+    film_damage_path: str | None = None,
 ) -> tuple[str, str | None]:
     """Returns (filter_complex_str, overscan_warning_or_none).
 
@@ -342,14 +423,15 @@ def build_shot_video_chain(
         fit_chain = build_contain_chain(out_w, out_h, blurred_bg=(fit == FitMode.CONTAIN_BLUR))
 
     # Grade order: fit/motion -> grade LUT (colour sliders + imported LUT)
-    # -> sharpen -> look preset -> vignette/grain. Each stage may be a plain comma chain or a labelled
+    # -> sharpen -> look preset -> old film -> vignette/grain. Each stage may be a plain comma chain or a labelled
     # split/blend sub-graph; stages are joined through [st*] pads.
     # setsar=1 normalizes sample-aspect-ratio drift introduced by
     # scale/crop rounding — without it, concat/xfade between two shots
     # with slightly different computed SAR (e.g. 3952:3951 vs 1126:1125,
     # both ~1.0 but not bit-identical) fails with "Input link parameters
     # do not match" and silently produces a zero-byte output.
-    stages = [c for c in (grade_chain, primary, effect_chain, finishing) if c]
+    film_chain = build_film_chain(look["film"], out_w, out_h, fps, film_damage_path, total_frames) if look.get("film") else None
+    stages = [c for c in (grade_chain, primary, effect_chain, film_chain, finishing) if c]
     if not stages:
         return f"[{in_label}]{fit_chain},setsar=1[vout]", warning
     graph = f"[{in_label}]{fit_chain}[st0]"

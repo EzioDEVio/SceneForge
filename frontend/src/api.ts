@@ -62,14 +62,16 @@ export type FontSettings = {
 };
 
 /** Must match BUILD_ID in backend/app/main.py. */
-export const BUILD_ID = "rc5-looks-audio-2";
+export const BUILD_ID = "rc5-old-film-3";
 
 export type Adjust = Partial<Record<'exposure'|'contrast'|'highlights'|'shadows'|'temperature'|'tint'|'saturation'|'vibrance'|'sharpen'|'vignette'|'grain', number>>;
 export type Look = {
   glitch?: {speed: number; block: 'small' | 'medium' | 'large'} | null;
   adjust?: Adjust | null;
   lut?: {asset_id: string; strength: number} | null;
+  film?: FilmLook | null;
 };
+export type FilmLook = {scratches: number; dust: number; flicker: number; weave: number; fps: 0 | 16 | 18 | 24; tone: 'color' | 'faded' | 'sepia' | 'bw'};
 
 export type Scene = {
   id: string;

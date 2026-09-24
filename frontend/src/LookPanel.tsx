@@ -1,6 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {RotateCcw, Upload, SlidersHorizontal, Palette, Zap, X} from 'lucide-react';
-import {api, Asset, Scene, Look, Adjust} from './api';
+import {RotateCcw, Upload, SlidersHorizontal, Palette, Zap, X, Film} from 'lucide-react';
+import {FILM_DEFAULTS, FILM_STYLES} from './FilmPreview';
+import {api, Asset, Scene, Look, Adjust, FilmLook} from './api';
 
 // Slider definitions mirror backend ADJUST_RANGES (render/filters.py).
 export const ADJUSTMENTS: {key: keyof Adjust; label: string; min: number; group: 'Light' | 'Color' | 'Detail'}[] = [
@@ -67,10 +68,12 @@ export function LookPanel({scene, disabled, onDraft, onSaveNow}: Props) {
   const look = scene.look_json || {};
   const [adjust, setAdjust] = useState<Adjust>(look.adjust || {});
   const [glitch, setGlitch] = useState({speed: look.glitch?.speed ?? 1, block: look.glitch?.block ?? 'medium'});
+  const [film, setFilm] = useState<FilmLook | null>(look.film || null);
   const [luts, setLuts] = useState<Asset[]>([]);
   const [lutError, setLutError] = useState('');
   const [lutBusy, setLutBusy] = useState(false);
   const lutFile = useRef<HTMLInputElement>(null);
+  useEffect(() => {setFilm(scene.look_json?.film || null);}, [scene.id]);
   useEffect(() => {setAdjust(scene.look_json?.adjust || {}); setGlitch({speed: scene.look_json?.glitch?.speed ?? 1, block: scene.look_json?.glitch?.block ?? 'medium'});}, [scene.id]);
   useEffect(() => {let live = true; api.listLuts(scene.project_id).then(l => {if (live) setLuts(l);}).catch(() => {}); return () => {live = false;};}, [scene.project_id]);
 
@@ -79,6 +82,10 @@ export function LookPanel({scene, disabled, onDraft, onSaveNow}: Props) {
     if (!value) delete next[key];
     setAdjust(next);
     onDraft({adjust: next});
+  }
+  function setFilmLook(next: FilmLook | null) {
+    setFilm(next);
+    onDraft({film: next});
   }
   function setGlitchOpt(patch: Partial<typeof glitch>) {
     const next = {...glitch, ...patch};
@@ -128,6 +135,31 @@ export function LookPanel({scene, disabled, onDraft, onSaveNow}: Props) {
         {BLOCKS.map(b => <button key={b.key} role="radio" aria-checked={glitch.block === b.key} className={glitch.block === b.key ? 'selected' : ''} disabled={disabled} onClick={() => setGlitchOpt({block: b.key})}>{b.label}</button>)}
       </div>
     </section>}
+
+    <section className="look-section" aria-label="Old film">
+      <div className="look-heading"><h3><Film size={15}/> Old film</h3>
+        <label className="switch-label"><input type="checkbox" role="switch" aria-label="Old film damage" checked={!!film} disabled={disabled} onChange={e => setFilmLook(e.target.checked ? {...FILM_DEFAULTS} : null)}/> {film ? 'On' : 'Off'}</label></div>
+      <p className="hint">Scratches, dust, hairs, flicker and projector wobble, like WWII newsreels and 8 mm home movies. Plays live in the preview.</p>
+      <div className="film-styles" role="group" aria-label="Old film styles">
+        {FILM_STYLES.map(st => <button key={st.name} className={`btn ${film && JSON.stringify(film) === JSON.stringify(st.film) ? 'selected' : ''}`} title={st.hint} disabled={disabled} onClick={() => setFilmLook({...st.film})}>{st.name}</button>)}
+      </div>
+      {film && <>
+        {([['scratches', 'Scratches'], ['dust', 'Dust & hair'], ['flicker', 'Flicker'], ['weave', 'Gate weave']] as const).map(([key, label]) =>
+          <div key={key} className={`adjust-row ${film[key] ? 'changed' : ''}`}>
+            <label htmlFor={`film-${key}`}>{label}</label>
+            <input id={`film-${key}`} aria-label={`Film ${label}`} type="range" min={0} max={100} value={film[key]} disabled={disabled} onChange={e => setFilmLook({...film, [key]: Number(e.target.value)})}/>
+            <input aria-label={`Film ${label} value`} type="number" min={0} max={100} value={film[key]} disabled={disabled} onChange={e => setFilmLook({...film, [key]: Math.max(0, Math.min(100, Math.round(Number(e.target.value) || 0)))})}/>
+            <span/>
+          </div>)}
+        <div className="film-option"><span>Frame rate</span><div className="segmented" role="radiogroup" aria-label="Film frame rate">
+          {([[0, 'Project'], [24, '24'], [18, '18'], [16, '16']] as const).map(([v, l]) => <button key={v} role="radio" aria-checked={film.fps === v} className={film.fps === v ? 'selected' : ''} disabled={disabled} onClick={() => setFilmLook({...film, fps: v})}>{l}</button>)}
+        </div></div>
+        <div className="film-option"><span>Tone</span><div className="segmented" role="radiogroup" aria-label="Film tone">
+          {([['color', 'Colour'], ['faded', 'Faded'], ['sepia', 'Sepia'], ['bw', 'B & W']] as const).map(([v, l]) => <button key={v} role="radio" aria-checked={film.tone === v} className={film.tone === v ? 'selected' : ''} disabled={disabled} onClick={() => setFilmLook({...film, tone: v})}>{l}</button>)}
+        </div></div>
+        <p className="hint">16–18 fps gives the jerky hand-cranked look. Render the scene for the final result.</p>
+      </>}
+    </section>
 
     <section className="look-section" aria-label="Adjustments">
       <div className="look-heading"><h3><SlidersHorizontal size={15}/> Adjust</h3>

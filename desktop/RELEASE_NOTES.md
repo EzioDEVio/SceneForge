@@ -1,3 +1,25 @@
+# SceneForge Desktop 0.2.0 RC5 (in progress) — Old film effect
+
+## Old film (Effects → Old film)
+- A real old-film look, like WWII newsreels and 8 mm home movies:
+  - **Scratches:** vertical lines that drift, wobble, drop out and last up to a few seconds; mostly white, some dark.
+  - **Dust & hair:** specks that change every frame, curly hairs caught in the gate for a few frames, the odd dark blotch.
+  - **Flicker:** exposure that varies from frame to frame, with the gate vignette "breathing" along with it.
+  - **Gate weave:** the picture wobbles in the projector gate, with the occasional frame slip.
+  - **Frame rate:** 16 or 18 fps for the jerky hand-cranked look (24 fps, or keep the project rate). Scene length is unchanged.
+  - **Tone:** Colour, Faded, Sepia, or B & W.
+  - Film grain and slight lens softness scale with the amount of damage.
+- One-click styles: **WWII newsreel**, **8mm home movie**, **Silent era**.
+- The effect plays **live in the editor preview**; the render uses the same settings through FFmpeg.
+- Each scene gets its own damage pattern, and re-rendering a scene gives identical results. The damage layer is cached under `proxies/film` in the data folder and can be deleted safely.
+- Works on top of any look, LUT and adjustment. Titles and captions stay sharp above the film damage.
+
+## Fixes
+- With the **Original** look selected, the colour-slider preview had no effect: the preview combined the CSS value `none` with other filters, which made the whole filter invalid. Fixed.
+
+## Version check
+- Build ID is now `rc5-old-film-3`.
+
 # SceneForge Desktop 0.2.0 RC5 (in progress) — LUT compatibility
 
 ## LUTs from DaVinci Resolve

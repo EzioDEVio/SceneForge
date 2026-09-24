@@ -8,6 +8,7 @@ import assert from 'node:assert/strict';
 const dom=new JSDOM('<!doctype html><html><body></body></html>',{url:'http://localhost'});
 for(const k of ['window','document','navigator','HTMLElement','HTMLInputElement','HTMLTextAreaElement','Event','MouseEvent','CustomEvent','KeyboardEvent','File','FormData']) Object.defineProperty(globalThis,k,{value:dom.window[k],configurable:true});
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+dom.window.HTMLCanvasElement.prototype.getContext=()=>null; // jsdom has no canvas; FilmPreview handles null
 globalThis.requestAnimationFrame=cb=>setTimeout(()=>cb(Date.now()),0);globalThis.cancelAnimationFrame=id=>clearTimeout(id);
 window.HTMLMediaElement.prototype.pause=function(){};
 globalThis.confirm=()=>true;
@@ -25,7 +26,7 @@ let failNextPatch=false;
 let requests=[];
 let next=10;
 let profiles=[];
-let healthBuild="rc5-looks-audio-2";let oldBackend=false;
+let healthBuild="rc5-old-film-3";let oldBackend=false;
 let failLocal=true;
 let closeReady=true;
 const clone=x=>structuredClone(x);
@@ -155,6 +156,21 @@ try{
  await user.click(await screen.findByRole('radio',{name:'Chunky'}));
  fireEvent.change(screen.getByRole('slider',{name:'Glitch speed'}),{target:{value:'2.5'}});await saved();
  check('glitch speed and block size save',requests.some(r=>r.body?.look?.glitch?.block==='large'&&r.body.look.glitch.speed===2.5));
+ // Old film section
+ const filmSwitch=screen.getByRole('switch',{name:'Old film damage'});
+ check('old film is off by default',!filmSwitch.checked&&!screen.queryByRole('slider',{name:'Film Scratches'}));
+ await user.clear(screen.getByRole('textbox',{name:'Search effects'}));await user.click(screen.getByRole('button',{name:'Original',exact:true}));await saved();
+ fireEvent.change(screen.getByRole('slider',{name:'Contrast'}),{target:{value:'20'}});await saved();
+ await user.click(screen.getByRole('button',{name:'WWII newsreel'}));await saved();
+ check('WWII newsreel style saves B&W, 18 fps, heavy scratches',requests.some(r=>r.body?.look?.film?.tone==='bw'&&r.body.look.film.fps===18&&r.body.look.film.scratches===75));
+ check('the style turns the old film switch on and shows its controls',screen.getByRole('switch',{name:'Old film damage'}).checked&&!!screen.getByRole('slider',{name:'Film Scratches'}));
+ check('the preview filter stays valid with the Original look (no "none" mixed in)',!visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('none'));
+ check('live old-film preview is drawn over the picture',!!document.querySelector('.preview-canvas canvas.film-preview')&&visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('grayscale(1)'));
+ fireEvent.change(screen.getByRole('slider',{name:'Film Dust & hair'}),{target:{value:'90'}});
+ await user.click(screen.getByRole('radio',{name:'16'}));await user.click(screen.getByRole('radio',{name:'Sepia'}));await saved();
+ check('dust, frame rate and tone changes save',requests.some(r=>r.body?.look?.film?.dust===90&&r.body.look.film.fps===16&&r.body.look.film.tone==='sepia'));
+ await user.click(screen.getByRole('switch',{name:'Old film damage'}));await saved();
+ check('switching old film off removes it and its preview',requests.some(r=>r.body?.look&&'film' in r.body.look&&r.body.look.film===null)&&!document.querySelector('canvas.film-preview'));
  check('LUT import control is offered',!!screen.getByRole('button',{name:/Import .cube/})&&!!screen.getByRole('combobox',{name:'Color LUT'}));
  const folderFiles=[new File(['x'],'Rec709 Kodak 2383 D65.cube'),new File(['x'],'Canon Log to Rec709.ilut'),new File(['x'],'LMT Day for Night.xml'),new File(['x'],'broken.cube'),new File(['x'],'Linear to sRGB.cube')];
  const folderInput=screen.getByLabelText('Import LUT folder');Object.defineProperty(folderInput,'files',{value:folderFiles,configurable:true});fireEvent.change(folderInput);
