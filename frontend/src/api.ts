@@ -57,6 +57,13 @@ export type FontSettings = {
   typewriter_duration_ms?: number;
 };
 
+export type Adjust = Partial<Record<'exposure'|'contrast'|'highlights'|'shadows'|'temperature'|'tint'|'saturation'|'vibrance'|'sharpen'|'vignette'|'grain', number>>;
+export type Look = {
+  glitch?: {speed: number; block: 'small' | 'medium' | 'large'} | null;
+  adjust?: Adjust | null;
+  lut?: {asset_id: string; strength: number} | null;
+};
+
 export type Scene = {
   id: string;
   project_id: string;
@@ -73,6 +80,7 @@ export type Scene = {
   effect_intensity: number;
   transition_in_json: { type: string; duration_ms: number };
   font_json: FontSettings;
+  look_json?: Look;
   revision: number;
   rendered_plan_hash: string | null;
   rendered_asset_id: string | null;
@@ -172,6 +180,8 @@ export const api = {
       body: JSON.stringify({ asset_id: assetId, motion, fit }),
     }),
   listAssets:(id:string)=>req<Asset[]>(`/api/assets?project_id=${id}`),
+  listLuts:(projectId:string)=>req<Asset[]>(`/api/assets/luts?project_id=${projectId}`),
+  importLut:(projectId:string,file:File)=>{const form=new FormData();form.append('file',file);return req<Asset>(`/api/assets/lut?project_id=${projectId}`,{method:'POST',body:form});},
   hideAsset:(id:string)=>req(`/api/assets/${id}/hide-from-pool`,{method:'POST'}),
   useAudioAsset:(sceneId:string,assetId:string)=>req(`/api/scenes/${sceneId}/voice-takes/from-asset`,{method:'POST',body:JSON.stringify({asset_id:assetId})}),
   splitScene: (id:string,at:number,baked=false)=>req<Scene>(`/api/scenes/${id}/split`,{method:"POST",body:JSON.stringify({at_ms:at,baked})}),

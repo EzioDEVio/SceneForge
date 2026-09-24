@@ -2,9 +2,9 @@
 import {build} from 'esbuild';
 import {createRequire} from 'node:module';
 import assert from 'node:assert/strict';
-await build({stdin:{contents:"export * from './src/poolPlan';export * from './src/fonts';",resolveDir:'.',loader:'ts'},outfile:'node_modules/.cache/units.cjs',bundle:true,platform:'node',format:'cjs',logLevel:'silent'});
+await build({stdin:{contents:"export * from './src/poolPlan';export * from './src/fonts';export * from './src/timelineDrop';export {adjustPreviewFilter} from './src/LookPanel';",resolveDir:'.',loader:'ts'},outfile:'node_modules/.cache/units.cjs',bundle:true,platform:'node',format:'cjs',logLevel:'silent'});
 const require=createRequire(import.meta.url);
-const {planPoolInsert,isUntouchedPlaceholder,fontPair,previewFontFamily}=require('../node_modules/.cache/units.cjs');
+const {planPoolInsert,isUntouchedPlaceholder,fontPair,previewFontFamily,planFileDrop,mediaKind,isMediaDrag,ASSET_DRAG_TYPE,adjustPreviewFilter}=require('../node_modules/.cache/units.cjs');
 let passed=0;const check=(name,cond)=>{assert.ok(cond,name);console.log('PASS '+name);passed++;};
 const scene=(id,extra={})=>({id,title:`Part-${id}`,shots:[],original_text:'',spoken_text:'',subtitle_text:'',voice_takes:[],font_json:{},...extra});
 const asset=(id,type='image')=>({id,type,original_filename:id});
@@ -22,4 +22,16 @@ check('a part with a title layer is not a placeholder',!isUntouchedPlaceholder(s
 check('Arabic family pairs with bundled Noto Sans for Latin',fontPair('Noto Naskh Arabic').join()==='Noto Naskh Arabic,Noto Sans');
 check('Latin system family keeps an Arabic companion',fontPair('Georgia').join()==='Noto Naskh Arabic,Georgia'&&fontPair('Arial')[0]==='Noto Sans Arabic');
 check('preview family lists Arabic font first so unicode-range routes Latin onward',previewFontFamily('Noto Sans Arabic').startsWith("'Noto Sans Arabic', 'Noto Sans'"));
+const f=name=>({name});
+let d=planFileDrop([f('b.mp3'),f('a.WAV'),f('10.jpg'),f('2.jpg'),f('clip.MOV'),f('notes.txt')],true);
+check('drop on a scene: first audio (by name) goes to the scene, the rest is reported',d.audio.name==='a.WAV'&&d.extraAudio.join()==='b.mp3');
+check('dropped images and videos keep natural name order (2 before 10)',d.visuals.map(x=>x.name).join()==='2.jpg,10.jpg,clip.MOV');
+check('unsupported files are reported, not uploaded',d.rejected.join()==='notes.txt');
+d=planFileDrop([f('music.mp3'),f('a.png')],false);
+check('audio dropped on empty timeline space is not attached anywhere',d.audio===null&&d.extraAudio.join()==='music.mp3'&&d.visuals.length===1);
+check('media kinds follow the backend allow-list',mediaKind('x.flac')==='audio'&&mediaKind('x.webm')==='video'&&mediaKind('x.bmp')==='image'&&mediaKind('x.gif')===null&&mediaKind('noext')===null);
+check('drag type detection: files, pool assets, or neither',isMediaDrag({dataTransfer:{types:['Files']}})==='files'&&isMediaDrag({dataTransfer:{types:[ASSET_DRAG_TYPE,'text/plain']}})==='assets'&&isMediaDrag({dataTransfer:{types:[]}})===null);
+check('no adjustments means no preview filter',adjustPreviewFilter({},'wb')===''&&adjustPreviewFilter(undefined,'wb')==='');
+const pf=adjustPreviewFilter({saturation:-100,temperature:40,contrast:20},'wb');
+check('preview filter maps saturation, contrast and white balance',pf.includes('saturate(0.000)')&&pf.includes('contrast(1.200)')&&pf.includes('url(#wb)'));
 console.log(`${passed} unit checks passed.`);

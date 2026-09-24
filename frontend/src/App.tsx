@@ -4,6 +4,8 @@ import {hasActiveWrites} from "./api";
 import { previewFontFamily } from "./fonts";
 import {Thumb} from "./Thumb";
 import {planPoolInsert} from "./poolPlan";
+import {planFileDrop, DraggedAsset} from "./timelineDrop";
+import {LookPanel, adjustPreviewFilter, WhiteBalanceFilter, PreviewFinish} from "./LookPanel";
 import {TitleDesigner,TitleDesign,ANIMATIONS} from './TitleDesigner';
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -620,7 +622,8 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
   }
   function draft(patch: Record<string, unknown>) {
     pending.current = {...pending.current, ...patch,
-      ...((pending.current.font||patch.font)?{font:{...(pending.current.font as object||{}),...(patch.font as object||{})}}:{})};
+      ...((pending.current.font||patch.font)?{font:{...(pending.current.font as object||{}),...(patch.font as object||{})}}:{}),
+      ...((pending.current.look||patch.look)?{look:{...(pending.current.look as object||{}),...(patch.look as object||{})}}:{})};
     setPreviewMode("source");
     onSaveState(scene.id, "Unsaved changes");
     if (timer.current) clearTimeout(timer.current);
@@ -651,6 +654,9 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
     const base=["contrast","brightness","saturate"].includes(fn)?1:0;
     return `${fn}(${base+(Number(n)-base)*strength}${unit})`;
   });
+  const liveAdjust = ((pending.current.look as any)?.adjust ?? scene.look_json?.adjust) || undefined;
+  const wbFilterId = `sf-wb-${scene.id}`;
+  const mediaFilter = [previewFilter, adjustPreviewFilter(liveAdjust, wbFilterId)].filter(Boolean).join(' ') || undefined;
   const canvasRatio = project.aspect.split(':').map(Number).reduce((a,b)=>a/b);
   async function uploadSound(file: File) {
     await run(async () => {
@@ -678,10 +684,10 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
             <span className="aspect-badge">{project.aspect}</span>
           </div>
           <div className="canvas-viewport">
-            <div className="preview-canvas" style={{aspectRatio: project.aspect.replace(":", "/"), width: `min(${zoom}%, calc((var(--stage-height) - 40px) * ${canvasRatio * zoom / 100}))`}}>
+            <div className="preview-canvas" style={{aspectRatio: project.aspect.replace(":", "/"), width: `min(${zoom}%, calc((var(--stage-height) - 40px) * ${canvasRatio * zoom / 100}))`}}><WhiteBalanceFilter id={wbFilterId} adjust={liveAdjust}/>{previewMode !== "render" && shot && <PreviewFinish adjust={liveAdjust}/>}
               {previewMode === "render" && rendered ? <video ref={videoRef} className="canvas-media" controls preload="metadata" src={api.assetStreamUrl(rendered)}/> :
-                shot ? shot.asset?.type === "image" ? (shot.crop_json?<svg className="canvas-media" role="img" aria-label={`Cropped source for ${scene.title}`} viewBox={`${shot.crop_json.x*(shot.asset.width||1)} ${shot.crop_json.y*(shot.asset.height||1)} ${shot.crop_json.width*(shot.asset.width||1)} ${shot.crop_json.height*(shot.asset.height||1)}`} preserveAspectRatio={shot.fit==='cover'?'xMidYMid slice':'xMidYMid meet'} style={{filter:previewFilter}}><image href={api.assetStreamUrl(shot.asset_id)} width={shot.asset.width||1} height={shot.asset.height||1}/></svg>:<img className="canvas-media" src={api.assetStreamUrl(shot.asset_id)} alt={`Source media for ${scene.title}`} style={{objectFit: shot.fit === "cover" ? "cover" : "contain", filter:previewFilter}}/>) :
-                  <video ref={videoRef} className="canvas-media" controls preload="metadata" src={api.assetStreamUrl(shot.asset_id)} style={{objectFit:shot.fit === "cover" ? "cover" : "contain",filter:previewFilter}}/> :
+                shot ? shot.asset?.type === "image" ? (shot.crop_json?<svg className="canvas-media" role="img" aria-label={`Cropped source for ${scene.title}`} viewBox={`${shot.crop_json.x*(shot.asset.width||1)} ${shot.crop_json.y*(shot.asset.height||1)} ${shot.crop_json.width*(shot.asset.width||1)} ${shot.crop_json.height*(shot.asset.height||1)}`} preserveAspectRatio={shot.fit==='cover'?'xMidYMid slice':'xMidYMid meet'} style={{filter:mediaFilter}}><image href={api.assetStreamUrl(shot.asset_id)} width={shot.asset.width||1} height={shot.asset.height||1}/></svg>:<img className="canvas-media" src={api.assetStreamUrl(shot.asset_id)} alt={`Source media for ${scene.title}`} style={{objectFit: shot.fit === "cover" ? "cover" : "contain", filter:mediaFilter}}/>) :
+                  <video ref={videoRef} className="canvas-media" controls preload="metadata" src={api.assetStreamUrl(shot.asset_id)} style={{objectFit:shot.fit === "cover" ? "cover" : "contain",filter:mediaFilter}}/> :
                   <div className="canvas-empty"><div className="empty-icon"><ImageIcon size={30}/></div><h3>Start with a visual</h3><p>Add an image or video to bring this scene to life.</p><button className="btn btn-primary" onClick={() => fileRef.current?.click()}><Plus size={15}/> Add media</button><button className="text-btn" onClick={() => setChatOpen(true)}><Sparkles size={14}/> Or generate an image</button></div>}
               {previewMode==="source"&&shot?.asset?.type==="image"&&scene.effect_preset==="glitch"&&strength>0&&<img aria-hidden="true" className="canvas-media glitch-slice glitch-full" src={api.assetStreamUrl(shot.asset_id)} alt="" style={{objectFit:shot.fit==="cover"?"cover":"contain",opacity:strength}}/>}
               {previewMode==="source"&&shot&&(scene.font_json.layers||[]).map(l=><div className="canvas-text-layer" key={l.id} dir="auto" style={{left:`${l.x}%`,top:`${l.y}%`,fontSize:`${l.size/project.width*100}cqw`,color:l.color,fontFamily:previewFontFamily(l.family||scene.font_json.family),fontWeight:l.bold?700:400,textAlign:(l.align||"center") as any,transform:`translate(${l.align==="left"?0:l.align==="right"?-100:-50}%,-50%)`,WebkitTextStroke:`${(l.outline_width||0)/project.width*100}cqw black`,textShadow:l.shadow?`${l.shadow/project.width*100}cqw ${l.shadow/project.width*100}cqw black`:"none"}}>{l.text}</div>)}
@@ -729,7 +735,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
           </>}
           {tab === "Motion" && <>{shot&&<FramingControls key={shot.id} shot={shot} save={run}/>}<h3>Camera movement</h3><p className="hint">Applied to {shot ? `media ${scene.shots.indexOf(shot)+1}` : "selected media"}. {shot?.fit !== "cover" ? "Motion requires Fill frame; Fit inside frame keeps the entire image still." : "Render to preview the movement."}</p><div className="motion-box">{MOTIONS.map(({key,label,Icon}) => <button key={key} className={`motion-btn ${activeMotion === key ? "selected" : ""}`} aria-pressed={activeMotion === key} disabled={!shot || saving || shot.fit !== "cover"} onClick={() => run(() => api.updateShot(shot.id,{motion:{type:key}}))}><Icon size={19}/><span>{label}</span></button>)}</div></>}
           {tab === "Effects" && <><h3>Image looks</h3><p className="hint">Choose a look for the whole scene.</p><label className="search-control"><Search size={15}/><input aria-label="Search effects" placeholder="Search effects…" value={search} onChange={e => setSearch(e.target.value)}/></label><div className="effects-grid">{EFFECTS.filter(f => f.label.toLowerCase().includes(search.toLowerCase())).map(fx => <button key={fx.key} className={`effect-tile ${scene.effect_preset === fx.key ? "selected" : ""}`} aria-pressed={scene.effect_preset === fx.key} disabled={saving} onClick={() => {setPreviewMode("source"); void update({effect_preset:fx.key});}}>
-            <div className="effect-image">{shot?.asset && shot.asset.type !== "audio" ? <img src={api.assetThumbUrl(shot.asset_id)} alt="" style={{filter:fx.swatch}}/> : <div className="effect-swatch" style={{filter:fx.swatch}}/>}{scene.effect_preset === fx.key && <CheckCircle2 size={17}/>}</div><span>{fx.label}</span></button>)}</div>{!EFFECTS.some(f => f.label.toLowerCase().includes(search.toLowerCase())) && <p className="hint">No matching effects.</p>}<p className="hint">Thumbnails are approximate. Glitch adds full-frame RGB separation and tearing across the top, middle and bottom. Render to check the exact result.</p><button className="btn" disabled={!shot||saving||isGenerating} onClick={render}><Play size={14}/> Render effect preview</button><label className="control-label">Effect strength · {scene.effect_intensity}%<input aria-label="Effect strength" type="range" min={0} max={100} step={5} disabled={saving||scene.effect_preset==="original"} key={scene.effect_intensity} defaultValue={scene.effect_intensity} onChange={e=>draft({effect_intensity:Number(e.target.value)})} onBlur={()=>void flush()}/></label><button className="text-btn" disabled={saving || scene.effect_preset === "original"} onClick={() => {setPreviewMode("source"); void update({effect_preset:"original"});}}>Reset to original</button></>}
+            <div className="effect-image">{shot?.asset && shot.asset.type !== "audio" ? <img src={api.assetThumbUrl(shot.asset_id)} alt="" style={{filter:fx.swatch}}/> : <div className="effect-swatch" style={{filter:fx.swatch}}/>}{scene.effect_preset === fx.key && <CheckCircle2 size={17}/>}</div><span>{fx.label}</span></button>)}</div>{!EFFECTS.some(f => f.label.toLowerCase().includes(search.toLowerCase())) && <p className="hint">No matching effects.</p>}<p className="hint">Thumbnails are approximate. Glitch tears the whole frame in bursts; choose its speed and block size below. Render to check the exact result.</p><button className="btn" disabled={!shot||saving||isGenerating} onClick={render}><Play size={14}/> Render effect preview</button><label className="control-label">Effect strength · {scene.effect_intensity}%<input aria-label="Effect strength" type="range" min={0} max={100} step={5} disabled={saving||scene.effect_preset==="original"} key={scene.effect_intensity} defaultValue={scene.effect_intensity} onChange={e=>draft({effect_intensity:Number(e.target.value)})} onBlur={()=>void flush()}/></label><button className="text-btn" disabled={saving || scene.effect_preset === "original"} onClick={() => {setPreviewMode("source"); void update({effect_preset:"original"});}}>Reset to original</button><LookPanel scene={scene} disabled={saving} onDraft={look=>draft({look})} onSaveNow={look=>{setPreviewMode("source");return update({look});}}/></>}
           {tab === "Text" && <><h3>On-screen captions</h3><p className="hint">Caption text is independent of narration.</p><textarea aria-label="On-screen captions" dir="auto" className="caption-box" value={captions} onChange={e => {setCaptions(e.target.value); draft({subtitle_text:e.target.value});}} onBlur={() => void flush()} placeholder="Write the text to appear on your video…"/><button className="text-btn" onClick={() => {setCaptions(text); draft({subtitle_text:text});}}><Copy size={13}/> Copy narration to captions</button><fieldset><FontPanel scene={scene} onChange={f => {if(f.typewriter&&!captions.trim()&&text.trim()){setCaptions(text);draft({subtitle_text:text});}void update({font:f});}}/><TextLayers scene={{...scene,font_json:{...scene.font_json,layers:draftLayers}}} onChange={layers=>{setDraftLayers(layers);draft({font:{layers}});}}/></fieldset><button className="btn btn-primary" disabled={!shot||isGenerating} onClick={render}>Render text preview</button><p className="hint">Caption typewriter applies to On-screen captions. For a title, choose typewriter under its Text overlay Animation. Render text preview to see the result.</p><section className="typewriter-controls"><h3>Typewriter timing & sound</h3>
             <p className="hint">Enable Captions and Typewriter reveal above. Sound follows each reveal, not the original recording’s rhythm.</p>
             <label className="check-label"><input type="checkbox" checked={!!scene.font_json.typewriter_sound} disabled={saving} onChange={e=>update({font:{typewriter_sound:e.target.checked}})}/> Synchronized keystrokes</label>
@@ -798,6 +804,49 @@ export default function App() {
     });
   }
   async function addPoolAssets(assets:Asset[]){if(!project)return;await action(async()=>{for(const {asset,sceneId} of planPoolInsert(project.scenes,assets)){const scene=sceneId?{id:sceneId}:await api.addScene(project.id);await api.updateScene(scene.id,{title:asset.original_filename,timing_mode:'fixed',requested_duration_ms:asset.type==='video'?(asset.duration_ms||4000):4000});await api.addShot(scene.id,asset.id);setSelectedId(scene.id);}setHistory([]);setFuture([]);await refresh();});}
+  // Timeline drops. Audio goes to the target scene's narration lane and the
+  // scene switches to "match narration" so picture and sound stay one clip.
+  // Images/videos dropped on a scene are added to it; dropped after the last
+  // scene they fill empty starter parts, then create new scenes.
+  async function attachAudio(sceneId:string,take:()=>Promise<{id:string}>){
+    const t=await take();await api.selectTake(t.id);
+    await api.updateScene(sceneId,{timing_mode:'audio_driven'});
+  }
+  async function placeVisuals(sceneId:string|null,assets:Asset[]){
+    if(!project)return;
+    if(sceneId){for(const a of assets)await api.addShot(sceneId,a.id);return;}
+    for(const {asset,sceneId:target} of planPoolInsert(projectRef.current?.scenes||project.scenes,assets)){
+      const scene=target?{id:target}:await api.addScene(project.id);
+      await api.updateScene(scene.id,{title:asset.original_filename,timing_mode:'fixed',requested_duration_ms:asset.type==='video'?(asset.duration_ms||4000):4000});
+      await api.addShot(scene.id,asset.id);setSelectedId(scene.id);
+    }
+  }
+  async function dropFilesOnTimeline(sceneId:string|null,files:File[]){
+    if(!project)return;
+    const plan=planFileDrop(files,!!sceneId);
+    const notes:string[]=[];
+    await action(async()=>{
+      if(plan.audio&&sceneId){setImportStatus(`Adding ${plan.audio.name}…`);await attachAudio(sceneId,()=>api.uploadVoiceTake(sceneId,plan.audio!));notes.push(`${plan.audio.name} added to the scene’s audio`);}
+      const uploaded:Asset[]=[];
+      for(const f of plan.visuals){setImportStatus(`Importing ${f.name}…`);uploaded.push(await api.uploadAsset(project.id,f));}
+      await placeVisuals(sceneId,uploaded);
+      if(uploaded.length)notes.push(`${uploaded.length} image/video file(s) ${sceneId?'added to the scene':'placed on the timeline'}`);
+      setMediaVersion(v=>v+1);await refresh();
+    });
+    if(plan.extraAudio.length)notes.push(sceneId?`${plan.extraAudio.length} more audio file(s) skipped — one audio file per scene`:`Audio not added — drop audio onto a scene`);
+    if(plan.rejected.length)notes.push(`Skipped unsupported: ${plan.rejected.slice(0,3).join(', ')}${plan.rejected.length>3?'…':''}`);
+    setImportStatus(notes.join('. ')+(notes.length?'.':''));
+  }
+  async function dropAssetsOnTimeline(sceneId:string|null,dragged:DraggedAsset[]){
+    if(!project)return;
+    const audio=dragged.filter(a=>a.type==='audio'),visual=dragged.filter(a=>a.type==='image'||a.type==='video');
+    await action(async()=>{
+      if(audio[0]&&sceneId)await attachAudio(sceneId,()=>api.useAudioAsset(sceneId,audio[0].id) as Promise<{id:string}>);
+      await placeVisuals(sceneId,visual as unknown as Asset[]);
+      await refresh();
+    });
+    setImportStatus(audio.length&&!sceneId?'Audio not added — drop audio onto a scene.':audio.length>1?'Only the first audio file was added; one audio file per scene.':'');
+  }
   async function usePoolAsset(asset:Asset){if(!selected)return;await action(async()=>{if(asset.type==='audio')await api.useAudioAsset(selected.id,asset.id);else await api.addShot(selected.id,asset.id);await refresh();});}
 
   async function importAudio(file:File|undefined){
@@ -958,7 +1007,7 @@ export default function App() {
         <div id="sequence-viewer"/>
       </main>
     </div>
-    <ProjectTimeline onDuration={resizeDuration} onRender={()=>void renderFullVideo()} exportScenes={exportScenes} exportAsset={exportJob?.status==="succeeded"?exportJob.artifact_asset_id:null} project={project} selectedId={selected?.id||""} disabled={busy||dirty||exporting} onSelect={setSelectedId} onAdd={addPart} onReorder={ids=>record('scene order',()=>api.reorderScenes(project.id,project.scenes.map(s=>s.id)),()=>api.reorderScenes(project.id,ids))} onUpdate={(id,patch)=>record('transition',()=>api.updateScene(id,{transition_in:project.scenes.find(s=>s.id===id)!.transition_in_json}),()=>api.updateScene(id,patch))} onDelete={()=>selected&&void deleteScene(selected.id)} onAudio={()=>audioImportRef.current?.click()} onRemoveAudio={()=>selected&&void action(async()=>{await api.clearNarration(selected.id);await refresh();})} onUndo={undoTimeline} onRedo={redoTimeline} canUndo={!!history.length} canRedo={!!future.length} onSplit={(at,baked)=>selected&&void action(async()=>{const right=await api.splitScene(selected.id,at,baked);setEditorEpoch(v=>v+1);setHistory([]);setFuture([]);await refresh();setSelectedId(right.id);})}/>
+    <ProjectTimeline notice={importStatus} onDropFiles={(id,files)=>void dropFilesOnTimeline(id,files)} onDropAssets={(id,assets)=>void dropAssetsOnTimeline(id,assets)} onDuration={resizeDuration} onRender={()=>void renderFullVideo()} exportScenes={exportScenes} exportAsset={exportJob?.status==="succeeded"?exportJob.artifact_asset_id:null} project={project} selectedId={selected?.id||""} disabled={busy||dirty||exporting} onSelect={setSelectedId} onAdd={addPart} onReorder={ids=>record('scene order',()=>api.reorderScenes(project.id,project.scenes.map(s=>s.id)),()=>api.reorderScenes(project.id,ids))} onUpdate={(id,patch)=>record('transition',()=>api.updateScene(id,{transition_in:project.scenes.find(s=>s.id===id)!.transition_in_json}),()=>api.updateScene(id,patch))} onDelete={()=>selected&&void deleteScene(selected.id)} onAudio={()=>audioImportRef.current?.click()} onRemoveAudio={()=>selected&&void action(async()=>{await api.clearNarration(selected.id);await refresh();})} onUndo={undoTimeline} onRedo={redoTimeline} canUndo={!!history.length} canRedo={!!future.length} onSplit={(at,baked)=>selected&&void action(async()=>{const right=await api.splitScene(selected.id,at,baked);setEditorEpoch(v=>v+1);setHistory([]);setFuture([]);await refresh();setSelectedId(right.id);})}/>
     {settingsOpen&&<SettingsPanel onClose={()=>setSettingsOpen(false)}/>}
   </div>;
 }

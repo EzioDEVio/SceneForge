@@ -95,6 +95,9 @@ class Scene(Base):
         JSON, default=lambda: {"type": "cut", "duration_ms": 0}
     )
     font_json: Mapped[dict] = mapped_column(JSON, default=lambda: DEFAULT_FONT.copy())
+    # Glitch parameters, adjustment sliders and imported-LUT reference:
+    # {"glitch": {...}, "adjust": {...}, "lut": {"asset_id", "strength"}}
+    look_json: Mapped[dict] = mapped_column(JSON, default=dict)
 
     revision: Mapped[int] = mapped_column(Integer, default=1)
     # Hash of the inputs that produced the current rendered part artifact.

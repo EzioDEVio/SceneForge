@@ -142,10 +142,6 @@ _EFFECT_FILTERS: dict[str, str] = {
     EffectPreset.VINTAGE: "curves=preset=vintage",
     EffectPreset.VIGNETTE: "vignette=PI/4",
     EffectPreset.SOFT_GLOW: "gblur=sigma=6:steps=1",
-    # RGB-channel split (chromatic-aberration-style) + film-grain-like
-    # noise — a digital "signal glitch" look, verified visually before
-    # being added here.
-    EffectPreset.GLITCH: "split=4[clean][top][middle][bottom];[top]crop=iw:ih/7:0:ih*.08[gt];[middle]crop=iw:ih/6:0:ih*.40[gm];[bottom]crop=iw:ih/7:0:ih*.76[gb];[clean][gt]overlay=x='28*sin(t*41)':y=H*.08:enable='lt(mod(t,1.2),.24)'[g1];[g1][gm]overlay=x='-32*cos(t*37)':y=H*.40:enable='lt(mod(t,1.2),.24)'[g2];[g2][gb]overlay=x='24*sin(t*53)':y=H*.76:enable='lt(mod(t,1.2),.24)',rgbashift=rh=18:bh=-18:gv=3:enable='lt(mod(t,1.2),.24)',noise=alls=18:allf=t+u:enable='lt(mod(t,1.2),.24)'",
     EffectPreset.CINEMATIC: "colorbalance=bs=.12:rs=-.05:rh=.10:bh=-.08,eq=contrast=1.12:saturation=.85",
     EffectPreset.NOIR: "hue=s=0,eq=contrast=1.45:brightness=-.03,vignette=PI/4",
     EffectPreset.SHARPEN: "unsharp=5:5:1.2:5:5:0",
@@ -160,12 +156,115 @@ _EFFECT_FILTERS: dict[str, str] = {
 }
 
 
-def build_effect_chain(preset: str, intensity: int) -> str | None:
+# ---------------------------------------------------------------------------
+# Glitch: full-frame slice displacement + RGB split + noise, in bursts.
+# ---------------------------------------------------------------------------
+GLITCH_BLOCKS = {"small": 16, "medium": 10, "large": 6}
+GLITCH_BURST_PERIOD_S = 1.2
+
+
+def _glitch_gate(speed: float, strength: float) -> str:
+    """1 during a glitch burst. `speed` multiplies how often bursts occur
+    (1.0 = every 1.2 s, 2.0 = every 0.6 s). Burst length is in real seconds
+    and grows with strength, capped so a gap always remains between bursts."""
+    period = GLITCH_BURST_PERIOD_S / speed
+    burst = min(0.12 + 0.2 * strength, period * 0.6)
+    return f"lt(mod(t,{period:.4f}),{burst:.4f})"
+
+
+def build_glitch_chain(strength: float, speed: float = 1.0, block: str = "medium", width: int = 1920) -> str:
+    """Every horizontal band of the frame can tear sideways — the bands tile
+    the whole height, so the distortion covers the full frame rather than a
+    few fixed strips. Deterministic (no RNG) so renders are reproducible.
+
+    strength 0..1 drives tear distance, how many bands tear at once, burst
+    length, RGB split and noise. speed 0.25..4 scales burst frequency and how
+    fast bands jitter. block chooses band height (small = many thin bands).
+    """
+    s = max(0.0, min(1.0, strength))
+    v = max(0.25, min(4.0, speed))
+    n = GLITCH_BLOCKS.get(block, GLITCH_BLOCKS["medium"])
+    gate = _glitch_gate(v, s)
+    amp = 0.015 + 0.075 * s                      # fraction of frame width
+    threshold = 0.55 - 1.05 * s                  # lower = more bands tear
+    labels = "".join(f"[b{i}]" for i in range(n))
+    parts = [f"split={n + 1}[g0]{labels}"]
+    prev = "g0"
+    for i in range(n):
+        f1 = 17 + 7.3 * i                        # incommensurate per-band rates
+        ph = 1.7 * i
+        parts.append(f"[b{i}]crop=iw:ceil(ih/{n}):0:ih*{i}/{n}[s{i}]")
+        x = f"W*{amp:.4f}*sin(t*{f1 * v:.3f}+{ph:.2f})"
+        enable = f"{gate}*gt(sin(t*{(5.1 + 2.9 * i) * v:.3f}+{ph:.2f}),{threshold:.3f})"
+        nxt = f"g{i + 1}"
+        parts.append(f"[{prev}][s{i}]overlay=x='{x}':y=H*{i}/{n}:enable='{enable}'[{nxt}]")
+        prev = nxt
+    shift = max(1, int(round(width * (0.002 + 0.012 * s))))   # 4..27 px at 1080p
+    noise = int(round(6 + 22 * s))
+    parts.append(
+        f"[{prev}]rgbashift=rh={shift}:bh=-{shift}:gv={max(1, shift // 6)}:enable='{gate}',"
+        f"noise=alls={noise}:allf=t+u:enable='{gate}'"
+    )
+    return ";".join(parts)
+
+
+# ---------------------------------------------------------------------------
+# Adjustments (per-scene sliders). All values are integers; 0 = no change.
+# ---------------------------------------------------------------------------
+ADJUST_RANGES = {
+    "exposure": (-100, 100), "contrast": (-100, 100), "saturation": (-100, 100),
+    "vibrance": (-100, 100), "temperature": (-100, 100), "tint": (-100, 100),
+    "highlights": (-100, 100), "shadows": (-100, 100),
+    "sharpen": (0, 100), "vignette": (0, 100), "grain": (0, 100),
+}
+
+
+def clean_adjust(raw: dict | None) -> dict:
+    out = {}
+    for key, (lo, hi) in ADJUST_RANGES.items():
+        value = (raw or {}).get(key, 0)
+        if isinstance(value, bool) or not isinstance(value, (int, float)):
+            continue
+        value = int(round(max(lo, min(hi, value))))
+        if value:
+            out[key] = value
+    return out
+
+
+def build_adjust_chain(adjust: dict | None) -> tuple[str | None, str | None]:
+    """Spatial adjustments only; colour controls are baked into the grade LUT
+    (render/grade.py). Returns (detail, finishing): sharpen runs straight
+    after the grade, vignette and grain run last so they sit on top of the
+    final look like real lens and film artefacts."""
+    a = clean_adjust(adjust)
+    detail = f"unsharp=5:5:{a['sharpen'] / 100 * 1.6:.3f}:5:5:0" if "sharpen" in a else None
+    finishing: list[str] = []
+    if "vignette" in a:
+        finishing.append(f"vignette=angle={0.15 + a['vignette'] / 100 * 0.95:.3f}")
+    if "grain" in a:
+        finishing.append(f"noise=alls={max(1, round(a['grain'] * 0.35))}:allf=t+u")
+    return detail, (",".join(finishing) or None)
+
+
+def build_grade_chain(grade_lut_path: str | None) -> str | None:
+    """One lut3d pass (planar RGB is the fastest input for lut3d)."""
+    from app.render.ffmpeg_utils import escape_path_for_filter
+    if not grade_lut_path:
+        return None
+    return f"format=gbrp,lut3d=file='{escape_path_for_filter(grade_lut_path)}':interp=tetrahedral"
+
+
+
+
+def build_effect_chain(preset: str, intensity: int, glitch: dict | None = None, width: int = 1920) -> str | None:
     """Returns a filter fragment to append after label splitting, or None
     for 'original'/0 intensity (no-op — cheapest path, and Original always
     disables other looks per spec)."""
     if preset == EffectPreset.ORIGINAL or intensity <= 0:
         return None
+    if preset == EffectPreset.GLITCH:
+        g = glitch or {}
+        return build_glitch_chain(intensity / 100, float(g.get("speed", 1.0)), str(g.get("block", "medium")), width)
     effect = _EFFECT_FILTERS.get(preset)
     if not effect:
         return None
@@ -213,6 +312,8 @@ def build_shot_video_chain(
     effect_preset: str,
     effect_intensity: int,
     in_label: str = "0:v",
+    look: dict | None = None,
+    grade_lut_path: str | None = None,
 ) -> tuple[str, str | None]:
     """Returns (filter_complex_str, overscan_warning_or_none).
 
@@ -223,7 +324,10 @@ def build_shot_video_chain(
     """
     plan = resolve_motion(motion_json)
     warning = overscan_warning(plan)
-    effect_chain = build_effect_chain(effect_preset, effect_intensity)
+    look = look or {}
+    effect_chain = build_effect_chain(effect_preset, effect_intensity, look.get("glitch"), out_w)
+    primary, finishing = build_adjust_chain(look.get("adjust"))
+    grade_chain = build_grade_chain(grade_lut_path)
 
     if fit == FitMode.COVER:
         if is_static_plan(plan):
@@ -237,16 +341,19 @@ def build_shot_video_chain(
             )
         fit_chain = build_contain_chain(out_w, out_h, blurred_bg=(fit == FitMode.CONTAIN_BLUR))
 
-    out_label = "vout" if effect_chain else "vout"
-    if not effect_chain:
-        graph = f"[{in_label}]{fit_chain},setsar=1[{out_label}]"
-        return graph, warning
-
-    # fit_chain -> [vfit] -> effect_chain (which itself may split/blend) -> [vout]
+    # Grade order: fit/motion -> grade LUT (colour sliders + imported LUT)
+    # -> sharpen -> look preset -> vignette/grain. Each stage may be a plain comma chain or a labelled
+    # split/blend sub-graph; stages are joined through [st*] pads.
     # setsar=1 normalizes sample-aspect-ratio drift introduced by
     # scale/crop rounding — without it, concat/xfade between two shots
     # with slightly different computed SAR (e.g. 3952:3951 vs 1126:1125,
     # both ~1.0 but not bit-identical) fails with "Input link parameters
     # do not match" and silently produces a zero-byte output.
-    graph = f"[{in_label}]{fit_chain}[vfit];[vfit]{effect_chain},setsar=1[{out_label}]"
+    stages = [c for c in (grade_chain, primary, effect_chain, finishing) if c]
+    if not stages:
+        return f"[{in_label}]{fit_chain},setsar=1[vout]", warning
+    graph = f"[{in_label}]{fit_chain}[st0]"
+    for i, stage in enumerate(stages):
+        end = ",setsar=1[vout]" if i == len(stages) - 1 else f"[st{i + 1}]"
+        graph += f";[st{i}]{stage}{end}"
     return graph, warning

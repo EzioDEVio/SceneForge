@@ -30,6 +30,7 @@ class AssetType(str, Enum):
     IMAGE = "image"
     VIDEO = "video"
     AUDIO = "audio"
+    LUT = "lut"          # imported .cube colour LUT (never on the timeline)
 
 
 class AssetOrigin(str, Enum):

@@ -3,6 +3,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {ArrowLeft, ArrowRight, Film, Plus, GripVertical, Play, Pause, Square, SkipBack, SkipForward, Volume2, Type, Maximize2, X, ChevronLeft, ChevronRight, Trash2, Scissors, Undo2, Redo2, Upload, StepBack, StepForward, Clapperboard, ArrowLeftRight, ChevronUp, ChevronDown, Captions} from 'lucide-react';
 import {api, Project, Scene} from './api';
+import {ASSET_DRAG_TYPE, DraggedAsset, collectDroppedFiles, isMediaDrag} from './timelineDrop';
 
 export const TRANSITIONS = [
   ['cut','Cut'], ['dissolve','Dissolve'], ['fade_through_black','Fade through black'],
@@ -29,7 +30,8 @@ export const timecode=(ms:number,fps=30)=>{
   const f=Math.max(0,Math.floor(ms/1000*fps));
   return [Math.floor(f/fps/3600),Math.floor(f/fps/60)%60,Math.floor(f/fps)%60,f%fps].map(n=>String(n).padStart(2,'0')).join(':');
 };
-export function ProjectTimeline({project,selectedId,disabled,onDuration,onRender,onSelect,onAdd,onReorder,onUpdate,exportAsset,exportScenes,onDelete,onAudio,onRemoveAudio,onUndo,onRedo,canUndo,canRedo,onSplit}:{
+export function ProjectTimeline({project,selectedId,disabled,onDuration,onRender,onSelect,onAdd,onReorder,onUpdate,exportAsset,exportScenes,onDelete,onAudio,onRemoveAudio,onUndo,onRedo,canUndo,canRedo,onSplit,onDropFiles,onDropAssets,notice}:{
+  notice?:string;onDropFiles?:(sceneId:string|null,files:File[])=>void;onDropAssets?:(sceneId:string|null,assets:DraggedAsset[])=>void;
   onDuration?:(id:string,ms:number)=>void;onRender?:()=>void;onDelete?:()=>void;onAudio?:()=>void;onRemoveAudio?:()=>void;onUndo?:()=>void;onRedo?:()=>void;canUndo?:boolean;canRedo?:boolean;onSplit?:(at:number,baked?:boolean)=>void;
   exportScenes?:Scene[];exportAsset?:string|null;project:Project;selectedId:string;disabled:boolean;onSelect:(id:string)=>void;onAdd:()=>void;
   onReorder:(ids:string[])=>Promise<unknown>;onUpdate:(id:string,patch:any)=>Promise<unknown>;
@@ -80,6 +82,26 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onRender
     if(monitor&&player.current){player.current.pause();player.current.currentTime=value/1000;}
     if(!monitor){const clip=[...clips].reverse().find(c=>value>=c.start);if(clip)requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('sceneforge-seek',{detail:{sceneId:clip.scene.id,timeMs:value-clip.start}})));}
     if(select&&!monitor){const c=[...clips].reverse().find(c=>value>=c.start);if(c&&c.scene.id!==selectedId){rulerSelection.current=c.scene.id;onSelect(c.scene.id);}}
+  }
+  const [dropTarget,setDropTarget]=useState('');
+  // Drop/import results show briefly, then clear so the ruler stays usable.
+  const [shownNotice,setShownNotice]=useState('');
+  useEffect(()=>{setShownNotice(notice||'');if(!notice)return;const t=setTimeout(()=>setShownNotice(''),7000);return()=>clearTimeout(t);},[notice]);
+  useEffect(()=>{const clear=()=>setDropTarget('');window.addEventListener('dragend',clear);window.addEventListener('drop',clear);return()=>{window.removeEventListener('dragend',clear);window.removeEventListener('drop',clear);};},[]);
+  function dragOverMedia(e:React.DragEvent,key:string):boolean{
+    if(!isMediaDrag(e)||disabled)return false;
+    e.preventDefault();e.stopPropagation();e.dataTransfer.dropEffect='copy';
+    if(dropTarget!==key)setDropTarget(key);
+    return true;
+  }
+  function dropMedia(e:React.DragEvent,sceneId:string|null):boolean{
+    const kind=isMediaDrag(e);
+    if(!kind)return false;
+    e.preventDefault();e.stopPropagation();setDropTarget('');
+    if(disabled)return true;
+    if(kind==='assets'){try{onDropAssets?.(sceneId,JSON.parse(e.dataTransfer.getData(ASSET_DRAG_TYPE)));}catch{/* malformed payload */}}
+    else{const dt=e.dataTransfer;void collectDroppedFiles(dt).then(files=>files.length&&onDropFiles?.(sceneId,files));}
+    return true;
   }
   function togglePlay() {
     if(disabled||!scenes.some(s=>s.shots.length))return;
@@ -145,7 +167,7 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onRender
       <div className="sequence-tools"><button className="render-sequence" title="Render every scene and assemble the full video" disabled={disabled||!scenes.some(s=>s.shots.length)} onClick={onRender}><Clapperboard size={14}/> Render full video</button><button aria-label="Minimize or restore timeline" title={minimized?'Restore timeline':'Minimize timeline'} onClick={()=>setMinimized(!minimized)}>{minimized?<ChevronUp size={15}/>:<ChevronDown size={15}/>}</button><button aria-label="Maximize timeline" title="Maximize timeline" onClick={()=>{setMinimized(false);setHeight(window.innerHeight*.6);}}><Maximize2 size={13}/></button><button aria-label="Fit timeline" title="Fit timeline to width" onClick={fit}><ArrowLeftRight size={15}/></button><label>Zoom<input aria-label="Timeline zoom" type="range" min={.5} max={150} step={.5} value={scale} onChange={e=>setScale(Number(e.target.value))}/></label><button disabled={disabled} onClick={onAdd}><Plus size={15}/> Add part</button></div>
     </header>
     <div className="sequence-editbar">
-      <span className="tool-feedback" aria-live="polite">{toolMessage}</span><span className="selection-label">{selected?.title||'Select a part'}</span>
+      <span className="tool-feedback" aria-live="polite">{toolMessage||shownNotice}</span><span className="selection-label">{selected?.title||'Select a part'}</span>
       <button aria-label="Move timeline part earlier" title="Move part earlier" disabled={disabled||index<=0} onClick={()=>move(-1)}><ArrowLeft size={14}/>Earlier</button>
       <button aria-label="Move timeline part later" title="Move part later" disabled={disabled||index<0||index>=scenes.length-1} onClick={()=>move(1)}><ArrowRight size={14}/>Later</button>
       <label>Transition<select aria-label="Incoming transition" disabled={disabled||!selected?.shots.length||firstPlayable} value={selected?.transition_in_json.type||'cut'} onChange={e=>selected&&void onUpdate(selected.id,{transition_in:{type:e.target.value,duration_ms:e.target.value==='cut'?0:(selected.transition_in_json.duration_ms||500)}})}>{TRANSITIONS.map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
@@ -162,9 +184,9 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onRender
             {Array.from({length:Math.min(1000,Math.ceil(extent/step))},(_,i)=><span key={i} style={{left:i*step*scale}}>{timecode(i*step*1000,project.fps).slice(0,8)}</span>)}
           </div>
           <div className="sequence-playhead" style={{left:position/1000*scale}}><span/></div>
-          <div className="picture-track" aria-label="Scene track">
+          <div className={`picture-track ${dropTarget==="end"?"drop-target":""}`} aria-label="Scene track" onDragOver={e=>{dragOverMedia(e,"end");}} onDragLeave={e=>{if(e.currentTarget===e.target)setDropTarget("");}} onDrop={e=>{dropMedia(e,null);}}>
             {clips.map(({scene:s,start,duration,overlap})=><React.Fragment key={s.id}>
-              <button draggable={!disabled&&!monitor} disabled={disabled} onDragStart={()=>setDrag(s.id)} onDragEnd={()=>setDrag('')} onDragOver={e=>e.preventDefault()} onDrop={()=>drop(s.id)} className={`picture-clip ${s.id===selectedId?'selected':''} ${s.shots.length?'':'placeholder'}`} style={{left:start/1000*scale,width:Math.max(4,duration/1000*scale-2)}} aria-label={`Storyboard scene ${scenes.indexOf(s)+1}`} aria-current={s.id===selectedId?'true':undefined} onClick={()=>{onSelect(s.id);seek(start);}} title={`${s.title} · ${(duration/1000).toFixed(1)}s${!s.shots.length?' · Add media':''}`}>
+              <button draggable={!disabled&&!monitor} disabled={disabled} onDragStart={()=>setDrag(s.id)} onDragEnd={()=>setDrag('')} onDragOver={e=>{if(!dragOverMedia(e,'v:'+s.id))e.preventDefault();}} onDragLeave={()=>setDropTarget('')} onDrop={e=>{if(!dropMedia(e,s.id))drop(s.id);}} className={`picture-clip ${s.id===selectedId?'selected':''} ${s.shots.length?'':'placeholder'} ${dropTarget==='v:'+s.id?'drop-target':''}`} style={{left:start/1000*scale,width:Math.max(4,duration/1000*scale-2)}} aria-label={`Storyboard scene ${scenes.indexOf(s)+1}`} aria-current={s.id===selectedId?'true':undefined} onClick={()=>{onSelect(s.id);seek(start);}} title={`${s.title} · ${(duration/1000).toFixed(1)}s${!s.shots.length?' · Add media':''}`}>
                 <div className="clip-label"><GripVertical size={12}/><strong>{s.title}</strong><small>{(duration/1000).toFixed(1)}s</small></div>
                 {s.shots[0]?.asset&&s.shots[0].asset.type!=='audio'?<div className="filmstrip" data-kind={s.shots[0].asset.type} style={{backgroundImage:`url("${api.assetThumbUrl(s.shots[0].asset_id,160)}")`}}/>:s.shots.length?<div className="clip-placeholder"><Film size={22}/>Video source</div>:<div className="clip-placeholder"><Plus size={18}/>Add media</div>}
               </button>
@@ -176,12 +198,12 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onRender
               {overlap>0&&<button disabled={disabled} className={`clip-transition ${selectedId===s.id?'selected':''}`} style={{left:start/1000*scale,width:Math.max(20,overlap/1000*scale)}} aria-label={`Edit ${s.title} transition`} title={`${TRANSITIONS.find(t=>t[0]===s.transition_in_json.type)?.[1]} · ${(overlap/1000).toFixed(2)}s (effective overlap)`} onClick={()=>{onSelect(s.id);seek(start);}}><span>⋈</span></button>}
             </React.Fragment>)}
           </div>
-          <div className="narration-track" aria-label="Narration track">{clips.map(({scene:s,start,duration})=>{const take=s.voice_takes.find(t=>t.accepted);return <button key={s.id} className={`narration-clip ${take?'has-take':''}`} style={{left:start/1000*scale,width:Math.max(4,duration/1000*scale-2)}} onClick={()=>onSelect(s.id)} title={take?`${take.voice||'Narration'} · ${((take.measured_duration_ms||0)/1000).toFixed(1)}s`:'No narration take selected'}><Volume2 size={13}/>{take?take.voice||'Narration':'No narration'}</button>})}</div>
+          <div className="narration-track" aria-label="Narration track">{clips.map(({scene:s,start,duration})=>{const take=s.voice_takes.find(t=>t.accepted);return <button key={s.id} onDragOver={e=>{dragOverMedia(e,'a:'+s.id);}} onDragLeave={()=>setDropTarget('')} onDrop={e=>{dropMedia(e,s.id);}} className={`narration-clip ${take?'has-take':''} ${dropTarget==='a:'+s.id?'drop-target':''}`} style={{left:start/1000*scale,width:Math.max(4,duration/1000*scale-2)}} onClick={()=>onSelect(s.id)} title={take?`${take.voice||'Narration'} · ${((take.measured_duration_ms||0)/1000).toFixed(1)}s · drop audio here to replace`:'Drop an audio file here to add sound to this scene'}><Volume2 size={13}/>{take?take.voice||'Narration':dropTarget==='a:'+s.id?'Drop to add audio':'No narration'}</button>})}</div>
           <div className="titles-track" aria-label="Text track">{clips.map(({scene:s,start,duration})=>{const caption=s.font_json.captions_enabled&&s.subtitle_text?s.subtitle_text:'';const layers=s.font_json.layers?.length||0;const summary=[caption&&`Caption: ${caption}`,layers&&`${layers} title${layers>1?'s':''}`].filter(Boolean).join(' · ')||'No captions or titles';return <button key={s.id} className={`title-clip ${caption||layers?'has-title':''}`} style={{left:start/1000*scale,width:Math.max(4,duration/1000*scale-2)}} onClick={()=>onSelect(s.id)} title={summary} aria-label={`${s.title} text: ${summary}`}>{layers>0&&<span className="lane-titles"><Type size={11}/>{layers}</span>}{caption?<span className="lane-caption"><Captions size={12}/>{caption}</span>:layers?null:<span className="lane-empty"><Type size={12}/>No text</span>}</button>})}</div>
         </div>
       </div>
     </div>
-    <footer className="sequence-status"><span>{staleExport?'EXPORT OUTDATED · Export again to include your latest changes':monitor?'LAST EXPORT · Export again after edits':'ASSEMBLY · Drag parts to reorder · Drag the ruler to seek'}</span><span>{scenes.some(s=>!s.shots.length)?'Empty placeholders are skipped on export · ':''}Estimated export {timecode(exportLength,project.fps)}</span></footer>
+    <footer className="sequence-status"><span>{staleExport?'EXPORT OUTDATED · Export again to include your latest changes':monitor?'LAST EXPORT · Export again after edits':'ASSEMBLY · Drag parts to reorder · Drop audio on a scene to add its sound · Drop images or videos on a scene, or after the last one'}</span><span>{scenes.some(s=>!s.shots.length)?'Empty placeholders are skipped on export · ':''}Estimated export {timecode(exportLength,project.fps)}</span></footer>
     {monitor&&exportAsset&&host&&createPortal(<div className="program-monitor"><header><strong>Last exported movie</strong><span>{staleExport?'Outdated — export again for current scenes':'Export again after edits'}</span><button title="Fullscreen movie" onClick={()=>void player.current?.requestFullscreen()}><Maximize2 size={15}/></button><button aria-label="Close movie preview" onClick={()=>{setMonitor(false);setPlaying(false);}}><X size={16}/></button></header><video ref={player} controls autoPlay src={api.assetStreamUrl(exportAsset)} onPlay={()=>setPlaying(true)} onPause={()=>setPlaying(false)} onEnded={()=>setPlaying(false)} onError={()=>setMediaError('The exported movie could not be loaded. Export again and retry.')} onTimeUpdate={e=>setPosition(e.currentTarget.currentTime*1000)}/>{mediaError&&<p role="alert">{mediaError}</p>}</div>,host)}
   </section>;
 }

@@ -1,3 +1,30 @@
+# SceneForge Desktop 0.2.0 RC5 (in progress) — looks, grading and timeline drops
+
+## Glitch
+- Tears now reach the whole frame: horizontal bands tile the full height, and the RGB split and noise cover the full frame (previously three fixed strips).
+- **Effect strength** sets tear distance, how many bands tear at once, and burst length. New **Speed** (0.25×–4×) sets how often bursts happen; **Block size** chooses Fine, Medium or Chunky bands. These controls appear when Glitch is selected.
+
+## Adjust (Effects tab)
+- Eleven sliders with number boxes and resets: Exposure, Contrast, Highlights, Shadows, Temperature, Tint, Saturation, Vibrance, Sharpen, Vignette, Grain. Double-click a slider to reset it; **Reset all** clears them.
+- The preview approximates the result live; render the scene for the exact grade.
+- Colour sliders and the LUT are baked into one 3D LUT per scene at render time, so grading adds roughly one filter pass however many sliders are used.
+
+## Color LUT
+- **Import .cube** in Effects → Color LUT, choose it per scene, and set its strength. 3D .cube files up to 65 points and 12 MB; invalid files are rejected with the reason. LUTs show in the rendered scene, not in the preview.
+
+## Drag and drop onto the timeline
+- Drop an audio file from Explorer onto a scene's picture or Narration lane: it becomes that scene's sound, and the scene switches to **Match narration** so picture and audio stay one clip.
+- Drop images or videos onto a scene to add them to it, or after the last scene to fill empty starter parts and then create new scenes. Folders work; files are placed in name order.
+- Items can also be dragged from the Media Pool onto a scene. Skipped files (unsupported types, more than one audio file per scene) are reported in the timeline.
+
+## Upgrade notes
+- Existing databases gain a `look_json` column automatically on first start; existing scenes keep all their data. Back up `backend\data` before upgrading, as always.
+- NumPy is now a runtime dependency (`backend/requirements.txt`); run `scripts\setup.bat` again after updating.
+
+## Tests
+- `tests/integration/test_looks.py` (33 checks, in CI): full-frame glitch, strength and speed; .cube parsing and rejection; LUT import; slider validation; real renders for LUT strength, greyscale, temperature and exposure; database upgrade from RC4.
+- 11 new component checks and 8 new unit checks for the Look panel and timeline drops.
+
 # SceneForge Desktop 0.2.0 RC5 (in progress) — editor fixes
 
 ## Captions and text

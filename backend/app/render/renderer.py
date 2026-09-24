@@ -170,6 +170,26 @@ def render_scene_visual(
     return concat_out
 
 
+def _grade_lut_for(scene: Scene) -> str | None:
+    """Bake the scene's colour sliders and imported LUT into one cached LUT."""
+    from app.config import PROXIES_DIR
+    from app.db.database import SessionLocal
+    from app.render.grade import build_grade_lut
+    look = scene.look_json or {}
+    lut = look.get("lut") or {}
+    lut_path = None
+    if lut.get("asset_id"):
+        # Render workers hold detached scenes, so look the asset up directly.
+        with SessionLocal() as db:
+            asset = db.get(Asset, lut["asset_id"])
+            if asset is None or asset.type != "lut" or asset.project_id != scene.project_id:
+                raise FFmpegError("The LUT chosen for this scene is missing. Choose it again in Effects → Color LUT.")
+            lut_path = _resolve_asset_path(asset)
+        if not Path(lut_path).exists():
+            raise FFmpegError("The LUT file for this scene is missing on disk. Import it again in Effects → Color LUT.")
+    return build_grade_lut(look.get("adjust"), lut_path, int(lut.get("strength", 100)), Path(PROXIES_DIR) / "grades")
+
+
 def _render_single_shot(
     shot, scene: Scene, out_w: int, out_h: int, fps: int, duration_ms: int, out_path: str, ctx: RenderContext,
     progress_cb=None,
@@ -210,6 +230,8 @@ def _render_single_shot(
         total_frames=total_frames,
         effect_preset=scene.effect_preset,
         effect_intensity=int(scene.effect_intensity),
+        look=scene.look_json or {},
+        grade_lut_path=_grade_lut_for(scene),
     )
     if pre_filters:
         # prepend a normalization stage (fps/rotation) onto the graph's input

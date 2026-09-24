@@ -33,3 +33,6 @@ websockets==17.1
 
 huggingface_hub==1.31.0
 Pillow>=10,<13
+
+# Colour grading: bakes adjustment sliders and imported .cube LUTs into one 3D LUT.
+numpy==2.5.3

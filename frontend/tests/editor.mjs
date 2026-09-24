@@ -16,7 +16,7 @@ await build({entryPoints:['src/App.tsx'],outfile:'node_modules/.cache/editor-tes
 const require=createRequire(import.meta.url);
 const React=require('react');
 const {default:App}=require('../node_modules/.cache/editor-test.cjs');
-const {render,screen,within,waitFor,cleanup,act}=await import('@testing-library/react');
+const {render,screen,within,waitFor,cleanup,act,fireEvent}=await import('@testing-library/react');
 const {default:userEvent}=await import('@testing-library/user-event');
 const user=userEvent.setup();
 const fixture=JSON.parse(readFileSync('../tests/ui-project-fixture.json','utf8'));
@@ -44,6 +44,12 @@ globalThis.fetch=async(path,init={})=>{
  else if(path==='/api/local-speech/kokoro/connect') {if(failLocal){failLocal=false;return {ok:false,status:503,json:async()=>({detail:'Engine is not running.'})};}const profile={id:'provider-kokoro',name:'kokoro',capability:'speech',base_url:'http://127.0.0.1:8880'};profiles.push(profile);result={profile,voices:['af_heart'],message:'Service connected.'};}
  else if(path.endsWith('/voices'))result={voices:['af_heart','default']};
  else if(path.endsWith('/image-history'))result=[];
+ else if(path.startsWith('/api/assets/luts'))result=[];
+ else if(path.startsWith('/api/assets/upload')&&method==='POST'){const f=body.get('file');result={id:'up-'+next++,type:/\.(mp4|mov)$/i.test(f.name)?'video':'image',original_filename:f.name,width:640,height:360,duration_ms:null};}
+ else if(/\/api\/scenes\/[^/]+\/voice-takes\/upload$/.test(path)){const sc=project.scenes.find(s=>s.id===path.split('/')[3]);const take={id:'take-'+next++,accepted:true,voice:'Uploaded audio',source:'upload',measured_duration_ms:5200,stale:false};sc.voice_takes.forEach(t=>t.accepted=false);sc.voice_takes.push(take);result=take;}
+ else if(/\/api\/voice-takes\/[^/]+\/select$/.test(path))result={ok:true};
+ else if(path.endsWith('/voice-takes/from-asset')){result={id:'take-'+next++,accepted:true,voice:'Uploaded audio',source:'upload',measured_duration_ms:3000,stale:false};}
+ else if(/\/api\/scenes\/[^/]+\/shots$/.test(path)&&method==='POST'){const sc=project.scenes.find(s=>s.id===path.split('/')[3]);const shot={id:'shot-'+next++,asset_id:body.asset_id,asset:{id:body.asset_id,type:'image',width:640,height:360},order_index:sc.shots.length,fit:'cover',motion_json:{type:'static'},crop_json:null,source_in_ms:0};sc.shots.push(shot);result=shot;}
  else if(path.endsWith('/generate-image'))result={id:'generated-image'};
  else if(path.endsWith('/scene-order')) {project.scenes=body.scene_ids.map(id=>project.scenes.find(s=>s.id===id));result={ok:true};}
  else if(path===`/api/projects/${project.id}/scenes`&&method==='POST') {
@@ -132,6 +138,42 @@ try{
  await user.click(screen.getByRole('button',{name:'Warm',exact:true}));await saved();
  check('effect selection persists',project.scenes.find(s=>s.id===firstId).effect_preset==='warm');
  check('effect appears on main preview',visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('saturate'));
+ fireEvent.change(screen.getByRole('slider',{name:'Exposure'}),{target:{value:'35'}});
+ fireEvent.change(screen.getByRole('slider',{name:'Temperature'}),{target:{value:'-40'}});
+ check('adjustment preview updates before saving',visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('brightness')&&visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('url(#sf-wb-'));
+ await saved();
+ check('adjustment sliders save together as one look',requests.some(r=>r.method==='PATCH'&&r.body?.look?.adjust?.exposure===35&&r.body.look.adjust.temperature===-40));
+ fireEvent.doubleClick(screen.getByRole('slider',{name:'Exposure'}));await saved();
+ check('double-click resets a slider',requests.filter(r=>r.body?.look?.adjust).at(-1).body.look.adjust.exposure===undefined&&requests.filter(r=>r.body?.look?.adjust).at(-1).body.look.adjust.temperature===-40);
+ check('glitch controls hidden unless Glitch is chosen',!screen.queryByRole('group',{name:'Glitch controls'})&&!screen.queryByRole('slider',{name:'Glitch speed'}));
+ await user.clear(screen.getByRole('textbox',{name:'Search effects'}));
+ await user.click(screen.getByRole('button',{name:'Glitch',exact:true}));await saved();
+ await user.click(await screen.findByRole('radio',{name:'Chunky'}));
+ fireEvent.change(screen.getByRole('slider',{name:'Glitch speed'}),{target:{value:'2.5'}});await saved();
+ check('glitch speed and block size save',requests.some(r=>r.body?.look?.glitch?.block==='large'&&r.body.look.glitch.speed===2.5));
+ check('LUT import control is offered',!!screen.getByRole('button',{name:/Import .cube/})&&!!screen.getByRole('combobox',{name:'Color LUT'}));
+ await user.click(screen.getByRole('button',{name:'Original',exact:true}));await saved();
+ const narration=screen.getAllByRole('button').filter(b=>b.className.includes('narration-clip'))[0];
+ const dt=(files)=>({dataTransfer:{types:['Files'],files,items:[],dropEffect:'',getData:()=>''}});
+ fireEvent.dragOver(narration,dt([]));
+ check('dragging a file over a scene highlights its audio lane',narration.className.includes('drop-target'));
+ const firstScene=project.scenes[0].id;
+ fireEvent.drop(narration,dt([new File(['RIFF'],'voiceover.wav',{type:'audio/wav'}),new File(['x'],'notes.txt')]));
+ await waitFor(()=>assert.ok(requests.some(r=>r.path===`/api/scenes/${firstScene}/voice-takes/upload`)));
+ await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.path===`/api/scenes/${firstScene}`&&r.body?.timing_mode==='audio_driven')));
+ check('dropping audio on a scene uploads it as that scene’s sound and matches the clip to it',requests.some(r=>/\/api\/voice-takes\/take-\d+\/select$/.test(r.path)));
+ await waitFor(()=>assert.match(screen.getByText(/voiceover\.wav added/).textContent,/Skipped unsupported: notes\.txt/));
+ check('drop results are reported, including skipped files',true);
+ const picture=screen.getAllByRole('button',{name:/Storyboard scene 1/})[0];
+ const before=project.scenes[0].shots.length;
+ fireEvent.drop(picture,dt([new File(['img'],'extra.png',{type:'image/png'})]));
+ await waitFor(()=>assert.equal(project.scenes[0].shots.length,before+1));
+ check('dropping an image on a picture clip adds it to that scene',requests.some(r=>r.path.startsWith('/api/assets/upload')));
+ const pool={id:'pool-audio',type:'audio',original_filename:'music.mp3'};
+ fireEvent.drop(narration,{dataTransfer:{types:['application/x-sceneforge-assets'],getData:()=>JSON.stringify([pool])}});
+ await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/voice-takes/from-asset')&&r.body.asset_id==='pool-audio')));
+ await waitFor(()=>assert.ok(requests.filter(r=>r.method==='PATCH'&&r.body?.timing_mode==='audio_driven').length>=2));
+ check('dragging audio from the Media Pool onto a scene attaches it and matches the clip',true);
  await user.click(screen.getByRole('tab',{name:'Text',exact:true}));
  await user.selectOptions(screen.getByLabelText('Family'),'Noto Sans Arabic');await saved();
  check('font selection retains other font settings',project.scenes.find(s=>s.id===firstId).font_json.family==='Noto Sans Arabic'&&project.scenes.find(s=>s.id===firstId).font_json.size===40);

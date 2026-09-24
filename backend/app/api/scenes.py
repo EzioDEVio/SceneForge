@@ -57,6 +57,8 @@ def update_scene(scene_id: str, body: schemas.SceneUpdate, db: Session = Depends
         if isinstance(duration, bool) or not isinstance(duration, int) or not 0 <= duration <= 30000:
             raise HTTPException(400, "Transition duration must be an integer from 0 to 30000 milliseconds.")
         scene.transition_in_json = {"type": body.transition_in["type"], "duration_ms": duration}
+    if body.look is not None:
+        scene.look_json = _validated_look(scene, body.look, db)
     if body.font is not None:
         from app.db.models import Asset
         for key, low, high in [('typewriter_volume', 0, 100), ('typewriter_delay_ms', 0, 120000), ('typewriter_duration_ms', 100, 120000)]:
@@ -136,6 +138,8 @@ def add_shot(scene_id: str, body: schemas.ShotIn, db: Session = Depends(get_db))
     asset = db.get(Asset, body.asset_id)
     if not asset:
         raise HTTPException(404, "Asset not found")
+    if asset.type not in ("image", "video") or asset.project_id != scene.project_id:
+        raise HTTPException(400, "Only images and videos from this project can be added to the picture track.")
     order = body.order_index if body.order_index else len(scene.shots)
     shot = Shot(
         scene_id=scene_id,
@@ -229,7 +233,7 @@ def split_scene(scene_id: str, body: dict, db: Session = Depends(get_db)):
     for sibling in scene.project.scenes:
         if sibling.order_index > scene.order_index: sibling.order_index += 1
     right = Scene(project_id=scene.project_id, order_index=scene.order_index+1, title=scene.title+' · B', timing_mode='fixed', requested_duration_ms=total-at,
-                  effect_preset=scene.effect_preset, effect_intensity=scene.effect_intensity, font_json=deepcopy(scene.font_json), transition_in_json={'type':'cut','duration_ms':0})
+                  effect_preset=scene.effect_preset, effect_intensity=scene.effect_intensity, font_json=deepcopy(scene.font_json), look_json=deepcopy(scene.look_json or {}), transition_in_json={'type':'cut','duration_ms':0})
     db.add(right);db.flush()
     db.add(Shot(scene_id=right.id,asset_id=shot.asset_id,order_index=0,fit=shot.fit,motion_json=deepcopy(shot.motion_json),crop_json=deepcopy(shot.crop_json),source_in_ms=(shot.source_in_ms or 0)+(at if shot.asset.type=='video' else 0),duration_ms=total-at))
     scene.timing_mode='fixed';scene.requested_duration_ms=at;shot.duration_ms=at;scene.revision+=1
@@ -272,7 +276,7 @@ def _split_rendered(scene, body, db):
         for shot in list(scene.shots):db.delete(shot)
         for take in scene.voice_takes:take.accepted=False
         scene.subtitle_text='';scene.font_json={'captions_enabled':False,'typewriter':False,'layers':[]}
-        scene.effect_preset='original';scene.effect_intensity=100;scene.lead_ms=0;scene.trail_ms=0
+        scene.effect_preset='original';scene.effect_intensity=100;scene.look_json={};scene.lead_ms=0;scene.trail_ms=0
         scene.timing_mode='fixed';scene.requested_duration_ms=at;scene.revision+=1
         scene.rendered_asset_id=None;scene.rendered_plan_hash=None;scene.measured_duration_ms=None
         for i,(target,offset,duration) in enumerate(((scene,0,at),(right,at,total-at))):
@@ -285,3 +289,62 @@ def _split_rendered(scene, body, db):
         db.rollback()
         for path in paths:path.unlink(missing_ok=True)
         raise
+
+
+def _validated_look(scene, look: dict, db) -> dict:
+    """Merge a partial look update. Each section ("glitch", "adjust", "lut")
+    is replaced as a whole when present; null removes it."""
+    from copy import deepcopy
+    from app.db.models import Asset
+    from app.render.filters import ADJUST_RANGES, GLITCH_BLOCKS, clean_adjust
+    if not isinstance(look, dict) or set(look) - {"glitch", "adjust", "lut"}:
+        raise HTTPException(400, "Look settings may only contain glitch, adjust and lut.")
+    merged = deepcopy(scene.look_json or {})
+    if "glitch" in look:
+        g = look["glitch"]
+        if g is None:
+            merged.pop("glitch", None)
+        else:
+            if not isinstance(g, dict):
+                raise HTTPException(400, "Glitch settings must be an object.")
+            speed = g.get("speed", 1.0)
+            if isinstance(speed, bool) or not isinstance(speed, (int, float)) or not 0.25 <= speed <= 4:
+                raise HTTPException(400, "Glitch speed must be between 0.25 and 4.")
+            block = g.get("block", "medium")
+            if block not in GLITCH_BLOCKS:
+                raise HTTPException(400, f"Glitch block size must be one of: {', '.join(GLITCH_BLOCKS)}.")
+            merged["glitch"] = {"speed": round(float(speed), 2), "block": block}
+    if "adjust" in look:
+        a = look["adjust"]
+        if a is None:
+            merged.pop("adjust", None)
+        else:
+            if not isinstance(a, dict):
+                raise HTTPException(400, "Adjustments must be an object.")
+            unknown = set(a) - set(ADJUST_RANGES)
+            if unknown:
+                raise HTTPException(400, f"Unknown adjustment: {', '.join(sorted(unknown))}.")
+            for key, value in a.items():
+                lo, hi = ADJUST_RANGES[key]
+                if isinstance(value, bool) or not isinstance(value, (int, float)) or not lo <= value <= hi:
+                    raise HTTPException(400, f"{key} must be between {lo} and {hi}.")
+            cleaned = clean_adjust(a)
+            if cleaned:
+                merged["adjust"] = cleaned
+            else:
+                merged.pop("adjust", None)
+    if "lut" in look:
+        l = look["lut"]
+        if l is None:
+            merged.pop("lut", None)
+        else:
+            if not isinstance(l, dict):
+                raise HTTPException(400, "LUT settings must be an object.")
+            asset = db.get(Asset, l.get("asset_id"))
+            if not asset or asset.type != "lut" or asset.project_id != scene.project_id:
+                raise HTTPException(400, "Choose a LUT imported into this project.")
+            strength = l.get("strength", 100)
+            if isinstance(strength, bool) or not isinstance(strength, (int, float)) or not 0 <= strength <= 100:
+                raise HTTPException(400, "LUT strength must be between 0 and 100.")
+            merged["lut"] = {"asset_id": asset.id, "strength": int(strength)}
+    return merged

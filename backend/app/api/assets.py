@@ -139,6 +139,50 @@ def stream_asset(asset_id: str, request: Request, db: Session = Depends(get_db),
     return StreamingResponse(iterfile(), status_code=status_code, headers=headers)
 
 
+@router.post("/lut", response_model=schemas.AssetOut)
+async def import_lut(project_id: str, file: UploadFile, db: Session = Depends(get_db)):
+    """Import a 3D .cube LUT. It is validated fully before it is stored and
+    is never passed to FFmpeg directly: renders bake it into a generated
+    grade LUT (render/grade.py)."""
+    from app.render.grade import MAX_CUBE_BYTES, CubeError, parse_cube
+    if not db.get(Project, project_id):
+        raise HTTPException(404, "Project not found")
+    if Path(file.filename or "").suffix.lower() != ".cube":
+        raise HTTPException(400, "Choose a .cube LUT file.")
+    data = await file.read(MAX_CUBE_BYTES + 1)
+    if len(data) > MAX_CUBE_BYTES:
+        raise HTTPException(413, "This LUT is larger than 12 MB. Use a LUT of 65 points or fewer.")
+    try:
+        text = data.decode("utf-8")
+        table, _, _ = parse_cube(text)
+    except UnicodeDecodeError:
+        raise HTTPException(400, "This .cube file is not plain text.")
+    except CubeError as e:
+        raise HTTPException(400, f"This LUT could not be read: {e}")
+    digest = hashlib.sha256(data).hexdigest()
+    existing = db.query(Asset).filter(Asset.project_id == project_id, Asset.type == "lut", Asset.content_hash == digest).first()
+    if existing:
+        return existing
+    dest_name = safe_generated_filename(file.filename or "look.cube")
+    project_dir = Path(MEDIA_DIR) / project_id
+    project_dir.mkdir(parents=True, exist_ok=True)
+    (project_dir / dest_name).write_bytes(data)
+    asset = Asset(project_id=project_id, type="lut", content_hash=digest, storage_key=f"{project_id}/{dest_name}",
+                  mime="text/plain", original_filename=Path(file.filename or "look.cube").name[:255],
+                  width=table.shape[0], origin=AssetOrigin.UPLOAD)
+    db.add(asset)
+    db.commit()
+    db.refresh(asset)
+    return asset
+
+
+@router.get("/luts", response_model=list[schemas.AssetOut])
+def list_luts(project_id: str, db: Session = Depends(get_db)):
+    if not db.get(Project, project_id):
+        raise HTTPException(404, "Project not found")
+    return db.query(Asset).filter(Asset.project_id == project_id, Asset.type == "lut").order_by(Asset.created_at).all()
+
+
 @router.get("/{asset_id}/thumbnail")
 def asset_thumbnail(asset_id: str, w: int = 320, db: Session = Depends(get_db)):
     """Cached JPEG thumbnail (image) or poster frame (video)."""
@@ -168,7 +212,7 @@ def get_asset(asset_id: str, db: Session = Depends(get_db)):
 @router.get('', response_model=list[schemas.AssetOut])
 def list_project_assets(project_id: str, db: Session = Depends(get_db)):
     if not db.get(Project, project_id): raise HTTPException(404, 'Project not found')
-    return [a for a in db.query(Asset).filter(Asset.project_id==project_id,Asset.origin.in_(['upload','generated','stock_search'])).order_by(Asset.created_at).all()
+    return [a for a in db.query(Asset).filter(Asset.project_id==project_id,Asset.type!='lut',Asset.origin.in_(['upload','generated','stock_search'])).order_by(Asset.created_at).all()
             if not (a.generation_metadata_json or {}).get('hidden_from_pool')]
 
 @router.post('/{asset_id}/hide-from-pool')

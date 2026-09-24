@@ -53,6 +53,7 @@ def visual_hash_of(scene: Scene) -> str:
         "shots": shots_repr,
         "effect_preset": scene.effect_preset,
         "effect_intensity": scene.effect_intensity,
+        "look": scene.look_json or {},
     })
 
 
