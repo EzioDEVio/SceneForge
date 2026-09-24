@@ -236,7 +236,7 @@ class GenerateImageRequest(BaseModel):
 
 
 class TextLayer(BaseModel):
-    family: str = Field(default="Noto Naskh Arabic", pattern=r"^(Noto Naskh Arabic|Noto Sans Arabic)$")
+    family: str = Field(default="Noto Naskh Arabic", pattern=r"^(Noto Naskh Arabic|Noto Sans Arabic|Noto Sans)$")
     align: str = Field(default="center", pattern=r"^(left|center|right)$")
     outline_width: float = Field(default=0, ge=0, le=10)
     shadow: float = Field(default=0, ge=0, le=10)

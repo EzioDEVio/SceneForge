@@ -6,7 +6,7 @@ import re
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.config import MAX_UPLOAD_BYTES, MEDIA_DIR, RENDERS_DIR
@@ -15,6 +15,7 @@ from app.db.models import Asset, Project
 from app.domain import schemas
 from app.domain.constants import AssetOrigin
 from app.render.ffmpeg_utils import FFmpegError, probe
+from app.render.thumbnails import ThumbnailError, thumbnail_path
 from app.security.uploads import UploadValidationError, classify_extension, safe_generated_filename
 
 router = APIRouter(prefix="/api/assets", tags=["assets"])
@@ -136,6 +137,25 @@ def stream_asset(asset_id: str, request: Request, db: Session = Depends(get_db),
 
     headers["Content-Length"] = str(length)
     return StreamingResponse(iterfile(), status_code=status_code, headers=headers)
+
+
+@router.get("/{asset_id}/thumbnail")
+def asset_thumbnail(asset_id: str, w: int = 320, db: Session = Depends(get_db)):
+    """Cached JPEG thumbnail (image) or poster frame (video)."""
+    asset = db.get(Asset, asset_id)
+    if not asset:
+        raise HTTPException(404, "Asset not found")
+    if asset.type not in ("image", "video"):
+        raise HTTPException(415, "Thumbnails are available for images and videos only.")
+    base = Path(RENDERS_DIR if asset.origin == AssetOrigin.RENDER_OUTPUT else MEDIA_DIR).resolve()
+    path = (base / asset.storage_key).resolve()
+    if base not in path.parents or not path.exists():
+        raise HTTPException(404, "Asset file missing on disk")
+    try:
+        thumb = thumbnail_path(asset.id, path, asset.type, asset.duration_ms, w)
+    except ThumbnailError as e:
+        raise HTTPException(422, str(e))
+    return FileResponse(thumb, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
 
 
 @router.get("/{asset_id}", response_model=schemas.AssetOut)

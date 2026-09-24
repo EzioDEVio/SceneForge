@@ -1,0 +1,25 @@
+// Pure-logic checks for editor helpers (no DOM, no API).
+import {build} from 'esbuild';
+import {createRequire} from 'node:module';
+import assert from 'node:assert/strict';
+await build({stdin:{contents:"export * from './src/poolPlan';export * from './src/fonts';",resolveDir:'.',loader:'ts'},outfile:'node_modules/.cache/units.cjs',bundle:true,platform:'node',format:'cjs',logLevel:'silent'});
+const require=createRequire(import.meta.url);
+const {planPoolInsert,isUntouchedPlaceholder,fontPair,previewFontFamily}=require('../node_modules/.cache/units.cjs');
+let passed=0;const check=(name,cond)=>{assert.ok(cond,name);console.log('PASS '+name);passed++;};
+const scene=(id,extra={})=>({id,title:`Part-${id}`,shots:[],original_text:'',spoken_text:'',subtitle_text:'',voice_takes:[],font_json:{},...extra});
+const asset=(id,type='image')=>({id,type,original_filename:id});
+const fresh=[scene('1'),scene('2'),scene('3')];
+let plan=planPoolInsert(fresh,[asset('a'),asset('b')]);
+check('new project: pool items fill starter parts in order',plan.map(p=>p.sceneId).join()==='1,2');
+plan=planPoolInsert(fresh,[asset('a'),asset('b'),asset('c'),asset('d')]);
+check('extra pool items create new scenes after placeholders are used',plan.map(p=>p.sceneId).join()==='1,2,3,');
+check('audio is never placed on the picture track',planPoolInsert(fresh,[asset('m','audio'),asset('v','video')]).map(p=>p.asset.id+':'+p.sceneId).join()==='v:1');
+const gap=[scene('1',{shots:[{}]}),scene('2'),scene('3',{shots:[{}]}),scene('4')];
+check('only trailing placeholders are filled; a gap mid-edit is left alone',planPoolInsert(gap,[asset('a'),asset('b')]).map(p=>p.sceneId).join()==='4,');
+check('a part with narration text is not a placeholder',!isUntouchedPlaceholder(scene('1',{original_text:'Hello'})));
+check('a renamed part is not a placeholder',!isUntouchedPlaceholder(scene('1',{title:'Opening'})));
+check('a part with a title layer is not a placeholder',!isUntouchedPlaceholder(scene('1',{font_json:{layers:[{id:'t'}]}})));
+check('Arabic family pairs with bundled Noto Sans for Latin',fontPair('Noto Naskh Arabic').join()==='Noto Naskh Arabic,Noto Sans');
+check('Latin system family keeps an Arabic companion',fontPair('Georgia').join()==='Noto Naskh Arabic,Georgia'&&fontPair('Arial')[0]==='Noto Sans Arabic');
+check('preview family lists Arabic font first so unicode-range routes Latin onward',previewFontFamily('Noto Sans Arabic').startsWith("'Noto Sans Arabic', 'Noto Sans'"));
+console.log(`${passed} unit checks passed.`);

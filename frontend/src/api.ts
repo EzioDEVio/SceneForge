@@ -213,6 +213,7 @@ export const api = {
     }),
 
   assetStreamUrl: (assetId: string) => `/api/assets/${assetId}/stream`,
+  assetThumbUrl: (assetId: string, width = 320) => `/api/assets/${assetId}/thumbnail?w=${width}`,
   assetDownloadUrl: (assetId: string) => `/api/assets/${assetId}/stream?download=1`,
 
   health: () => req<{status:string;build?:string;credential_warning?:string}>("/api/health"),

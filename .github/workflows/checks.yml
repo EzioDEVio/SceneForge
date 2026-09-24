@@ -29,4 +29,5 @@ jobs:
             python tests/integration/test_editor_plus.py
             python tests/integration/test_hosted_adapters.py
             python tests/integration/test_timeline.py
+            python tests/integration/test_text_thumbs.py
           '

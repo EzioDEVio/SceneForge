@@ -84,3 +84,13 @@
 
 .editor-confirm{background:#262931;color:#eee;border:1px solid #555;border-radius:10px;max-width:440px;padding:24px}.editor-confirm::backdrop{background:#0009}.editor-confirm p{white-space:pre-wrap;line-height:1.5}.editor-confirm input{width:100%;margin-bottom:16px}.editor-confirm .button-row{justify-content:flex-end}
 .slider-field output{float:right;color:#b9a6ff;font-variant-numeric:tabular-nums}.slider-field input[type=range]{width:100%;accent-color:#8267e8}
+
+/* Thumbnails: server-made JPEGs for images and video poster frames */
+.pool-thumb,.scene-thumb{position:relative}.pool-thumb img,.scene-thumb img{width:100%;height:100%;object-fit:cover;display:block}.thumb-video-badge{position:absolute;right:5px;bottom:5px;display:grid;place-items:center;width:20px;height:20px;border-radius:4px;background:#000a;color:#fff}
+/* Transport: playback only; rendering lives with the timeline tools */
+.sequence-tools .render-sequence{display:inline-flex;align-items:center;gap:6px;font-size:11px;font-weight:650;white-space:nowrap;padding:5px 10px;background:#6653dc;border-color:#7b69ea;color:#fff}
+.sequence-tools .render-sequence:hover:not(:disabled){background:#5542c9}
+.sequence-transport .transport-timecode{margin-left:8px}
+/* Text lane: captions and title layers are told apart */
+.title-clip{display:flex;align-items:center;gap:6px}.title-clip .lane-caption,.title-clip .lane-empty{display:inline-flex;align-items:center;gap:5px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}.title-clip .lane-titles{flex:none;display:inline-flex;align-items:center;gap:3px;padding:1px 5px;border-radius:3px;background:#c98a2e;color:#1d1608;font-weight:700;font-size:10px}
+.media-select{position:relative}

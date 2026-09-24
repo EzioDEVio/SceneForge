@@ -1,5 +1,10 @@
 """Generate .ass subtitle files for caption burn-in.
 
+Style Encoding is -1: libass then detects the paragraph base direction
+(Arabic-first lines lay out right-to-left) and runs the bidi algorithm across
+the whole event instead of splitting it at every override tag. That matters
+because each script run carries its own \\fn switch (see fontruns.py).
+
 RTL/Arabic shaping is handled by libass (HarfBuzz + FriBidi), which this
 project's target FFmpeg build has compiled in (`--enable-libass
 --enable-libfribidi --enable-libharfbuzz`). We simply write correctly
@@ -10,6 +15,7 @@ which is the classic mistake that breaks shaping.
 from __future__ import annotations
 
 from app.config import TMP_DIR
+from app.render.fontruns import tag_runs
 from app.render.typewriter import reveal_schedule
 
 
@@ -23,6 +29,7 @@ def _hex_to_ass_color(hex_color: str, alpha: int = 0) -> str:
 
 
 _ALIGNMENT = {"bottom": 2, "top": 8, "middle": 5}
+LAYER_FAMILIES = ("Noto Naskh Arabic", "Noto Sans Arabic", "Noto Sans")
 
 
 def write_ass_file(
@@ -64,7 +71,7 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{family},{size},{primary},{primary},{outline},{back_color},0,0,0,0,100,100,0,0,{border_style},{outline_w},0,{alignment},40,40,{margin_v},1
+Style: Default,{family},{size},{primary},{primary},{outline},{back_color},0,0,0,0,100,100,0,0,{border_style},{outline_w},0,{alignment},40,40,{margin_v},-1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -72,15 +79,20 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     def escape_text(value):
         # Neutralize ASS override injection while retaining Arabic logical order.
         return value.replace("\\", "＼").replace("{", "｛").replace("}", "｝").replace("\n", "\\N")
-    clean_text = escape_text(text)
+    def runs(value, chosen_family):
+        # Explicit per-script font switches: bundled Arabic font for Arabic,
+        # bundled/selected Latin font for everything else (no OS fallback).
+        first, tagged = tag_runs(value, chosen_family, escape_text)
+        return "{\\fn%s}%s" % (first, tagged) if tagged else ""
+
     if not typewriter or not text.strip():
-        events = [f"Dialogue: 0,{ts(0)},{ts(duration_ms)},Default,,0,0,0,,{clean_text}\n"]
+        events = [f"Dialogue: 0,{ts(0)},{ts(duration_ms)},Default,,0,0,0,,{runs(text, family)}\n"]
     else:
         schedule = reveal_schedule(text, duration_ms, font_json)
         events = []
         for i, event in enumerate(schedule):
             end = schedule[i + 1]['time_ms'] if i + 1 < len(schedule) else duration_ms
-            substr = escape_text(event['text'])
+            substr = runs(event['text'], family)
             events.append(f"Dialogue: 0,{ts(event['time_ms'])},{ts(end)},Default,,0,0,0,,{substr}\n")
 
     for index, layer in enumerate(font_json.get('layers', [])):
@@ -108,16 +120,16 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             extra += r'\fscx130\fax0.2\t(0,%d,\fscx85\fax-0.2)\t(%d,%d,\fscx100\fax0)' % (anim_ms//2,anim_ms//2,anim_ms)
         align={'left':4,'center':5,'right':6}.get(layer.get('align','center'),5)
         family=layer.get('family','Noto Naskh Arabic')
-        if family not in ('Noto Naskh Arabic','Noto Sans Arabic'): family='Noto Naskh Arabic'
-        overrides = r'{\an%d%s\fn%s\fs%d\c%s\b%d\bord%.1f\shad%.1f%s}' % (align,position_tag,family,layer.get('size',64),color,int(layer.get('bold',False)),layer.get('outline_width',0),layer.get('shadow',0),extra)
+        if family not in LAYER_FAMILIES: family='Noto Naskh Arabic'
+        overrides = r'{\an%d%s\fs%d\c%s\b%d\bord%.1f\shad%.1f%s}' % (align,position_tag,layer.get('size',64),color,int(layer.get('bold',False)),layer.get('outline_width',0),layer.get('shadow',0),extra)
         if animation == 'typewriter':
             schedule = reveal_schedule(layer['text'],span,{'typewriter_delay_ms':0,'typewriter_duration_ms':anim_ms})
             for j,event in enumerate(schedule):
                 stop = schedule[j+1]['time_ms'] if j+1<len(schedule) else span
                 event_overrides=overrides if j==len(schedule)-1 else overrides.replace(r'\fad(0,%d)' % exit_ms,'')
-                events.append(f"Dialogue: {index+1},{ts(start+event['time_ms'])},{ts(start+stop)},Default,,0,0,0,,{event_overrides}{escape_text(event['text'])}\n")
+                events.append(f"Dialogue: {index+1},{ts(start+event['time_ms'])},{ts(start+stop)},Default,,0,0,0,,{event_overrides}{runs(event['text'], family)}\n")
         else:
-            events.append(f"Dialogue: {index+1},{ts(start)},{ts(end)},Default,,0,0,0,,{overrides}{escape_text(layer['text'])}\n")
+            events.append(f"Dialogue: {index+1},{ts(start)},{ts(end)},Default,,0,0,0,,{overrides}{runs(layer['text'], family)}\n")
 
     path = out_path or str(TMP_DIR / f"{scene_id}_captions.ass")
     with open(path, "w", encoding="utf-8-sig") as fh:
