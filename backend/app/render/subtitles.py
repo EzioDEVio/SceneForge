@@ -44,6 +44,7 @@ def write_ass_file(
     speech_start_ms: int = 0,
     speech_ms: int | None = None,
     speech_segments: list[tuple[int, int]] | None = None,
+    word_times: list[tuple[int, int]] | None = None,
 ) -> str:
     family = font_json.get("family", "Noto Naskh Arabic")
     size = int(font_json.get("size", 44))
@@ -100,7 +101,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         weights = [len(w) + 2 for w in words]
         total = sum(weights)
         hi = _hex_to_ass_color(font_json.get("highlight_color", "#FFD84D"), alpha=0)
-        if speech_segments:
+        if word_times and len(word_times) == len(words):
+            # Exact: the voice engine reported when each word is spoken.
+            starts = [s for s, _ in word_times]
+            ends = starts[1:] + [word_times[-1][1]]
+        elif speech_segments:
             # Measured: words placed on the spoken parts of the narration.
             from app.render.word_timing import word_starts
             starts = word_starts(weights, speech_segments)

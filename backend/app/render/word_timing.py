@@ -75,3 +75,42 @@ def word_starts(weights: list[float], segments: list[tuple[int, int]]) -> list[i
             starts.append(segments[-1][1])
         acc += w
     return starts
+
+
+def words_from_alignment(alignment: dict, in_ms: int = 0, out_ms: int | None = None) -> list[tuple[str, int, int]]:
+    """Group per-character timings (ElevenLabs) into words: (word, start_ms,
+    end_ms) relative to the trimmed clip. Words outside the trim are dropped."""
+    words, cur, start, end = [], "", None, None
+    for ch, s, e in zip(alignment.get("chars", []), alignment.get("starts", []), alignment.get("ends", [])):
+        if ch.isspace():
+            if cur:
+                words.append((cur, start, end))
+            cur, start = "", None
+            continue
+        if start is None:
+            start = s
+        cur, end = cur + ch, e
+    if cur:
+        words.append((cur, start, end))
+    out = []
+    for w, s, e in words:
+        s_ms, e_ms = int(round(s * 1000)) - in_ms, int(round(e * 1000)) - in_ms
+        if e_ms <= 0 or (out_ms is not None and s_ms >= out_ms - in_ms):
+            continue
+        out.append((w, max(0, s_ms), e_ms))
+    return out
+
+
+def _norm(word: str) -> str:
+    return "".join(c for c in word.lower() if c.isalnum())
+
+
+def exact_word_times(caption_words: list[str], spoken: list[tuple[str, int, int]]) -> list[tuple[int, int]] | None:
+    """Use the voice's own word timings when the caption says the same words
+    (ignoring case and punctuation). Otherwise None, and the caller falls back
+    to speech/pause detection."""
+    if len(caption_words) != len(spoken) or not spoken:
+        return None
+    if sum(_norm(a) == _norm(b[0]) for a, b in zip(caption_words, spoken)) < 0.9 * len(spoken):
+        return None
+    return [(s, e) for _, s, e in spoken]

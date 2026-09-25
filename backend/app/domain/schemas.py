@@ -64,6 +64,7 @@ class ShotIn(BaseModel):
 
 class ShotOut(BaseModel):
     crop_json: dict | None = None
+    speed_json: dict = {}
     id: str
     asset_id: str
     order_index: int

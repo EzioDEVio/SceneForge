@@ -188,7 +188,7 @@ class SpeechRequest(schemas.BaseModel):
 @router.post('/api/scenes/{scene_id}/voice-takes/service')
 def create_service_take(scene_id: str, body: SpeechRequest, db: Session = Depends(get_db)):
     from app.db.models import ProviderProfile
-    from app.providers.speech_http import synthesize
+    from app.providers.speech_http import synthesize, synthesize_with_alignment
     scene = db.get(Scene, scene_id)
     if not scene: raise HTTPException(404, 'Scene not found')
     profile = db.get(ProviderProfile, body.provider_id)
@@ -196,7 +196,7 @@ def create_service_take(scene_id: str, body: SpeechRequest, db: Session = Depend
     if not scene.spoken_text.strip(): raise HTTPException(400, 'Write narration first.')
     text = scene.spoken_text[:250] if body.audition else scene.spoken_text
     if len(text) > 10000: raise HTTPException(400, 'Split narration longer than 10,000 characters into scenes.')
-    try: audio = synthesize(profile, text, body.voice, body.language, body.speed)
+    try: audio, alignment = synthesize_with_alignment(profile, text, body.voice, body.language, body.speed)
     except ValueError as exc: raise HTTPException(502, str(exc))
     folder = Path(MEDIA_DIR) / scene.project_id
     folder.mkdir(parents=True, exist_ok=True)
@@ -218,7 +218,7 @@ def create_service_take(scene_id: str, body: SpeechRequest, db: Session = Depend
         return {'asset': schemas.AssetOut.model_validate(asset).model_dump()}
     for take in scene.voice_takes: take.accepted = False
     take = VoiceTake(scene_id=scene.id, spoken_text_hash=_text_hash(scene.spoken_text), source=VoiceTakeSource.CLOUD_TTS,
-        provider=profile.name, voice=body.voice, settings_json={'language':body.language, 'speed':body.speed},
+        provider=profile.name, voice=body.voice, settings_json={'language':body.language, 'speed':body.speed, **({'alignment': alignment} if alignment else {})},
         audio_asset_id=asset.id, measured_duration_ms=info.duration_ms, accepted=True)
     db.add(take); scene.revision += 1; db.commit(); db.refresh(take)
     return schemas.VoiceTakeOut.model_validate(take)

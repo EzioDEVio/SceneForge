@@ -55,6 +55,23 @@ def list_voices(profile):
 
 
 def synthesize(profile, text, voice, language, speed):
+    return synthesize_with_alignment(profile, text, voice, language, speed)[0]
+
+
+def _alignment_from(payload) -> dict | None:
+    """ElevenLabs /with-timestamps: per-character start/end seconds."""
+    al = payload.get('alignment') if isinstance(payload, dict) else None
+    if not isinstance(al, dict):
+        return None
+    chars, starts, ends = al.get('characters'), al.get('character_start_times_seconds'), al.get('character_end_times_seconds')
+    if not (isinstance(chars, list) and isinstance(starts, list) and isinstance(ends, list) and len(chars) == len(starts) == len(ends) and chars):
+        return None
+    return {'chars': [str(c)[:4] for c in chars], 'starts': [float(x) for x in starts], 'ends': [float(x) for x in ends]}
+
+
+def synthesize_with_alignment(profile, text, voice, language, speed):
+    """Return (audio bytes, alignment or None). ElevenLabs is asked for
+    character timestamps so word-by-word captions can follow the voice exactly."""
     if profile.name == 'elevenlabs':
         base, headers = connection(profile)
         import re
@@ -63,14 +80,21 @@ def synthesize(profile, text, voice, language, speed):
         if not .7 <= speed <= 1.2:
             raise ValueError('ElevenLabs speaking speed must be between 0.70 and 1.20.')
         try:
-            res = requests.post(base + '/text-to-speech/' + voice,
+            res = requests.post(base + '/text-to-speech/' + voice + '/with-timestamps',
                 params={'output_format': 'mp3_44100_128'},
                 json={'text': text, 'model_id': profile.model or 'eleven_multilingual_v2',
                       'voice_settings': {'stability': 0.45, 'similarity_boost': 0.8, 'speed': speed}},
-                headers={**headers, 'Accept': 'audio/mpeg', 'Content-Type': 'application/json'},
+                headers={**headers, 'Accept': 'application/json', 'Content-Type': 'application/json'},
                 timeout=(10, 600), allow_redirects=False)
             if not res.ok: raise ValueError(f'ElevenLabs returned HTTP {res.status_code}. Check key, voice and quota.')
-            return res.content
+            try:
+                payload = res.json()
+            except (ValueError, AttributeError):   # not JSON: plain audio from an older endpoint
+                payload = None
+            if isinstance(payload, dict) and isinstance(payload.get('audio_base64'), str):
+                import base64
+                return base64.b64decode(payload['audio_base64']), _alignment_from(payload)
+            return res.content, None
         except requests.RequestException:
             raise ValueError('ElevenLabs is unavailable or timed out.')
     if profile.name == 'kokoro' and (language == 'ar' or any('\u0600' <= c <= '\u06ff' for c in text)):
@@ -95,6 +119,6 @@ def synthesize(profile, text, voice, language, speed):
                 except ValueError: pass
             raise ValueError(detail or f'Voice generation returned HTTP {res.status_code}. Run DIAGNOSE_VOICE.bat and check model installation.')
         if len(res.content) > 100 * 1024 * 1024: raise ValueError('Voice response is too large. Split the script into shorter scenes.')
-        return res.content
+        return res.content, None
     except requests.RequestException:
         raise ValueError('Voice service unavailable or timed out. Check the service log before retrying.')

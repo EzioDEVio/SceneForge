@@ -115,7 +115,20 @@ def clean_tone(d) -> dict:
             "amount": int(_num(d, "amount", 0, 100, "Split toning")), "balance": int(_num(d, "balance", -100, 100, "Split toning"))}
 
 
-CLEANERS = {"shake": clean_shake, "spotlight": clean_spotlight, "redact": clean_redact, "leak": clean_leak, "tone": clean_tone}
+def clean_wheels(d) -> dict:
+    """Lift / gamma / gain wheels: each an [r, g, b] offset in -100..100
+    (0 = neutral). Lift moves shadows, gamma midtones, gain highlights."""
+    d = _only({"lift": [0, 0, 0], "gamma": [0, 0, 0], "gain": [0, 0, 0], **(d or {})}, {"lift", "gamma", "gain"}, "Colour wheels")
+    out = {}
+    for k in ("lift", "gamma", "gain"):
+        v = d[k]
+        if not isinstance(v, list) or len(v) != 3 or any(isinstance(x, bool) or not isinstance(x, (int, float)) or not -100 <= x <= 100 for x in v):
+            raise SceneFxError(f"Colour wheel {k} must be three numbers between -100 and 100.")
+        out[k] = [int(round(x)) for x in v]
+    return out
+
+
+CLEANERS = {"wheels": clean_wheels, "shake": clean_shake, "spotlight": clean_spotlight, "redact": clean_redact, "leak": clean_leak, "tone": clean_tone}
 
 
 def has_scene_fx(look: dict | None) -> bool:

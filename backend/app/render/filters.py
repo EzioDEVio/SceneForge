@@ -170,8 +170,10 @@ _EFFECT_FILTERS: dict[str, str] = {
     # VHS camcorder: colour bleed, soft picture, scanlines, a rolling tracking
     # band and tape noise.
     EffectPreset.VHS: ("chromashift=cbh=5:crh=-5,eq=saturation=1.25:contrast=1.06,gblur=sigma=0.7,"
-                       "noise=alls=10:allf=t,drawgrid=w=iw:h=3:t=1:c=black@0.22,"
-                       "drawbox=x=0:y='mod(t*80,ih)':w=iw:h=ih*0.035:color=white@0.10:t=fill"),
+                       "noise=alls=10:allf=t,drawgrid=w=iw:h=3:t=1:c=black@0.22[vhsm];"
+                       # drawbox positions are evaluated once, so the rolling band is an overlay (per-frame t)
+                       "color=c=white:s=4096x40,format=rgba,colorchannelmixer=aa=0.12[vhsb];"
+                       "[vhsm][vhsb]overlay=x=0:y='mod(t*80,H)':shortest=1"),
     EffectPreset.OLD_FILM: "curves=preset=vintage,eq=saturation=0.75:contrast=1.05,noise=alls=22:allf=t+u,vignette=PI/3.5",
 }
 

@@ -192,6 +192,12 @@ def update_shot(shot_id: str, body: dict, db: Session = Depends(get_db)):
         shot.motion_json = motion
     if "crop" in body:
         shot.crop_json = body["crop"]
+    if "speed" in body:
+        from app.render.speed import SpeedError, clean_speed
+        try:
+            shot.speed_json = clean_speed(body["speed"])
+        except SpeedError as e:
+            raise HTTPException(400, str(e))
     shot.scene.revision += 1
     db.commit()
     db.refresh(shot)
@@ -417,7 +423,7 @@ def graded_frame_endpoint(scene_id: str, w: int = 1280, shot_id: str | None = No
             raise HTTPException(404, "The LUT chosen for this scene is missing.")
         lut_path = str(Path(MEDIA_DIR) / lut_asset.storage_key)
     try:
-        grade = build_grade_lut(look.get("adjust"), lut_path, int(lut.get("strength", 100)), Path(PROXIES_DIR) / "grades", look.get("tone"))
+        grade = build_grade_lut(look.get("adjust"), lut_path, int(lut.get("strength", 100)), Path(PROXIES_DIR) / "grades", look.get("tone"), look.get("wheels"))
     except CubeError as e:
         raise HTTPException(422, f"The LUT could not be read: {e}")
     asset = shot.asset

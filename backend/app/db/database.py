@@ -42,6 +42,7 @@ _ADDED_COLUMNS = {
     "scenes": {"look_json": "JSON NOT NULL DEFAULT '{}'", "overlays_json": "JSON NOT NULL DEFAULT '[]'"},
     "voice_takes": {"edit_json": "JSON NOT NULL DEFAULT '{}'"},
     "projects": {"finishing_json": "JSON NOT NULL DEFAULT '{}'"},
+    "shots": {"speed_json": "JSON NOT NULL DEFAULT '{}'"},
 }
 
 

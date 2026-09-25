@@ -165,6 +165,8 @@ class Shot(Base):
     source_in_ms: Mapped[int] = mapped_column(Integer, default=0)
     source_out_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)  # None = proportional share
+    # Video timing: {"speed": 0.25-4, "ramp": none|slow_middle|fast_middle, "freeze_at_ms", "freeze_ms"}
+    speed_json: Mapped[dict] = mapped_column(JSON, default=dict)
 
     fit: Mapped[str] = mapped_column(String(16), default="cover")
     crop_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)

@@ -239,7 +239,7 @@ def _grade_lut_for(scene: Scene) -> str | None:
             lut_path = _resolve_asset_path(asset)
         if not Path(lut_path).exists():
             raise FFmpegError("The LUT file for this scene is missing on disk. Import it again in Effects → Color LUT.")
-    return build_grade_lut(look.get("adjust"), lut_path, int(lut.get("strength", 100)), Path(PROXIES_DIR) / "grades", look.get("tone"))
+    return build_grade_lut(look.get("adjust"), lut_path, int(lut.get("strength", 100)), Path(PROXIES_DIR) / "grades", look.get("tone"), look.get("wheels"))
 
 
 def _render_single_shot(
@@ -257,17 +257,19 @@ def _render_single_shot(
     if asset.type == AssetType.IMAGE:
         input_args = ["-loop", "1", "-framerate", str(fps), "-t", f"{duration_s:.3f}", "-i", src_path]
     else:
+        from app.render.speed import plan as speed_plan
+        src_s, speed_pre, speed_post = speed_plan(getattr(shot, "speed_json", None), duration_s, fps)
         p = probe(src_path)
         src_dur_ms = p.duration_ms or duration_ms
         in_ms = shot.source_in_ms or 0
-        needs_loop = (src_dur_ms - in_ms) < duration_ms
+        needs_loop = (src_dur_ms - in_ms) < src_s * 1000
         if needs_loop:
             input_args = ["-stream_loop", "-1", "-ss", f"{in_ms/1000:.3f}", "-i", src_path, "-t", f"{duration_s:.3f}"]
         else:
             input_args = ["-ss", f"{in_ms/1000:.3f}", "-i", src_path, "-t", f"{duration_s:.3f}"]
         if p.rotation in (90, -90, 270, -270):
             pre_filters = "transpose=1," if p.rotation in (90, -270) else "transpose=2,"
-        pre_filters += f"fps={fps},"
+        pre_filters += (f"{speed_pre}," if speed_pre else "") + f"fps={fps}," + (f"{speed_post}," if speed_post else "")
 
     if shot.crop_json:
         c = shot.crop_json
@@ -313,6 +315,19 @@ def _render_single_shot(
     run_ffmpeg(args, cancel_check=ctx.cancel_check, on_progress=on_ffmpeg_progress)
 
 
+def _exact_word_times(scene: Scene, lead_ms: int) -> list[tuple[int, int]] | None:
+    """Per-word times from the voice engine (ElevenLabs), in scene time."""
+    from app.render.word_timing import exact_word_times, words_from_alignment
+    take = _accepted_take(scene)
+    alignment = ((take.settings_json or {}) if take else {}).get("alignment")
+    if not alignment:
+        return None
+    edit = take.edit_json or {}
+    spoken = words_from_alignment(alignment, int(edit.get("in_ms") or 0), edit.get("out_ms"))
+    times = exact_word_times(scene.subtitle_text.split(), spoken)
+    return [(s + lead_ms, e + lead_ms) for s, e in times] if times else None
+
+
 def _speech_segments(scene: Scene, narration_path: str, lead_ms: int, total_ms: int) -> list[tuple[int, int]] | None:
     """Spoken spans of the accepted take (after its trim), in scene time."""
     from app.render.word_timing import voiced_segments
@@ -343,6 +358,7 @@ def mux_audio_and_captions(
             speech_start_ms=lead_ms if narration_path else 0,
             speech_ms=_narration_duration_ms(scene)[0] if narration_path else None,
             speech_segments=_speech_segments(scene, narration_path, lead_ms, total_duration_ms) if narration_path and scene.font_json.get("karaoke") else None,
+            word_times=_exact_word_times(scene, lead_ms) if narration_path and scene.font_json.get("karaoke") else None,
         )
         fonts_dir = escape_path_for_filter(str(BUNDLED_FONT_PATH.parent))
         ass_escaped = escape_path_for_filter(ass_path)

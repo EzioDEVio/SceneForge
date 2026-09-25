@@ -226,8 +226,21 @@ def apply_adjustments(rgb: np.ndarray, a: dict) -> np.ndarray:
     return np.clip(rgb, 0, 1)
 
 
-def grade_is_active(adjust: dict | None, lut_path: str | None, lut_strength: int, tone: dict | None = None) -> bool:
-    return bool((lut_path and lut_strength > 0) or any((adjust or {}).get(k) for k in COLOR_KEYS) or (tone or {}).get("amount"))
+def grade_is_active(adjust: dict | None, lut_path: str | None, lut_strength: int, tone: dict | None = None, wheels: dict | None = None) -> bool:
+    return bool((lut_path and lut_strength > 0) or any((adjust or {}).get(k) for k in COLOR_KEYS) or (tone or {}).get("amount")
+                or any(any(v) for v in (wheels or {}).values()))
+
+
+def apply_wheels(rgb: np.ndarray, wheels: dict | None) -> np.ndarray:
+    """Lift / gamma / gain per channel (Premiere/Resolve-style primary wheels)."""
+    if not wheels or not any(any(v) for v in wheels.values()):
+        return rgb
+    lift = np.array(wheels.get("lift", [0, 0, 0]), dtype=np.float64) / 100 * 0.25
+    gamma = np.array(wheels.get("gamma", [0, 0, 0]), dtype=np.float64) / 100
+    gain = np.array(wheels.get("gain", [0, 0, 0]), dtype=np.float64) / 100 * 0.5
+    out = rgb + lift * (1 - rgb)
+    out = np.clip(out * (1 + gain), 0, 1)
+    return np.clip(out ** (2.0 ** (-gamma)), 0, 1)
 
 
 def apply_split_tone(rgb: np.ndarray, tone: dict | None) -> np.ndarray:
@@ -248,14 +261,15 @@ def apply_split_tone(rgb: np.ndarray, tone: dict | None) -> np.ndarray:
     return np.clip(shifted, 0, 1)
 
 
-def build_grade_lut(adjust: dict | None, lut_path: str | None, lut_strength: int, out_dir: Path, tone: dict | None = None) -> str | None:
+def build_grade_lut(adjust: dict | None, lut_path: str | None, lut_strength: int, out_dir: Path, tone: dict | None = None,
+                    wheels: dict | None = None) -> str | None:
     """Write (or reuse) the combined grade LUT and return its path."""
     adjust = {k: int((adjust or {}).get(k, 0)) for k in COLOR_KEYS}
     lut_strength = max(0, min(100, int(lut_strength)))
-    if not grade_is_active(adjust, lut_path, lut_strength, tone):
+    if not grade_is_active(adjust, lut_path, lut_strength, tone, wheels):
         return None
     lut_bytes = Path(lut_path).read_bytes() if lut_path and lut_strength else b""
-    key = hashlib.sha256(json.dumps([adjust, lut_strength, GRID, tone or {}], sort_keys=True).encode() + lut_bytes).hexdigest()[:24]
+    key = hashlib.sha256(json.dumps([adjust, lut_strength, GRID, tone or {}, wheels or {}], sort_keys=True).encode() + lut_bytes).hexdigest()[:24]
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / f"grade_{key}.cube"
     with _locks_guard:
@@ -265,15 +279,15 @@ def build_grade_lut(adjust: dict | None, lut_path: str | None, lut_strength: int
     with lock:
         if out.exists():
             return str(out)
-        _write_grade(out, adjust, lut_bytes, lut_strength, tone)
+        _write_grade(out, adjust, lut_bytes, lut_strength, tone, wheels)
     return str(out)
 
 
-def _write_grade(out: Path, adjust: dict, lut_bytes: bytes, lut_strength: int, tone: dict | None = None) -> None:
+def _write_grade(out: Path, adjust: dict, lut_bytes: bytes, lut_strength: int, tone: dict | None = None, wheels: dict | None = None) -> None:
     g = np.linspace(0, 1, GRID)
     b, gg, r = np.meshgrid(g, g, g, indexing="ij")
     rgb = np.stack([r, gg, b], axis=-1).reshape(-1, 3)
-    graded = apply_adjustments(rgb, adjust)
+    graded = apply_wheels(apply_adjustments(rgb, adjust), wheels)
     if lut_bytes:
         looked = np.clip(parse_lut(decode_cube(lut_bytes)).apply(graded), 0, 1)
         s = lut_strength / 100
