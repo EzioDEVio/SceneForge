@@ -241,6 +241,8 @@ export const api = {
     }),
 
   getAsset: (assetId: string) => req<Asset>(`/api/assets/${assetId}`),
+  restoreAsset: (assetId: string) => req<Asset>(`/api/assets/${assetId}/restore`, {method: 'POST'}),
+  beatSync: (projectId: string) => req<{bpm: number; beats: number[]; scenes_changed: number; scenes_kept: number}>(`/api/projects/${projectId}/beat-sync`, {method: 'POST'}),
   assetStreamUrl: (assetId: string) => `/api/assets/${assetId}/stream`,
   assetThumbUrl: (assetId: string, width = 320) => `/api/assets/${assetId}/thumbnail?w=${width}`,
   gradedFrameUrl: (sceneId: string, key: string, width = 1280, shotId?: string) => `/api/scenes/${sceneId}/graded-frame?w=${width}&k=${key}${shotId ? `&shot_id=${shotId}` : ''}`,

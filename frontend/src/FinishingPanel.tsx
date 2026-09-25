@@ -11,6 +11,7 @@ export function FinishingPanel({project, disabled, onChanged}: {project: Project
   const [tracks, setTracks] = useState<Asset[]>([]);
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
+  const [syncing, setSyncing] = useState(false);
   const file = useRef<HTMLInputElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>();
   useEffect(() => {setFin(project.finishing_json || {});}, [project.id]);
@@ -58,6 +59,8 @@ export function FinishingPanel({project, disabled, onChanged}: {project: Project
         <label className="control-label">Fade out · {(m.fade_out_ms / 1000).toFixed(1)} s<input aria-label="Music fade out" type="range" min={0} max={10000} step={500} value={m.fade_out_ms} disabled={disabled} onChange={e => save({...fin, music: {...m, fade_out_ms: Number(e.target.value)}})}/></label>
       </div>
       <p className="hint">The music loops to the length of the video and gets quieter automatically whenever someone is speaking.</p>
+      <button className="btn" disabled={disabled || syncing} onClick={async () => {setSyncing(true); setError(''); try {const r = await api.beatSync(project.id); setStatus(`${r.bpm} BPM · ${r.scenes_changed} cut${r.scenes_changed === 1 ? '' : 's'} moved onto the beat${r.scenes_kept ? ` · ${r.scenes_kept} narrated scene${r.scenes_kept === 1 ? '' : 's'} kept` : ''}`); await onChanged();} catch (e: any) {setError(e.message || 'Beat sync failed.');} finally {setSyncing(false);}}}>{syncing ? 'Finding the beat…' : 'Sync scene cuts to the beat'}</button>
+      <p className="hint">Changes fixed-length scenes so each cut lands on a beat. Scenes that follow their narration keep their length.</p>
     </>}
     <label className="switch-label finishing-toggle"><input type="checkbox" aria-label="Level loudness for YouTube" checked={!!fin.loudnorm} disabled={disabled} onChange={e => save({...fin, loudnorm: e.target.checked}, true)}/><Gauge size={14}/> Level loudness for YouTube (-14 LUFS)</label>
     <label className="switch-label finishing-toggle"><input type="checkbox" aria-label="Countdown leader" checked={!!fin.leader} disabled={disabled} onChange={e => save({...fin, leader: e.target.checked}, true)}/><Clapperboard size={14}/> Film countdown leader at the start (5 s, with the “2-pop” beep)</label>

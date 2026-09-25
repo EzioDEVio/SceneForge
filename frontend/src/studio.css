@@ -216,3 +216,17 @@ body.resizing-inspector iframe,body.resizing-inspector video{pointer-events:none
 @keyframes sf-leak{0%{background-position:0% 30%}100%{background-position:100% 70%}}
 @media (prefers-reduced-motion:reduce){.fx-leak{animation:none}}
 .scene-fx-panel{margin-top:6px;border-top:1px solid var(--line);padding-top:10px}
+/* Colour wheels */
+.wheels-row{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:6px}
+.wheel{display:flex;flex-direction:column;align-items:center;gap:5px;min-width:0}
+.wheel-disc{position:relative;width:100%;max-width:110px;aspect-ratio:1;border-radius:50%;cursor:crosshair;touch-action:none;
+  background:radial-gradient(circle,#777 0%,transparent 70%),conic-gradient(from 90deg,#f33,#f3f,#33f,#3ff,#3f3,#ff3,#f33);box-shadow:inset 0 0 0 2px #0006}
+.wheel-disc:focus-visible{outline:2px solid #a699f0;outline-offset:2px}
+.wheel-dot{position:absolute;width:12px;height:12px;margin:-6px 0 0 -6px;border-radius:50%;background:#fff;border:2px solid #222;pointer-events:none}
+.wheel-label{font-size:11px;color:#c3c9d6}.wheel input[type=range]{width:100%;accent-color:#a58fe9}
+/* Parallax subject + route previews and editor */
+.fx-subject{position:absolute;border:2px dashed #ffffffaa;display:grid;place-items:start center}.fx-subject.ellipse{border-radius:50%}
+.fx-subject span{font-size:10px;color:#fff;background:#0008;padding:1px 6px;border-radius:3px;margin-top:4px}
+.fx-route{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
+.route-canvas{position:absolute;inset:0;z-index:6;cursor:crosshair}
+.route-point{position:absolute;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;border:2px solid #fff;color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center;cursor:grab;box-shadow:0 1px 4px #0008}

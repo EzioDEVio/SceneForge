@@ -9,6 +9,7 @@ const dom=new JSDOM('<!doctype html><html><body></body></html>',{url:'http://loc
 for(const k of ['window','document','navigator','HTMLElement','HTMLInputElement','HTMLTextAreaElement','Event','MouseEvent','CustomEvent','KeyboardEvent','File','FormData']) Object.defineProperty(globalThis,k,{value:dom.window[k],configurable:true});
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 dom.window.HTMLCanvasElement.prototype.getContext=()=>null; // jsdom has no canvas; FilmPreview handles null
+if(!dom.window.PointerEvent){dom.window.PointerEvent=class PointerEvent extends dom.window.MouseEvent{constructor(t,i={}){super(t,i);this.pointerId=i.pointerId??1;this.pointerType=i.pointerType??'mouse';}};}  // jsdom lacks PointerEvent: keep clientX/clientY
 globalThis.requestAnimationFrame=cb=>setTimeout(()=>cb(Date.now()),0);globalThis.cancelAnimationFrame=id=>clearTimeout(id);
 window.HTMLMediaElement.prototype.pause=function(){};
 globalThis.confirm=()=>true;
@@ -46,6 +47,8 @@ globalThis.fetch=async(path,init={})=>{
  else if(path.endsWith('/voices'))result={voices:['af_heart','default']};
  else if(path.endsWith('/image-history'))result=[];
  else if(path.startsWith('/api/assets/luts'))result=[];
+ else if(/\/api\/projects\/[^/]+\/beat-sync$/.test(path))result={bpm:120,beats:[0.5,1,1.5],scenes_changed:2,scenes_kept:1};
+ else if(/\/api\/assets\/[^/]+\/restore$/.test(path))result={id:'restored-'+next++,type:'image',original_filename:'photo (restored).png',width:1600,height:1200};
  else if(path.startsWith('/api/assets?'))result=[{id:'pool-img',type:'image',original_filename:'map.png',width:800,height:600},{id:'pool-vid',type:'video',original_filename:'clip.mp4',width:1280,height:720}];
  else if(/^\/api\/assets\/[^/?]+$/.test(path)&&method==='GET')result={id:path.split('/')[3],type:'image',original_filename:'map.png',width:800,height:600};
  else if(path.startsWith('/api/assets/lut?')&&method==='POST'){const f=body.get('file');if(/broken/.test(f.name))return {ok:false,status:400,statusText:'Bad',json:async()=>({detail:'This LUT could not be read: Expected 35937 entries, found 3.'})};result={id:'lut-'+next++,type:'lut',original_filename:f.name,width:33};}
@@ -207,6 +210,7 @@ try{
  await user.click(screen.getByRole('checkbox',{name:'Countdown leader'}));
  await waitFor(()=>assert.ok(requests.some(r=>r.body?.finishing?.leader===true&&r.body.finishing.loudnorm===true)));
  check('YouTube loudness and countdown leader save on the project',true);
+ check('restore old photo is offered for image scenes',(await (async()=>{await user.click(screen.getByRole('tab',{name:'Media',exact:true}));const b=screen.queryByRole('button',{name:/Restore old photo/});await user.click(screen.getByRole('tab',{name:'Audio',exact:true}));return !!b;})()));
  // Effects pack controls
  await user.click(screen.getByRole('tab',{name:'Effects',exact:true}));
  await user.click(screen.getByRole('switch',{name:'Camera shake'}));
@@ -225,6 +229,23 @@ try{
  await user.click(screen.getByRole('switch',{name:'Spotlight'}));await saved();
  check('turning an effect off removes it',lk().some(l=>'spotlight' in l&&l.spotlight===null)&&!document.querySelector('.scenefx-preview .fx-layer:not(.fx-leak)'));
  check('VHS look is offered',!!screen.getByRole('button',{name:'VHS',exact:true}));
+ // Batch B/C controls
+ await user.click(screen.getByRole('switch',{name:'Colour wheels'}));
+ const liftDisc=screen.getByRole('slider',{name:'Lift colour wheel'});liftDisc.focus();fireEvent.keyDown(liftDisc,{key:'ArrowLeft'});fireEvent.keyDown(liftDisc,{key:'ArrowLeft'});await saved();
+ check('colour wheels save lift towards blue with the keyboard',lk().some(l=>l.wheels&&l.wheels.lift[2]>l.wheels.lift[0]));
+ await user.click(screen.getByRole('switch',{name:'3D photo (parallax)'}));
+ await user.click(screen.getByRole('radio',{name:'Drift left'}));await saved();
+ check('3D photo saves with direction and previews the subject box',lk().some(l=>l.parallax?.direction==='left')&&!!document.querySelector('.fx-subject'));
+ const splitSwitch=screen.getByRole('switch',{name:'Split screen'});
+ check('split screen needs at least two media in the scene',project.scenes[0].shots.length>=2||splitSwitch.disabled);
+ await user.click(screen.getByRole('switch',{name:'Map route'}));await saved();
+ check('map route starts with three stops and edit mode on',lk().some(l=>l.route?.points?.length===3)&&!!document.querySelector('.route-canvas'));
+ const rc=document.querySelector('.route-canvas');rc.getBoundingClientRect=()=>({left:0,top:0,width:200,height:100,right:200,bottom:100});
+ fireEvent.pointerDown(rc,{clientX:150,clientY:20});await saved();
+ check('clicking the preview adds a route stop where clicked',lk().some(l=>l.route?.points?.length===4&&l.route.points[3][0]===75&&l.route.points[3][1]===20));
+ await user.click(screen.getByRole('button',{name:'Done editing points'}));
+ check('finishing route editing hides the point editor',!document.querySelector('.route-canvas'));
+ await user.click(screen.getByRole('switch',{name:'Map route'}));await user.click(screen.getByRole('switch',{name:'3D photo (parallax)'}));await user.click(screen.getByRole('switch',{name:'Colour wheels'}));await saved();
  // Picture-in-picture overlays
  await user.click(screen.getByRole('tab',{name:'Overlays',exact:true}));
  await waitFor(()=>assert.ok(within(screen.getByRole('combobox',{name:'Add overlay from media'})).getAllByRole('option').length===3));
