@@ -1,3 +1,8 @@
+# SceneForge Desktop 0.2.0 RC5 (in progress) — split screen and photo restore fixes
+
+- **Split screen**: the editor preview now shows the layout. When a scene has only one picture, an **Add another image or video to this scene** button appears under Split screen, and the hint says how many pictures the scene has.
+- **Restore old photo**: shows progress and a confirmation naming the restored copy; the Media Pool refreshes right away. If the photo tools are missing (setup.bat not re-run after updating), a clear message says what to do instead of a generic error.
+
 # SceneForge Desktop 0.2.0 RC5 (in progress) — Batch B and C
 
 ## Pictures

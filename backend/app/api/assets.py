@@ -215,9 +215,9 @@ def restore_asset(asset_id: str, db: Session = Depends(get_db)):
     folder.mkdir(parents=True, exist_ok=True)
     name = f"restored_{uuid.uuid4().hex[:10]}.png"
     try:
-        restore_photo(str(src), str(folder / name))
+        report = restore_photo(str(src), str(folder / name))
     except PhotoError as e:
-        raise HTTPException(422, str(e))
+        raise HTTPException(503 if "not installed" in str(e) else 422, str(e))
     data = (folder / name).read_bytes()
     from PIL import Image
     with Image.open(folder / name) as im:

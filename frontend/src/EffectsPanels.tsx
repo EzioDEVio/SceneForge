@@ -88,8 +88,8 @@ const Timing = ({v, set, disabled, name}: {v: {start_ms: number; end_ms: number 
   </div>;
 
 /** Scene effects: camera shake, spotlight, blur/pixelate regions, light leaks, split toning. */
-export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEditing, onRouteEditing}: {scene: Scene; disabled: boolean; onDraft: (look: Look) => void;
-  liveRoute?: RouteFx | null; routeEditing?: boolean; onRouteEditing?: (on: boolean) => void}) {
+export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEditing, onRouteEditing, onAddMedia}: {scene: Scene; disabled: boolean; onDraft: (look: Look) => void;
+  liveRoute?: RouteFx | null; routeEditing?: boolean; onRouteEditing?: (on: boolean) => void; onAddMedia?: () => void}) {
   const look = (scene.look_json || {}) as any;
   const pick = (l: any) => ({shake: l.shake || null, spotlight: l.spotlight || null, redact: l.redact || [], leak: l.leak || null, tone: l.tone || null, wheels: l.wheels || null, layout: l.layout || null, parallax: l.parallax || null});
   const [st, setSt] = useState(pick(look));
@@ -121,13 +121,14 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
         <p className="hint">Applies to photos in this scene (not video clips). The subject box shows on the preview.</p>
       </>}
     </Section>
-    <Section title="Split screen" Icon={LayoutGrid} on={!!layout} onToggle={on => put('layout', on ? {...LAYOUT} : null)} disabled={disabled || videoOrImages < 2} hint={videoOrImages < 2 ? "Add two or more images or videos to this scene to show them side by side." : "Show the scene's media at the same time, e.g. then-and-now. Media fill the panels in order."}>
+    <Section title="Split screen" Icon={LayoutGrid} on={!!layout} onToggle={on => put('layout', on ? {...LAYOUT} : null)} disabled={disabled || videoOrImages < 2} hint={videoOrImages < 2 ? `Split screen shows several pictures at once, so this scene needs at least two. It has ${videoOrImages}.` : "Show the scene's pictures at the same time, e.g. then-and-now. They fill the panels in order and the preview shows the layout."}>
       {layout && <>
         <Pills label="Layout" value={layout.type} options={[['split2', 'Side by side'], ['split2v', 'Top & bottom'], ['split3', 'Three'], ['grid4', '2 × 2 grid']]} onChange={type => put('layout', {...layout, type})} disabled={disabled}/>
         <Row label="Gap" value={layout.gap} min={0} max={40} unit="px" onChange={gap => put('layout', {...layout, gap})} disabled={disabled}/>
         <div className="adjust-row changed"><label>Background</label><input type="color" aria-label="Split screen background" value={layout.bg} disabled={disabled} onChange={e => put('layout', {...layout, bg: e.target.value.toUpperCase()})}/><span/><span/></div>
       </>}
     </Section>
+    {videoOrImages < 2 && onAddMedia && <div className="split-add"><button className="btn primary" disabled={disabled} onClick={onAddMedia}><Plus size={14}/> Add another image or video to this scene</button></div>}
     <Section title="Map route" Icon={RouteIcon} on={!!route} onToggle={on => {onDraft({route: on ? {...ROUTE, points: [[20, 70], [50, 45], [78, 35]]} : null} as any); onRouteEditing?.(on);}} disabled={disabled} hint="A line that draws itself across the picture, with pins at each stop, like an army's march or a trade route.">
       {route && <>
         <button className={`btn ${routeEditing ? 'primary' : ''}`} aria-pressed={!!routeEditing} disabled={disabled} onClick={() => onRouteEditing?.(!routeEditing)}><MousePointerClick size={14}/> {routeEditing ? 'Done editing points' : 'Edit points on the preview'}</button>
@@ -180,13 +181,23 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
 }
 
 /** Live approximations over the editor preview. */
-export function SceneFxPreview({look}: {look: any}) {
+export function SceneFxPreview({look, shots = []}: {look: any; shots?: {asset_id: string; asset?: {type?: string}}[]}) {
   if (!look) return null;
+  const layout: Layout | undefined = look.layout;
   const sp: Spot | undefined = look.spotlight, redact: Redact[] = look.redact || [], leak: Leak | undefined = look.leak;
   const plx: Parallax | undefined = look.parallax, route: RouteFx | undefined = look.route;
   const hole = sp ? (sp.shape === 'ellipse' ? `radial-gradient(ellipse ${sp.w / 2}% ${sp.h / 2}% at ${sp.x}% ${sp.y}%, transparent ${Math.max(0, 100 - sp.feather)}%, rgba(0,0,0,${sp.dim / 100}) 100%)` : undefined) : undefined;
   const leakColors = {warm: ['255,140,40', '255,70,30'], cool: ['80,170,255', '140,90,255'], rainbow: ['255,80,60', '70,150,255']};
+  const cells: [number, number, number, number][] = !layout ? [] : ({
+    split2: [[0, 0, 50, 100], [50, 0, 50, 100]], split2v: [[0, 0, 100, 50], [0, 50, 100, 50]],
+    split3: [[0, 0, 33.34, 100], [33.33, 0, 33.34, 100], [66.66, 0, 33.34, 100]],
+    grid4: [[0, 0, 50, 50], [50, 0, 50, 50], [0, 50, 50, 50], [50, 50, 50, 50]]} as Record<string, [number, number, number, number][]>)[layout.type];
+  const gapPct = layout ? layout.gap / 1080 * 100 / 2 : 0;
   return <div className="scenefx-preview" aria-hidden="true">
+    {layout && shots.length >= 2 && <div className="fx-layout" style={{background: layout.bg}}>
+      {cells.slice(0, shots.length).map(([x, y, w, h], i) => <div key={i} className="fx-cell" style={{left: `calc(${x}% + ${x > 0 ? gapPct : 0}%)`, top: `calc(${y}% + ${y > 0 ? gapPct * 16 / 9 : 0}%)`,
+        width: `calc(${w}% - ${gapPct}%)`, height: `calc(${h}% - ${gapPct * 16 / 9}%)`, backgroundImage: `url(/api/assets/${shots[i].asset_id}/thumbnail?w=640)`}}/>)}
+    </div>}
     {plx && <div className={`fx-subject ${plx.shape}`} style={{left: `${plx.x - plx.w / 2}%`, top: `${plx.y - plx.h / 2}%`, width: `${plx.w}%`, height: `${plx.h}%`}}><span>Subject</span></div>}
     {route && route.points.length > 1 && <svg className="fx-route" viewBox="0 0 100 100" preserveAspectRatio="none">
       <polyline points={route.points.map(p => p.join(',')).join(' ')} fill="none" stroke={route.color} strokeWidth={route.width / 10} vectorEffect="non-scaling-stroke" style={{strokeWidth: `${route.width / 3}px`}} strokeDasharray={route.style === 'dashed' ? '6 4' : undefined} strokeLinecap="round" strokeLinejoin="round"/>

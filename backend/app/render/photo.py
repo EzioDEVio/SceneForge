@@ -26,6 +26,18 @@ class PhotoError(ValueError):
     pass
 
 
+MISSING_CV = ("Photo tools are not installed yet. Close SceneForge and every start.bat window, "
+              "run scripts\\setup.bat in the SceneForge folder, then start SceneForge again.")
+
+
+def _cv2():
+    try:
+        import cv2
+        return cv2
+    except ImportError:
+        raise PhotoError(MISSING_CV) from None
+
+
 def clean_parallax(d) -> dict:
     if not isinstance(d, dict) or set(d) - set(PARALLAX_DEFAULT):
         raise PhotoError("Parallax settings may only contain: " + ", ".join(PARALLAX_DEFAULT) + ".")
@@ -43,7 +55,7 @@ def clean_parallax(d) -> dict:
 
 
 def _load(path: str):
-    import cv2
+    cv2 = _cv2()
     img = cv2.imdecode(np.fromfile(path, dtype=np.uint8), cv2.IMREAD_COLOR)   # handles non-ASCII Windows paths
     if img is None:
         raise PhotoError("This image could not be read.")
@@ -52,7 +64,7 @@ def _load(path: str):
 
 def parallax_layers(src: str, px: dict, cache: Path) -> tuple[str, str]:
     """(background with the subject filled in, subject with soft alpha) PNGs."""
-    import cv2
+    cv2 = _cv2()
     key = hashlib.sha256(f"v1|{src}|{os.path.getmtime(src)}|{sorted(px.items())}".encode()).hexdigest()[:20]
     cache.mkdir(parents=True, exist_ok=True)
     bg_p, fg_p = cache / f"plx_bg_{key}.png", cache / f"plx_fg_{key}.png"
@@ -122,7 +134,7 @@ def parallax_clip(src: str, px: dict, w: int, h: int, fps: int, seconds: float, 
 def restore_photo(src: str, dest: str) -> dict:
     """Denoise, remove dust/scratches, recover contrast, sharpen, upscale small
     scans. Returns a short report."""
-    import cv2
+    cv2 = _cv2()
     img = _load(src)
     h, w = img.shape[:2]
     report = {"size_before": [w, h]}

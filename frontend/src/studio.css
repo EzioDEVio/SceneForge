@@ -230,3 +230,7 @@ body.resizing-inspector iframe,body.resizing-inspector video{pointer-events:none
 .fx-route{position:absolute;inset:0;width:100%;height:100%;overflow:visible}
 .route-canvas{position:absolute;inset:0;z-index:6;cursor:crosshair}
 .route-point{position:absolute;width:20px;height:20px;margin:-10px 0 0 -10px;border-radius:50%;border:2px solid #fff;color:#fff;font-size:10px;font-weight:700;display:grid;place-items:center;cursor:grab;box-shadow:0 1px 4px #0008}
+.fx-layout{position:absolute;inset:0;z-index:1}
+.fx-cell{position:absolute;background-size:cover;background-position:center}
+.split-add{margin:-4px 0 10px}.split-add .btn{font-size:11px}
+.restore-note{margin:8px 0 0;color:#8fe3bb}
