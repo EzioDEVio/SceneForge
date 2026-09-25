@@ -13,7 +13,7 @@ export const TRANSITIONS = [
   ['wipe_left','Wipe left'], ['wipe_right','Wipe right'], ['circle_open','Circle reveal'],
   ['circle_close','Circle close'], ['zoom_in','Zoom in'], ['smooth_left','Smooth slide left'], ['smooth_right','Smooth slide right'],
   ['radial','Clock wipe'], ['pixelize','Pixelate'], ['blur','Blur'], ['diagonal','Diagonal wipe'], ['squeeze','Squeeze'],
-  ['fade_grays','Fade through grey'], ['film_burn','Film burn'],
+  ['fade_grays','Fade through grey'], ['film_burn','Film burn'], ['wind','Wind'], ['slice','Slice'], ['open','Open'], ['close','Close'], ['fade_fast','Quick fade'],
 ];
 export {sceneDuration} from './duration';
 export function sequenceClips(scenes:Scene[]) {

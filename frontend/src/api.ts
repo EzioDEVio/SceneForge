@@ -40,7 +40,7 @@ export type VoiceTake = {
   edit_json?: AudioEdit;
   effective_duration_ms?: number | null;
 };
-export type AudioEdit = {in_ms?: number; out_ms?: number | null; volume?: number; fade_in_ms?: number; fade_out_ms?: number};
+export type AudioEdit = {in_ms?: number; out_ms?: number | null; volume?: number; fade_in_ms?: number; fade_out_ms?: number; voice_fx?: string};
 export type Waveform = {duration_ms: number; peaks: number[]; peak: number};
 
 export type FontSettings = {
@@ -73,7 +73,8 @@ export type Look = {
 };
 export type Overlay = {id: string; asset_id: string; x: number; y: number; width: number; rotation: number; opacity: number;
   radius: number; border: number; border_color: string; shadow: number; start_ms: number; end_ms: number | null;
-  anim_in: 'none' | 'fade' | 'slide_left' | 'slide_up' | 'zoom'; anim_out: 'none' | 'fade' | 'slide_left' | 'slide_up' | 'zoom'; anim_ms: number};
+  anim_in: 'none' | 'fade' | 'slide_left' | 'slide_up' | 'zoom'; anim_out: 'none' | 'fade' | 'slide_left' | 'slide_up' | 'zoom'; anim_ms: number;
+  x2?: number | null; y2?: number | null; chroma?: string | null; chroma_similarity?: number; feather?: number};
 export type Finishing = {music?: {asset_id: string; volume: number; duck: number; fade_in_ms: number; fade_out_ms: number} | null; loudnorm?: boolean; leader?: boolean};
 export type FilmLook = {scratches: number; dust: number; flicker: number; weave: number; sound: number; fps: 0 | 16 | 18 | 24; tone: 'color' | 'faded' | 'sepia' | 'bw'};
 

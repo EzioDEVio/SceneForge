@@ -11,6 +11,7 @@ import {FilmPreview, filmToneFilter} from "./FilmPreview";
 import {FinishingPanel} from "./FinishingPanel";
 import {OverlayCanvas, OverlayPanel} from "./Overlays";
 import {InspectorResizer} from "./InspectorResizer";
+import {SceneEffectsPanel, SceneFxPreview} from "./EffectsPanels";
 import type {Overlay} from "./api";
 import {sceneDuration} from "./duration";
 import {TitleDesigner,TitleDesign,ANIMATIONS} from './TitleDesigner';
@@ -63,6 +64,7 @@ const EFFECTS: { key: string; label: string; swatch: string }[] = [
   { key: "noir", label: "Noir", swatch: "grayscale(1) contrast(1.45) brightness(.97)" },
   { key: "sharpen", label: "Sharpen", swatch: "contrast(1.08)" },
   { key: "negative", label: "Negative", swatch: "invert(1)" },
+  { key: "vhs", label: "VHS", swatch: "saturate(1.3) contrast(1.08) hue-rotate(-6deg) blur(0.4px)" },
   { key: "old_film", label: "Old film", swatch: "sepia(0.5) contrast(1.1) brightness(0.85) saturate(0.7)" },
 ];
 
@@ -513,6 +515,7 @@ function FontPanel({ scene, onChange }: { scene: Scene; onChange: (f: Partial<Sc
         <input type="checkbox" aria-label="Word-by-word highlight" checked={!!(f as any).karaoke} onChange={(e) => onChange({ karaoke: e.target.checked, ...(e.target.checked ? {captions_enabled:true, typewriter:false} : {}) } as any)} />
         Word-by-word highlight (follows the narration)
       </label>
+      {(f as any).karaoke && <label>Caption style<select aria-label="Caption style" value={(f as any).karaoke_style || "fill"} onChange={(e) => onChange({ karaoke_style: e.target.value } as any)}><option value="fill">Colour fill</option><option value="pop">Pop (current word grows)</option><option value="glow">Glow (current word glows)</option></select></label>}
       {(f as any).karaoke && <label>Highlight colour<input type="color" aria-label="Highlight colour" value={(f as any).highlight_color || "#FFD84D"} onChange={(e) => onChange({ highlight_color: e.target.value } as any)} /></label>}
       {!f.captions_enabled && (
         <small className="hint">Font changes have no visible effect while captions are disabled.</small>
@@ -686,7 +689,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
   const wbFilterId = `sf-wb-${scene.id}`;
   // With a LUT, the preview shows a server-graded frame (exact colour: LUT +
   // colour sliders), so only the look preset stays as a CSS approximation.
-  const gradedSrc = scene.look_json?.lut && shot ? api.gradedFrameUrl(scene.id, gradeKey(scene.look_json), 1280, shot.id) : null;
+  const gradedSrc = (scene.look_json?.lut || (scene.look_json as any)?.tone?.amount) && shot ? api.gradedFrameUrl(scene.id, gradeKey(scene.look_json), 1280, shot.id) : null;
   const liveFilm = (pending.current.look as any)?.film !== undefined ? (pending.current.look as any).film : scene.look_json?.film;
   // "none" (the Original look) is not combinable with other CSS filter
   // functions: joined into a list it makes the whole value invalid, and the
@@ -720,7 +723,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
             <span className="aspect-badge">{project.aspect}</span>
           </div>
           <div className="canvas-viewport">
-            <div className="preview-canvas" style={{aspectRatio: project.aspect.replace(":", "/"), width: `min(${zoom}%, calc((var(--stage-height) - 40px) * ${canvasRatio * zoom / 100}))`}}><WhiteBalanceFilter id={wbFilterId} adjust={liveAdjust}/>{previewMode !== "render" && shot && <PreviewFinish adjust={liveAdjust}/>}{previewMode !== "render" && shot && liveFilm && <FilmPreview film={liveFilm}/>}{previewMode !== "render" && shot && overlays.length > 0 && <OverlayCanvas overlays={overlays} frameAspect={project.width / project.height} selected={ovSelected} onSelect={i => {setOvSelected(i); setTab("Overlays");}} onChange={(i, patch, commit) => {const next = ovRef.current.map((x, k) => k === i ? {...x, ...patch} : x); ovRef.current = next; changeOverlays(next, !!commit);}} onCommit={() => draft({overlays: ovRef.current})}/>}
+            <div className="preview-canvas" style={{aspectRatio: project.aspect.replace(":", "/"), width: `min(${zoom}%, calc((var(--stage-height) - 40px) * ${canvasRatio * zoom / 100}))`}}><WhiteBalanceFilter id={wbFilterId} adjust={liveAdjust}/>{previewMode !== "render" && shot && <PreviewFinish adjust={liveAdjust}/>}{previewMode !== "render" && shot && liveFilm && <FilmPreview film={liveFilm}/>}{previewMode !== "render" && shot && <SceneFxPreview look={{...(scene.look_json || {}), ...((pending.current.look as any) || {})}}/>}{previewMode !== "render" && shot && overlays.length > 0 && <OverlayCanvas overlays={overlays} frameAspect={project.width / project.height} selected={ovSelected} onSelect={i => {setOvSelected(i); setTab("Overlays");}} onChange={(i, patch, commit) => {const next = ovRef.current.map((x, k) => k === i ? {...x, ...patch} : x); ovRef.current = next; changeOverlays(next, !!commit);}} onCommit={() => draft({overlays: ovRef.current})}/>}
               {previewMode === "render" && rendered ? <video ref={videoRef} className="canvas-media" controls preload="metadata" src={api.assetStreamUrl(rendered)}/> :
                 shot ? shot.asset?.type === "image" ? (shot.crop_json?<svg className="canvas-media" role="img" aria-label={`Cropped source for ${scene.title}`} viewBox={`${shot.crop_json.x*(shot.asset.width||1)} ${shot.crop_json.y*(shot.asset.height||1)} ${shot.crop_json.width*(shot.asset.width||1)} ${shot.crop_json.height*(shot.asset.height||1)}`} preserveAspectRatio={shot.fit==='cover'?'xMidYMid slice':'xMidYMid meet'} style={{filter:mediaFilter}}><image href={gradedSrc||api.assetStreamUrl(shot.asset_id)} width={shot.asset.width||1} height={shot.asset.height||1}/></svg>:<img className="canvas-media" src={gradedSrc||api.assetStreamUrl(shot.asset_id)} alt={`Source media for ${scene.title}`} style={{objectFit: shot.fit === "cover" ? "cover" : "contain", filter:mediaFilter}}/>) :
                   <video ref={videoRef} className="canvas-media" controls preload="metadata" poster={gradedSrc||undefined} src={api.assetStreamUrl(shot.asset_id)} style={{objectFit:shot.fit === "cover" ? "cover" : "contain",filter:mediaFilter}}/> :
@@ -781,7 +784,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
   // Save pending edits first, but do not let an earlier failed save block this independent LUT change.
   await flush();await run(async()=>{const saved:any=await api.updateScene(scene.id,{look});
   // An old backend ignores "look" without an error; say so instead of silently doing nothing.
-  if(look.lut&&saved?.look_json?.lut?.asset_id!==look.lut.asset_id)throw new Error("The LUT was not saved because this SceneForge backend is out of date. Close every SceneForge and start.bat window, run setup.bat in the newest folder, then start it again.");});}}/></>}
+  if(look.lut&&saved?.look_json?.lut?.asset_id!==look.lut.asset_id)throw new Error("The LUT was not saved because this SceneForge backend is out of date. Close every SceneForge and start.bat window, run setup.bat in the newest folder, then start it again.");});}}/><SceneEffectsPanel scene={scene} disabled={saving} onDraft={look=>draft({look})}/></>}
           {tab === "Text" && <><h3>On-screen captions</h3><p className="hint">Caption text is independent of narration.</p><textarea aria-label="On-screen captions" dir="auto" className="caption-box" value={captions} onChange={e => {setCaptions(e.target.value); draft({subtitle_text:e.target.value});}} onBlur={() => void flush()} placeholder="Write the text to appear on your video…"/><button className="text-btn" onClick={() => {setCaptions(text); draft({subtitle_text:text});}}><Copy size={13}/> Copy narration to captions</button><fieldset><FontPanel scene={scene} onChange={f => {if(f.typewriter&&!captions.trim()&&text.trim()){setCaptions(text);draft({subtitle_text:text});}void update({font:f});}}/><TextLayers scene={{...scene,font_json:{...scene.font_json,layers:draftLayers}}} onChange={layers=>{setDraftLayers(layers);draft({font:{layers}});}}/></fieldset><button className="btn btn-primary" disabled={!shot||isGenerating} onClick={render}>Render text preview</button><p className="hint">Caption typewriter applies to On-screen captions. For a title, choose typewriter under its Text overlay Animation. Render text preview to see the result.</p><section className="typewriter-controls"><h3>Typewriter timing & sound</h3>
             <p className="hint">Enable Captions and Typewriter reveal above. Sound follows each reveal, not the original recording’s rhythm.</p>
             <label className="check-label"><input type="checkbox" checked={!!scene.font_json.typewriter_sound} disabled={saving} onChange={e=>update({font:{typewriter_sound:e.target.checked}})}/> Synchronized keystrokes</label>

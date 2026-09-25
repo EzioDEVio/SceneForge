@@ -3,7 +3,7 @@ import {Plus, Trash2, Copy, ArrowUp, ArrowDown, Upload, PictureInPicture2} from 
 import {api, Asset, Overlay, Scene} from './api';
 
 export const OVERLAY_DEFAULTS: Omit<Overlay, 'id' | 'asset_id'> = {
-  x: 72, y: 30, width: 34, rotation: 0, opacity: 100, radius: 6, border: 6, border_color: '#FFFFFF', shadow: 60,
+  x: 72, y: 30, width: 34, rotation: 0, opacity: 100, radius: 6, border: 6, border_color: '#FFFFFF', shadow: 60, feather: 0, chroma: null, chroma_similarity: 30, x2: null, y2: null,
   start_ms: 0, end_ms: null, anim_in: 'fade', anim_out: 'fade', anim_ms: 600,
 };
 const ANIMS: [Overlay['anim_in'], string][] = [['none', 'None'], ['fade', 'Fade'], ['slide_left', 'Slide'], ['slide_up', 'Rise'], ['zoom', 'Zoom pop']];
@@ -129,6 +129,18 @@ export function OverlayPanel({scene, overlays, selected, onSelect, onChange, dis
         {num('radius', 'Corners', 0, 50, 1, '%')}{num('border', 'Border', 0, 40, 1, 'px')}
         <div className="adjust-row changed"><label htmlFor="ov-color">Border colour</label><input id="ov-color" aria-label="Overlay border colour" type="color" value={o.border_color} disabled={disabled} onChange={e => set({border_color: e.target.value.toUpperCase()})}/><span/><span/></div>
         {num('shadow', 'Shadow', 0, 100, 1, '%')}
+        {num('feather', 'Soft edges', 0, 100, 1, '%')}
+      </fieldset>
+      <fieldset className="adjust-group"><legend>Move & green screen</legend>
+        <label className="switch-label finishing-toggle"><input type="checkbox" aria-label="Glide to another position" checked={o.x2 != null} disabled={disabled} onChange={e => set(e.target.checked ? {x2: clamp(o.x - 30, -20, 120), y2: o.y} : {x2: null, y2: null})}/> Glide to another position during its time</label>
+        {o.x2 != null && <>
+          {num('x2' as any, 'End left–right', -20, 120, 0.5, '%')}{num('y2' as any, 'End up–down', -20, 120, 0.5, '%')}
+        </>}
+        <label className="switch-label finishing-toggle"><input type="checkbox" aria-label="Green screen" checked={!!o.chroma} disabled={disabled} onChange={e => set({chroma: e.target.checked ? '#00FF00' : null})}/> Green screen (make one colour transparent)</label>
+        {o.chroma && <>
+          <div className="adjust-row changed"><label htmlFor="ov-chroma">Key colour</label><input id="ov-chroma" aria-label="Green screen colour" type="color" value={o.chroma} disabled={disabled} onChange={e => set({chroma: e.target.value.toUpperCase()})}/><span/><span/></div>
+          {num('chroma_similarity' as any, 'Tolerance', 1, 100, 1, '%')}
+        </>}
       </fieldset>
       <fieldset className="adjust-group"><legend>Timing & animation</legend>
         <div className="audio-times">

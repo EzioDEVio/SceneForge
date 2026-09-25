@@ -207,6 +207,24 @@ try{
  await user.click(screen.getByRole('checkbox',{name:'Countdown leader'}));
  await waitFor(()=>assert.ok(requests.some(r=>r.body?.finishing?.leader===true&&r.body.finishing.loudnorm===true)));
  check('YouTube loudness and countdown leader save on the project',true);
+ // Effects pack controls
+ await user.click(screen.getByRole('tab',{name:'Effects',exact:true}));
+ await user.click(screen.getByRole('switch',{name:'Camera shake'}));
+ await user.click(screen.getByRole('checkbox',{name:'Impact zoom'}));await saved();
+ const lk=()=>requests.filter(r=>r.method==='PATCH'&&r.body?.look).map(r=>r.body.look);
+ check('camera shake with impact zoom saves',lk().some(l=>l.shake?.impact===true&&l.shake.amount===40));
+ await user.click(screen.getByRole('switch',{name:'Spotlight'}));await saved();
+ check('spotlight saves and previews over the picture',lk().some(l=>l.spotlight?.shape==='ellipse')&&!!document.querySelector('.scenefx-preview .fx-layer'));
+ await user.click(screen.getByRole('switch',{name:'Blur or pixelate areas'}));await user.click(screen.getByRole('button',{name:/Add another area/}));
+ await user.click(within(screen.getAllByRole('radiogroup',{name:'Style'})[1]).getByRole('radio',{name:'Pixelate'}));await saved();
+ check('two redaction areas save, one pixelated, and preview as blurred boxes',lk().some(l=>l.redact?.length===2&&l.redact[1].mode==='pixelate')&&document.querySelectorAll('.fx-redact').length===2);
+ await user.click(screen.getByRole('switch',{name:'Light leaks'}));await user.click(screen.getByRole('radio',{name:'Rainbow'}));await saved();
+ check('light leaks save with colour',lk().some(l=>l.leak?.color==='rainbow'));
+ await user.click(screen.getByRole('switch',{name:'Split toning'}));await saved();
+ check('split toning saves',lk().some(l=>l.tone?.amount===40));
+ await user.click(screen.getByRole('switch',{name:'Spotlight'}));await saved();
+ check('turning an effect off removes it',lk().some(l=>'spotlight' in l&&l.spotlight===null)&&!document.querySelector('.scenefx-preview .fx-layer:not(.fx-leak)'));
+ check('VHS look is offered',!!screen.getByRole('button',{name:'VHS',exact:true}));
  // Picture-in-picture overlays
  await user.click(screen.getByRole('tab',{name:'Overlays',exact:true}));
  await waitFor(()=>assert.ok(within(screen.getByRole('combobox',{name:'Add overlay from media'})).getAllByRole('option').length===3));
@@ -225,6 +243,8 @@ try{
  check('duplicate adds a second overlay offset from the first',ovSave().length===2&&ovSave()[1].x===81&&ovSave()[1].id!==ovSave()[0].id);
  await user.click(screen.getByRole('button',{name:'Send overlay 2 back'}));await saved();
  check('stacking order can be changed',ovSave()[0].x===81);
+ await user.click(screen.getByRole('checkbox',{name:'Glide to another position'}));await user.click(screen.getByRole('checkbox',{name:'Green screen'}));await saved();
+ check('overlay glide and green screen save',ovSave().some(o=>o.x2!=null&&o.chroma==='#00FF00'));
  await user.click(screen.getByRole('button',{name:'Delete overlay 2'}));await user.click(screen.getByRole('button',{name:'Delete overlay 1'}));await saved();
  check('deleting overlays removes them from the scene and the preview',ovSave().length===0&&!screen.queryByRole('button',{name:/Drag to move/}));
  await user.click(screen.getByRole('tab',{name:'Effects',exact:true}));

@@ -21,7 +21,7 @@ export function loadWaveform(assetId: string, points = 600): Promise<Waveform> {
   return waveCache.get(key)!;
 }
 
-const DEFAULTS = {in_ms: 0, out_ms: null as number | null, volume: 100, fade_in_ms: 0, fade_out_ms: 0};
+const DEFAULTS = {in_ms: 0, out_ms: null as number | null, volume: 100, fade_in_ms: 0, fade_out_ms: 0, voice_fx: 'none'};
 const secs = (ms: number) => (ms / 1000).toFixed(2);
 
 /** Peak bars as a single SVG path, from `from` to `to` (0..1 of the file). */
@@ -151,6 +151,9 @@ export function AudioClipEditor({scene, take, disabled, onChanged, onRemove}: Pr
       <label className="control-label">Fade out · {secs(edit.fade_out_ms)} s
         <input aria-label="Fade out" type="range" min={0} max={Math.min(10000, Math.max(0, clipMs - edit.fade_in_ms))} step={100} value={edit.fade_out_ms} disabled={disabled} onChange={e => change({fade_out_ms: Number(e.target.value)})}/></label>
     </div>
+    <label className="control-label">Voice effect<select aria-label="Voice effect" value={edit.voice_fx || 'none'} disabled={disabled} onChange={e => change({voice_fx: e.target.value})}>
+      <option value="none">None</option><option value="clean">Clean up (less noise, even level)</option><option value="radio">1940s radio / newsreel</option><option value="telephone">Telephone</option>
+    </select></label>
     {error && <p className="form-error" role="alert">{error}</p>}
     <div className="button-row audio-actions">
       <button className="text-btn" disabled={disabled || JSON.stringify(edit) === JSON.stringify(DEFAULTS)} onClick={() => change({...DEFAULTS})}><RotateCcw size={12}/> Reset edits</button>

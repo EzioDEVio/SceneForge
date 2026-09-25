@@ -207,3 +207,12 @@ body.resizing-inspector iframe,body.resizing-inspector video{pointer-events:none
 .script-footer{display:flex;align-items:center;justify-content:space-between;gap:8px}
 .script-footer .script-voice{font-size:11px;padding:5px 10px;display:inline-flex;align-items:center;gap:4px}
 @media(max-height:800px){.studio-shell .script-card{flex-basis:112px}}
+/* Scene effect previews */
+.scenefx-preview{position:absolute;inset:0;z-index:3;pointer-events:none;overflow:hidden;container-type:inline-size}
+.fx-layer{position:absolute;inset:0}
+.fx-spot-rect{position:absolute;border-radius:2px}
+.fx-redact{position:absolute;outline:1px dashed #ffffff55}
+.fx-leak{mix-blend-mode:screen;background-size:180% 180%;animation:sf-leak 8s ease-in-out infinite alternate}
+@keyframes sf-leak{0%{background-position:0% 30%}100%{background-position:100% 70%}}
+@media (prefers-reduced-motion:reduce){.fx-leak{animation:none}}
+.scene-fx-panel{margin-top:6px;border-top:1px solid var(--line);padding-top:10px}
