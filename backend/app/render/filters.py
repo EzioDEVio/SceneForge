@@ -167,6 +167,11 @@ _EFFECT_FILTERS: dict[str, str] = {
     EffectPreset.DREAM: "gblur=sigma=1.5,eq=brightness=0.04:saturation=0.8",
     # Desaturated vintage grade + heavier grain + vignette — an "old
     # film reel" look, distinct from the lighter "Vintage" preset.
+    # VHS camcorder: colour bleed, soft picture, scanlines, a rolling tracking
+    # band and tape noise.
+    EffectPreset.VHS: ("chromashift=cbh=5:crh=-5,eq=saturation=1.25:contrast=1.06,gblur=sigma=0.7,"
+                       "noise=alls=10:allf=t,drawgrid=w=iw:h=3:t=1:c=black@0.22,"
+                       "drawbox=x=0:y='mod(t*80,ih)':w=iw:h=ih*0.035:color=white@0.10:t=fill"),
     EffectPreset.OLD_FILM: "curves=preset=vintage,eq=saturation=0.75:contrast=1.05,noise=alls=22:allf=t+u,vignette=PI/3.5",
 }
 

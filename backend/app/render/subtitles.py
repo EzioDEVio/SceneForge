@@ -58,7 +58,7 @@ def write_ass_file(
     margin_v = 60
 
     def ts(ms: int) -> str:
-        cs = ms // 10
+        cs = int(round(ms)) // 10
         h = cs // 360000
         m = (cs % 360000) // 6000
         s = (cs % 6000) // 100
@@ -112,11 +112,41 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 starts.append(t)
                 t += span * weight / total
             ends = starts[1:] + [start + span]
-        parts = [f"{{\\1c{hi}\\2c{primary}\\k{max(0, round(starts[0] / 10))}}}"]
-        for i, word in enumerate(words):
-            first, tagged = tag_runs(word + (" " if i < len(words) - 1 else ""), family, escape_text)
-            parts.append(f"{{\\k{max(1, round((ends[i] - starts[i]) / 10))}\\fn{first}}}{tagged}")
-        events = [f"Dialogue: 0,{ts(0)},{ts(duration_ms)},Default,,0,0,0,,{''.join(parts)}\n"]
+        style = font_json.get("karaoke_style", "fill")
+        if style in ("pop", "glow"):
+            # One event per word: spoken words in the highlight colour, the
+            # current word popped (bigger) or glowing, the rest in the caption colour.
+            tagged_words = [tag_runs(w + (" " if i < len(words) - 1 else ""), family, escape_text) for i, w in enumerate(words)]
+            def line(current: int, spoken: int) -> str:
+                out = []
+                for j, (first, tagged) in enumerate(tagged_words):
+                    if j == current and style == "pop":
+                        out.append(f"{{\\fn{first}\\1c{hi}\\fscx122\\fscy122}}{tagged}{{\\fscx100\\fscy100}}")
+                    else:
+                        out.append(f"{{\\fn{first}\\1c{hi if j <= spoken and (j < spoken or j == current) else primary}}}{tagged}")
+                return "".join(out)
+            def halo(current: int) -> str:
+                # Same text and layout, everything invisible except a soft
+                # blurred outline around the current word (drawn underneath).
+                out = []
+                for j, (first, tagged) in enumerate(tagged_words):
+                    if j == current:
+                        out.append(f"{{\\fn{first}\\alpha&H00&\\1a&HFF&\\3c{hi}\\bord7\\blur9}}{tagged}")
+                    else:
+                        out.append(f"{{\\fn{first}\\alpha&HFF&}}{tagged}")
+                return "".join(out)
+            events = [f"Dialogue: 1,{ts(0)},{ts(starts[0])},Default,,0,0,0,,{line(-1, 0)}\n"]
+            for i in range(len(words)):
+                if style == "glow":
+                    events.append(f"Dialogue: 0,{ts(starts[i])},{ts(ends[i])},Default,,0,0,0,,{halo(i)}\n")
+                events.append(f"Dialogue: 1,{ts(starts[i])},{ts(ends[i])},Default,,0,0,0,,{line(i, i)}\n")
+            events.append(f"Dialogue: 1,{ts(ends[-1])},{ts(duration_ms)},Default,,0,0,0,,{line(-1, len(words))}\n")
+        else:
+            parts = [f"{{\\1c{hi}\\2c{primary}\\k{max(0, round(starts[0] / 10))}}}"]
+            for i, word in enumerate(words):
+                first, tagged = tag_runs(word + (" " if i < len(words) - 1 else ""), family, escape_text)
+                parts.append(f"{{\\k{max(1, round((ends[i] - starts[i]) / 10))}\\fn{first}}}{tagged}")
+            events = [f"Dialogue: 0,{ts(0)},{ts(duration_ms)},Default,,0,0,0,,{''.join(parts)}\n"]
     elif not typewriter or not text.strip():
         events = [f"Dialogue: 0,{ts(0)},{ts(duration_ms)},Default,,0,0,0,,{runs(text, family)}\n"]
     else:

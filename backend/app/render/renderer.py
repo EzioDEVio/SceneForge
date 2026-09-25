@@ -183,7 +183,23 @@ def _apply_overlays(scene: Scene, project: Project, visual_path: str, total_ms: 
             if a is None or a.type not in ("image", "video"):
                 raise FFmpegError("An overlay's media file is missing. Choose it again in the Overlays tab.")
             assets[a.id] = SimpleNamespace(type=a.type, width=a.width, height=a.height, path=_resolve_asset_path(a))
-    inputs, graph = build_overlay_pass(scene.overlays_json, assets, out_w, out_h, project.fps, total_ms, Path(PROXIES_DIR) / "overlays")
+    from app.render import scene_fx as fx
+    look, dur, fps = scene.look_json or {}, total_ms / 1000, project.fps
+    graph_parts, base, inputs = [], "0:v", []
+    if look.get("redact"):
+        g, base = fx.redact_graph(base, look["redact"], out_w, out_h, dur); graph_parts += g
+    if scene.overlays_json:
+        inputs, og = build_overlay_pass(scene.overlays_json, assets, out_w, out_h, fps, total_ms, Path(PROXIES_DIR) / "overlays",
+                                        base=base, first_input=1, final="ovl")
+        graph_parts.append(og); base = "ovl"
+    if look.get("spotlight"):
+        g, base = fx.spotlight_graph(base, look["spotlight"], fx.spotlight_png(look["spotlight"], out_w, out_h, Path(PROXIES_DIR) / "scenefx"), fps, dur); graph_parts += g
+    if look.get("leak") and look["leak"]["amount"] > 0:
+        g, base = fx.leak_graph(base, look["leak"], fx.leak_clip(look["leak"]["color"], look["leak"]["speed"], Path(PROXIES_DIR) / "scenefx"), out_w, out_h, fps); graph_parts += g
+    if look.get("shake") and (look["shake"]["amount"] > 0 or look["shake"]["impact"]):
+        g, base = fx.shake_graph(base, look["shake"], out_w, out_h, fps); graph_parts += g
+    graph_parts.append(f"[{base}]format=yuv420p,setsar=1[vout]")
+    graph = ";".join(graph_parts)
     out = str(Path(work_dir) / "scene_overlays.mp4")
     run_ffmpeg(["-i", visual_path, *inputs, "-filter_complex", graph, "-map", "[vout]", "-t", f"{total_ms / 1000:.3f}",
                 "-r", str(project.fps), "-pix_fmt", "yuv420p", "-c:v", "libx264", "-preset", X264_PRESET, "-crf", X264_CRF, out],
@@ -223,7 +239,7 @@ def _grade_lut_for(scene: Scene) -> str | None:
             lut_path = _resolve_asset_path(asset)
         if not Path(lut_path).exists():
             raise FFmpegError("The LUT file for this scene is missing on disk. Import it again in Effects → Color LUT.")
-    return build_grade_lut(look.get("adjust"), lut_path, int(lut.get("strength", 100)), Path(PROXIES_DIR) / "grades")
+    return build_grade_lut(look.get("adjust"), lut_path, int(lut.get("strength", 100)), Path(PROXIES_DIR) / "grades", look.get("tone"))
 
 
 def _render_single_shot(
@@ -436,7 +452,8 @@ def render_part(
         if progress_cb:
             progress_cb("visual", 0)
         visual_path = render_scene_visual(scene, project, total_ms, ctx, work_dir, progress_cb)
-        if scene.overlays_json:
+        from app.render.scene_fx import has_scene_fx
+        if scene.overlays_json or has_scene_fx(scene.look_json):
             visual_path = _apply_overlays(scene, project, visual_path, total_ms, work_dir, ctx)
         if progress_cb:
             progress_cb("captions_audio", 50)
@@ -490,7 +507,8 @@ XFADE_NAMES = {
     "fade_white": "fadewhite", "circle_open": "circleopen", "circle_close": "circleclose",
     "zoom_in": "zoomin", "smooth_left": "smoothleft", "smooth_right": "smoothright",
     "radial": "radial", "pixelize": "pixelize", "blur": "hblur", "diagonal": "diagtl",
-    "squeeze": "squeezeh", "fade_grays": "fadegrays", "film_burn": f"custom:expr='{FILM_BURN_EXPR}'",
+    "squeeze": "squeezeh", "fade_grays": "fadegrays", "wind": "hlwind", "slice": "hlslice",
+    "open": "horzopen", "close": "horzclose", "fade_fast": "fadefast", "film_burn": f"custom:expr='{FILM_BURN_EXPR}'",
 }
 
 

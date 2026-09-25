@@ -226,18 +226,36 @@ def apply_adjustments(rgb: np.ndarray, a: dict) -> np.ndarray:
     return np.clip(rgb, 0, 1)
 
 
-def grade_is_active(adjust: dict | None, lut_path: str | None, lut_strength: int) -> bool:
-    return bool((lut_path and lut_strength > 0) or any((adjust or {}).get(k) for k in COLOR_KEYS))
+def grade_is_active(adjust: dict | None, lut_path: str | None, lut_strength: int, tone: dict | None = None) -> bool:
+    return bool((lut_path and lut_strength > 0) or any((adjust or {}).get(k) for k in COLOR_KEYS) or (tone or {}).get("amount"))
 
 
-def build_grade_lut(adjust: dict | None, lut_path: str | None, lut_strength: int, out_dir: Path) -> str | None:
+def apply_split_tone(rgb: np.ndarray, tone: dict | None) -> np.ndarray:
+    """Tint shadows and highlights with two colours (Lightroom-style split
+    toning). Balance moves the crossover point; luminance is preserved."""
+    if not tone or not tone.get("amount"):
+        return rgb
+    def col(h):
+        return np.array([int(h[i:i + 2], 16) for i in (1, 3, 5)], dtype=np.float64) / 255
+    amt = tone["amount"] / 100 * 0.5
+    pivot = 0.5 + 0.35 * tone.get("balance", 0) / 100
+    luma = (rgb @ _LUMA)[:, None]
+    w_hi = np.clip((luma - pivot) / (1 - pivot + 1e-6), 0, 1) ** 0.8
+    w_sh = np.clip((pivot - luma) / (pivot + 1e-6), 0, 1) ** 0.8
+    shifted = rgb + amt * (w_sh * (col(tone["shadow"]) - 0.5) + w_hi * (col(tone["highlight"]) - 0.5))
+    # keep brightness where it was
+    shifted += luma - (shifted @ _LUMA)[:, None]
+    return np.clip(shifted, 0, 1)
+
+
+def build_grade_lut(adjust: dict | None, lut_path: str | None, lut_strength: int, out_dir: Path, tone: dict | None = None) -> str | None:
     """Write (or reuse) the combined grade LUT and return its path."""
     adjust = {k: int((adjust or {}).get(k, 0)) for k in COLOR_KEYS}
     lut_strength = max(0, min(100, int(lut_strength)))
-    if not grade_is_active(adjust, lut_path, lut_strength):
+    if not grade_is_active(adjust, lut_path, lut_strength, tone):
         return None
     lut_bytes = Path(lut_path).read_bytes() if lut_path and lut_strength else b""
-    key = hashlib.sha256(json.dumps([adjust, lut_strength, GRID]).encode() + lut_bytes).hexdigest()[:24]
+    key = hashlib.sha256(json.dumps([adjust, lut_strength, GRID, tone or {}], sort_keys=True).encode() + lut_bytes).hexdigest()[:24]
     out_dir.mkdir(parents=True, exist_ok=True)
     out = out_dir / f"grade_{key}.cube"
     with _locks_guard:
@@ -247,11 +265,11 @@ def build_grade_lut(adjust: dict | None, lut_path: str | None, lut_strength: int
     with lock:
         if out.exists():
             return str(out)
-        _write_grade(out, adjust, lut_bytes, lut_strength)
+        _write_grade(out, adjust, lut_bytes, lut_strength, tone)
     return str(out)
 
 
-def _write_grade(out: Path, adjust: dict, lut_bytes: bytes, lut_strength: int) -> None:
+def _write_grade(out: Path, adjust: dict, lut_bytes: bytes, lut_strength: int, tone: dict | None = None) -> None:
     g = np.linspace(0, 1, GRID)
     b, gg, r = np.meshgrid(g, g, g, indexing="ij")
     rgb = np.stack([r, gg, b], axis=-1).reshape(-1, 3)
@@ -260,6 +278,7 @@ def _write_grade(out: Path, adjust: dict, lut_bytes: bytes, lut_strength: int) -
         looked = np.clip(parse_lut(decode_cube(lut_bytes)).apply(graded), 0, 1)
         s = lut_strength / 100
         graded = graded * (1 - s) + looked * s
+    graded = apply_split_tone(graded, tone)
     tmp = out.with_name(f"{out.stem}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp")
     with open(tmp, "w", encoding="ascii") as fh:
         fh.write(f"TITLE \"SceneForge grade\"\nLUT_3D_SIZE {GRID}\n")

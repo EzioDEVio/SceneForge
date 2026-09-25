@@ -74,6 +74,7 @@ class EffectPreset(str, Enum):
     SOFT_GLOW = "soft_glow"
     GLITCH = "glitch"
     OLD_FILM = "old_film"
+    VHS = "vhs"
     FILM_GRAIN = "film_grain"
     HIGH_CONTRAST = "high_contrast"
     FADED = "faded"
@@ -105,6 +106,11 @@ class TransitionType(str, Enum):
     SQUEEZE = "squeeze"
     FADE_GRAYS = "fade_grays"
     FILM_BURN = "film_burn"
+    WIND = "wind"
+    SLICE = "slice"
+    OPEN = "open"
+    CLOSE = "close"
+    FADE_FAST = "fade_fast"
 
 
 class TimingMode(str, Enum):

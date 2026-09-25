@@ -11,7 +11,15 @@ from __future__ import annotations
 
 MIN_CLIP_MS = 200
 MAX_FADE_MS = 10000
-DEFAULT_EDIT = {"in_ms": 0, "out_ms": None, "volume": 100, "fade_in_ms": 0, "fade_out_ms": 0}
+DEFAULT_EDIT = {"in_ms": 0, "out_ms": None, "volume": 100, "fade_in_ms": 0, "fade_out_ms": 0, "voice_fx": "none"}
+# Voice effects: "clean" reduces background noise and evens the level (home
+# recordings); "radio" is a 1940s newsreel / wireless sound; "telephone" is narrower.
+VOICE_FX = {
+    "none": "",
+    "clean": "highpass=f=70,afftdn=nf=-25,dynaudnorm=f=150:g=15",
+    "radio": "highpass=f=300,lowpass=f=3400,acompressor=threshold=0.1:ratio=6:attack=5:release=80,volume=1.8,alimiter=limit=0.9",
+    "telephone": "highpass=f=500,lowpass=f=2600,acompressor=threshold=0.08:ratio=8,volume=2.0,alimiter=limit=0.9",
+}
 
 
 class AudioEditError(ValueError):
@@ -58,7 +66,9 @@ def clean_edit(raw: dict | None, source_ms: int | None) -> dict:
         fades[key] = value
     if end is not None and fades["fade_in_ms"] + fades["fade_out_ms"] > end - in_ms:
         raise AudioEditError("Fade in and fade out together are longer than the trimmed audio.")
-    return {"in_ms": in_ms, "out_ms": out_ms, "volume": volume, **fades}
+    if edit["voice_fx"] not in VOICE_FX:
+        raise AudioEditError("Voice effect must be one of: " + ", ".join(VOICE_FX) + ".")
+    return {"in_ms": in_ms, "out_ms": out_ms, "volume": volume, **fades, "voice_fx": edit["voice_fx"]}
 
 
 def is_default(edit: dict | None) -> bool:
@@ -81,6 +91,8 @@ def narration_filter(edit: dict | None, clip_ms: int) -> str:
     if e["in_ms"] or e["out_ms"] is not None:
         end = f":end={e['out_ms'] / 1000:.3f}" if e["out_ms"] is not None else ""
         parts.append(f"atrim=start={e['in_ms'] / 1000:.3f}{end},asetpts=PTS-STARTPTS")
+    if VOICE_FX.get(e.get("voice_fx", "none")):
+        parts.append(VOICE_FX[e["voice_fx"]])
     if e["volume"] != 100:
         parts.append(f"volume={e['volume'] / 100:.3f}")
     if e["fade_in_ms"]:

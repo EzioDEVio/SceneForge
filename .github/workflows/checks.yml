@@ -35,4 +35,5 @@ jobs:
             python tests/integration/test_old_film.py
             python tests/integration/test_finishing.py
             python tests/integration/test_overlays.py
+            python tests/integration/test_effects_pack.py
           '

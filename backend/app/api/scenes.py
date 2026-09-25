@@ -307,8 +307,10 @@ def _validated_look(scene, look: dict, db) -> dict:
     from copy import deepcopy
     from app.db.models import Asset
     from app.render.filters import ADJUST_RANGES, GLITCH_BLOCKS, clean_adjust
-    if not isinstance(look, dict) or set(look) - {"glitch", "adjust", "lut", "film"}:
-        raise HTTPException(400, "Look settings may only contain glitch, adjust, lut and film.")
+    from app.render.scene_fx import CLEANERS, SceneFxError
+    allowed = {"glitch", "adjust", "lut", "film", *CLEANERS}
+    if not isinstance(look, dict) or set(look) - allowed:
+        raise HTTPException(400, "Look settings may only contain: " + ", ".join(sorted(allowed)) + ".")
     merged = deepcopy(scene.look_json or {})
     if "glitch" in look:
         g = look["glitch"]
@@ -343,6 +345,15 @@ def _validated_look(scene, look: dict, db) -> dict:
                 merged["adjust"] = cleaned
             else:
                 merged.pop("adjust", None)
+    for key, clean in CLEANERS.items():
+        if key in look:
+            if look[key] is None or look[key] == []:
+                merged.pop(key, None)
+            else:
+                try:
+                    merged[key] = clean(look[key])
+                except SceneFxError as e:
+                    raise HTTPException(400, str(e))
     if "film" in look:
         from app.render.filters import FILM_AMOUNTS, FILM_FPS, FILM_TONES, FILM_DEFAULTS
         f = look["film"]
@@ -406,7 +417,7 @@ def graded_frame_endpoint(scene_id: str, w: int = 1280, shot_id: str | None = No
             raise HTTPException(404, "The LUT chosen for this scene is missing.")
         lut_path = str(Path(MEDIA_DIR) / lut_asset.storage_key)
     try:
-        grade = build_grade_lut(look.get("adjust"), lut_path, int(lut.get("strength", 100)), Path(PROXIES_DIR) / "grades")
+        grade = build_grade_lut(look.get("adjust"), lut_path, int(lut.get("strength", 100)), Path(PROXIES_DIR) / "grades", look.get("tone"))
     except CubeError as e:
         raise HTTPException(422, f"The LUT could not be read: {e}")
     asset = shot.asset
