@@ -1,3 +1,27 @@
+# SceneForge Desktop 0.2.0 RC5 (in progress) — Effects pack
+
+## New looks and scene effects (Effects tab)
+- **VHS** look: colour bleed, scanlines, a rolling tracking band and tape noise.
+- **Split toning**: tint shadows and highlights with two colours; shown in the preview.
+- **Camera shake** with optional **impact zoom** at the start.
+- **Spotlight**: darken everything except an oval or box, with soft edges and timing.
+- **Blur or pixelate areas** (up to 6) to hide faces, names or number plates.
+- **Light leaks**: warm, cool or rainbow light drifting in from the edges.
+- Spotlight, blur areas and light leaks are previewed live in the editor.
+
+## Transitions
+- Wind, Slice, Open, Close and Quick fade (25 in total).
+
+## Overlays
+- **Glide** from one position to another during the overlay's time, **green screen** (make a colour transparent), and **soft edges**.
+
+## Narration and captions
+- **Voice effect** per take (Audio tab): Clean up, 1940s radio / newsreel, Telephone.
+- **Caption style** for word-by-word: Colour fill, Pop (the current word grows), Glow (the current word glows).
+
+## Tests
+- `tests/integration/test_effects_pack.py` (28 real-render checks, in CI); 8 new component checks (108 total). Build ID `rc5-effects-6`.
+
 # SceneForge Desktop 0.2.0 RC5 (in progress) — caption timing, roomier editor
 
 ## Word-by-word captions follow the real voice
