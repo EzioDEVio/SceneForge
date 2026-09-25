@@ -50,6 +50,16 @@ def cap(t_):
 early,late=cap(0.5),cap(4.8)
 check('spoken words turn to the highlight colour over time',early[0]==0 and early[1]>0 and late[0]>early[0]+200)
 
+# measured word timing: speech 1.5 s, pause 1 s, speech 1.5 s inside a 9.8 s fixed scene
+from app.render.word_timing import voiced_segments
+import itertools
+ff('-f','lavfi','-i','sine=f=300:d=1.5','-f','lavfi','-i','anullsrc=r=44100:cl=mono:d=1','-f','lavfi','-i','sine=f=300:d=1.5','-filter_complex','[0][1][2]concat=n=3:v=0:a=1',str(t/'sp.wav'))
+segs=voiced_segments(str(t/'sp.wav'))
+check('speech and pauses are found in the narration audio',len(segs)==2 and abs(segs[0][1]-1500)<=40 and abs(segs[1][0]-2500)<=40)
+write_ass_file('w','one two three four five six',9800,{'karaoke':True},640,360,out_path=str(t/'w.ass'),speech_start_ms=250,speech_ms=4000,speech_segments=[(a+250,b+250) for a,b in segs])
+st=list(itertools.accumulate(int(x) for x in re.findall(r'\\k(\d+)',(t/'w.ass').read_text(encoding='utf-8-sig'))))
+check('highlight waits through the pause and ends with the voice, not the 9.8 s scene',abs(st[3]-275)<=3 and abs(st[-1]-425)<=3)
+
 # --- project with narration for export checks --------------------------------
 p=client.post('/api/projects',json={'title':'Finish','aspect':'16:9'}).json();pid=p['id']
 ff('-f','lavfi','-i','testsrc2=s=640x360','-frames:v','1',str(t/'a.png'))

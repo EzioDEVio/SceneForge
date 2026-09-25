@@ -120,7 +120,7 @@ export function OverlayPanel({scene, overlays, selected, onSelect, onChange, dis
         <button className="icon-reset" aria-label={`Delete overlay ${i + 1}`} disabled={disabled} onClick={() => {onChange(overlays.filter((_, k) => k !== i)); onSelect(Math.max(0, Math.min(selected, overlays.length - 2)));}}><Trash2 size={12}/></button>
       </li>)}
     </ul>}
-    {o && <>
+    {o && <div className="panel-grid">
       <fieldset className="adjust-group"><legend>Position & size</legend>
         {num('x', 'Left–right', -20, 120, 0.5, '%')}{num('y', 'Up–down', -20, 120, 0.5, '%')}{num('width', 'Size', 3, 100, 0.5, '%')}
         {num('rotation', 'Rotation', -180, 180, 1, '°')}{num('opacity', 'Opacity', 0, 100, 1, '%')}
@@ -141,7 +141,7 @@ export function OverlayPanel({scene, overlays, selected, onSelect, onChange, dis
           </div></div>)}
         {num('anim_ms', 'Anim. length', 0, 3000, 100, 'ms')}
       </fieldset>
-      <p className="hint">Videos play silently and loop. Render the scene for the final result.</p>
-    </>}
+    </div>}
+    {o && <p className="hint">Videos play silently and loop. Render the scene for the final result.</p>}
   </div>;
 }

@@ -166,3 +166,44 @@
 .overlay-list li.selected{border-color:#8472c1;background:#2e2a3a}
 .overlay-pick{display:flex;align-items:center;gap:8px;background:none;border:0;color:var(--text);font-size:11px;text-align:left;min-width:0}.overlay-pick img{width:40px;height:24px;object-fit:cover;border-radius:3px}
 .overlay-panel .adjust-row .unit{font-size:10px;color:var(--muted)}
+
+/* ---- Scene settings: resizable, roomier, modern controls ---- */
+.studio-shell .inspector{position:relative}
+.inspector-resizer{position:absolute;left:-4px;top:0;bottom:0;width:8px;cursor:col-resize;z-index:20}
+.inspector-resizer::after{content:"";position:absolute;left:3px;top:0;bottom:0;width:2px;background:transparent;transition:background .15s}
+.inspector-resizer:hover::after,.inspector-resizer:focus-visible::after,body.resizing-inspector .inspector-resizer::after{background:#8f7cf0}
+body.resizing-inspector{cursor:col-resize;user-select:none}
+body.resizing-inspector iframe,body.resizing-inspector video{pointer-events:none}
+.studio-shell .inspector-body{container-type:inline-size;container-name:inspector}
+/* groups become cards */
+.studio-shell .adjust-group{border:1px solid #3a3e48;border-radius:8px;background:#2d3038;padding:8px 10px 10px;margin:10px 0 0;min-width:0}
+.studio-shell .adjust-group legend{padding:0 6px;font-size:10px;letter-spacing:.06em;text-transform:uppercase;color:#a9b0bf}
+.adjust-row{grid-template-columns:minmax(64px,32%) minmax(0,1fr) 60px 18px;min-height:30px}
+.adjust-row input[type=number]{width:60px;padding:4px 6px;border-radius:6px}
+.adjust-row label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* choice groups wrap as pills instead of squashing */
+.film-option{grid-template-columns:1fr;gap:5px;margin-top:10px}
+.look-panel .film-option .segmented,.overlay-panel .film-option .segmented{display:flex;flex-wrap:wrap;gap:4px;padding:0;background:transparent}
+.look-panel .film-option .segmented button,.overlay-panel .film-option .segmented button{flex:0 0 auto;white-space:nowrap;padding:5px 11px;border:1px solid #444956;border-radius:999px;background:#262930;color:#c9cfdb}
+.look-panel .film-option .segmented button.selected,.overlay-panel .film-option .segmented button.selected{background:#5b49d6;border-color:#7b69ea;color:#fff}
+.audio-times input{width:84px}
+/* wide panel: sections sit side by side */
+@container inspector (min-width:540px){
+  .panel-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 12px;align-items:start}
+  .look-panel{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:0 16px;align-items:start}
+  .look-panel .look-section{border-bottom:0}
+}
+@container inspector (min-width:720px){.panel-grid{grid-template-columns:repeat(3,minmax(0,1fr))}}
+
+/* ---- Narration script card ---- */
+.studio-shell .script-card{flex:0 0 132px;border-radius:8px;border-color:#434858;border-left:3px solid #8f7cf0;padding:8px 12px 7px;transition:flex-basis .2s}
+.studio-shell .script-card.expanded{flex-basis:44%}
+.studio-shell .script-card .script-heading{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.studio-shell .script-card h3{font-size:12px;margin-right:auto;display:flex;align-items:center;gap:6px}
+.script-chip{font-size:10px;padding:2px 8px;border-radius:999px;background:#343845;color:#b9c0cf}
+.script-chip.ok{background:#1f3a2e;color:#8fe3bb}.script-chip.warn{background:#4a3517;color:#ffcf7a}
+.studio-shell .script-box{font-size:13px;line-height:1.6;padding:4px 0}
+.studio-shell .script-card.expanded .script-box{font-size:14px}
+.script-footer{display:flex;align-items:center;justify-content:space-between;gap:8px}
+.script-footer .script-voice{font-size:11px;padding:5px 10px;display:inline-flex;align-items:center;gap:4px}
+@media(max-height:800px){.studio-shell .script-card{flex-basis:112px}}

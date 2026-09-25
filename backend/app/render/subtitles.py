@@ -43,6 +43,7 @@ def write_ass_file(
     typewriter: bool = False,
     speech_start_ms: int = 0,
     speech_ms: int | None = None,
+    speech_segments: list[tuple[int, int]] | None = None,
 ) -> str:
     family = font_json.get("family", "Noto Naskh Arabic")
     size = int(font_json.get("size", 44))
@@ -99,11 +100,22 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         weights = [len(w) + 2 for w in words]
         total = sum(weights)
         hi = _hex_to_ass_color(font_json.get("highlight_color", "#FFD84D"), alpha=0)
-        lead_cs = start // 10
-        parts = [f"{{\\1c{hi}\\2c{primary}\\k{lead_cs}}}"]
-        for i, (word, weight) in enumerate(zip(words, weights)):
+        if speech_segments:
+            # Measured: words placed on the spoken parts of the narration.
+            from app.render.word_timing import word_starts
+            starts = word_starts(weights, speech_segments)
+            ends = starts[1:] + [speech_segments[-1][1]]
+        else:
+            # No audio to measure: share the span out by word length.
+            starts, t = [], start
+            for weight in weights:
+                starts.append(t)
+                t += span * weight / total
+            ends = starts[1:] + [start + span]
+        parts = [f"{{\\1c{hi}\\2c{primary}\\k{max(0, round(starts[0] / 10))}}}"]
+        for i, word in enumerate(words):
             first, tagged = tag_runs(word + (" " if i < len(words) - 1 else ""), family, escape_text)
-            parts.append(f"{{\\k{max(1, round(span * weight / total / 10))}\\fn{first}}}{tagged}")
+            parts.append(f"{{\\k{max(1, round((ends[i] - starts[i]) / 10))}\\fn{first}}}{tagged}")
         events = [f"Dialogue: 0,{ts(0)},{ts(duration_ms)},Default,,0,0,0,,{''.join(parts)}\n"]
     elif not typewriter or not text.strip():
         events = [f"Dialogue: 0,{ts(0)},{ts(duration_ms)},Default,,0,0,0,,{runs(text, family)}\n"]

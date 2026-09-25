@@ -1,3 +1,15 @@
+# SceneForge Desktop 0.2.0 RC5 (in progress) — caption timing, roomier editor
+
+## Word-by-word captions follow the real voice
+- Fixed: in scenes with a fixed length longer than the narration, the highlight was spread over the whole scene and finished late.
+- Word timing is now measured from the narration audio: SceneForge finds where the voice speaks and where it pauses and places the words on the spoken parts. The highlight waits during pauses and ends when the voice ends. Works with every voice engine (ElevenLabs, Chatterbox, Kokoro, uploads) and language, including Arabic. Trimmed takes are respected.
+
+## Editor layout
+- **Scene settings is resizable**: drag its left edge (280–760 px), double-click to reset, arrow keys for fine steps. The width is remembered.
+- When the panel is wide, groups sit side by side (two or three columns).
+- Controls are grouped into cards; number boxes are wider; choice buttons (animations, tone, frame rate) wrap as pills instead of squashing.
+- **Narration script** card is taller, has **Expand**, and shows the word count, the estimated speaking time, and the voice status (length, or "Script changed · generate a new voice"), with a clear **Generate voice** button.
+
 # SceneForge Desktop 0.2.0 RC5 (in progress) — Picture in picture
 
 ## Overlays (new Overlays tab)

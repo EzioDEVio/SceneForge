@@ -10,6 +10,7 @@ import {AudioClipEditor, removeSceneAudio} from "./AudioClipEditor";
 import {FilmPreview, filmToneFilter} from "./FilmPreview";
 import {FinishingPanel} from "./FinishingPanel";
 import {OverlayCanvas, OverlayPanel} from "./Overlays";
+import {InspectorResizer} from "./InspectorResizer";
 import type {Overlay} from "./api";
 import {sceneDuration} from "./duration";
 import {TitleDesigner,TitleDesign,ANIMATIONS} from './TitleDesigner';
@@ -558,6 +559,8 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
   const [tab, setTab] = useState<InspectorTab>("Media");
   const [chatOpen, setChatOpen] = useState(false);
   const [text, setText] = useState(scene.spoken_text || scene.original_text);
+  const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
+  const speakSeconds = wordCount / 2.5;   // natural narration pace, about 150 words a minute
   const [captions, setCaptions] = useState(scene.subtitle_text);
   const [draftLayers,setDraftLayers]=useState(scene.font_json.layers||[]);
   const [search, setSearch] = useState("");
@@ -595,6 +598,8 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
   const isGenerating = !!job && ["queued", "running", "cancelling"].includes(job.status);
   const rendered = scene.rendered_asset_id;
   const acceptedTake = scene.voice_takes.find(t => t.accepted);
+  const [scriptOpen, setScriptOpen] = useState(() => {try {return localStorage.getItem("sceneforge.scriptOpen") === "1";} catch {return false;}});
+  useEffect(() => {try {localStorage.setItem("sceneforge.scriptOpen", scriptOpen ? "1" : "0");} catch {/* storage unavailable */}}, [scriptOpen]);
   // Overlays are edited live (canvas drag + panel); the draft is saved with the scene.
   const [ovDraft, setOvDraft] = useState<Overlay[] | null>(null);
   const [ovSelected, setOvSelected] = useState(0);
@@ -738,13 +743,19 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
         </div>
         {isGenerating && <progress aria-label="Scene rendering progress" max={100} value={job?.progress || 0}/>}
         {(error || job?.status === "failed") && <div role="alert" className="error-box"><details><summary>Render/save failed — show details</summary><pre>{error || job?.error}</pre></details><button className="text-btn" onClick={()=>{setError(null);setJobId(null);}}>Dismiss</button>{error && <button className="text-btn" onClick={async () => { setError(null); await flush(); }}>Retry text save / dismiss</button>}</div>}
-        <section className="script-card">
-          <div className="section-heading"><h3><FileText size={16}/> Narration script</h3><span className="subtle">{text.trim() ? text.trim().split(/\s+/).length : 0} words</span></div>
+        <section className={`script-card ${scriptOpen ? "expanded" : ""}`} aria-label="Narration script">
+          <div className="section-heading script-heading">
+            <h3><FileText size={16}/> Narration script</h3>
+            <span className="script-chip">{wordCount} words · ≈ {speakSeconds.toFixed(0)} s spoken</span>
+            {acceptedTake ? <span className={`script-chip ${acceptedTake.stale ? "warn" : "ok"}`}>{acceptedTake.stale ? "Script changed · generate a new voice" : `Voice ${(((acceptedTake.effective_duration_ms ?? acceptedTake.measured_duration_ms) || 0) / 1000).toFixed(1)} s`}</span> : wordCount > 0 && <span className="script-chip">No voice yet</span>}
+            <button className="text-btn script-expand" aria-expanded={scriptOpen} onClick={() => setScriptOpen(!scriptOpen)}>{scriptOpen ? "Collapse" : "Expand"}</button>
+          </div>
           <textarea aria-label="Narration script" dir="auto" className="script-box" value={text} onChange={e => {setText(e.target.value); draft({original_text: e.target.value, spoken_text: e.target.value});}} onBlur={() => void flush()} placeholder="Tell your story. Paste or write the narration for this scene…"/>
-          <div className="script-footer"><span>Changes save automatically. After editing narration, generate a new voice take.</span><button className="text-btn" onClick={async () => {if (await flush()) setTab("Audio");}}><Volume2 size={14}/> Voice & narration <ChevronRight size={14}/></button></div>
+          <div className="script-footer"><span>Saves automatically. After editing, generate a new voice so the audio matches.</span><button className="btn primary script-voice" onClick={async () => {if (await flush()) setTab("Audio");}}><Volume2 size={14}/> {acceptedTake ? "Voice & narration" : "Generate voice"} <ChevronRight size={14}/></button></div>
         </section>
       </div>
       <aside className="inspector" aria-label="Scene inspector">
+        <InspectorResizer/>
         <div className="inspector-heading"><span className="eyebrow">SCENE SETTINGS</span><span className="subtle">{durationLabel(scene)}</span></div>
         <div className="inspector-tabs" role="tablist" aria-label="Scene tools">
           {INSPECTOR_TABS.map(({name, Icon}) => <button key={name} role="tab" id={`${scene.id}-${name}-tab`} aria-controls={`${scene.id}-panel`} aria-selected={tab === name} onClick={() => setTab(name)} onKeyDown={e => {

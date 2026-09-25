@@ -297,6 +297,16 @@ def _render_single_shot(
     run_ffmpeg(args, cancel_check=ctx.cancel_check, on_progress=on_ffmpeg_progress)
 
 
+def _speech_segments(scene: Scene, narration_path: str, lead_ms: int, total_ms: int) -> list[tuple[int, int]] | None:
+    """Spoken spans of the accepted take (after its trim), in scene time."""
+    from app.render.word_timing import voiced_segments
+    take = _accepted_take(scene)
+    edit = (take.edit_json if take else None) or {}
+    segs = voiced_segments(narration_path, int(edit.get("in_ms") or 0), edit.get("out_ms"))
+    segs = [(s + lead_ms, min(e + lead_ms, total_ms)) for s, e in segs if s + lead_ms < total_ms]
+    return segs or None
+
+
 def mux_audio_and_captions(
     scene: Scene,
     project: Project,
@@ -315,7 +325,8 @@ def mux_audio_and_captions(
             out_path=str(work_dir / f"{scene.id}_captions.ass"),
             typewriter=bool(scene.font_json.get("typewriter", False)),
             speech_start_ms=lead_ms if narration_path else 0,
-            speech_ms=(total_duration_ms - lead_ms - (scene.trail_ms if scene.trail_ms is not None else 400)) if narration_path else None,
+            speech_ms=_narration_duration_ms(scene)[0] if narration_path else None,
+            speech_segments=_speech_segments(scene, narration_path, lead_ms, total_duration_ms) if narration_path and scene.font_json.get("karaoke") else None,
         )
         fonts_dir = escape_path_for_filter(str(BUNDLED_FONT_PATH.parent))
         ass_escaped = escape_path_for_filter(ass_path)
