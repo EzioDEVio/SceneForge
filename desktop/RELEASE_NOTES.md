@@ -1,3 +1,27 @@
+# SceneForge Desktop 0.2.0 RC5 (in progress) — Batch B and C
+
+## Pictures
+- **3D photo (parallax)**: mark the subject of a still photo; the background behind it is filled in automatically and the two layers move at different depths (push in, pull out, drift left or right).
+- **Restore old photo** (Media tab): a cleaned-up copy with less noise, dust and scratches removed, recovered contrast, sharper detail, and small scans upscaled. The original is kept.
+- **Colour wheels**: lift, gamma and gain, shown in the preview.
+- **Split screen**: side by side, top & bottom, three panels, or a 2 × 2 grid, with gap and background colour.
+
+## Motion and timing
+- **Clip speed** for video clips (Motion tab): 0.25×–4×, a slow-motion or fast moment in the middle, and freeze frames. Scene length does not change.
+- **Map route**: a line draws itself across the picture with pins popping in at each stop. Click the preview to add stops and drag them to adjust; solid or dashed, colour, width, start and draw time.
+- **Sync scene cuts to the beat** (Audio → Music & finishing): finds the tempo of the background music and moves fixed-length scene cuts onto beats. Narrated scenes keep their length.
+
+## Captions
+- **Exact word timing with ElevenLabs**: new ElevenLabs voices include per-word timings, and word-by-word captions follow them exactly when the caption matches the narration. Other voices keep the speech/pause detection.
+
+## Fixes
+- The VHS look's rolling tracking band never appeared (FFmpeg evaluates drawbox positions only once); it is now drawn with a per-frame overlay.
+
+## Notes
+- New dependency: OpenCV (headless), about 70 MB, for 3D photo and photo restore. Run `scripts\setup.bat` again after updating.
+- Colorizing black & white photos and automatic subject detection need AI models and are not included yet.
+- Build ID `rc5-batchbc-7`. New tests: `test_batch_b.py` (27 real-render checks); 7 component checks (115 total).
+
 # SceneForge Desktop 0.2.0 RC5 (in progress) — Effects pack
 
 ## New looks and scene effects (Effects tab)
