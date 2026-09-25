@@ -1,6 +1,7 @@
 # Builds SceneForge Studio for Windows, Linux and macOS and attaches the installers
-# to a DRAFT GitHub Release. Review the draft, then click "Publish release":
-# only published releases are offered to users' apps as updates.
+# to a DRAFT GitHub Release. Every job also runs an end-to-end test of real editor work
+# in the packaged app. Publish the draft ONLY when every job is green: only published
+# releases are offered to users' apps as updates.
 #
 #   Release:  push a tag that matches desktop/package.json, e.g.  git tag v0.3.0 && git push origin v0.3.0
 #   Beta:     a version with a suffix (0.3.1-beta.1) becomes a pre-release, offered only to
@@ -82,6 +83,18 @@ jobs:
           publish=never
           case "$GITHUB_REF" in refs/tags/v*) publish=always;; esac
           cd desktop && npx electron-builder ${{ matrix.target }} --publish "$publish"
+      - name: Real editor work in the packaged Linux app (end-to-end, time-limited)
+        if: runner.os == 'Linux'
+        run: |
+          appimage=$(ls desktop/release/*.AppImage | head -1)
+          (cd "$RUNNER_TEMP" && "$GITHUB_WORKSPACE/$appimage" --appimage-extract >/dev/null)
+          app="$RUNNER_TEMP/squashfs-root/resources"
+          dbus-run-session -- bash -c "printf ci | gnome-keyring-daemon --unlock --components=secrets >/dev/null; python desktop/tests/e2e_backend.py --exe $app/backend/sceneforge-backend --ffmpeg-dir $app/ffmpeg/bin --resources $app/app-resources"
+      - name: Real editor work in the macOS build (end-to-end, time-limited)
+        if: runner.os == 'macOS'
+        run: |
+          app=$(ls -d desktop/release/mac*/*.app | head -1)/Contents/Resources
+          python desktop/tests/e2e_backend.py --exe "$app/backend/sceneforge-backend" --ffmpeg-dir "$app/ffmpeg/bin" --resources "$app/app-resources"
       - name: Start the installed Linux app
         if: runner.os == 'Linux'
         run: |
@@ -102,6 +115,10 @@ jobs:
           if (-not $app.WaitForExit(90000)) { Stop-Process -Id $app.Id; throw 'Startup timed out' }
           $report = Get-Content $env:SCENEFORGE_SMOKE_REPORT | ConvertFrom-Json
           if (-not $report.ok) { throw "App failed: $($report.error)" }
+          # Real editor work in the INSTALLED app's backend (import, thumbnails, effects, preview, render)
+          $res = Join-Path $installDir 'resources'
+          python desktop/tests/e2e_backend.py --exe (Join-Path $res 'backend/sceneforge-backend.exe') --ffmpeg-dir (Join-Path $res 'ffmpeg/bin') --resources (Join-Path $res 'app-resources')
+          if ($LASTEXITCODE -ne 0) { throw 'End-to-end editor test failed in the installed app' }
       - uses: actions/upload-artifact@v4
         with:
           name: SceneForge-Studio-${{ matrix.name }}

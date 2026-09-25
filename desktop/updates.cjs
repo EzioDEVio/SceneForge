@@ -66,6 +66,24 @@ function backupDatabase(workspaceDir, label, now = new Date()) {
   return target;
 }
 
+/** Once per workspace: switch off Stable Diffusion's automatic start (a heavy engine that
+ *  can make the whole computer slow while it starts). Returns true when it was switched off,
+ *  so the app can explain how to turn it back on. */
+function reviewSdAutostart(workspaceDir) {
+  const stateFile = path.join(workspaceDir, 'app-state.json');
+  const state = readJSON(stateFile, {});
+  if (state.sdAutostartReviewed) return false;
+  const sdFile = path.join(workspaceDir, 'local-images.json');
+  const sd = readJSON(sdFile, null);
+  let changed = false;
+  if (sd && sd.autostart) {
+    writeJSON(sdFile, {...sd, autostart: false});
+    changed = true;
+  }
+  writeJSON(stateFile, {...state, sdAutostartReviewed: true});
+  return changed;
+}
+
 function loadSettings(userDataDir) { return readJSON(path.join(userDataDir, 'update-settings.json'), {beta: false}); }
 function saveSettings(userDataDir, settings) { writeJSON(path.join(userDataDir, 'update-settings.json'), settings); }
 
@@ -119,4 +137,4 @@ function setupUpdates({app, dialog, shell, getWindow, workspaceDir, userDataDir,
   return {check, setBeta, beta: () => !!loadSettings(userDataDir).beta};
 }
 
-module.exports = {migrateLegacyWorkspace, backupOnVersionChange, backupDatabase, loadSettings, saveSettings, setupUpdates, KEEP_BACKUPS, RELEASES_URL};
+module.exports = {migrateLegacyWorkspace, backupOnVersionChange, reviewSdAutostart, backupDatabase, loadSettings, saveSettings, setupUpdates, KEEP_BACKUPS, RELEASES_URL};
