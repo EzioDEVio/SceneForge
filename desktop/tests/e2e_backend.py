@@ -40,7 +40,15 @@ def request(method, path, body=None, files=None, timeout=60):
         return json.loads(raw) if r.headers.get("content-type", "").startswith("application/json") else raw
 
 
+timeouts = 0
+
+
 def step(name, limit, fn):
+    global timeouts
+    if timeouts >= 2:   # the backend has stopped answering: skip the rest (its log explains why)
+        print(f"   ----   skipped (backend not answering) {name}", flush=True)
+        failures.append(f"{name}: skipped, backend not answering")
+        return None
     start = time.time()
     try:
         out = fn()
@@ -51,6 +59,8 @@ def step(name, limit, fn):
     except Exception as e:  # noqa: BLE001
         took, out, status = time.time() - start, None, f"FAILED: {e}"
         failures.append(f"{name}: {e}")
+        if "timed out" in str(e):
+            timeouts += 1
     print(f"{took:7.2f}s  {status:<24} {name}", flush=True)
     return out
 
@@ -105,6 +115,6 @@ finally:
 
 if failures:
     print("\nFAILED:\n  " + "\n  ".join(failures))
-    print("\nbackend log:\n" + open(os.path.join(data, "backend-stderr.log"), errors="replace").read()[-4000:])
+    print("\nbackend log:\n" + open(os.path.join(data, "backend-stderr.log"), errors="replace").read()[-12000:])
     sys.exit(1)
 print("\nAll end-to-end steps passed.")
