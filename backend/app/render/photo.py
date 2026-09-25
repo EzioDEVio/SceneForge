@@ -131,34 +131,92 @@ def parallax_clip(src: str, px: dict, w: int, h: int, fps: int, seconds: float, 
     return str(out)
 
 
+def _noise_sigma(gray: np.ndarray) -> float:
+    """Immerkaer's fast noise estimate: the photo's own grain level."""
+    cv2 = _cv2()
+    kernel = np.array([[1, -2, 1], [-2, 4, -2], [1, -2, 1]], np.float32)
+    r = cv2.filter2D(gray.astype(np.float32), -1, kernel)[1:-1, 1:-1]
+    return float(np.sqrt(np.pi / 2) * np.abs(r).mean() / 6)
+
+
+def dust_mask(gray: np.ndarray, sigma: float, max_fraction: float = 0.005) -> np.ndarray:
+    """Conservative dust detection. A pixel is only called dust when it is a
+    tiny isolated speck that stands out strongly against a SMOOTH area (sky,
+    smoke, walls). Anything inside texture (ground, clothing, foliage) is real
+    detail and left alone. Never marks more than max_fraction of the photo."""
+    cv2 = _cv2()
+    med = cv2.medianBlur(gray, 5)
+    diff = np.abs(gray.astype(np.int16) - med.astype(np.int16)).astype(np.float32)
+    # local texture of the smoothed picture: dust in texture is not worth the risk
+    m32 = med.astype(np.float32)
+    local_std = np.sqrt(np.maximum(cv2.blur(m32 * m32, (15, 15)) - cv2.blur(m32, (15, 15)) ** 2, 0))
+    cand = ((diff > max(35.0, 4.5 * sigma)) & (local_std < 10)).astype(np.uint8)
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(cand, connectivity=8)
+    max_area = max(4, int(gray.size * 0.00002))
+    keep = np.zeros(n, bool)
+    strength = np.zeros(n, np.float32)
+    for i in range(1, n):
+        x, y, w, h, area = stats[i]
+        if area <= max_area and w <= 7 and h <= 7:
+            keep[i] = True
+            strength[i] = diff[labels == i].max()
+    # cap the total: keep only the strongest specks if there are too many
+    budget = int(gray.size * max_fraction)
+    order = np.argsort(-strength)
+    total = 0
+    for i in order:
+        if not keep[i]:
+            continue
+        if total + stats[i][4] > budget:
+            keep[i] = False
+        else:
+            total += stats[i][4]
+    mask = keep[labels].astype(np.uint8) * 255
+    return cv2.dilate(mask, np.ones((3, 3), np.uint8))
+
+
 def restore_photo(src: str, dest: str) -> dict:
-    """Denoise, remove dust/scratches, recover contrast, sharpen, upscale small
-    scans. Returns a short report."""
+    """Careful restoration: remove isolated dust specks, reduce grain in
+    proportion to the photo's measured noise, gently recover contrast, mildly
+    sharpen and upscale small scans. Black-and-white photos stay black and
+    white. When in doubt a pixel is left alone."""
     cv2 = _cv2()
     img = _load(src)
     h, w = img.shape[:2]
-    report = {"size_before": [w, h]}
-    img = cv2.fastNlMeansDenoisingColored(img, None, 6, 6, 7, 21)
-    # dust and thin scratches: small bright/dark features that stand out from their surroundings
-    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-    k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (9, 9))
-    spots = cv2.max(cv2.morphologyEx(gray, cv2.MORPH_TOPHAT, k), cv2.morphologyEx(gray, cv2.MORPH_BLACKHAT, k))
-    _, mask = cv2.threshold(spots, 40, 255, cv2.THRESH_BINARY)
-    mask = cv2.dilate(mask, np.ones((3, 3), np.uint8))
+    mono = float(np.abs(img[..., 0].astype(np.int16) - img[..., 2]).mean()) < 3 and \
+        float(np.abs(img[..., 1].astype(np.int16) - img[..., 2]).mean()) < 3
+    work = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY) if mono else img
+    gray = work if mono else cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    sigma = _noise_sigma(gray)
+    report = {"size_before": [w, h], "black_and_white": mono, "noise_level": round(sigma, 1)}
+    # 1. dust first, on the original pixels
+    mask = dust_mask(gray, sigma)
     report["dust_pixels_fixed"] = int((mask > 0).sum())
+    report["dust_fraction"] = round(float((mask > 0).mean()), 5)
     if report["dust_pixels_fixed"]:
-        img = cv2.inpaint(img, mask, 3, cv2.INPAINT_TELEA)
-    lab = cv2.cvtColor(img, cv2.COLOR_BGR2LAB)
-    lab[..., 0] = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8)).apply(lab[..., 0])
-    img = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+        work = cv2.inpaint(work, mask, 3, cv2.INPAINT_TELEA)
+    # 2. grain reduction scaled to the measured noise (light touch keeps texture)
+    hstr = float(np.clip(0.8 * sigma, 2.0, 10.0))
+    work = cv2.fastNlMeansDenoising(work, None, hstr, 7, 21) if mono else \
+        cv2.fastNlMeansDenoisingColored(work, None, hstr, hstr, 7, 21)
+    # 3. gentle local contrast, blended back so it never looks processed
+    if mono:
+        eq = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8)).apply(work)
+        work = cv2.addWeighted(work, 0.4, eq, 0.6, 0)
+    else:
+        lab = cv2.cvtColor(work, cv2.COLOR_BGR2LAB)
+        eq = cv2.createCLAHE(clipLimit=1.5, tileGridSize=(8, 8)).apply(lab[..., 0])
+        lab[..., 0] = cv2.addWeighted(lab[..., 0], 0.4, eq, 0.6, 0)
+        work = cv2.cvtColor(lab, cv2.COLOR_LAB2BGR)
+    # 4. upscale small scans, then mild sharpening (small radius avoids halos)
     if max(w, h) < 1600:
         f = min(2.0, 1600 / max(w, h))
-        img = cv2.resize(img, None, fx=f, fy=f, interpolation=cv2.INTER_LANCZOS4)
-    blur = cv2.GaussianBlur(img, (0, 0), 1.2)
-    img = cv2.addWeighted(img, 1.5, blur, -0.5, 0)
-    ok, buf = cv2.imencode(".png", img)
+        work = cv2.resize(work, None, fx=f, fy=f, interpolation=cv2.INTER_LANCZOS4)
+    blur = cv2.GaussianBlur(work, (0, 0), 1.0)
+    work = cv2.addWeighted(work, 1.35, blur, -0.35, 0)
+    ok, buf = cv2.imencode(".png", work)
     if not ok:
         raise PhotoError("The restored photo could not be saved.")
     buf.tofile(dest)
-    report["size_after"] = [img.shape[1], img.shape[0]]
+    report["size_after"] = [work.shape[1], work.shape[0]]
     return report

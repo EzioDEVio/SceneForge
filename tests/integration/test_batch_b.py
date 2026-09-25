@@ -145,16 +145,27 @@ check('subject layer has a soft transparent edge',fga[200,320,3]>240 and fga[20,
 client.patch(f'/api/scenes/{sid}',json={'look':{'parallax':None}})
 
 # --- photo restore ------------------------------------------------------------------------
-rng=np.random.default_rng(3);old=np.clip(np.full((300,400,3),128.0)+rng.normal(0,18,(300,400,3)),0,255)
-old=(old*0.6+50).astype(np.uint8)                       # low contrast, noisy
-for _ in range(60):                                      # dust specks
- y,x=rng.integers(5,295),rng.integers(5,395);old[y-1:y+2,x-1:x+2]=255
-Image.fromarray(old).save(t/'old.png');oldid=up('old.png')['id']
+# A textured black & white "photo": smooth sky on top, detailed ground below (like real war photos),
+# with dust specks in the sky. Restore must remove the dust and keep the ground detail.
+rng=np.random.default_rng(3)
+yy,xx=np.mgrid[0:600,0:800]
+sky=160+30*np.sin(xx/140.0)+rng.normal(0,4,(600,800))
+ground=110+45*np.sign(np.sin(xx/3.1)*np.sin(yy/2.7))+rng.normal(0,6,(600,800))      # fine high-contrast texture
+photo=np.where(yy<300,sky,ground)
+dust=[(rng.integers(20,280),rng.integers(20,780)) for _ in range(40)]
+for y,x in dust:photo[y-1:y+2,x-1:x+2]=250
+Image.fromarray(np.clip(photo,0,255).astype(np.uint8)).convert('RGB').save(t/'old.jpg',quality=95);oldid=up('old.jpg')['id']
 r=client.post(f'/api/assets/{oldid}/restore');rest=r.json()
 check('restore creates a new photo and keeps the original',r.status_code==200 and rest['id']!=oldid and rest['original_filename']=='old (restored).png')
 ra=np.asarray(Image.open(io.BytesIO(client.get(f"/api/assets/{rest['id']}/stream").content)).convert('RGB')).astype(float)
-check('restore upscales small scans',ra.shape[1]>=800)
-small=cv2.resize(ra,(400,300),interpolation=cv2.INTER_AREA)
-check('restore removes dust specks and noise',(small.min(axis=2)>245).sum()<10 and small.std()<old.astype(float).std())
+check('restore upscales small scans and keeps black & white as black & white',ra.shape[1]>=1200 and np.abs(ra[...,0]-ra[...,2]).mean()<1)
+small=cv2.resize(ra,(800,600),interpolation=cv2.INTER_AREA).mean(axis=2)
+check('restore removes the dust specks from the smooth sky',max(small[y,x]-np.median(small[y-6:y+7,x-6:x+7]) for y,x in dust)<40)
+lap=lambda a:np.abs(cv2.Laplacian(a.astype(np.float32),cv2.CV_32F)).mean()
+kept=lap(small[320:580,20:780])/lap(photo[320:580,20:780])
+check(f'restore keeps the fine ground detail (kept {kept*100:.0f}%; the old method smeared textured areas)',kept>0.85)
+from app.render.photo import dust_mask,_noise_sigma
+g=np.clip(photo,0,255).astype(np.uint8)
+check('dust detection never marks textured areas',(dust_mask(g,_noise_sigma(g))[300:]>0).mean()<0.001)
 check('restore rejects non-photos',client.post(f"/api/assets/{music['id']}/restore").status_code==400)
 print(f'{n} batch B/C checks passed')

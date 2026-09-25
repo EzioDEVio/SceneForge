@@ -1,3 +1,12 @@
+# SceneForge Desktop 0.2.0 RC5 (in progress) — photo restore rewritten
+
+- **Restore old photo** no longer damages detailed photos. The previous version treated fine detail (debris, clothing, branches) as dust and smeared it; on a real WWII photo it "repaired" 23 % of the picture. Now:
+  - dust is only removed where it is a tiny isolated speck on a smooth area (sky, smoke, walls), never inside texture, and never more than 0.5 % of the photo;
+  - grain reduction is scaled to the photo's measured noise;
+  - black-and-white photos are processed and saved as black and white;
+  - contrast and sharpening are gentler (no halos).
+  On the same WWII photo, 94–105 % of the detail is kept.
+
 # SceneForge Desktop 0.2.0 RC5 (in progress) — split screen and photo restore fixes
 
 - **Split screen**: the editor preview now shows the layout. When a scene has only one picture, an **Add another image or video to this scene** button appears under Split screen, and the hint says how many pictures the scene has.
