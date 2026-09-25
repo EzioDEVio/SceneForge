@@ -1,0 +1,19 @@
+PASS health
+PASS create/open with three scenes
+PASS separate narration and caption fields
+PASS narration update preserves captions
+PASS editing isolated to selected scene
+PASS media/motion/fit persist
+PASS font patch preserves family and size
+PASS uploaded narration selected
+PASS render/export job succeeded
+PASS real MP4 has video and audio
+PASS fixed duration respected
+PASS render no longer stale
+PASS effect change marks previous render stale
+PASS reordering preserves scene identities
+PASS render/export job succeeded
+PASS export provides downloadable artifact
+PASS project, media, captions and render survive restart
+PASS unconfigured image provider reports a real error
+18 checks passed
