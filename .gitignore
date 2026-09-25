@@ -17,3 +17,9 @@ frontend/dist/
 *_backups/
 .pytest_cache/
 .venv/
+
+desktop/node_modules/
+desktop/build/
+desktop/vendor/
+desktop/release/
+*.spec

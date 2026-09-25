@@ -46,6 +46,8 @@ class Project(Base):
     height: Mapped[int] = mapped_column(Integer, default=1080)
     revision: Mapped[int] = mapped_column(Integer, default=1)
     default_font_json: Mapped[dict] = mapped_column(JSON, default=lambda: DEFAULT_FONT.copy())
+    # Export finishing: {"music": {...}, "loudnorm": bool, "leader": bool}
+    finishing_json: Mapped[dict] = mapped_column(JSON, default=dict)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=_now, onupdate=_now)
 
@@ -95,6 +97,11 @@ class Scene(Base):
         JSON, default=lambda: {"type": "cut", "duration_ms": 0}
     )
     font_json: Mapped[dict] = mapped_column(JSON, default=lambda: DEFAULT_FONT.copy())
+    # Glitch parameters, adjustment sliders and imported-LUT reference:
+    # {"glitch": {...}, "adjust": {...}, "lut": {"asset_id", "strength"}}
+    look_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Picture-in-picture overlays (render/overlays.py), bottom to top.
+    overlays_json: Mapped[list] = mapped_column(JSON, default=list)
 
     revision: Mapped[int] = mapped_column(Integer, default=1)
     # Hash of the inputs that produced the current rendered part artifact.
@@ -158,6 +165,8 @@ class Shot(Base):
     source_in_ms: Mapped[int] = mapped_column(Integer, default=0)
     source_out_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
     duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)  # None = proportional share
+    # Video timing: {"speed": 0.25-4, "ramp": none|slow_middle|fast_middle, "freeze_at_ms", "freeze_ms"}
+    speed_json: Mapped[dict] = mapped_column(JSON, default=dict)
 
     fit: Mapped[str] = mapped_column(String(16), default="cover")
     crop_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
@@ -185,6 +194,8 @@ class VoiceTake(Base):
     settings_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     audio_asset_id: Mapped[str | None] = mapped_column(ForeignKey("assets.id"), nullable=True)
     measured_duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # Non-destructive trim/volume/fade (render/audio_edit.py).
+    edit_json: Mapped[dict] = mapped_column(JSON, default=dict)
     accepted: Mapped[bool] = mapped_column(Boolean, default=False)
     stale: Mapped[bool] = mapped_column(Boolean, default=False)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=_now)

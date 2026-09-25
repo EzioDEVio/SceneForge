@@ -19,6 +19,7 @@ engine = create_engine(
 def _set_sqlite_pragma(dbapi_connection, connection_record):  # noqa: ANN001
     cursor = dbapi_connection.cursor()
     cursor.execute("PRAGMA foreign_keys=ON")
+    cursor.execute("PRAGMA secure_delete=ON")
     cursor.execute("PRAGMA journal_mode=WAL")
     cursor.close()
 
@@ -31,6 +32,27 @@ def init_db() -> None:
     migration mechanism; docs/architecture.md records the follow-up to a
     real migration tool such as Alembic before schema changes ship)."""
     Base.metadata.create_all(bind=engine)
+    _add_missing_columns()
+
+
+# Columns added after a table was first created. create_all never alters an
+# existing table, so upgrades add them here. Additive only: no drops/renames,
+# and existing rows get the default, so older databases open unchanged.
+_ADDED_COLUMNS = {
+    "scenes": {"look_json": "JSON NOT NULL DEFAULT '{}'", "overlays_json": "JSON NOT NULL DEFAULT '[]'"},
+    "voice_takes": {"edit_json": "JSON NOT NULL DEFAULT '{}'"},
+    "projects": {"finishing_json": "JSON NOT NULL DEFAULT '{}'"},
+    "shots": {"speed_json": "JSON NOT NULL DEFAULT '{}'"},
+}
+
+
+def _add_missing_columns() -> None:
+    with engine.begin() as conn:
+        for table, columns in _ADDED_COLUMNS.items():
+            present = {row[1] for row in conn.exec_driver_sql(f"PRAGMA table_info({table})")}
+            for name, ddl in columns.items():
+                if name not in present:
+                    conn.exec_driver_sql(f"ALTER TABLE {table} ADD COLUMN {name} {ddl}")
 
 
 @contextmanager

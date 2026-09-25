@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import hashlib
 import os
+import uuid
 import re
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile
-from fastapi.responses import StreamingResponse
+from fastapi.responses import FileResponse, StreamingResponse
 from sqlalchemy.orm import Session
 
 from app.config import MAX_UPLOAD_BYTES, MEDIA_DIR, RENDERS_DIR
@@ -15,6 +16,7 @@ from app.db.models import Asset, Project
 from app.domain import schemas
 from app.domain.constants import AssetOrigin
 from app.render.ffmpeg_utils import FFmpegError, probe
+from app.render.thumbnails import ThumbnailError, thumbnail_path
 from app.security.uploads import UploadValidationError, classify_extension, safe_generated_filename
 
 router = APIRouter(prefix="/api/assets", tags=["assets"])
@@ -138,6 +140,114 @@ def stream_asset(asset_id: str, request: Request, db: Session = Depends(get_db),
     return StreamingResponse(iterfile(), status_code=status_code, headers=headers)
 
 
+@router.post("/lut", response_model=schemas.AssetOut)
+async def import_lut(project_id: str, file: UploadFile, db: Session = Depends(get_db)):
+    """Import a 3D .cube LUT. It is validated fully before it is stored and
+    is never passed to FFmpeg directly: renders bake it into a generated
+    grade LUT (render/grade.py)."""
+    from app.render.grade import MAX_CUBE_BYTES, CubeError, decode_cube, parse_lut
+    if not db.get(Project, project_id):
+        raise HTTPException(404, "Project not found")
+    if Path(file.filename or "").suffix.lower() != ".cube":
+        raise HTTPException(400, "Choose a .cube LUT file.")
+    data = await file.read(MAX_CUBE_BYTES + 1)
+    if len(data) > MAX_CUBE_BYTES:
+        raise HTTPException(413, "This LUT is larger than 32 MB. Use a LUT of 65 points or fewer.")
+    if b"\x00" in data[:4096]:
+        raise HTTPException(400, "This .cube file is not plain text.")
+    try:
+        lut = parse_lut(decode_cube(data))
+    except CubeError as e:
+        raise HTTPException(400, f"This LUT could not be read: {e}")
+    digest = hashlib.sha256(data).hexdigest()
+    existing = db.query(Asset).filter(Asset.project_id == project_id, Asset.type == "lut", Asset.content_hash == digest).first()
+    if existing:
+        return existing
+    dest_name = safe_generated_filename(file.filename or "look.cube")
+    project_dir = Path(MEDIA_DIR) / project_id
+    project_dir.mkdir(parents=True, exist_ok=True)
+    (project_dir / dest_name).write_bytes(data)
+    asset = Asset(project_id=project_id, type="lut", content_hash=digest, storage_key=f"{project_id}/{dest_name}",
+                  mime="text/plain", original_filename=Path(file.filename or "look.cube").name[:255],
+                  width=lut.size, origin=AssetOrigin.UPLOAD)
+    db.add(asset)
+    db.commit()
+    db.refresh(asset)
+    return asset
+
+
+@router.get("/luts", response_model=list[schemas.AssetOut])
+def list_luts(project_id: str, db: Session = Depends(get_db)):
+    if not db.get(Project, project_id):
+        raise HTTPException(404, "Project not found")
+    return db.query(Asset).filter(Asset.project_id == project_id, Asset.type == "lut").order_by(Asset.created_at).all()
+
+
+@router.get("/{asset_id}/waveform")
+def asset_waveform(asset_id: str, points: int = 600, db: Session = Depends(get_db)):
+    """Peak envelope (0..1) for drawing an audio clip. Cached on disk."""
+    from app.render.waveform import WaveformError, waveform
+    asset = db.get(Asset, asset_id)
+    if not asset:
+        raise HTTPException(404, "Asset not found")
+    if asset.type not in ("audio", "video"):
+        raise HTTPException(415, "Waveforms are available for audio and video only.")
+    base = Path(RENDERS_DIR if asset.origin == AssetOrigin.RENDER_OUTPUT else MEDIA_DIR).resolve()
+    path = (base / asset.storage_key).resolve()
+    if base not in path.parents or not path.exists():
+        raise HTTPException(404, "Asset file missing on disk")
+    try:
+        return waveform(asset.id, path, points)
+    except WaveformError as e:
+        raise HTTPException(422, str(e))
+
+
+@router.post("/{asset_id}/restore", response_model=schemas.AssetOut)
+def restore_asset(asset_id: str, db: Session = Depends(get_db)):
+    """Make a restored copy of an old photo (denoise, dust and scratch removal,
+    contrast, sharpen, upscale). The original is kept."""
+    from app.render.photo import PhotoError, restore_photo
+    asset = db.get(Asset, asset_id)
+    if not asset or asset.type != "image":
+        raise HTTPException(400, "Choose a photo to restore.")
+    src = Path(MEDIA_DIR) / asset.storage_key
+    folder = Path(MEDIA_DIR) / asset.project_id
+    folder.mkdir(parents=True, exist_ok=True)
+    name = f"restored_{uuid.uuid4().hex[:10]}.png"
+    try:
+        report = restore_photo(str(src), str(folder / name))
+    except PhotoError as e:
+        raise HTTPException(503 if "not installed" in str(e) else 422, str(e))
+    data = (folder / name).read_bytes()
+    from PIL import Image
+    with Image.open(folder / name) as im:
+        w, h = im.size
+    base = Path(asset.original_filename or "photo").stem
+    new = Asset(project_id=asset.project_id, type="image", content_hash=hashlib.sha256(data).hexdigest(), storage_key=f"{asset.project_id}/{name}",
+                mime="image/png", original_filename=f"{base} (restored).png", width=w, height=h, origin=AssetOrigin.UPLOAD)
+    db.add(new); db.commit(); db.refresh(new)
+    return new
+
+
+@router.get("/{asset_id}/thumbnail")
+def asset_thumbnail(asset_id: str, w: int = 320, db: Session = Depends(get_db)):
+    """Cached JPEG thumbnail (image) or poster frame (video)."""
+    asset = db.get(Asset, asset_id)
+    if not asset:
+        raise HTTPException(404, "Asset not found")
+    if asset.type not in ("image", "video"):
+        raise HTTPException(415, "Thumbnails are available for images and videos only.")
+    base = Path(RENDERS_DIR if asset.origin == AssetOrigin.RENDER_OUTPUT else MEDIA_DIR).resolve()
+    path = (base / asset.storage_key).resolve()
+    if base not in path.parents or not path.exists():
+        raise HTTPException(404, "Asset file missing on disk")
+    try:
+        thumb = thumbnail_path(asset.id, path, asset.type, asset.duration_ms, w)
+    except ThumbnailError as e:
+        raise HTTPException(422, str(e))
+    return FileResponse(thumb, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
+
+
 @router.get("/{asset_id}", response_model=schemas.AssetOut)
 def get_asset(asset_id: str, db: Session = Depends(get_db)):
     asset = db.get(Asset, asset_id)
@@ -148,7 +258,7 @@ def get_asset(asset_id: str, db: Session = Depends(get_db)):
 @router.get('', response_model=list[schemas.AssetOut])
 def list_project_assets(project_id: str, db: Session = Depends(get_db)):
     if not db.get(Project, project_id): raise HTTPException(404, 'Project not found')
-    return [a for a in db.query(Asset).filter(Asset.project_id==project_id,Asset.origin.in_(['upload','generated','stock_search'])).order_by(Asset.created_at).all()
+    return [a for a in db.query(Asset).filter(Asset.project_id==project_id,Asset.type!='lut',Asset.origin.in_(['upload','generated','stock_search'])).order_by(Asset.created_at).all()
             if not (a.generation_metadata_json or {}).get('hidden_from_pool')]
 
 @router.post('/{asset_id}/hide-from-pool')

@@ -188,7 +188,7 @@ class SpeechRequest(schemas.BaseModel):
 @router.post('/api/scenes/{scene_id}/voice-takes/service')
 def create_service_take(scene_id: str, body: SpeechRequest, db: Session = Depends(get_db)):
     from app.db.models import ProviderProfile
-    from app.providers.speech_http import synthesize
+    from app.providers.speech_http import synthesize, synthesize_with_alignment
     scene = db.get(Scene, scene_id)
     if not scene: raise HTTPException(404, 'Scene not found')
     profile = db.get(ProviderProfile, body.provider_id)
@@ -196,11 +196,12 @@ def create_service_take(scene_id: str, body: SpeechRequest, db: Session = Depend
     if not scene.spoken_text.strip(): raise HTTPException(400, 'Write narration first.')
     text = scene.spoken_text[:250] if body.audition else scene.spoken_text
     if len(text) > 10000: raise HTTPException(400, 'Split narration longer than 10,000 characters into scenes.')
-    try: audio = synthesize(profile, text, body.voice, body.language, body.speed)
+    try: audio, alignment = synthesize_with_alignment(profile, text, body.voice, body.language, body.speed)
     except ValueError as exc: raise HTTPException(502, str(exc))
     folder = Path(MEDIA_DIR) / scene.project_id
     folder.mkdir(parents=True, exist_ok=True)
-    path = folder / f'narration_{uuid.uuid4().hex}.wav'
+    suffix = 'mp3' if profile.name == 'elevenlabs' else 'wav'
+    path = folder / f'narration_{uuid.uuid4().hex}.{suffix}'
     path.write_bytes(audio)
     try:
         info = probe(str(path))
@@ -209,7 +210,7 @@ def create_service_take(scene_id: str, body: SpeechRequest, db: Session = Depend
         path.unlink(missing_ok=True)
         raise HTTPException(502, 'Voice service returned invalid audio.')
     asset = Asset(project_id=scene.project_id, type=AssetType.AUDIO, content_hash=hashlib.sha256(audio).hexdigest(),
-        storage_key=str(path.relative_to(MEDIA_DIR)), mime='audio/wav', original_filename=path.name,
+        storage_key=str(path.relative_to(MEDIA_DIR)), mime='audio/mpeg' if suffix == 'mp3' else 'audio/wav', original_filename=path.name,
         duration_ms=info.duration_ms, origin=AssetOrigin.LOCAL_TTS, creator=profile.name)
     db.add(asset); db.flush()
     if body.audition:
@@ -217,7 +218,7 @@ def create_service_take(scene_id: str, body: SpeechRequest, db: Session = Depend
         return {'asset': schemas.AssetOut.model_validate(asset).model_dump()}
     for take in scene.voice_takes: take.accepted = False
     take = VoiceTake(scene_id=scene.id, spoken_text_hash=_text_hash(scene.spoken_text), source=VoiceTakeSource.CLOUD_TTS,
-        provider=profile.name, voice=body.voice, settings_json={'language':body.language, 'speed':body.speed},
+        provider=profile.name, voice=body.voice, settings_json={'language':body.language, 'speed':body.speed, **({'alignment': alignment} if alignment else {})},
         audio_asset_id=asset.id, measured_duration_ms=info.duration_ms, accepted=True)
     db.add(take); scene.revision += 1; db.commit(); db.refresh(take)
     return schemas.VoiceTakeOut.model_validate(take)
@@ -232,3 +233,40 @@ def voice_from_asset(scene_id:str,body:dict,db:Session=Depends(get_db)):
     for take in scene.voice_takes:take.accepted=False
     take=VoiceTake(scene_id=scene_id,source='upload',audio_asset_id=asset.id,spoken_text_hash=_text_hash(scene.spoken_text),measured_duration_ms=asset.duration_ms,accepted=True)
     db.add(take);scene.revision+=1;db.commit();db.refresh(take);return take
+
+@router.patch('/api/voice-takes/{take_id}/edit', response_model=schemas.VoiceTakeOut)
+def edit_voice_take(take_id: str, body: dict, db: Session = Depends(get_db)):
+    """Trim, level and fade a take without touching the source file."""
+    from app.render.audio_edit import AudioEditError, clean_edit, is_default
+    take = db.get(VoiceTake, take_id)
+    if not take:
+        raise HTTPException(404, 'Audio take not found')
+    if not isinstance(body, dict):
+        raise HTTPException(400, 'Audio settings must be an object.')
+    try:
+        edit = clean_edit({**(take.edit_json or {}), **body}, take.measured_duration_ms)
+    except AudioEditError as e:
+        raise HTTPException(400, str(e))
+    take.edit_json = {} if is_default(edit) else edit
+    take.scene.revision += 1
+    db.commit(); db.refresh(take)
+    return take
+
+
+@router.delete('/api/voice-takes/{take_id}')
+def delete_voice_take(take_id: str, db: Session = Depends(get_db)):
+    from app.db.models import RenderJob
+    take = db.get(VoiceTake, take_id)
+    if not take: raise HTTPException(404, 'Voice take not found')
+    scene = take.scene
+    active = db.query(RenderJob).filter(RenderJob.project_id == scene.project_id, RenderJob.status.in_(['queued','running'])).first()
+    if active: raise HTTPException(409, 'Wait for the project render to finish before deleting audio.')
+    if take.accepted:
+        scene.revision += 1
+        scene.rendered_asset_id = None
+        scene.rendered_plan_hash = None
+        scene.measured_duration_ms = None
+    # Retain the asset: it may also be used by another scene or the media pool.
+    db.delete(take)
+    db.commit()
+    return {'deleted': True}

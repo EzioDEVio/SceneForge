@@ -16,6 +16,7 @@ python-dotenv==1.2.3
 python-multipart==0.0.32
 PyYAML==6.0.3
 requests==2.34.2
+keyring==25.6.0
 SQLAlchemy==2.0.53
 sse-starlette==3.4.11
 starlette==1.6.0
@@ -32,3 +33,8 @@ websockets==17.1
 
 huggingface_hub==1.31.0
 Pillow>=10,<13
+
+# Colour grading: bakes adjustment sliders and imported .cube LUTs into one 3D LUT.
+numpy==2.5.3
+# Photo tools (2.5D parallax background fill, photo restore). Headless: no GUI libraries.
+opencv-python-headless==5.0.0.93

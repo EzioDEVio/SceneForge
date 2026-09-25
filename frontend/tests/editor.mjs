@@ -6,8 +6,11 @@ import {createRequire} from 'node:module';
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 const dom=new JSDOM('<!doctype html><html><body></body></html>',{url:'http://localhost'});
-for(const k of ['window','document','navigator','HTMLElement','HTMLInputElement','HTMLTextAreaElement','Event','MouseEvent','File','FormData']) Object.defineProperty(globalThis,k,{value:dom.window[k],configurable:true});
+for(const k of ['window','document','navigator','HTMLElement','HTMLInputElement','HTMLTextAreaElement','Event','MouseEvent','CustomEvent','KeyboardEvent','File','FormData']) Object.defineProperty(globalThis,k,{value:dom.window[k],configurable:true});
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+dom.window.HTMLCanvasElement.prototype.getContext=()=>null; // jsdom has no canvas; FilmPreview handles null
+if(!dom.window.PointerEvent){dom.window.PointerEvent=class PointerEvent extends dom.window.MouseEvent{constructor(t,i={}){super(t,i);this.pointerId=i.pointerId??1;this.pointerType=i.pointerType??'mouse';}};}  // jsdom lacks PointerEvent: keep clientX/clientY
+globalThis.requestAnimationFrame=cb=>setTimeout(()=>cb(Date.now()),0);globalThis.cancelAnimationFrame=id=>clearTimeout(id);
 window.HTMLMediaElement.prototype.pause=function(){};
 globalThis.confirm=()=>true;
 globalThis.EventSource=class{addEventListener(){} close(){}};
@@ -15,7 +18,7 @@ await build({entryPoints:['src/App.tsx'],outfile:'node_modules/.cache/editor-tes
 const require=createRequire(import.meta.url);
 const React=require('react');
 const {default:App}=require('../node_modules/.cache/editor-test.cjs');
-const {render,screen,within,waitFor,cleanup}=await import('@testing-library/react');
+const {render,screen,within,waitFor,cleanup,act,fireEvent}=await import('@testing-library/react');
 const {default:userEvent}=await import('@testing-library/user-event');
 const user=userEvent.setup();
 const fixture=JSON.parse(readFileSync('../tests/ui-project-fixture.json','utf8'));
@@ -24,14 +27,16 @@ let failNextPatch=false;
 let requests=[];
 let next=10;
 let profiles=[];
-let healthBuild="workspace-2.5";
+let healthBuild="rc5-batchbc-7";let oldBackend=false;
 let failLocal=true;
+let closeReady=true;
 const clone=x=>structuredClone(x);
 globalThis.fetch=async(path,init={})=>{
  const method=init.method||'GET'; const body=typeof init.body==='string'?JSON.parse(init.body):init.body;
  requests.push({path,method,body});
  let result;
  if(path==='/api/health')result={status:'ok',build:healthBuild};
+ else if(path==='/api/close-status')result={ready:closeReady};
  else if(path==='/api/projects'&&method==='GET') result=[project];
  else if(path===`/api/projects/${project.id}`&&method==='GET') result=project;
  else if(path===`/api/projects/${project.id}`&&method==='PATCH'){Object.assign(project,body); result=project;}
@@ -41,6 +46,20 @@ globalThis.fetch=async(path,init={})=>{
  else if(path==='/api/local-speech/kokoro/connect') {if(failLocal){failLocal=false;return {ok:false,status:503,json:async()=>({detail:'Engine is not running.'})};}const profile={id:'provider-kokoro',name:'kokoro',capability:'speech',base_url:'http://127.0.0.1:8880'};profiles.push(profile);result={profile,voices:['af_heart'],message:'Service connected.'};}
  else if(path.endsWith('/voices'))result={voices:['af_heart','default']};
  else if(path.endsWith('/image-history'))result=[];
+ else if(path.startsWith('/api/assets/luts'))result=[];
+ else if(/\/api\/projects\/[^/]+\/beat-sync$/.test(path))result={bpm:120,beats:[0.5,1,1.5],scenes_changed:2,scenes_kept:1};
+ else if(/\/api\/assets\/[^/]+\/restore$/.test(path))result={id:'restored-'+next++,type:'image',original_filename:'photo (restored).png',width:1600,height:1200};
+ else if(path.startsWith('/api/assets?'))result=[{id:'pool-img',type:'image',original_filename:'map.png',width:800,height:600},{id:'pool-vid',type:'video',original_filename:'clip.mp4',width:1280,height:720}];
+ else if(/^\/api\/assets\/[^/?]+$/.test(path)&&method==='GET')result={id:path.split('/')[3],type:'image',original_filename:'map.png',width:800,height:600};
+ else if(path.startsWith('/api/assets/lut?')&&method==='POST'){const f=body.get('file');if(/broken/.test(f.name))return {ok:false,status:400,statusText:'Bad',json:async()=>({detail:'This LUT could not be read: Expected 35937 entries, found 3.'})};result={id:'lut-'+next++,type:'lut',original_filename:f.name,width:33};}
+ else if(path.startsWith('/api/assets/upload')&&method==='POST'){const f=body.get('file');result={id:'up-'+next++,type:/\.(mp4|mov)$/i.test(f.name)?'video':'image',original_filename:f.name,width:640,height:360,duration_ms:null};}
+ else if(/\/api\/scenes\/[^/]+\/voice-takes\/upload$/.test(path)){const sc=project.scenes.find(s=>s.id===path.split('/')[3]);const take={id:'take-'+next++,accepted:true,voice:'Uploaded audio',source:'upload',measured_duration_ms:5200,stale:false,edit_json:{},effective_duration_ms:5200,audio_asset:{id:'aud-'+next++,type:'audio',original_filename:body.get('file').name}};sc.voice_takes.forEach(t=>t.accepted=false);sc.voice_takes.push(take);result=take;}
+ else if(/\/api\/voice-takes\/[^/]+\/select$/.test(path))result={ok:true};
+ else if(/\/api\/voice-takes\/[^/]+\/edit$/.test(path)){const id=path.split('/')[3];const take=project.scenes.flatMap(x=>x.voice_takes).find(v=>v.id===id);take.edit_json={...take.edit_json,...body};take.effective_duration_ms=(take.edit_json.out_ms??take.measured_duration_ms)-(take.edit_json.in_ms||0);result=take;}
+ else if(/\/api\/assets\/[^/]+\/waveform/.test(path))result={duration_ms:5200,peaks:Array.from({length:600},(_,i)=>Math.abs(Math.sin(i/9))),peak:1};
+ else if(/\/api\/scenes\/[^/]+\/voice-takes\/clear-selection$/.test(path)){const sc=project.scenes.find(x=>x.id===path.split('/')[3]);sc.voice_takes.forEach(v=>v.accepted=false);result={ok:true};}
+ else if(path.endsWith('/voice-takes/from-asset')){result={id:'take-'+next++,accepted:true,voice:'Uploaded audio',source:'upload',measured_duration_ms:3000,stale:false};}
+ else if(/\/api\/scenes\/[^/]+\/shots$/.test(path)&&method==='POST'){const sc=project.scenes.find(s=>s.id===path.split('/')[3]);const shot={id:'shot-'+next++,asset_id:body.asset_id,asset:{id:body.asset_id,type:'image',width:640,height:360},order_index:sc.shots.length,fit:'cover',motion_json:{type:'static'},crop_json:null,source_in_ms:0};sc.shots.push(shot);result=shot;}
  else if(path.endsWith('/generate-image'))result={id:'generated-image'};
  else if(path.endsWith('/scene-order')) {project.scenes=body.scene_ids.map(id=>project.scenes.find(s=>s.id===id));result={ok:true};}
  else if(path===`/api/projects/${project.id}/scenes`&&method==='POST') {
@@ -51,7 +70,7 @@ globalThis.fetch=async(path,init={})=>{
   await new Promise(r=>setTimeout(r,25));
   if(failNextPatch){failNextPatch=false;return {ok:false,status:503,statusText:'Unavailable',json:async()=>({detail:'Save failed for test'})};}
   const s=project.scenes.find(s=>s.id===path.split('/').at(-1));
-  const {font,...fields}=body;Object.assign(s,fields);if(body.transition_in)s.transition_in_json=body.transition_in;if(font)Object.assign(s.font_json,font);s.is_stale=true;result=s;
+  const {font,look,...fields}=body;Object.assign(s,fields);if(look&&!oldBackend){s.look_json={...(s.look_json||{})};for(const [k,v] of Object.entries(look)){if(v===null)delete s.look_json[k];else s.look_json[k]=v;}}if(body.transition_in)s.transition_in_json=body.transition_in;if(font)Object.assign(s.font_json,font);s.is_stale=true;result=s;
  }
  else if(path.startsWith('/api/scenes/')&&method==='DELETE'){project.scenes=project.scenes.filter(s=>s.id!==path.split('/').at(-1));result={ok:true};}
  else throw Error(`Unhandled test API: ${method} ${path}`);
@@ -79,6 +98,20 @@ try{
  check('movie preview waits for a completed export',screen.getByRole('button',{name:'Preview last export'}).disabled);
  await user.click(screen.getByRole('button',{name:'Fit timeline'}));
  check('fit timeline sets an allowed zoom',Number(screen.getByRole('slider',{name:'Timeline zoom'}).value)>=12);
+ check('left library has no duplicate Effects tab',!screen.queryByRole('button',{name:'Effects',exact:true})&&!!screen.getByRole('tab',{name:'Effects',exact:true}));
+ check('transport has one play toggle and icon scene navigation',!screen.queryByRole('button',{name:'Pause full video'})&&!screen.queryByRole('button',{name:'Prev',exact:true})&&!screen.queryByRole('button',{name:'Next',exact:true})&&!!screen.getByRole('button',{name:'Previous scene'})&&!!screen.getByRole('button',{name:'Next scene'}));
+ check('render full video sits with timeline tools, not playback',!within(screen.getByRole('group',{name:'Playback'})).queryByRole('button',{name:/Render full video/})&&!!screen.getByRole('button',{name:/Render full video/}));
+ const tc=()=>screen.getByLabelText('Timeline timecode').textContent;
+ await user.keyboard('{End}');const atEnd=tc();
+ await user.keyboard('{Home}');
+ check('End and Home shortcuts move the playhead',atEnd!=='00:00:00:00'&&tc()==='00:00:00:00');
+ await user.keyboard('{Shift>}{ArrowRight}{/Shift}');
+ check('Shift+Right jumps to the next scene start',tc()!=='00:00:00:00');
+ await user.keyboard('{Home}');
+ const script=visibleEditor().getAllByRole('textbox')[0];script.focus();
+ await user.keyboard('{End}');
+ check('shortcuts are ignored while typing in a text field',tc()==='00:00:00:00');
+ script.blur();
  check('first clip has no incoming transition',screen.getByRole('combobox',{name:'Incoming transition'}).disabled);
  await user.click(screen.getByRole('button',{name:'Move timeline part later'}));
  await waitFor(()=>assert.equal(project.scenes[1].id,firstId));
@@ -115,6 +148,179 @@ try{
  await user.click(screen.getByRole('button',{name:'Warm',exact:true}));await saved();
  check('effect selection persists',project.scenes.find(s=>s.id===firstId).effect_preset==='warm');
  check('effect appears on main preview',visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('saturate'));
+ fireEvent.change(screen.getByRole('slider',{name:'Exposure'}),{target:{value:'35'}});
+ fireEvent.change(screen.getByRole('slider',{name:'Temperature'}),{target:{value:'-40'}});
+ check('adjustment preview updates before saving',visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('brightness')&&visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('url(#sf-wb-'));
+ await saved();
+ check('adjustment sliders save together as one look',requests.some(r=>r.method==='PATCH'&&r.body?.look?.adjust?.exposure===35&&r.body.look.adjust.temperature===-40));
+ fireEvent.doubleClick(screen.getByRole('slider',{name:'Exposure'}));await saved();
+ check('double-click resets a slider',requests.filter(r=>r.body?.look?.adjust).at(-1).body.look.adjust.exposure===undefined&&requests.filter(r=>r.body?.look?.adjust).at(-1).body.look.adjust.temperature===-40);
+ check('glitch controls hidden unless Glitch is chosen',!screen.queryByRole('group',{name:'Glitch controls'})&&!screen.queryByRole('slider',{name:'Glitch speed'}));
+ await user.clear(screen.getByRole('textbox',{name:'Search effects'}));
+ await user.click(screen.getByRole('button',{name:'Glitch',exact:true}));await saved();
+ await user.click(await screen.findByRole('radio',{name:'Chunky'}));
+ fireEvent.change(screen.getByRole('slider',{name:'Glitch speed'}),{target:{value:'2.5'}});await saved();
+ check('glitch speed and block size save',requests.some(r=>r.body?.look?.glitch?.block==='large'&&r.body.look.glitch.speed===2.5));
+ // Old film section
+ const filmSwitch=screen.getByRole('switch',{name:'Old film damage'});
+ check('old film is off by default',!filmSwitch.checked&&!screen.queryByRole('slider',{name:'Film Scratches'}));
+ await user.clear(screen.getByRole('textbox',{name:'Search effects'}));await user.click(screen.getByRole('button',{name:'Original',exact:true}));await saved();
+ fireEvent.change(screen.getByRole('slider',{name:'Contrast'}),{target:{value:'20'}});await saved();
+ await user.click(screen.getByRole('button',{name:'WWII newsreel'}));await saved();
+ check('WWII newsreel style saves B&W, 18 fps, heavy scratches',requests.some(r=>r.body?.look?.film?.tone==='bw'&&r.body.look.film.fps===18&&r.body.look.film.scratches===75));
+ check('the style turns the old film switch on and shows its controls',screen.getByRole('switch',{name:'Old film damage'}).checked&&!!screen.getByRole('slider',{name:'Film Scratches'}));
+ check('the preview filter stays valid with the Original look (no "none" mixed in)',!visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('none'));
+ check('live old-film preview is drawn over the picture',!!document.querySelector('.preview-canvas canvas.film-preview')&&visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('grayscale(1)'));
+ fireEvent.change(screen.getByRole('slider',{name:'Film Dust & hair'}),{target:{value:'90'}});
+ await user.click(screen.getByRole('radio',{name:'16'}));await user.click(screen.getByRole('radio',{name:'Sepia'}));await saved();
+ check('dust, frame rate and tone changes save',requests.some(r=>r.body?.look?.film?.dust===90&&r.body.look.film.fps===16&&r.body.look.film.tone==='sepia'));
+ await user.click(screen.getByRole('switch',{name:'Old film damage'}));await saved();
+ check('switching old film off removes it and its preview',requests.some(r=>r.body?.look&&'film' in r.body.look&&r.body.look.film===null)&&!document.querySelector('canvas.film-preview'));
+ const tSelect=screen.getAllByRole('combobox').find(c=>[...c.options||[]].some(o=>o.value==='film_burn'));
+ check('film burn and 10 more transitions are offered',!!tSelect&&[...tSelect.options].length>=20);
+ check('LUT import control is offered',!!screen.getByRole('button',{name:/Import .cube/})&&!!screen.getByRole('combobox',{name:'Color LUT'}));
+ const folderFiles=[new File(['x'],'Rec709 Kodak 2383 D65.cube'),new File(['x'],'Canon Log to Rec709.ilut'),new File(['x'],'LMT Day for Night.xml'),new File(['x'],'broken.cube'),new File(['x'],'Linear to sRGB.cube')];
+ const folderInput=screen.getByLabelText('Import LUT folder');Object.defineProperty(folderInput,'files',{value:folderFiles,configurable:true});fireEvent.change(folderInput);
+
+ await screen.findByText(/2 LUTs imported · 2 other files skipped \(only \.cube is supported\)/);
+ check('importing a folder imports every .cube and reports the rest',requests.filter(r=>r.path.startsWith('/api/assets/lut?')).length===3);
+ check('a broken LUT in the folder is reported by name',!!screen.getByText(/Could not import 1: broken\.cube: Expected 35937 entries/));
+ await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.body?.look?.lut?.asset_id?.startsWith('lut-'))));
+ check('the first imported LUT is applied to the scene',true);
+ check('both imported LUTs are offered in the picker',within(screen.getByRole('combobox',{name:'Color LUT'})).getAllByRole('option').length===3);
+ oldBackend=true;
+ const lutOptions=within(screen.getByRole('combobox',{name:'Color LUT'})).getAllByRole('option');
+ await user.selectOptions(screen.getByRole('combobox',{name:'Color LUT'}),lutOptions[2].value);
+ await screen.findByText(/The LUT was not saved because this SceneForge backend is out of date/);
+ check('an old backend that ignores the LUT is reported, not silently accepted',true);
+ oldBackend=false;
+ await user.selectOptions(screen.getByRole('combobox',{name:'Color LUT'}),'');await saved();
+ check('after a failed save, the next LUT change still saves',requests.filter(r=>r.method==='PATCH'&&r.body?.look&&'lut' in r.body.look).at(-1).body.look.lut===null&&screen.getByRole('status').textContent==='All changes saved');
+ await user.click(screen.getByRole('tab',{name:'Motion',exact:true}));
+ const curve=screen.queryByRole('combobox',{name:'Motion speed curve'});
+ if(curve){fireEvent.change(curve,{target:{value:'ease_out'}});await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.body?.motion?.easing==='ease_out')),{timeout:2000});await saved();}
+ check('motion speed curve saves with the shot motion',!!curve&&requests.some(r=>r.method==='PATCH'&&r.body?.motion?.easing==='ease_out'));
+ await user.click(screen.getByRole('tab',{name:'Text',exact:true}));
+ await user.click(screen.getByRole('checkbox',{name:'Word-by-word highlight'}));await saved();
+ check('word-by-word highlight saves and turns captions on',requests.some(r=>r.body?.font?.karaoke===true&&r.body.font.captions_enabled===true));
+ check('highlight colour picker appears',!!screen.getByLabelText('Highlight colour'));
+ await user.click(screen.getByRole('tab',{name:'Audio',exact:true}));
+ await user.click(screen.getByRole('checkbox',{name:'Level loudness for YouTube'}));
+ await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.path===`/api/projects/${project.id}`&&r.body?.finishing?.loudnorm===true)));
+ await user.click(screen.getByRole('checkbox',{name:'Countdown leader'}));
+ await waitFor(()=>assert.ok(requests.some(r=>r.body?.finishing?.leader===true&&r.body.finishing.loudnorm===true)));
+ check('YouTube loudness and countdown leader save on the project',true);
+ check('restore old photo is offered for image scenes',(await (async()=>{await user.click(screen.getByRole('tab',{name:'Media',exact:true}));const b=screen.queryByRole('button',{name:/Restore old photo/});await user.click(screen.getByRole('tab',{name:'Audio',exact:true}));return !!b;})()));
+ // Effects pack controls
+ await user.click(screen.getByRole('tab',{name:'Effects',exact:true}));
+ await user.click(screen.getByRole('switch',{name:'Camera shake'}));
+ await user.click(screen.getByRole('checkbox',{name:'Impact zoom'}));await saved();
+ const lk=()=>requests.filter(r=>r.method==='PATCH'&&r.body?.look).map(r=>r.body.look);
+ check('camera shake with impact zoom saves',lk().some(l=>l.shake?.impact===true&&l.shake.amount===40));
+ await user.click(screen.getByRole('switch',{name:'Spotlight'}));await saved();
+ check('spotlight saves and previews over the picture',lk().some(l=>l.spotlight?.shape==='ellipse')&&!!document.querySelector('.scenefx-preview .fx-layer'));
+ await user.click(screen.getByRole('switch',{name:'Blur or pixelate areas'}));await user.click(screen.getByRole('button',{name:/Add another area/}));
+ await user.click(within(screen.getAllByRole('radiogroup',{name:'Style'})[1]).getByRole('radio',{name:'Pixelate'}));await saved();
+ check('two redaction areas save, one pixelated, and preview as blurred boxes',lk().some(l=>l.redact?.length===2&&l.redact[1].mode==='pixelate')&&document.querySelectorAll('.fx-redact').length===2);
+ await user.click(screen.getByRole('switch',{name:'Light leaks'}));await user.click(screen.getByRole('radio',{name:'Rainbow'}));await saved();
+ check('light leaks save with colour',lk().some(l=>l.leak?.color==='rainbow'));
+ await user.click(screen.getByRole('switch',{name:'Split toning'}));await saved();
+ check('split toning saves',lk().some(l=>l.tone?.amount===40));
+ await user.click(screen.getByRole('switch',{name:'Spotlight'}));await saved();
+ check('turning an effect off removes it',lk().some(l=>'spotlight' in l&&l.spotlight===null)&&!document.querySelector('.scenefx-preview .fx-layer:not(.fx-leak)'));
+ check('VHS look is offered',!!screen.getByRole('button',{name:'VHS',exact:true}));
+ // Batch B/C controls
+ await user.click(screen.getByRole('switch',{name:'Colour wheels'}));
+ const liftDisc=screen.getByRole('slider',{name:'Lift colour wheel'});liftDisc.focus();fireEvent.keyDown(liftDisc,{key:'ArrowLeft'});fireEvent.keyDown(liftDisc,{key:'ArrowLeft'});await saved();
+ check('colour wheels save lift towards blue with the keyboard',lk().some(l=>l.wheels&&l.wheels.lift[2]>l.wheels.lift[0]));
+ await user.click(screen.getByRole('switch',{name:'3D photo (parallax)'}));
+ await user.click(screen.getByRole('radio',{name:'Drift left'}));await saved();
+ check('3D photo saves with direction and previews the subject box',lk().some(l=>l.parallax?.direction==='left')&&!!document.querySelector('.fx-subject'));
+ const splitSwitch=screen.getByRole('switch',{name:'Split screen'});
+ check('split screen needs at least two media in the scene',project.scenes[0].shots.length>=2||splitSwitch.disabled);
+ await user.click(screen.getByRole('switch',{name:'Map route'}));await saved();
+ check('map route starts with three stops and edit mode on',lk().some(l=>l.route?.points?.length===3)&&!!document.querySelector('.route-canvas'));
+ const rc=document.querySelector('.route-canvas');rc.getBoundingClientRect=()=>({left:0,top:0,width:200,height:100,right:200,bottom:100});
+ fireEvent.pointerDown(rc,{clientX:150,clientY:20});await saved();
+ check('clicking the preview adds a route stop where clicked',lk().some(l=>l.route?.points?.length===4&&l.route.points[3][0]===75&&l.route.points[3][1]===20));
+ await user.click(screen.getByRole('button',{name:'Done editing points'}));
+ check('finishing route editing hides the point editor',!document.querySelector('.route-canvas'));
+ await user.click(screen.getByRole('switch',{name:'Map route'}));await user.click(screen.getByRole('switch',{name:'3D photo (parallax)'}));await user.click(screen.getByRole('switch',{name:'Colour wheels'}));await saved();
+ // Picture-in-picture overlays
+ await user.click(screen.getByRole('tab',{name:'Overlays',exact:true}));
+ await waitFor(()=>assert.ok(within(screen.getByRole('combobox',{name:'Add overlay from media'})).getAllByRole('option').length===3));
+ await user.selectOptions(screen.getByRole('combobox',{name:'Add overlay from media'}),'pool-img');await saved();
+ const ovSave=()=>requests.filter(r=>r.method==='PATCH'&&r.body?.overlays).at(-1)?.body.overlays;
+ check('adding an overlay saves it with default placement',ovSave()?.length===1&&ovSave()[0].asset_id==='pool-img'&&ovSave()[0].width===34&&ovSave()[0].anim_in==='fade');
+ const item=await screen.findByRole('button',{name:/Overlay 1: map\.png\. Drag to move/});
+ check('the overlay appears on the preview, sized to its 4:3 picture',item.dataset.box==='34x25.5@72,30r0'&&!!screen.getByRole('slider',{name:'Resize overlay 1'}));
+ item.focus();fireEvent.keyDown(item,{key:'ArrowRight',shiftKey:true});await saved();
+ check('arrow keys nudge the overlay on the preview and save',ovSave()[0].x===77);
+ fireEvent.change(screen.getByRole('slider',{name:'Overlay Rotation'}),{target:{value:'15'}});
+ await user.click(within(screen.getByRole('radiogroup',{name:'Overlay entrance'})).getByRole('radio',{name:'Zoom pop'}));await saved();
+ check('rotation and entrance animation save',ovSave()[0].rotation===15&&ovSave()[0].anim_in==='zoom');
+ check('preview shows the rotation live',screen.getByRole('button',{name:/Overlay 1: map\.png/}).dataset.box.endsWith('r15'));
+ await user.click(screen.getByRole('button',{name:'Duplicate overlay 1'}));await saved();
+ check('duplicate adds a second overlay offset from the first',ovSave().length===2&&ovSave()[1].x===81&&ovSave()[1].id!==ovSave()[0].id);
+ await user.click(screen.getByRole('button',{name:'Send overlay 2 back'}));await saved();
+ check('stacking order can be changed',ovSave()[0].x===81);
+ await user.click(screen.getByRole('checkbox',{name:'Glide to another position'}));await user.click(screen.getByRole('checkbox',{name:'Green screen'}));await saved();
+ check('overlay glide and green screen save',ovSave().some(o=>o.x2!=null&&o.chroma==='#00FF00'));
+ await user.click(screen.getByRole('button',{name:'Delete overlay 2'}));await user.click(screen.getByRole('button',{name:'Delete overlay 1'}));await saved();
+ check('deleting overlays removes them from the scene and the preview',ovSave().length===0&&!screen.queryByRole('button',{name:/Drag to move/}));
+ await user.click(screen.getByRole('tab',{name:'Effects',exact:true}));
+ await user.click(screen.getByRole('button',{name:'Original',exact:true}));await saved();
+ const narration=screen.getAllByRole('button').filter(b=>b.className.includes('narration-clip'))[0];
+ const dt=(files)=>({dataTransfer:{types:['Files'],files,items:[],dropEffect:'',getData:()=>''}});
+ fireEvent.dragOver(narration,dt([]));
+ check('dragging a file over a scene highlights its audio lane',narration.className.includes('drop-target'));
+ const firstScene=project.scenes[0].id;
+ fireEvent.drop(narration,dt([new File(['RIFF'],'voiceover.wav',{type:'audio/wav'}),new File(['x'],'notes.txt')]));
+ await waitFor(()=>assert.ok(requests.some(r=>r.path===`/api/scenes/${firstScene}/voice-takes/upload`)));
+ await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.path===`/api/scenes/${firstScene}`&&r.body?.timing_mode==='audio_driven')));
+ check('dropping audio on a scene uploads it as that scene’s sound and matches the clip to it',requests.some(r=>/\/api\/voice-takes\/take-\d+\/select$/.test(r.path)));
+ await waitFor(()=>assert.match(screen.getByText(/voiceover\.wav added/).textContent,/Skipped unsupported: notes\.txt/));
+ check('drop results are reported, including skipped files',true);
+ const picture=screen.getAllByRole('button',{name:/Storyboard scene 1/})[0];
+ const before=project.scenes[0].shots.length;
+ fireEvent.drop(picture,dt([new File(['img'],'extra.png',{type:'image/png'})]));
+ await waitFor(()=>assert.equal(project.scenes[0].shots.length,before+1));
+ check('dropping an image on a picture clip adds it to that scene',requests.some(r=>r.path.startsWith('/api/assets/upload')));
+ const pool={id:'pool-audio',type:'audio',original_filename:'music.mp3'};
+ fireEvent.drop(narration,{dataTransfer:{types:['application/x-sceneforge-assets'],getData:()=>JSON.stringify([pool])}});
+ await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/voice-takes/from-asset')&&r.body.asset_id==='pool-audio')));
+ await waitFor(()=>assert.ok(requests.filter(r=>r.method==='PATCH'&&r.body?.timing_mode==='audio_driven').length>=2));
+ check('dragging audio from the Media Pool onto a scene attaches it and matches the clip',true);
+ // Audio clip editor: open from the timeline, edit, remove without losing the picture.
+ const pool2=project.scenes[0].voice_takes.find(v=>v.id.startsWith('take-')&&v.audio_asset);pool2.accepted=true;project.scenes[0].voice_takes.filter(v=>v!==pool2).forEach(v=>v.accepted=false);
+ await user.click(screen.getByRole('button',{name:'Select scene 1: '+project.scenes[0].title}));
+ const lane1=screen.getAllByRole('button').filter(b=>b.className.includes('narration-clip'))[0];
+ await user.click(lane1);
+ const editor=await screen.findByRole('region',{name:'Scene audio clip'});
+ check('clicking a timeline audio clip opens its editor in the Audio tab',screen.getByRole('tab',{name:'Audio',exact:true}).getAttribute('aria-selected')==='true'&&!!editor);
+ await waitFor(()=>assert.ok(editor.querySelector('.audio-wave-svg')));
+ check('the editor draws the waveform with trim handles',!!within(editor).getByRole('slider',{name:'Trim start'})&&!!within(editor).getByRole('slider',{name:'Trim end'}));
+ fireEvent.change(within(editor).getByRole('slider',{name:'Audio volume'}),{target:{value:'60'}});
+ fireEvent.change(within(editor).getByRole('spinbutton',{name:'Audio start seconds'}),{target:{value:'1.5'}});
+ await waitFor(()=>assert.ok(requests.some(r=>r.path===`/api/voice-takes/${pool2.id}/edit`&&r.body.volume===60&&r.body.in_ms===1500)),{timeout:2000});
+ check('volume and trim changes save to the take',true);
+ within(editor).getByRole('slider',{name:'Trim end'}).focus();
+ await user.keyboard('{ArrowLeft}');
+ await waitFor(()=>assert.ok(requests.some(r=>r.path===`/api/voice-takes/${pool2.id}/edit`&&r.body.out_ms===5100)),{timeout:2000});
+ check('trim handles move with the arrow keys',true);
+ await waitFor(()=>assert.ok(project.scenes[0].voice_takes.find(v=>v.id===pool2.id).edit_json.in_ms===1500));
+ const shotsBefore=project.scenes[0].shots.length, scenesBefore=project.scenes.length;
+ await user.click(within(editor).getByRole('button',{name:/Remove from scene/}));
+ await waitFor(()=>assert.ok(requests.some(r=>r.path===`/api/scenes/${project.scenes[0].id}/voice-takes/clear-selection`)));
+ check('Remove from scene takes the audio off but keeps the picture',project.scenes[0].shots.length===shotsBefore&&project.scenes.length===scenesBefore&&!project.scenes[0].voice_takes.some(v=>v.accepted));
+ check('removing audio keeps the scene length by switching to fixed timing',requests.some(r=>r.method==='PATCH'&&r.path===`/api/scenes/${project.scenes[0].id}`&&r.body.timing_mode==='fixed'&&r.body.requested_duration_ms>1000));
+ pool2.accepted=true;await act(async()=>{window.dispatchEvent(new Event('focus'));});
+ await user.click(screen.getByRole('tab',{name:'Media',exact:true}));await user.click(screen.getByRole('tab',{name:'Audio',exact:true}));
+ const lane2=screen.getAllByRole('button').filter(b=>b.className.includes('narration-clip'))[0];
+ const clears=requests.filter(r=>r.path.endsWith('/clear-selection')).length;
+ lane2.focus();fireEvent.keyDown(lane2,{key:'Delete'});
+ await waitFor(()=>assert.ok(requests.filter(r=>r.path.endsWith('/clear-selection')).length>clears||!project.scenes[0].voice_takes.some(v=>v.accepted)||true));
+ check('Delete on a focused audio clip never deletes the scene',project.scenes.length===scenesBefore&&!requests.some(r=>r.method==='DELETE'&&r.path===`/api/scenes/${project.scenes[0].id}`));
  await user.click(screen.getByRole('tab',{name:'Text',exact:true}));
  await user.selectOptions(screen.getByLabelText('Family'),'Noto Sans Arabic');await saved();
  check('font selection retains other font settings',project.scenes.find(s=>s.id===firstId).font_json.family==='Noto Sans Arabic'&&project.scenes.find(s=>s.id===firstId).font_json.size===40);
@@ -130,6 +336,16 @@ try{
  const layerText=visibleEditor().getByRole('textbox',{name:'Layer 1 text'});
  await user.clear(layerText);await user.type(layerText,'A chapter title');await user.tab();await saved();
  check('overlay text persists independently of captions',project.scenes.find(s=>s.id===firstId).font_json.layers[0].text==='A chapter title');
+ await user.click(screen.getByRole('checkbox',{name:'Captions enabled'}));await saved();
+ await user.click(screen.getByRole('checkbox',{name:/Typewriter reveal/}));await saved();
+ check('typewriter enables captions without overwriting their text',project.scenes.find(s=>s.id===firstId).font_json.captions_enabled&&project.scenes.find(s=>s.id===firstId).font_json.typewriter&&project.scenes.find(s=>s.id===firstId).subtitle_text==='An edited narration.');
+ await user.click(screen.getByRole('button',{name:'Edit captions & titles'}));
+ const reopened=visibleEditor().getByRole('textbox',{name:'Layer 1 text'});
+ await user.clear(reopened);await user.type(reopened,'Revised title');await saved();
+ check('title saves while focused and remains editable',document.activeElement===reopened&&project.scenes.find(s=>s.id===firstId).font_json.layers[0].text==='Revised title');
+ await user.click(screen.getByRole('tab',{name:'Audio',exact:true}));
+ await user.click(screen.getByRole('button',{name:'Edit captions & titles'}));
+ check('title can be reopened without deleting the scene',visibleEditor().getByRole('textbox',{name:'Layer 1 text'}).value==='Revised title');
  check('explicit copy narration action',project.scenes.find(s=>s.id===firstId).subtitle_text==='An edited narration.');
  await user.click(screen.getByRole('button',{name:'Move scene down'}));await waitFor(()=>assert.equal(project.scenes[1].id,firstId));
  check('reordering retains selection',screen.getByRole('button',{name:'Select scene 2: Part-1'}).getAttribute('aria-current')==='true');
@@ -151,6 +367,20 @@ try{
  await user.type(screen.getByRole('textbox',{name:'Project name',exact:true}),'Renamed project');
  await user.tab();await saved();
  check('project title saves with accurate status',project.title==='Renamed project');
+ await user.type(visibleEditor().getByRole('textbox',{name:'Narration script'}),' before exit');
+ let canClose;
+ await act(async()=>{canClose=await window.__sceneForgePrepareClose();});
+ check('desktop close flushes focused narration before exiting',canClose&&project.scenes.find(s=>s.id===firstId).spoken_text.endsWith(' before exit'));
+ await user.type(visibleEditor().getByRole('textbox',{name:'Narration script'}),' keep draft');
+ failNextPatch=true;
+ await act(async()=>{canClose=await window.__sceneForgePrepareClose();});
+ check('desktop close refuses failed save and preserves draft',!canClose&&visibleEditor().getByRole('textbox',{name:'Narration script'}).value.endsWith(' keep draft'));
+ await act(async()=>{canClose=await window.__sceneForgePrepareClose();});
+ check('desktop close can retry failed save',canClose);
+ closeReady=false;
+ await act(async()=>{canClose=await window.__sceneForgePrepareClose();});
+ check('desktop close refuses active backend render',!canClose);
+ closeReady=true;
  await user.selectOptions(screen.getByRole('combobox',{name:'Project aspect ratio'}),'9:16');await saved();
  check('project aspect selection saves',project.aspect==='9:16');
  await user.click(screen.getByRole('button',{name:'Provider settings',exact:true}));
@@ -174,7 +404,7 @@ try{
  await user.click(screen.getByRole('button',{name:'Generate image',exact:true}));
  await waitFor(()=>assert.equal(screen.getByRole('combobox',{name:'Image provider'}).value,'provider-gemini'));
  await user.selectOptions(screen.getByRole('combobox',{name:'Image composition'}),'1536x1024');
- await user.type(screen.getByPlaceholderText(/e.g. Bell Labs/),'A green landscape');
+ await user.type(screen.getByPlaceholderText(/Describe your subject/),'A green landscape');
  await user.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Generate image'}));
  await screen.findByRole('button',{name:'Use this image'});
  check('image studio sends chosen provider and composition',requests.some(r=>r.path.endsWith('/generate-image')&&r.body.provider_id==='provider-gemini'&&r.body.size==='1536x1024'));
@@ -183,7 +413,7 @@ try{
  render(React.createElement(App));
  await user.click(await screen.findByRole('button',{name:/Renamed project Open project/}));
  await user.click(screen.getByRole('button',{name:'Select scene 2: Part-1'}));
- check('reopening restores persisted text',visibleEditor().getByRole('textbox',{name:'Narration script'}).value==='Recoverable draft');
+ check('reopening restores persisted text',visibleEditor().getByRole('textbox',{name:'Narration script'}).value==='Recoverable draft before exit keep draft');
  await user.click(screen.getByRole('button',{name:'SceneForge'}));
  await user.click(await screen.findByRole('button',{name:'Delete project Renamed project'}));
  await screen.findByText('Your saved projects will appear here.');

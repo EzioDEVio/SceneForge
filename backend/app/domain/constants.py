@@ -30,6 +30,7 @@ class AssetType(str, Enum):
     IMAGE = "image"
     VIDEO = "video"
     AUDIO = "audio"
+    LUT = "lut"          # imported .cube colour LUT (never on the timeline)
 
 
 class AssetOrigin(str, Enum):
@@ -73,6 +74,7 @@ class EffectPreset(str, Enum):
     SOFT_GLOW = "soft_glow"
     GLITCH = "glitch"
     OLD_FILM = "old_film"
+    VHS = "vhs"
     FILM_GRAIN = "film_grain"
     HIGH_CONTRAST = "high_contrast"
     FADED = "faded"
@@ -93,6 +95,22 @@ class TransitionType(str, Enum):
     WIPE_RIGHT = "wipe_right"
     FADE_WHITE = "fade_white"
     CIRCLE_OPEN = "circle_open"
+    CIRCLE_CLOSE = "circle_close"
+    ZOOM_IN = "zoom_in"
+    SMOOTH_LEFT = "smooth_left"
+    SMOOTH_RIGHT = "smooth_right"
+    RADIAL = "radial"
+    PIXELIZE = "pixelize"
+    BLUR = "blur"
+    DIAGONAL = "diagonal"
+    SQUEEZE = "squeeze"
+    FADE_GRAYS = "fade_grays"
+    FILM_BURN = "film_burn"
+    WIND = "wind"
+    SLICE = "slice"
+    OPEN = "open"
+    CLOSE = "close"
+    FADE_FAST = "fade_fast"
 
 
 class TimingMode(str, Enum):

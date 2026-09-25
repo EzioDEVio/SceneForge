@@ -1,9 +1,24 @@
-# Contributing to SceneForge
+# Contributing to SceneForge Studio
 
-Use a feature branch and keep changes focused. Include the problem, resulting behaviour, and relevant test evidence in pull requests.
+Thanks for helping! SceneForge Studio is licensed under the **GNU GPL v3.0 or later**. By contributing
+you agree that your contribution is licensed under the same terms.
 
-For editor changes run the TypeScript build and component tests. For filter, timing or transition changes, also render a small fixture through real FFmpeg. Never replace render validation with a simulated progress bar.
+## Reporting bugs
+Open an issue with: the SceneForge version (Help → About), your OS, steps to reproduce, and what you expected.
+For render problems include the aspect ratio, scene length, effects used, and whether narration is present.
+Logs are in the workspace folder (File → Open logs); remove anything private before attaching them.
 
-Do not commit backend/data, provider keys, .env files, virtual environments, node_modules, generated user videos or model weights. Keep examples synthetic. Hosted provider tests should mock responses unless the tester explicitly opts into live account usage.
+## Development setup
+See "Build from source" in the README. Before opening a pull request, run:
+```
+npm --prefix frontend run build && npm --prefix frontend test
+npm --prefix desktop test
+python tests/integration/test_combined.py     # plus the suite for the area you changed
+```
+The full backend suite is listed in `.github/workflows/checks.yml` and runs on every pull request.
 
-Bug reports should include OS, /api/health build, reproduction steps and redacted errors. Explain expected versus actual results. Check the effects guide before proposing a new preset to avoid overlapping names.
+## Guidelines
+- Keep database changes additive (new columns via `backend/app/db/database.py:_ADDED_COLUMNS`); never drop user data.
+- Rendering changes need a real-render test that measures the output (see `tests/integration/test_effects_pack.py`).
+- Bump `BUILD_ID` in `backend/app/main.py` and `frontend/src/api.ts` together when the API changes.
+- Never commit API keys, tokens or personal media.

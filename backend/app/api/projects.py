@@ -67,6 +67,12 @@ def update_project(project_id: str, body: schemas.ProjectUpdate, db: Session = D
         project.title = body.title
     if body.language is not None:
         project.language = body.language
+    if body.finishing is not None:
+        from app.render.finishing import FinishingError, clean_finishing
+        try:
+            project.finishing_json = clean_finishing(body.finishing, project.id, db)
+        except FinishingError as e:
+            raise HTTPException(400, str(e))
     project.revision += 1
     db.commit()
     db.refresh(project)
@@ -176,3 +182,49 @@ def delete_project(project_id: str, db: Session = Depends(get_db)):
     db.delete(project)
     db.commit()
     return {"ok": True, "media_retained": True}
+
+
+def scene_duration_ms(scene) -> int:
+    """Current scene length, matching the editor timeline (frontend duration.ts)."""
+    from app.render.audio_edit import effective_ms
+    if scene.timing_mode == "fixed" and scene.requested_duration_ms:
+        return int(scene.requested_duration_ms)
+    take = next((t for t in scene.voice_takes if t.accepted), None)
+    audio = effective_ms(take.measured_duration_ms, take.edit_json) if take and take.measured_duration_ms else None
+    if audio:
+        lead = 250 if scene.lead_ms is None else scene.lead_ms
+        trail = 400 if scene.trail_ms is None else scene.trail_ms
+        return int(audio + lead + trail)
+    return int(scene.measured_duration_ms or scene.requested_duration_ms or 4000)
+
+
+@router.post("/{project_id}/beat-sync")
+def beat_sync(project_id: str, db: Session = Depends(get_db)):
+    """Find the beats in the background music and change fixed-length scenes
+    so each cut lands on a beat. Scenes that follow their narration keep
+    their length."""
+    from pathlib import Path
+    from app.config import MEDIA_DIR
+    from app.db.models import Asset
+    from app.render.beats import detect_beats, snap_durations
+    project = db.get(Project, project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+    music = (project.finishing_json or {}).get("music")
+    asset = db.get(Asset, music["asset_id"]) if music else None
+    if not asset:
+        raise HTTPException(400, "Choose background music first (Audio → Music & finishing).")
+    bpm, beats = detect_beats(str(Path(MEDIA_DIR) / asset.storage_key))
+    if not beats:
+        raise HTTPException(422, "No steady beat was found in this music.")
+    scenes = [s for s in project.scenes if s.shots]
+    durations = [scene_duration_ms(s) for s in scenes]
+    fixed = [s.timing_mode == "fixed" for s in scenes]
+    new = snap_durations(durations, fixed, beats)
+    changed = 0
+    for s, old_ms, new_ms, is_fixed in zip(scenes, durations, new, fixed):
+        if is_fixed and new_ms != old_ms:
+            s.requested_duration_ms = new_ms; s.revision += 1; changed += 1
+    project.revision += 1
+    db.commit()
+    return {"bpm": bpm, "beats": beats[:2000], "scenes_changed": changed, "scenes_kept": sum(not f for f in fixed)}

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import BaseModel, Field
+from pydantic import model_validator, BaseModel, Field
 
 
 class ProjectCreate(BaseModel):
@@ -21,6 +21,7 @@ class ProjectOut(BaseModel):
     height: int
     revision: int
     default_font_json: dict
+    finishing_json: dict = {}
 
     class Config:
         from_attributes = True
@@ -30,6 +31,7 @@ class ProjectUpdate(BaseModel):
     title: str | None = None
     aspect: str | None = None
     language: str | None = None
+    finishing: dict | None = None
 
 
 class AssetOut(BaseModel):
@@ -62,6 +64,7 @@ class ShotIn(BaseModel):
 
 class ShotOut(BaseModel):
     crop_json: dict | None = None
+    speed_json: dict = {}
     id: str
     asset_id: str
     order_index: int
@@ -86,6 +89,15 @@ class VoiceTakeOut(BaseModel):
     accepted: bool
     stale: bool
     audio_asset: AssetOut | None = None
+    edit_json: dict = {}
+    # Length after trimming; this is what "Match narration" uses.
+    effective_duration_ms: int | None = None
+
+    @model_validator(mode="after")
+    def _effective(self):
+        from app.render.audio_edit import effective_ms
+        self.effective_duration_ms = effective_ms(self.measured_duration_ms, self.edit_json)
+        return self
 
     class Config:
         from_attributes = True
@@ -105,6 +117,8 @@ class SceneUpdate(BaseModel):
     effect_intensity: int | None = None
     transition_in: dict | None = None
     font: dict | None = None
+    look: dict | None = None
+    overlays: list | None = None
     lead_ms: int | None = None
     trail_ms: int | None = None
     requested_duration_ms: int | None = None
@@ -127,6 +141,8 @@ class SceneOut(BaseModel):
     effect_intensity: int
     transition_in_json: dict
     font_json: dict
+    look_json: dict = {}
+    overlays_json: list = []
     revision: int
     rendered_plan_hash: str | None
     rendered_asset_id: str | None
@@ -236,7 +252,7 @@ class GenerateImageRequest(BaseModel):
 
 
 class TextLayer(BaseModel):
-    family: str = Field(default="Noto Naskh Arabic", pattern=r"^(Noto Naskh Arabic|Noto Sans Arabic)$")
+    family: str = Field(default="Noto Naskh Arabic", pattern=r"^(Noto Naskh Arabic|Noto Sans Arabic|Noto Sans)$")
     align: str = Field(default="center", pattern=r"^(left|center|right)$")
     outline_width: float = Field(default=0, ge=0, le=10)
     shadow: float = Field(default=0, ge=0, le=10)

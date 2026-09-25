@@ -35,13 +35,19 @@ project=SimpleNamespace(id='fixture',fps=30,width=320,height=180)
 scenes=[SimpleNamespace(id='red'),SimpleNamespace(id='blue')]
 for transition,bright in [('fade_through_black',False),('fade_white',True)]:
  result=render_export(project,scenes,{c:str(t/(c+'.mp4')) for c in ['red','blue']},[{'type':transition,'duration_ms':1000}],RenderContext())
- mean=frame(result,1.5).mean()
- check(transition+' has correct midpoint',mean>220 if bright else mean<25)
+ # FFmpeg's fadeblack/fadewhite use a nonlinear curve: the peak need
+ # not land on the exact temporal midpoint. Inspect the full overlap.
+ means=[frame(result,1+i/30).mean() for i in range(30)]
+ check(transition+' passes through the intended color',max(means)>240 if bright else min(means)<15)
+ for at,channel in [(0.5,0),(2.5,2)]:
+  rgb=frame(result,at).mean(axis=(0,1))
+  check(transition+' preserves clip color at '+str(at),rgb[channel]>220 and all(rgb[j]<30 for j in range(3) if j!=channel))
  check(transition+' has expected overlap duration',abs(probe(result).duration_ms-3000)<100)
 with TestClient(app) as c:
  p=c.post('/api/projects',json={'title':'timeline fixture'}).json()
  sid=c.get('/api/projects/'+p['id']).json()['scenes'][0]['id']
- for value in [-1,3001,'500',True]:
+ for value in [-1,30001,'500',True]:
   check('invalid transition duration rejected: '+str(value),c.patch('/api/scenes/'+sid,json={'transition_in':{'type':'dissolve','duration_ms':value}}).status_code==400)
+ check('30-second transition limit is accepted',c.patch('/api/scenes/'+sid,json={'transition_in':{'type':'dissolve','duration_ms':30000}}).status_code==200)
  check('new transition persists',c.patch('/api/scenes/'+sid,json={'transition_in':{'type':'wipe_left','duration_ms':600}}).json()['transition_in_json']=={'type':'wipe_left','duration_ms':600})
 print(f'{n} timeline checks passed')

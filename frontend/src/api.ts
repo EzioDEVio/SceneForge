@@ -37,7 +37,11 @@ export type VoiceTake = {
   accepted: boolean;
   stale: boolean;
   audio_asset?: Asset;
+  edit_json?: AudioEdit;
+  effective_duration_ms?: number | null;
 };
+export type AudioEdit = {in_ms?: number; out_ms?: number | null; volume?: number; fade_in_ms?: number; fade_out_ms?: number; voice_fx?: string};
+export type Waveform = {duration_ms: number; peaks: number[]; peak: number};
 
 export type FontSettings = {
   family: string;
@@ -57,6 +61,23 @@ export type FontSettings = {
   typewriter_duration_ms?: number;
 };
 
+/** Must match BUILD_ID in backend/app/main.py. */
+export const BUILD_ID = "rc5-batchbc-7";
+
+export type Adjust = Partial<Record<'exposure'|'contrast'|'highlights'|'shadows'|'temperature'|'tint'|'saturation'|'vibrance'|'sharpen'|'vignette'|'grain', number>>;
+export type Look = {
+  glitch?: {speed: number; block: 'small' | 'medium' | 'large'} | null;
+  adjust?: Adjust | null;
+  lut?: {asset_id: string; strength: number} | null;
+  film?: FilmLook | null;
+};
+export type Overlay = {id: string; asset_id: string; x: number; y: number; width: number; rotation: number; opacity: number;
+  radius: number; border: number; border_color: string; shadow: number; start_ms: number; end_ms: number | null;
+  anim_in: 'none' | 'fade' | 'slide_left' | 'slide_up' | 'zoom'; anim_out: 'none' | 'fade' | 'slide_left' | 'slide_up' | 'zoom'; anim_ms: number;
+  x2?: number | null; y2?: number | null; chroma?: string | null; chroma_similarity?: number; feather?: number};
+export type Finishing = {music?: {asset_id: string; volume: number; duck: number; fade_in_ms: number; fade_out_ms: number} | null; loudnorm?: boolean; leader?: boolean};
+export type FilmLook = {scratches: number; dust: number; flicker: number; weave: number; sound: number; fps: 0 | 16 | 18 | 24; tone: 'color' | 'faded' | 'sepia' | 'bw'};
+
 export type Scene = {
   id: string;
   project_id: string;
@@ -73,6 +94,8 @@ export type Scene = {
   effect_intensity: number;
   transition_in_json: { type: string; duration_ms: number };
   font_json: FontSettings;
+  look_json?: Look;
+  overlays_json?: Overlay[];
   revision: number;
   rendered_plan_hash: string | null;
   rendered_asset_id: string | null;
@@ -92,6 +115,7 @@ export type Project = {
   height: number;
   revision: number;
   default_font_json: FontSettings;
+  finishing_json?: Finishing;
   scenes: Scene[];
 };
 
@@ -116,10 +140,16 @@ export type ProviderProfile = {
   masked_key: string;
   configured: boolean;
 };
+export type VoiceOption = { id: string; name: string; language?: string; accent?: string; gender?: string; age?: string; description?: string; preview_url?: string };
 
 const BASE = "";
 
+let activeWrites=0;
+export const hasActiveWrites=()=>activeWrites>0;
 async function req<T>(path: string, init?: RequestInit): Promise<T> {
+  const write=!!init?.method&&init.method!=="GET";
+  if(write)activeWrites++;
+  try {
   const res = await fetch(`${BASE}${path}`, {
     headers: init?.body && !(init.body instanceof FormData) ? { "Content-Type": "application/json" } : undefined,
     ...init,
@@ -135,7 +165,8 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
     throw new Error(detail);
   }
   if (res.status === 204) return undefined as unknown as T;
-  return res.json();
+  return await res.json();
+  } finally {if(write)activeWrites--;}
 }
 
 export const api = {
@@ -144,7 +175,7 @@ export const api = {
   deleteProject: (id:string) => req<{ok:boolean}>(`/api/projects/${id}`, {method:"DELETE"}),
   listProjects: () => req<Project[]>("/api/projects"),
   getProject: (id: string) => req<Project>(`/api/projects/${id}`),
-  updateProject: (id: string, body: Partial<{ title: string; aspect: string }>) =>
+  updateProject: (id: string, body: Partial<{ title: string; aspect: string; finishing: Finishing }>) =>
     req<Project>(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   addScene: (projectId: string) =>
     req<Scene>(`/api/projects/${projectId}/scenes`, { method: "POST", body: JSON.stringify({}) }),
@@ -165,6 +196,8 @@ export const api = {
       body: JSON.stringify({ asset_id: assetId, motion, fit }),
     }),
   listAssets:(id:string)=>req<Asset[]>(`/api/assets?project_id=${id}`),
+  listLuts:(projectId:string)=>req<Asset[]>(`/api/assets/luts?project_id=${projectId}`),
+  importLut:(projectId:string,file:File)=>{const form=new FormData();form.append('file',file);return req<Asset>(`/api/assets/lut?project_id=${projectId}`,{method:'POST',body:form});},
   hideAsset:(id:string)=>req(`/api/assets/${id}/hide-from-pool`,{method:'POST'}),
   useAudioAsset:(sceneId:string,assetId:string)=>req(`/api/scenes/${sceneId}/voice-takes/from-asset`,{method:'POST',body:JSON.stringify({asset_id:assetId})}),
   splitScene: (id:string,at:number,baked=false)=>req<Scene>(`/api/scenes/${id}/split`,{method:"POST",body:JSON.stringify({at_ms:at,baked})}),
@@ -188,6 +221,9 @@ export const api = {
       body: JSON.stringify({ text, voice }),
     }),
   clearNarration: (sceneId: string) => req(`/api/scenes/${sceneId}/voice-takes/clear-selection`, {method: "POST"}),
+  editTake: (takeId: string, edit: AudioEdit) => req<VoiceTake>(`/api/voice-takes/${takeId}/edit`, {method: "PATCH", body: JSON.stringify(edit)}),
+  waveform: (assetId: string, points = 600) => req<Waveform>(`/api/assets/${assetId}/waveform?points=${points}`),
+  deleteTake: (takeId: string) => req(`/api/voice-takes/${takeId}`, {method:"DELETE"}),
   selectTake: (takeId: string) => req<VoiceTake>(`/api/voice-takes/${takeId}/select`, { method: "POST" }),
 
   renderPart: (sceneId: string) => req<{ job_id: string }>(`/api/scenes/${sceneId}/render`, { method: "POST" }),
@@ -204,13 +240,19 @@ export const api = {
       body: JSON.stringify({ scenes, replace_existing: replaceExisting }),
     }),
 
+  getAsset: (assetId: string) => req<Asset>(`/api/assets/${assetId}`),
+  restoreAsset: (assetId: string) => req<Asset>(`/api/assets/${assetId}/restore`, {method: 'POST'}),
+  beatSync: (projectId: string) => req<{bpm: number; beats: number[]; scenes_changed: number; scenes_kept: number}>(`/api/projects/${projectId}/beat-sync`, {method: 'POST'}),
   assetStreamUrl: (assetId: string) => `/api/assets/${assetId}/stream`,
+  assetThumbUrl: (assetId: string, width = 320) => `/api/assets/${assetId}/thumbnail?w=${width}`,
+  gradedFrameUrl: (sceneId: string, key: string, width = 1280, shotId?: string) => `/api/scenes/${sceneId}/graded-frame?w=${width}&k=${key}${shotId ? `&shot_id=${shotId}` : ''}`,
   assetDownloadUrl: (assetId: string) => `/api/assets/${assetId}/stream?download=1`,
 
-  health: () => req<{status:string;build?:string}>("/api/health"),
+  health: () => req<{status:string;build?:string;credential_warning?:string}>("/api/health"),
+  closeStatus:()=>req<{ready:boolean}>("/api/close-status"),
   connectLocalSpeech: (engine:string) => req<{profile:ProviderProfile;voices:string[];message:string}>(`/api/local-speech/${engine}/connect`, {method:"POST"}),
   imageHistory: (sceneId:string) => req<{id:string;prompt:string;provider:string}[]>(`/api/scenes/${sceneId}/image-history`),
-  providerVoices: (id:string) => req<{voices:string[]}>(`/api/providers/profile/${id}/voices`),
+  providerVoices: (id:string) => req<{voices:VoiceOption[]}>(`/api/providers/profile/${id}/voices`),
   deleteProviderProfile: (id:string) => req(`/api/providers/profile/${id}`, {method:"DELETE"}),
   serviceTts: (sceneId:string, providerId:string, voice:string, language:string, speed:number, audition=false) => req<any>(`/api/scenes/${sceneId}/voice-takes/service`, {method:"POST",body:JSON.stringify({provider_id:providerId,voice,language,speed,audition})}),
   listProviders: () => req<ProviderProfile[]>("/api/providers"),

@@ -1,3 +1,20 @@
+import {askConfirm} from "./dialogs";
+import {registerCloseSave,saveBeforeClose} from "./closeGuard";
+import {hasActiveWrites, BUILD_ID} from "./api";
+import { previewFontFamily } from "./fonts";
+import {Thumb} from "./Thumb";
+import {planPoolInsert} from "./poolPlan";
+import {planFileDrop, DraggedAsset} from "./timelineDrop";
+import {LookPanel, adjustPreviewFilter, WhiteBalanceFilter, PreviewFinish, gradeKey} from "./LookPanel";
+import {AudioClipEditor, removeSceneAudio} from "./AudioClipEditor";
+import {FilmPreview, filmToneFilter} from "./FilmPreview";
+import {FinishingPanel} from "./FinishingPanel";
+import {OverlayCanvas, OverlayPanel} from "./Overlays";
+import {InspectorResizer} from "./InspectorResizer";
+import {SceneEffectsPanel, SceneFxPreview, RouteCanvas} from "./EffectsPanels";
+import {SpeedControls} from "./SpeedControls";
+import type {Overlay} from "./api";
+import {sceneDuration} from "./duration";
 import {TitleDesigner,TitleDesign,ANIMATIONS} from './TitleDesigner';
 import React, { useEffect, useRef, useState } from "react";
 import {
@@ -7,7 +24,7 @@ import {
   FileText, ImageIcon, Clock, Palette, Type, Wand2, Film, Settings, Key, Check,
   ChevronRight, Layers, Copy, PanelLeftClose, PanelLeftOpen, Search, CheckCircle2,
 } from "lucide-react";
-import { api, subscribeJob, Project, Scene, Shot, Job, VoiceTake, ProviderProfile, Asset } from "./api";
+import { api, subscribeJob, Project, Scene, Shot, Job, VoiceTake, ProviderProfile, Asset, VoiceOption } from "./api";
 
 import {MediaPool} from "./MediaPool";
 import {FramingControls} from "./FramingControls";
@@ -48,6 +65,7 @@ const EFFECTS: { key: string; label: string; swatch: string }[] = [
   { key: "noir", label: "Noir", swatch: "grayscale(1) contrast(1.45) brightness(.97)" },
   { key: "sharpen", label: "Sharpen", swatch: "contrast(1.08)" },
   { key: "negative", label: "Negative", swatch: "invert(1)" },
+  { key: "vhs", label: "VHS", swatch: "saturate(1.3) contrast(1.08) hue-rotate(-6deg) blur(0.4px)" },
   { key: "old_film", label: "Old film", swatch: "sepia(0.5) contrast(1.1) brightness(0.85) saturate(0.7)" },
 ];
 
@@ -59,6 +77,7 @@ const EFFECTS: { key: string; label: string; swatch: string }[] = [
 const FONT_FAMILIES = [
   "Noto Naskh Arabic",
   "Noto Sans Arabic",
+  "Noto Sans",
   "Arial",
   "Calibri",
   "Segoe UI",
@@ -165,6 +184,9 @@ function ImageChatDrawer({
 
   const imageProvider = providers?.find((p) => p.capability === "image" && (!providerId || p.id===providerId));
   const configured = !!imageProvider;
+  const [localSetup,setLocalSetup]=useState({folder:"",autostart:true});
+  const [setupMessage,setSetupMessage]=useState("");
+  useEffect(()=>{fetch("/api/local-image-settings").then(r=>r.ok?r.json():Promise.reject()).then(setLocalSetup).catch(()=>setSetupMessage("Could not load local engine settings."));},[]);
   const [engineStatus,setEngineStatus]=useState('');
   const [engineLog,setEngineLog]=useState<string|null>(null);
   const [startingEngine,setStartingEngine]=useState(false);
@@ -214,7 +236,7 @@ function ImageChatDrawer({
           narration or voice settings.
         </small></p>
         <div className="provider-form"><label className="control-label">Image provider<select aria-label="Image provider" value={imageProvider?.id||""} onChange={e=>setProviderId(e.target.value)}>{providers?.filter(p=>p.capability==="image").map(p=><option value={p.id} key={p.id}>{p.name} · {p.model}</option>)}</select></label><label className="control-label">Composition<select disabled={imageProvider?.name==="cloudflare"} aria-label="Image composition" value={size} onChange={e=>setSize(e.target.value)}><option value="1024x1024">Square</option><option value="1536x1024">Landscape</option><option value="1024x1536">Portrait</option></select></label></div>
-        {imageProvider?.name==='local_sd'&&<fieldset className="provider-form"><legend>Local image quality</legend><div className="engine-actions"><button className="btn" disabled={startingEngine} onClick={()=>void engineAction('start')}>Start / retry engine</button><button className="btn" onClick={()=>void engineAction('log')}>View startup log</button></div>{engineLog!==null&&<div><button className="text-btn" onClick={()=>setEngineLog(null)}>Close log</button><pre className="engine-log">{engineLog}</pre></div>}<button type="button" onClick={()=>void checkEngine()}>Check engine</button><p role="status" className="hint">{engineStatus}</p>
+        {imageProvider?.name==='local_sd'&&<fieldset className="provider-form"><legend>Local image quality</legend><details><summary>Local engine setup</summary><label>Stable Diffusion installation folder<input value={localSetup.folder} onChange={e=>setLocalSetup({...localSetup,folder:e.target.value})}/></label><label><input type="checkbox" checked={localSetup.autostart} onChange={e=>setLocalSetup({...localSetup,autostart:e.target.checked})}/>Start with SceneForge</label><p className="hint">Choose the folder containing webui-user.bat. Keep --api in its launch options. Your existing models will be reused.</p><button className="btn" disabled={startingEngine} onClick={async()=>{try{const r=await fetch('/api/local-image-settings',{method:'PUT',headers:{'Content-Type':'application/json'},body:JSON.stringify(localSetup)});const d=await r.json();if(!r.ok)throw Error(d.detail);setLocalSetup(d);setSetupMessage('Saved. Starting your local engine…');await engineAction('start');}catch(e:any){setSetupMessage(e.message)}}}>Save and start</button><p role="status" className="hint">{setupMessage}</p></details><div className="engine-actions"><button className="btn" disabled={startingEngine} onClick={()=>void engineAction('start')}>Start / retry engine</button><button className="btn" onClick={()=>void engineAction('log')}>View startup log</button></div>{engineLog!==null&&<div><button className="text-btn" onClick={()=>setEngineLog(null)}>Close log</button><pre className="engine-log">{engineLog}</pre></div>}<button type="button" onClick={()=>void checkEngine()}>Check engine</button><p role="status" className="hint">{engineStatus}</p>
           <label>Checkpoint family<select value={sd.family} onChange={e=>setSd({...sd,family:e.target.value})}><option value="sd15">SD 1.5 · 512 base</option><option value="sdxl">SDXL · 1024 base (requires SDXL checkpoint)</option></select></label>
           <label>Sampling steps<input type="number" min="10" max="60" value={sd.steps} onChange={e=>setSd({...sd,steps:Number(e.target.value)})}/></label>
           <label>Guidance (CFG)<input type="number" min="1" max="15" step="0.5" value={sd.cfg_scale} onChange={e=>setSd({...sd,cfg_scale:Number(e.target.value)})}/></label>
@@ -225,7 +247,7 @@ function ImageChatDrawer({
         </fieldset>}
         {imageProvider&&<p className="hint">{PROVIDER_NOTES[imageProvider.name]}</p>}
         <textarea
-          placeholder="e.g. Bell Labs, 1947, black-and-white archival photo style, wide shot of a workbench..."
+          placeholder="Describe your subject, setting, composition, lighting, and style…"
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
         />
@@ -268,14 +290,18 @@ const PROVIDER_NOTES:Record<string,string> = {
   gemini:"Image API billing depends on your Google account and model; not advertised as free.",
   cloudflare:"Free daily Workers AI allowance; limits apply. Paid accounts may incur usage charges. FLUX Schnell uses the model’s default composition.",
   huggingface:"Small monthly inference credit, not unlimited free images. Extra usage follows your HF account billing. Model availability varies.",
+  together:"Together AI image models, including a limited free FLUX Schnell model. Usage and quota follow your account.",
   local_sd:"Runs on your computer. Install AUTOMATIC1111 and an image checkpoint, then start it with --api. No API key or Docker required. GPU memory limits apply; model downloads are separate. Use current to keep the loaded model.",
+  elevenlabs:"Hosted multilingual voice generation. Usage and quota follow your ElevenLabs account.",
 };
 const PROVIDER_OPTIONS = [
   {name:"cloudflare", label:"Cloudflare · Free allowance", capability:"image", model:"@cf/black-forest-labs/flux-1-schnell", url:""},
   {name:"huggingface", label:"Hugging Face · Limited credits", capability:"image", model:"black-forest-labs/FLUX.1-schnell", url:""},
+  {name:"together", label:"Together AI · FLUX images", capability:"image", model:"black-forest-labs/FLUX.1-schnell-Free", url:""},
   {name:"local_sd", label:"Local · Stable Diffusion", capability:"image", model:"current", url:"http://127.0.0.1:7860"},
   {name:"openai", label:"OpenAI · Images", capability:"image", model:"gpt-image-1", url:""},
   {name:"gemini", label:"Google Gemini · Images", capability:"image", model:"gemini-3.1-flash-image", url:""},
+  {name:"elevenlabs", label:"ElevenLabs · Voice", capability:"speech", model:"eleven_multilingual_v2", url:"https://api.elevenlabs.io/v1"},
 ];
 function SettingsPanel({ onClose }: { onClose: () => void }) {
   const drawerRef = useDrawerFocus(onClose);
@@ -296,28 +322,28 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
   };
   async function save() {
     setBusy(true);setMessage("");
-    try {await api.upsertProvider(choice.capability,name,key,model,url);setKey("");await refresh();setMessage("Provider saved.");}
+    try {await api.upsertProvider(choice.capability,name,key,model,url);setKey("");await refresh();window.dispatchEvent(new Event("sceneforge:providers-changed"));setMessage("Provider saved.");}
     catch(e:any){setMessage(e.message);}finally{setBusy(false);}
   }
   return <div className="drawer-backdrop" onClick={onClose}><div className="drawer provider-studio" ref={drawerRef} role="dialog" aria-modal="true" aria-label="Editor panel" tabIndex={-1} onClick={e=>e.stopPropagation()}>
     <button className="icon-btn drawer-close" aria-label="Close panel" onClick={onClose}><X size={16}/></button>
     <h3>Settings — Providers</h3><p className="hint">Anthropic Claude analyzes images and writes prompts, but does not provide a photo-generation API. Choose an image engine below.</p><p className="hint">Connect image-generation services. Local narration engines are managed separately under Audio → Local voice engines.</p>
-    <div className="provider-list">{providers.filter(p=>p.capability==="image").map(p=><article className="provider-card" key={p.id}><strong>{PROVIDER_OPTIONS.find(o=>o.name===p.name)?.label||p.name}</strong><small>{p.model} · {p.masked_key||"No key required"}</small><div className="button-row"><button className="text-btn" disabled={busy} onClick={()=>select(p.name)}>Edit</button><button className="text-btn" disabled={busy} onClick={async()=>{try{await api.deleteProviderProfile(p.id);await refresh();}catch(e:any){setMessage(e.message);}}}>Remove</button></div></article>)}</div>
+    <div className="provider-list">{providers.filter(p=>PROVIDER_OPTIONS.some(o=>o.name===p.name)).map(p=><article className="provider-card" key={p.id}><strong>{PROVIDER_OPTIONS.find(o=>o.name===p.name)?.label||p.name}</strong><small>{p.capability} · {p.model} · {p.masked_key||"No key required"}</small><div className="button-row"><button className="text-btn" disabled={busy} onClick={()=>select(p.name)}>Edit</button><button className="text-btn" disabled={busy} onClick={async()=>{try{await api.deleteProviderProfile(p.id);await refresh();window.dispatchEvent(new Event("sceneforge:providers-changed"));}catch(e:any){setMessage(e.message);}}}>Remove</button></div></article>)}</div>
     <fieldset disabled={busy} className="provider-form"><label className="control-label">Provider<select aria-label="Provider" value={name} onChange={e=>select(e.target.value)}>{PROVIDER_OPTIONS.map(o=><option value={o.name} key={o.name}>{o.label}</option>)}</select></label>
     <p className="hint">{PROVIDER_NOTES[name]}</p>
-    {(name==="cloudflare"||name==="local_sd")&&<label className="control-label">{name==="cloudflare"?"Cloudflare account ID":"Local engine URL"}<input aria-label="Provider connection" value={url} onChange={e=>setUrl(e.target.value)}/></label>}
+    {(name==="cloudflare"||name==="local_sd"||name==="elevenlabs")&&<label className="control-label">{name==="cloudflare"?"Cloudflare account ID":name==="elevenlabs"?"ElevenLabs API URL":"Local engine URL"}<input aria-label="Provider connection" value={url} onChange={e=>setUrl(e.target.value)}/></label>}
     <label className="control-label">Model<input disabled={name==="cloudflare"} aria-label="Provider model" value={model} onChange={e=>setModel(e.target.value)}/></label>
 
-    {name!=="local_sd"&&<label className="control-label">{choice.capability==="image"?"API key (re-enter to save)":"Service token (optional)"}<input aria-label="Provider API key" type="password" autoComplete="off" value={key} onChange={e=>setKey(e.target.value)}/></label>}
+    {name!=="local_sd"&&<label className="control-label">{choice.capability==="image"?"API key (re-enter to save)":"Service token"}<input aria-label="Provider API key" type="password" autoComplete="off" value={key} onChange={e=>setKey(e.target.value)}/></label>}
     <button className="btn btn-primary" disabled={busy||(name!=="local_sd"&&!key.trim())} onClick={save}>{busy?"Saving…":"Save provider"}</button></fieldset>
     {message&&<p role="status">{message}</p>}<button className="btn" onClick={onClose}>Close</button>
   </div></div>;
 }
 
-function VoicePanel({ scene, onChanged }: { scene: Scene; onChanged: () => void }) {
+function VoicePanel({ scene, onChanged, beforeGenerate }: { scene: Scene; onChanged: () => void; beforeGenerate: () => Promise<boolean> }) {
   const [providers,setProviders]=useState<ProviderProfile[]>([]);
   const [providerId,setProviderId]=useState("unselected");
-  const [voices,setVoices]=useState<string[]>([]);
+  const [voices,setVoices]=useState<VoiceOption[]>([]);
   const [voice,setVoice]=useState("af_heart");
   const [language,setLanguage]=useState(/[\u0600-\u06ff]/.test(scene.spoken_text)?"ar":"en");
   const [speed,setSpeed]=useState(1);
@@ -327,7 +353,7 @@ function VoicePanel({ scene, onChanged }: { scene: Scene; onChanged: () => void 
     try {
       const result=await api.connectLocalSpeech(engine);
       setProviders(old=>[...old.filter(p=>p.id!==result.profile.id),result.profile]);
-      setProviderId(result.profile.id);setVoices(result.voices);setVoice(result.voices[0]);
+      setProviderId(result.profile.id);setVoices(result.voices.map(v=>typeof v === "string" ? {id:v,name:v} : v));setVoice(result.voices[0] || "");
       if(engine==="chatterbox"&&/[\u0600-\u06ff]/.test(scene.spoken_text))setLanguage("ar");
       if(engine==="kokoro"&&!['en','es','fr','hi','it','ja','pt','zh'].includes(language))setLanguage("en");
       setLocalStatus(result.message);
@@ -336,14 +362,14 @@ function VoicePanel({ scene, onChanged }: { scene: Scene; onChanged: () => void 
   }
   const selectedEngine=providers.find(p=>p.id===providerId)?.name;
   const voicePrefix:Record<string,string>={en:"ab",es:"e",fr:"f",hi:"h",it:"i",ja:"j",pt:"p",zh:"z"};
-  const availableVoices=selectedEngine==="kokoro"?voices.filter(v=>(voicePrefix[language]||"").includes(v[0])):voices;
-  useEffect(()=>{if(availableVoices.length&&!availableVoices.includes(voice))setVoice(availableVoices[0]);},[language,voices,providerId]);
-  useEffect(()=>{api.listProviders().then(p=>setProviders(p.filter(v=>v.capability==="speech"))).catch(()=>{});},[]);
+  const availableVoices=selectedEngine==="kokoro"?voices.filter(v=>(voicePrefix[language]||"").includes(v.id[0])):voices;
+  useEffect(()=>{if(availableVoices.length&&!availableVoices.some(v=>v.id===voice))setVoice(availableVoices[0].id);},[language,voices,providerId]);
+  useEffect(()=>{const refreshProviders=()=>api.listProviders().then(p=>setProviders(p.filter(v=>v.capability==="speech"))).catch(()=>{});void refreshProviders();window.addEventListener("sceneforge:providers-changed",refreshProviders);return()=>window.removeEventListener("sceneforge:providers-changed",refreshProviders);},[]);
   async function connect(id:string){
     setProviderId(id);setVoices([]);setErr(null);if(providers.find(p=>p.id===id)?.name==="kokoro"&&!voicePrefix[language])setLanguage("en");
     if(!id)return;
     setBusy(true);
-    try{const result=await api.providerVoices(id);setVoices(result.voices);setVoice(result.voices[0]||"default");}
+    try{const result=await api.providerVoices(id);const next=result.voices.map(v=>typeof v === "string" ? {id:v,name:v} : v);setVoices(next);setVoice(next[0]?.id||"");}
     catch(e:any){setErr(e.message);}finally{setBusy(false);}
   }
   const [open, setOpen] = useState(true);
@@ -353,6 +379,7 @@ function VoicePanel({ scene, onChanged }: { scene: Scene; onChanged: () => void 
   const fileRef = useRef<HTMLInputElement>(null);
 
   async function audition() {
+    if(!(await beforeGenerate()))return;
     setBusy(true);
     setErr(null);
     try {
@@ -366,6 +393,7 @@ function VoicePanel({ scene, onChanged }: { scene: Scene; onChanged: () => void 
   }
 
   async function generateLocalTake() {
+    if(!(await beforeGenerate()))return;
     setBusy(true);
     setErr(null);
     try {
@@ -400,10 +428,10 @@ function VoicePanel({ scene, onChanged }: { scene: Scene; onChanged: () => void 
       </div>
       {open && (
         <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
-          <section className="local-voice-component"><h3>Local voice engines</h3><p className="hint">Natural speech runs on this computer after the engine and model are installed. No AI provider key is required.</p><div className="button-row"><button className="btn" disabled={busy} onClick={()=>connectEngine("chatterbox")}>Connect Chatterbox · Arabic + multilingual</button><button className="btn" disabled={busy} onClick={()=>connectEngine("kokoro")}>Connect Kokoro</button></div><p className="hint">First-time setup: run START_CHATTERBOX_VOICE.bat or START_KOKORO_VOICE.bat from your app folder. The launcher installs/starts the local component using Docker Desktop.</p>{localStatus&&<p role="status">{localStatus}</p>}</section>
-          <fieldset disabled={busy} className="provider-form"><label className="control-label">Narration engine<select aria-label="Narration engine" value={providerId} onChange={e=>connect(e.target.value)}><option value="unselected">Select a local engine…</option><option value="">Diagnostic voice — robotic (espeak)</option>{providers.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
+          <section className="local-voice-component"><h3>Local voice engines</h3><p className="hint">Natural speech runs on this computer after the engine and model are installed. No AI provider key is required.</p><div className="button-row"><button className="btn" disabled={busy} onClick={()=>connectEngine("chatterbox")}>Connect Chatterbox · Arabic + multilingual</button><button className="btn" disabled={busy} onClick={()=>connectEngine("kokoro")}>Connect Kokoro</button></div><p className="hint">Connect to your installed voice service. For a Docker installation, keep its engine and voice container running. Enter narration text before generating audio.</p>{localStatus&&<p role="status">{localStatus}</p>}</section>
+          <fieldset disabled={busy} className="provider-form"><label className="control-label">Narration engine<select aria-label="Narration engine" value={providerId} onChange={e=>connect(e.target.value)}><option value="unselected">Select a narration engine…</option><option value="">Diagnostic voice — robotic (espeak)</option>{providers.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
           <label className="control-label">Language<select aria-label="Narration language" value={language} onChange={e=>setLanguage(e.target.value)}>{(selectedEngine==="kokoro"?["en","fr","es","it","pt","ja","zh","hi"]:["en","ar","fr","es","de","it","pt","ja","zh","hi","ko","ru","tr"]).map(v=><option value={v} key={v}>{{en:"English",ar:"Arabic",fr:"French",es:"Spanish",de:"German",it:"Italian",pt:"Portuguese",ja:"Japanese",zh:"Chinese",hi:"Hindi",ko:"Korean",ru:"Russian",tr:"Turkish"}[v]}</option>)}</select></label>
-          {providerId&&<><label className="control-label">Voice<select aria-label="Narration voice" value={voice} onChange={e=>setVoice(e.target.value)}>{availableVoices.map(v=><option key={v}>{v}</option>)}</select></label><button className="text-btn" onClick={()=>connect(providerId)}>Refresh voices / test connection</button><label className="control-label">Speaking speed · {speed.toFixed(2)}×<input aria-label="Speaking speed" type="range" min={.5} max={2} step={.05} value={speed} onChange={e=>setSpeed(Number(e.target.value))}/></label></>}
+          {providerId&&<><label className="control-label">Voice<select aria-label="Narration voice" value={voice} onChange={e=>setVoice(e.target.value)}>{availableVoices.map(v=><option key={v.id} value={v.id}>{v.name}{[v.language,v.accent,v.gender].filter(Boolean).length?` · ${[v.language,v.accent,v.gender].filter(Boolean).join(" · ")}`:""}</option>)}</select></label><button className="text-btn" onClick={()=>connect(providerId)}>Refresh voices / test connection</button><label className="control-label">Speaking speed · {speed.toFixed(2)}×<input aria-label="Speaking speed" type="range" min={.5} max={2} step={.05} value={speed} onChange={e=>setSpeed(Number(e.target.value))}/></label></>}
           </fieldset>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
             <button className="btn" onClick={audition} disabled={busy || !scene.spoken_text.trim() || (!!providerId&&!availableVoices.length)}>
@@ -415,11 +443,12 @@ function VoicePanel({ scene, onChanged }: { scene: Scene; onChanged: () => void 
             <button className="btn" onClick={() => fileRef.current?.click()} disabled={busy}>
               Upload recorded audio
             </button>
-            <button className="btn" disabled={busy || !scene.voice_takes.some(t => t.accepted)} onClick={async () => {setBusy(true); setErr(null); try {await api.clearNarration(scene.id); onChanged();} catch(e:any) {setErr(e.message);} finally {setBusy(false);}}}>Use no narration</button>
+            <button className="btn" disabled={busy || !scene.voice_takes.some(t => t.accepted)} onClick={async () => {setBusy(true); setErr(null); try {await removeSceneAudio(scene); onChanged();} catch(e:any) {setErr(e.message);} finally {setBusy(false);}}}>Use no narration</button>
             <input ref={fileRef} type="file" accept="audio/*" style={{ display: "none" }}
               onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadTake(f); }} />
           </div>
           <small className="hint">
+            {!scene.spoken_text.trim() && <strong style={{display:"block"}}>Enter narration text to enable voice generation.</strong>}
             Select a local engine above. The diagnostic espeak voice is robotic and must be chosen explicitly. Narration is sent as continuous text, separately from typewriter animation.
           </small>
           {previewUrl && <audio controls src={previewUrl} style={{ width: "100%" }} />}
@@ -438,6 +467,7 @@ function VoicePanel({ scene, onChanged }: { scene: Scene; onChanged: () => void 
                     </button>
                   )}
                   {t.accepted && <span>✓ selected</span>}
+                  <button className="btn" disabled={busy} aria-label="Delete audio take" onClick={async()=>{if(!await askConfirm('Delete this audio take from the scene?'+(t.accepted?' The scene will have no narration until you choose another take.':'')))return;setBusy(true);setErr(null);try{await api.deleteTake(t.id);onChanged();}catch(e:any){setErr(e.message);}finally{setBusy(false);}}}>Delete</button>
                 </div>
               ))}
             </div>
@@ -479,9 +509,15 @@ function FontPanel({ scene, onChange }: { scene: Scene; onChange: (f: Partial<Sc
         Captions enabled
       </label>
       <label style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-        <input type="checkbox" checked={!!f.typewriter} onChange={(e) => onChange({ typewriter: e.target.checked })} />
-        Typewriter reveal
+        <input type="checkbox" checked={!!f.typewriter} onChange={(e) => onChange({ typewriter: e.target.checked, ...(e.target.checked ? {captions_enabled:true} : {}) })} />
+        Typewriter reveal (captions)
       </label>
+      <label style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
+        <input type="checkbox" aria-label="Word-by-word highlight" checked={!!(f as any).karaoke} onChange={(e) => onChange({ karaoke: e.target.checked, ...(e.target.checked ? {captions_enabled:true, typewriter:false} : {}) } as any)} />
+        Word-by-word highlight (follows the narration)
+      </label>
+      {(f as any).karaoke && <label>Caption style<select aria-label="Caption style" value={(f as any).karaoke_style || "fill"} onChange={(e) => onChange({ karaoke_style: e.target.value } as any)}><option value="fill">Colour fill</option><option value="pop">Pop (current word grows)</option><option value="glow">Glow (current word glows)</option></select></label>}
+      {(f as any).karaoke && <label>Highlight colour<input type="color" aria-label="Highlight colour" value={(f as any).highlight_color || "#FFD84D"} onChange={(e) => onChange({ highlight_color: e.target.value } as any)} /></label>}
       {!f.captions_enabled && (
         <small className="hint">Font changes have no visible effect while captions are disabled.</small>
       )}
@@ -491,25 +527,29 @@ function FontPanel({ scene, onChange }: { scene: Scene; onChange: (f: Partial<Sc
 }
 
 function TextLayers({scene,onChange}:{scene:Scene;onChange:(layers:NonNullable<Scene["font_json"]["layers"]>)=>void}) {
-  const layers=scene.font_json.layers||[];
-  const patch=(id:string,values:object)=>onChange(layers.map(l=>l.id===id?{...l,...values}:l));
-  return <section className="text-layers"><div className="section-heading"><h3>Text overlays</h3><span>{layers.length}/12</span></div><p className="hint">Add titles and labels independently of captions. Coordinates are percentages; end 0 means scene end. Preview shows all layers; render applies timing.</p>
-    {layers.map((l,i)=><article className="layer-card" key={l.id}><div className="section-heading"><strong>Layer {i+1}</strong><button className="text-btn" onClick={()=>onChange(layers.filter(v=>v.id!==l.id))}>Remove</button></div>
-    <textarea aria-label={`Layer ${i+1} text`} dir="auto" key={l.text} defaultValue={l.text} onBlur={e=>{if(e.target.value!==l.text)patch(l.id,{text:e.target.value});}}/>
-    <div className="layer-fields">{[{key:"x",label:"X (%)",max:100},{key:"y",label:"Y (%)",max:100},{key:"size",label:"Size",max:200},{key:"start_ms",label:"Start (ms)",max:3600000},{key:"end_ms",label:"End (ms)",max:3600000}].map(field=><label className="control-label" key={field.key}>{field.label}<input type="number" min={field.key==="size"?12:0} max={field.max} key={String(l[field.key as keyof typeof l])} defaultValue={Number(l[field.key as keyof typeof l])} onBlur={e=>{const n=Math.min(field.max,Math.max(field.key==="size"?12:0,Number(e.target.value)||0));if(n!==l[field.key as keyof typeof l])patch(l.id,{[field.key]:n});}}/></label>)}
-    <label className="control-label">Font<select value={l.family||'Noto Naskh Arabic'} onChange={e=>patch(l.id,{family:e.target.value})}><option>Noto Naskh Arabic</option><option>Noto Sans Arabic</option></select></label><label className="control-label">Alignment<select value={l.align||'center'} onChange={e=>patch(l.id,{align:e.target.value})}>{['left','center','right'].map(v=><option key={v}>{v}</option>)}</select></label>{(['outline_width','shadow','exit_ms'] as const).map(k=><label key={k} className="control-label">{k==='exit_ms'?'Exit fade (ms)':k==='shadow'?'Shadow':'Outline'}<input type="number" min={0} max={k==='exit_ms'?10000:10} value={l[k]||0} onChange={e=>patch(l.id,{[k]:Math.max(0,Math.min(k==='exit_ms'?10000:10,+e.target.value))})}/></label>)}<label className="control-label">Animation<select aria-label={`Layer ${i+1} animation`} value={l.animation||'none'} onChange={e=>patch(l.id,{animation:e.target.value})}>{ANIMATIONS.map(v=><option key={v}>{v}</option>)}</select></label><label className="control-label">Animation ms<input type="number" min={100} max={10000} defaultValue={l.animation_ms||800} onBlur={e=>patch(l.id,{animation_ms:Math.max(100,Math.min(10000,Number(e.target.value)||800))})}/></label><label className="control-label">Color<input type="color" value={l.color} onChange={e=>patch(l.id,{color:e.target.value})}/></label></div><label className="check-label"><input type="checkbox" checked={l.bold} onChange={e=>patch(l.id,{bold:e.target.checked})}/>Bold</label></article>)}
-    <button className="btn" disabled={layers.length>=12} onClick={()=>onChange([...layers,{id:crypto.randomUUID(),text:"Your title",x:50,y:25,size:64,color:"#FFFFFF",start_ms:0,end_ms:0,bold:true}])}><Plus size={14}/> Add text overlay</button>
+  const [layers,setLayers]=useState(scene.font_json.layers||[]);
+  const latest=useRef(layers);
+  const change=(next:typeof layers)=>{latest.current=next;setLayers(next);onChange(next);};
+  const patch=(id:string,values:object)=>change(latest.current.map(l=>l.id===id?{...l,...values}:l));
+  return <section className="text-layers"><div className="section-heading"><h3>Text overlays</h3><span>{layers.length}/12</span></div><p className="hint">Add titles and labels independently of captions. Coordinates are percentages; end 0 means scene end. Choose each title’s Animation here. Preview shows all layers; Render scene plays the animation.</p>
+    {layers.map((l,i)=><article className="layer-card" key={l.id}><div className="section-heading"><strong>Layer {i+1}</strong><button className="text-btn" onClick={()=>change(latest.current.filter(v=>v.id!==l.id))}>Remove</button></div>
+    <textarea aria-label={`Layer ${i+1} text`} dir="auto" value={l.text} onChange={e=>patch(l.id,{text:e.target.value})}/>
+    <div className="layer-fields">{[{key:"x",label:"X position",max:100,step:1},{key:"y",label:"Y position",max:100,step:1},{key:"size",label:"Font size",max:200,step:1},{key:"start_ms",label:"Start (ms)",max:3600000,step:100},{key:"end_ms",label:"End (ms)",max:3600000,step:100}].map(field=>{const min=field.key==="size"?12:0;const value=Number(l[field.key as keyof typeof l])||0;return <label className="control-label slider-field" key={field.key}>{field.label}<span className="slider-value">{value}</span><input type="range" min={min} max={field.max} step={field.step} value={value} onChange={e=>patch(l.id,{[field.key]:Number(e.target.value)})}/></label>})}
+    <label className="control-label">Font<select value={l.family||'Noto Naskh Arabic'} onChange={e=>patch(l.id,{family:e.target.value})}><option>Noto Naskh Arabic</option><option>Noto Sans Arabic</option><option>Noto Sans</option></select></label><label className="control-label">Alignment<select value={l.align||'center'} onChange={e=>patch(l.id,{align:e.target.value})}>{['left','center','right'].map(v=><option key={v}>{v}</option>)}</select></label>{(['outline_width','shadow','exit_ms'] as const).map(k=><label key={k} className="control-label">{k==='exit_ms'?'Exit fade (ms)':k==='shadow'?'Shadow':'Outline'}<input type="number" min={0} max={k==='exit_ms'?10000:10} value={l[k]||0} onChange={e=>patch(l.id,{[k]:Math.max(0,Math.min(k==='exit_ms'?10000:10,+e.target.value))})}/></label>)}<label className="control-label">Animation<select aria-label={`Layer ${i+1} animation`} value={l.animation||'none'} onChange={e=>patch(l.id,{animation:e.target.value})}>{ANIMATIONS.map(v=><option key={v}>{v}</option>)}</select></label><label className="control-label">Animation ms<input type="number" min={100} max={10000} defaultValue={l.animation_ms||800} onBlur={e=>patch(l.id,{animation_ms:Math.max(100,Math.min(10000,Number(e.target.value)||800))})}/></label><label className="control-label">Color<input type="color" value={l.color} onChange={e=>patch(l.id,{color:e.target.value})}/></label></div><label className="check-label"><input type="checkbox" checked={l.bold} onChange={e=>patch(l.id,{bold:e.target.checked})}/>Bold</label></article>)}
+    <button className="btn" disabled={layers.length>=12} onClick={()=>change([...latest.current,{id:crypto.randomUUID(),text:"Your title",x:50,y:25,size:64,color:"#FFFFFF",start_ms:0,end_ms:0,bold:true}])}><Plus size={14}/> Add text overlay</button>
   </section>;
 }
 
-type InspectorTab = "Media" | "Motion" | "Effects" | "Text" | "Audio";
+type InspectorTab = "Media" | "Motion" | "Effects" | "Overlays" | "Text" | "Audio";
 const INSPECTOR_TABS: {name: InspectorTab; Icon: typeof Film}[] = [
   {name: "Media", Icon: ImageIcon}, {name: "Motion", Icon: Film},
-  {name: "Effects", Icon: Palette}, {name: "Text", Icon: Type}, {name: "Audio", Icon: Volume2},
+  {name: "Effects", Icon: Palette}, {name: "Overlays", Icon: Layers}, {name: "Text", Icon: Type}, {name: "Audio", Icon: Volume2},
 ];
 
 function durationLabel(scene: Scene) {
-  const ms = scene.timing_mode === "fixed" ? scene.requested_duration_ms : scene.measured_duration_ms;
+  // Current length (trimmed audio + padding), not the length of the last render.
+  const ms = scene.timing_mode === "fixed" ? scene.requested_duration_ms
+    : scene.voice_takes.some(t => t.accepted) ? sceneDuration(scene) : scene.measured_duration_ms;
   return ms ? `${(ms / 1000).toFixed(1)}s` : "Auto";
 }
 
@@ -523,7 +563,10 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
   const [tab, setTab] = useState<InspectorTab>("Media");
   const [chatOpen, setChatOpen] = useState(false);
   const [text, setText] = useState(scene.spoken_text || scene.original_text);
+  const wordCount = text.trim() ? text.trim().split(/\s+/).length : 0;
+  const speakSeconds = wordCount / 2.5;   // natural narration pace, about 150 words a minute
   const [captions, setCaptions] = useState(scene.subtitle_text);
+  const [draftLayers,setDraftLayers]=useState(scene.font_json.layers||[]);
   const [search, setSearch] = useState("");
   const soundRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
@@ -541,6 +584,12 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
   const writes = useRef(0);
   const alive = useRef(true);
   const job = useJobProgress(jobId);
+  const closeSaveRef=useRef<()=>Promise<boolean>>(async()=>false);
+  closeSaveRef.current=async()=>{
+    if(job&&['queued','running','cancelling'].includes(job.status))return false;
+    return flush();
+  };
+  useEffect(()=>registerCloseSave(scene.id,()=>closeSaveRef.current()),[scene.id]);
   const shot = scene.shots.find(s => s.id === selectedShotId) || scene.shots[0];
   useEffect(()=>{
     const handler=(event:Event)=>{const {sceneId,timeMs}=(event as CustomEvent).detail;if(sceneId!==scene.id)return;
@@ -552,6 +601,22 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
   },[scene.id,previewMode,shot?.id,shot?.source_in_ms]);
   const isGenerating = !!job && ["queued", "running", "cancelling"].includes(job.status);
   const rendered = scene.rendered_asset_id;
+  const acceptedTake = scene.voice_takes.find(t => t.accepted);
+  const [scriptOpen, setScriptOpen] = useState(() => {try {return localStorage.getItem("sceneforge.scriptOpen") === "1";} catch {return false;}});
+  useEffect(() => {try {localStorage.setItem("sceneforge.scriptOpen", scriptOpen ? "1" : "0");} catch {/* storage unavailable */}}, [scriptOpen]);
+  // Overlays are edited live (canvas drag + panel); the draft is saved with the scene.
+  const [ovDraft, setOvDraft] = useState<Overlay[] | null>(null);
+  const [ovSelected, setOvSelected] = useState(0);
+  useEffect(() => {setOvDraft(null); setOvSelected(0);}, [scene.id]);
+  const overlays = ovDraft ?? scene.overlays_json ?? [];
+  const ovRef = useRef(overlays); ovRef.current = overlays;
+  const [routeEditing, setRouteEditing] = useState(false);
+  const [restoreNote, setRestoreNote] = useState('');
+  useEffect(() => setRestoreNote(''), [scene.id]);
+  useEffect(() => setRouteEditing(false), [scene.id]);   // latest overlays for drag-release saves
+  const changeOverlays = (next: Overlay[], save = true) => {setOvDraft(next); if (save) draft({overlays: next});};
+  // Timeline narration clicks open this scene's Audio tab.
+  useEffect(() => {const open = (e: Event) => {const d = (e as CustomEvent).detail; if (d?.sceneId === scene.id && d.tab) setTab(d.tab);}; window.addEventListener('sceneforge-open-tab', open); return () => window.removeEventListener('sceneforge-open-tab', open);}, [scene.id]);
 
   useEffect(() => { if (!active) editorRef.current?.querySelectorAll<HTMLMediaElement>("video, audio").forEach(media => media.pause()); }, [active]);
   useEffect(() => {
@@ -592,12 +657,16 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
     return ok;
   }
   function draft(patch: Record<string, unknown>) {
-    pending.current = {...pending.current, ...patch};
+    pending.current = {...pending.current, ...patch,
+      ...((pending.current.font||patch.font)?{font:{...(pending.current.font as object||{}),...(patch.font as object||{})}}:{}),
+      ...((pending.current.look||patch.look)?{look:{...(pending.current.look as object||{}),...(patch.look as object||{})}}:{})};
+    setPreviewMode("source");
     onSaveState(scene.id, "Unsaved changes");
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => { void flush(); }, 500);
   }
   async function update(patch: Record<string, unknown>) {
+    setPreviewMode("source");
     if (await flush()) await run(() => api.updateScene(scene.id, patch));
   }
   async function upload(file: File) {
@@ -610,7 +679,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
   async function render() {
     setError(null);
     if (!(await flush())) return;
-    if (!scene.voice_takes.some(t => t.accepted) && !(scene.font_json.typewriter_sound && scene.font_json.typewriter && scene.font_json.captions_enabled && captions.trim()) && !confirm("No narration take is selected. Render this scene without narration?")) return;
+    if (!scene.voice_takes.some(t => t.accepted) && !(scene.font_json.typewriter_sound && scene.font_json.typewriter && scene.font_json.captions_enabled && captions.trim()) && !await askConfirm("No narration take is selected. Render this scene without narration?")) return;
     try { setJobId((await api.renderPart(scene.id)).job_id); }
     catch (e: any) { setError(e.message); }
   }
@@ -621,6 +690,19 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
     const base=["contrast","brightness","saturate"].includes(fn)?1:0;
     return `${fn}(${base+(Number(n)-base)*strength}${unit})`;
   });
+  const liveAdjust = ((pending.current.look as any)?.adjust ?? scene.look_json?.adjust) || undefined;
+  const pendingLook = (pending.current.look as any) || {};
+  const liveRoute = ('route' in pendingLook ? pendingLook.route : (scene.look_json as any)?.route) || null;
+  const wbFilterId = `sf-wb-${scene.id}`;
+  // With a LUT, the preview shows a server-graded frame (exact colour: LUT +
+  // colour sliders), so only the look preset stays as a CSS approximation.
+  const gradedSrc = (scene.look_json?.lut || (scene.look_json as any)?.tone?.amount || (scene.look_json as any)?.wheels) && shot ? api.gradedFrameUrl(scene.id, gradeKey(scene.look_json), 1280, shot.id) : null;
+  const liveFilm = (pending.current.look as any)?.film !== undefined ? (pending.current.look as any).film : scene.look_json?.film;
+  // "none" (the Original look) is not combinable with other CSS filter
+  // functions: joined into a list it makes the whole value invalid, and the
+  // browser then drops every filter. Keep only real filter functions.
+  const presetFilter = previewFilter === "none" ? "" : previewFilter;
+  const mediaFilter = [presetFilter, gradedSrc ? "" : adjustPreviewFilter(liveAdjust, wbFilterId), filmToneFilter(liveFilm)].filter(Boolean).join(' ') || undefined;
   const canvasRatio = project.aspect.split(':').map(Number).reduce((a,b)=>a/b);
   async function uploadSound(file: File) {
     await run(async () => {
@@ -640,7 +722,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
           </div>
         </header>
         <div className="preview-card">
-          <div className="preview-toolbar">
+          <div className="preview-toolbar"><div className="button-row"><button className="btn" onClick={()=>{setPreviewMode("source");editorRef.current?.querySelector<HTMLTextAreaElement>('[aria-label="Narration script"]')?.focus();}}>Edit narration</button><button className="btn" onClick={()=>{setTab("Text");setPreviewMode("source");}}>Edit captions & titles</button></div>
             <div className="segmented" aria-label="Preview mode">
               <button aria-pressed={previewMode === "source"} onClick={() => setPreviewMode("source")}>Preview</button>
               <button aria-pressed={previewMode === "render"} disabled={!rendered} onClick={() => setPreviewMode("render")}>Rendered scene</button>
@@ -648,13 +730,13 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
             <span className="aspect-badge">{project.aspect}</span>
           </div>
           <div className="canvas-viewport">
-            <div className="preview-canvas" style={{aspectRatio: project.aspect.replace(":", "/"), width: `min(${zoom}%, calc((var(--stage-height) - 40px) * ${canvasRatio * zoom / 100}))`}}>
+            <div className="preview-canvas" style={{aspectRatio: project.aspect.replace(":", "/"), width: `min(${zoom}%, calc((var(--stage-height) - 40px) * ${canvasRatio * zoom / 100}))`}}><WhiteBalanceFilter id={wbFilterId} adjust={liveAdjust}/>{previewMode !== "render" && shot && <PreviewFinish adjust={liveAdjust}/>}{previewMode !== "render" && shot && liveFilm && <FilmPreview film={liveFilm}/>}{previewMode !== "render" && shot && <SceneFxPreview look={{...(scene.look_json || {}), ...((pending.current.look as any) || {})}} shots={scene.shots}/>}{previewMode !== "render" && shot && routeEditing && liveRoute && <RouteCanvas route={liveRoute} onChange={r => draft({look: {route: r}})}/>}{previewMode !== "render" && shot && overlays.length > 0 && <OverlayCanvas overlays={overlays} frameAspect={project.width / project.height} selected={ovSelected} onSelect={i => {setOvSelected(i); setTab("Overlays");}} onChange={(i, patch, commit) => {const next = ovRef.current.map((x, k) => k === i ? {...x, ...patch} : x); ovRef.current = next; changeOverlays(next, !!commit);}} onCommit={() => draft({overlays: ovRef.current})}/>}
               {previewMode === "render" && rendered ? <video ref={videoRef} className="canvas-media" controls preload="metadata" src={api.assetStreamUrl(rendered)}/> :
-                shot ? shot.asset?.type === "image" ? (shot.crop_json?<svg className="canvas-media" role="img" aria-label={`Cropped source for ${scene.title}`} viewBox={`${shot.crop_json.x*(shot.asset.width||1)} ${shot.crop_json.y*(shot.asset.height||1)} ${shot.crop_json.width*(shot.asset.width||1)} ${shot.crop_json.height*(shot.asset.height||1)}`} preserveAspectRatio={shot.fit==='cover'?'xMidYMid slice':'xMidYMid meet'} style={{filter:previewFilter}}><image href={api.assetStreamUrl(shot.asset_id)} width={shot.asset.width||1} height={shot.asset.height||1}/></svg>:<img className="canvas-media" src={api.assetStreamUrl(shot.asset_id)} alt={`Source media for ${scene.title}`} style={{objectFit: shot.fit === "cover" ? "cover" : "contain", filter:previewFilter}}/>) :
-                  <video ref={videoRef} className="canvas-media" controls preload="metadata" src={api.assetStreamUrl(shot.asset_id)} style={{objectFit:shot.fit === "cover" ? "cover" : "contain",filter:previewFilter}}/> :
+                shot ? shot.asset?.type === "image" ? (shot.crop_json?<svg className="canvas-media" role="img" aria-label={`Cropped source for ${scene.title}`} viewBox={`${shot.crop_json.x*(shot.asset.width||1)} ${shot.crop_json.y*(shot.asset.height||1)} ${shot.crop_json.width*(shot.asset.width||1)} ${shot.crop_json.height*(shot.asset.height||1)}`} preserveAspectRatio={shot.fit==='cover'?'xMidYMid slice':'xMidYMid meet'} style={{filter:mediaFilter}}><image href={gradedSrc||api.assetStreamUrl(shot.asset_id)} width={shot.asset.width||1} height={shot.asset.height||1}/></svg>:<img className="canvas-media" src={gradedSrc||api.assetStreamUrl(shot.asset_id)} alt={`Source media for ${scene.title}`} style={{objectFit: shot.fit === "cover" ? "cover" : "contain", filter:mediaFilter}}/>) :
+                  <video ref={videoRef} className="canvas-media" controls preload="metadata" poster={gradedSrc||undefined} src={api.assetStreamUrl(shot.asset_id)} style={{objectFit:shot.fit === "cover" ? "cover" : "contain",filter:mediaFilter}}/> :
                   <div className="canvas-empty"><div className="empty-icon"><ImageIcon size={30}/></div><h3>Start with a visual</h3><p>Add an image or video to bring this scene to life.</p><button className="btn btn-primary" onClick={() => fileRef.current?.click()}><Plus size={15}/> Add media</button><button className="text-btn" onClick={() => setChatOpen(true)}><Sparkles size={14}/> Or generate an image</button></div>}
               {previewMode==="source"&&shot?.asset?.type==="image"&&scene.effect_preset==="glitch"&&strength>0&&<img aria-hidden="true" className="canvas-media glitch-slice glitch-full" src={api.assetStreamUrl(shot.asset_id)} alt="" style={{objectFit:shot.fit==="cover"?"cover":"contain",opacity:strength}}/>}
-              {previewMode==="source"&&shot&&(scene.font_json.layers||[]).map(l=><div className="canvas-text-layer" key={l.id} dir="auto" style={{left:`${l.x}%`,top:`${l.y}%`,fontSize:`${l.size/project.width*100}cqw`,color:l.color,fontFamily:l.family||scene.font_json.family,fontWeight:l.bold?700:400,textAlign:(l.align||"center") as any,transform:`translate(${l.align==="left"?0:l.align==="right"?-100:-50}%,-50%)`,WebkitTextStroke:`${(l.outline_width||0)/project.width*100}cqw black`,textShadow:l.shadow?`${l.shadow/project.width*100}cqw ${l.shadow/project.width*100}cqw black`:"none"}}>{l.text}</div>)}
+              {previewMode==="source"&&shot&&(scene.font_json.layers||[]).map(l=><div className="canvas-text-layer" key={l.id} dir="auto" style={{left:`${l.x}%`,top:`${l.y}%`,fontSize:`${l.size/project.width*100}cqw`,color:l.color,fontFamily:previewFontFamily(l.family||scene.font_json.family),fontWeight:l.bold?700:400,textAlign:(l.align||"center") as any,transform:`translate(${l.align==="left"?0:l.align==="right"?-100:-50}%,-50%)`,WebkitTextStroke:`${(l.outline_width||0)/project.width*100}cqw black`,textShadow:l.shadow?`${l.shadow/project.width*100}cqw ${l.shadow/project.width*100}cqw black`:"none"}}>{l.text}</div>)}
             </div>
           </div>
           <footer className="preview-footer">
@@ -671,13 +753,19 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
         </div>
         {isGenerating && <progress aria-label="Scene rendering progress" max={100} value={job?.progress || 0}/>}
         {(error || job?.status === "failed") && <div role="alert" className="error-box"><details><summary>Render/save failed — show details</summary><pre>{error || job?.error}</pre></details><button className="text-btn" onClick={()=>{setError(null);setJobId(null);}}>Dismiss</button>{error && <button className="text-btn" onClick={async () => { setError(null); await flush(); }}>Retry text save / dismiss</button>}</div>}
-        <section className="script-card">
-          <div className="section-heading"><h3><FileText size={16}/> Narration script</h3><span className="subtle">{text.trim() ? text.trim().split(/\s+/).length : 0} words</span></div>
+        <section className={`script-card ${scriptOpen ? "expanded" : ""}`} aria-label="Narration script">
+          <div className="section-heading script-heading">
+            <h3><FileText size={16}/> Narration script</h3>
+            <span className="script-chip">{wordCount} words · ≈ {speakSeconds.toFixed(0)} s spoken</span>
+            {acceptedTake ? <span className={`script-chip ${acceptedTake.stale ? "warn" : "ok"}`}>{acceptedTake.stale ? "Script changed · generate a new voice" : `Voice ${(((acceptedTake.effective_duration_ms ?? acceptedTake.measured_duration_ms) || 0) / 1000).toFixed(1)} s`}</span> : wordCount > 0 && <span className="script-chip">No voice yet</span>}
+            <button className="text-btn script-expand" aria-expanded={scriptOpen} onClick={() => setScriptOpen(!scriptOpen)}>{scriptOpen ? "Collapse" : "Expand"}</button>
+          </div>
           <textarea aria-label="Narration script" dir="auto" className="script-box" value={text} onChange={e => {setText(e.target.value); draft({original_text: e.target.value, spoken_text: e.target.value});}} onBlur={() => void flush()} placeholder="Tell your story. Paste or write the narration for this scene…"/>
-          <div className="script-footer"><span>Changes save automatically. Captions are edited in Text.</span><button className="text-btn" onClick={async () => {if (await flush()) setTab("Audio");}}><Volume2 size={14}/> Voice & narration <ChevronRight size={14}/></button></div>
+          <div className="script-footer"><span>Saves automatically. After editing, generate a new voice so the audio matches.</span><button className="btn primary script-voice" onClick={async () => {if (await flush()) setTab("Audio");}}><Volume2 size={14}/> {acceptedTake ? "Voice & narration" : "Generate voice"} <ChevronRight size={14}/></button></div>
         </section>
       </div>
       <aside className="inspector" aria-label="Scene inspector">
+        <InspectorResizer/>
         <div className="inspector-heading"><span className="eyebrow">SCENE SETTINGS</span><span className="subtle">{durationLabel(scene)}</span></div>
         <div className="inspector-tabs" role="tablist" aria-label="Scene tools">
           {INSPECTOR_TABS.map(({name, Icon}) => <button key={name} role="tab" id={`${scene.id}-${name}-tab`} aria-controls={`${scene.id}-panel`} aria-selected={tab === name} onClick={() => setTab(name)} onKeyDown={e => {
@@ -690,17 +778,21 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
             <div className="section-heading"><h3>Scene media</h3><span className="count-badge">{scene.shots.length}</span></div>
             <p className="hint">Images and clips play in the order shown.</p>
             <div className="media-grid">{scene.shots.map((s,i) => <div className={`media-item ${s.id === shot?.id ? "selected" : ""}`} key={s.id}>
-              <button className="media-select" aria-label={`Select media ${i+1}`} aria-pressed={s.id === shot?.id} onClick={() => {setSelectedShotId(s.id); setPreviewMode("source");}}>{s.asset?.type === "image" ? <img src={api.assetStreamUrl(s.asset_id)} alt=""/> : <video preload="metadata" muted src={api.assetStreamUrl(s.asset_id)}/>}<span>{String(i+1).padStart(2,"0")}</span></button>
+              <button className="media-select" aria-label={`Select media ${i+1}`} aria-pressed={s.id === shot?.id} onClick={() => {setSelectedShotId(s.id); setPreviewMode("source");}}><Thumb assetId={s.asset_id} type={s.asset?.type}/><span>{String(i+1).padStart(2,"0")}</span></button>
               <button className="remove-media" aria-label={`Remove media ${i+1}`} disabled={saving} onClick={() => run(() => api.deleteShot(s.id))}><X size={12}/></button>
             </div>)}</div>
             <button className="btn upload-btn" disabled={saving} onClick={() => fileRef.current?.click()}><Upload size={16}/> Upload image or video</button>
-            <button className="btn ai-btn" onClick={() => setChatOpen(true)}><Sparkles size={16}/> Generate image</button>
+            <button className="btn ai-btn" onClick={() => setChatOpen(true)}><Sparkles size={16}/> Generate image</button>{shot?.asset?.type==="image"&&<button className="btn" disabled={saving} title="Make a cleaned-up copy: less noise, dust and scratches removed, better contrast, sharper and larger" onClick={()=>{setRestoreNote("Restoring… this can take a few seconds for large scans.");void run(async()=>{try{const restored=await api.restoreAsset(shot.asset_id);await api.addShot(scene.id,restored.id);await api.deleteShot(shot.id);setRestoreNote(`Done: “${restored.original_filename}” is now in this scene. The original is still in the Media Pool.`);window.dispatchEvent(new Event("sceneforge-media-changed"));}catch(e){setRestoreNote("");throw e;}});}}><Wand2 size={16}/> Restore old photo</button>}{restoreNote&&<p className="hint restore-note" role="status" aria-live="polite">{restoreNote}</p>}
             {shot && <label className="control-label">Frame fit<select aria-label="Frame fit" value={shot.fit} disabled={saving} onChange={e => {const fit = e.currentTarget.value; setPreviewMode("source"); void run(() => api.updateShot(shot.id, {fit}));}}><option value="cover">Fill frame (crop)</option><option value="contain">Fit inside frame (show entire image)</option></select><span className="hint">Fit preserves the whole image with bars where needed. Fill crops the edges to cover the frame.</span></label>}
           </>}
-          {tab === "Motion" && <>{shot&&<FramingControls key={shot.id} shot={shot} save={run}/>}<h3>Camera movement</h3><p className="hint">Applied to {shot ? `media ${scene.shots.indexOf(shot)+1}` : "selected media"}. {shot?.fit !== "cover" ? "Motion requires Fill frame; Fit inside frame keeps the entire image still." : "Render to preview the movement."}</p><div className="motion-box">{MOTIONS.map(({key,label,Icon}) => <button key={key} className={`motion-btn ${activeMotion === key ? "selected" : ""}`} aria-pressed={activeMotion === key} disabled={!shot || saving || shot.fit !== "cover"} onClick={() => run(() => api.updateShot(shot.id,{motion:{type:key}}))}><Icon size={19}/><span>{label}</span></button>)}</div></>}
+          {tab === "Motion" && <>{shot&&<FramingControls key={shot.id} shot={shot} save={run}/>}{shot&&shot.asset?.type==="video"&&<SpeedControls key={"sp"+shot.id} shot={shot} disabled={saving} save={speed=>run(()=>api.updateShot(shot.id,{speed}))}/>}<h3>Camera movement</h3><p className="hint">Applied to {shot ? `media ${scene.shots.indexOf(shot)+1}` : "selected media"}. {shot?.fit !== "cover" ? "Motion requires Fill frame; Fit inside frame keeps the entire image still." : "Render to preview the movement."}</p><div className="motion-box">{MOTIONS.map(({key,label,Icon}) => <button key={key} className={`motion-btn ${activeMotion === key ? "selected" : ""}`} aria-pressed={activeMotion === key} disabled={!shot || saving || shot.fit !== "cover"} onClick={() => run(() => api.updateShot(shot.id,{motion:{type:key,easing:(shot.motion_json as any)?.easing||"ease_in_out"}}))}><Icon size={19}/><span>{label}</span></button>)}</div>{shot&&<label className="control-label">Speed curve<select aria-label="Motion speed curve" value={(shot.motion_json as any)?.easing||"ease_in_out"} disabled={saving||shot.fit!=="cover"} onChange={e=>{const easing=e.target.value; /* read now: the controlled select resets before the queued save runs */ void run(()=>api.updateShot(shot.id,{motion:{...(shot.motion_json||{type:"static"}),easing}}));}}><option value="ease_in_out">Smooth (ease in and out)</option><option value="ease_in">Ease in (starts slow)</option><option value="ease_out">Ease out (ends slow)</option><option value="linear">Constant speed</option></select></label>}</>}
           {tab === "Effects" && <><h3>Image looks</h3><p className="hint">Choose a look for the whole scene.</p><label className="search-control"><Search size={15}/><input aria-label="Search effects" placeholder="Search effects…" value={search} onChange={e => setSearch(e.target.value)}/></label><div className="effects-grid">{EFFECTS.filter(f => f.label.toLowerCase().includes(search.toLowerCase())).map(fx => <button key={fx.key} className={`effect-tile ${scene.effect_preset === fx.key ? "selected" : ""}`} aria-pressed={scene.effect_preset === fx.key} disabled={saving} onClick={() => {setPreviewMode("source"); void update({effect_preset:fx.key});}}>
-            <div className="effect-image">{shot?.asset?.type === "image" ? <img src={api.assetStreamUrl(shot.asset_id)} alt="" style={{filter:fx.swatch}}/> : <div className="effect-swatch" style={{filter:fx.swatch}}/>}{scene.effect_preset === fx.key && <CheckCircle2 size={17}/>}</div><span>{fx.label}</span></button>)}</div>{!EFFECTS.some(f => f.label.toLowerCase().includes(search.toLowerCase())) && <p className="hint">No matching effects.</p>}<p className="hint">Thumbnails are approximate. Glitch adds full-frame RGB separation and tearing across the top, middle and bottom. Render to check the exact result.</p><button className="btn" disabled={!shot||saving||isGenerating} onClick={render}><Play size={14}/> Render effect preview</button><label className="control-label">Effect strength · {scene.effect_intensity}%<input aria-label="Effect strength" type="range" min={0} max={100} step={5} disabled={saving||scene.effect_preset==="original"} key={scene.effect_intensity} defaultValue={scene.effect_intensity} onChange={e=>draft({effect_intensity:Number(e.target.value)})} onBlur={()=>void flush()}/></label><button className="text-btn" disabled={saving || scene.effect_preset === "original"} onClick={() => {setPreviewMode("source"); void update({effect_preset:"original"});}}>Reset to original</button></>}
-          {tab === "Text" && <><h3>On-screen captions</h3><p className="hint">Caption text is independent of narration.</p><textarea aria-label="On-screen captions" dir="auto" className="caption-box" value={captions} onChange={e => {setCaptions(e.target.value); draft({subtitle_text:e.target.value});}} onBlur={() => void flush()} placeholder="Write the text to appear on your video…"/><button className="text-btn" onClick={() => {setCaptions(text); draft({subtitle_text:text});}}><Copy size={13}/> Copy narration to captions</button><fieldset disabled={saving}><FontPanel scene={scene} onChange={f => update({font:f})}/><TextLayers scene={scene} onChange={layers=>update({font:{layers}})}/></fieldset><section className="typewriter-controls"><h3>Typewriter timing & sound</h3>
+            <div className="effect-image">{shot?.asset && shot.asset.type !== "audio" ? <img src={api.assetThumbUrl(shot.asset_id)} alt="" style={{filter:fx.swatch}}/> : <div className="effect-swatch" style={{filter:fx.swatch}}/>}{scene.effect_preset === fx.key && <CheckCircle2 size={17}/>}</div><span>{fx.label}</span></button>)}</div>{!EFFECTS.some(f => f.label.toLowerCase().includes(search.toLowerCase())) && <p className="hint">No matching effects.</p>}<p className="hint">Thumbnails are approximate. Glitch tears the whole frame in bursts; choose its speed and block size below. Render to check the exact result.</p><button className="btn" disabled={!shot||saving||isGenerating} onClick={render}><Play size={14}/> Render effect preview</button><label className="control-label">Effect strength · {scene.effect_intensity}%<input aria-label="Effect strength" type="range" min={0} max={100} step={5} disabled={saving||scene.effect_preset==="original"} key={scene.effect_intensity} defaultValue={scene.effect_intensity} onChange={e=>draft({effect_intensity:Number(e.target.value)})} onBlur={()=>void flush()}/></label><button className="text-btn" disabled={saving || scene.effect_preset === "original"} onClick={() => {setPreviewMode("source"); void update({effect_preset:"original"});}}>Reset to original</button><LookPanel scene={scene} disabled={saving} onDraft={look=>draft({look})} onSaveNow={async look=>{setPreviewMode("source");
+  // Save pending edits first, but do not let an earlier failed save block this independent LUT change.
+  await flush();await run(async()=>{const saved:any=await api.updateScene(scene.id,{look});
+  // An old backend ignores "look" without an error; say so instead of silently doing nothing.
+  if(look.lut&&saved?.look_json?.lut?.asset_id!==look.lut.asset_id)throw new Error("The LUT was not saved because this SceneForge backend is out of date. Close every SceneForge and start.bat window, run setup.bat in the newest folder, then start it again.");});}}/><SceneEffectsPanel scene={scene} disabled={saving} onDraft={look=>draft({look})} liveRoute={liveRoute} routeEditing={routeEditing} onRouteEditing={setRouteEditing} onAddMedia={() => fileRef.current?.click()}/></>}
+          {tab === "Text" && <><h3>On-screen captions</h3><p className="hint">Caption text is independent of narration.</p><textarea aria-label="On-screen captions" dir="auto" className="caption-box" value={captions} onChange={e => {setCaptions(e.target.value); draft({subtitle_text:e.target.value});}} onBlur={() => void flush()} placeholder="Write the text to appear on your video…"/><button className="text-btn" onClick={() => {setCaptions(text); draft({subtitle_text:text});}}><Copy size={13}/> Copy narration to captions</button><fieldset><FontPanel scene={scene} onChange={f => {if(f.typewriter&&!captions.trim()&&text.trim()){setCaptions(text);draft({subtitle_text:text});}void update({font:f});}}/><TextLayers scene={{...scene,font_json:{...scene.font_json,layers:draftLayers}}} onChange={layers=>{setDraftLayers(layers);draft({font:{layers}});}}/></fieldset><button className="btn btn-primary" disabled={!shot||isGenerating} onClick={render}>Render text preview</button><p className="hint">Caption typewriter applies to On-screen captions. For a title, choose typewriter under its Text overlay Animation. Render text preview to see the result.</p><section className="typewriter-controls"><h3>Typewriter timing & sound</h3>
             <p className="hint">Enable Captions and Typewriter reveal above. Sound follows each reveal, not the original recording’s rhythm.</p>
             <label className="check-label"><input type="checkbox" checked={!!scene.font_json.typewriter_sound} disabled={saving} onChange={e=>update({font:{typewriter_sound:e.target.checked}})}/> Synchronized keystrokes</label>
             <div className="button-row">{[{label:"Slow",ms:220},{label:"Natural",ms:160},{label:"Fast",ms:80}].map(p=><button className="btn" disabled={saving} key={p.label} onClick={()=>update({font:{typewriter_duration_ms:Math.min(120000,Math.max(100,(Array.from(captions).length-1)*p.ms))}})}>{p.label}</button>)}</div><button className="text-btn" disabled={saving} onClick={()=>update({timing_mode:"fixed",requested_duration_ms:Math.max(scene.requested_duration_ms||4000,(scene.font_json.typewriter_delay_ms||0)+(scene.font_json.typewriter_duration_ms||Math.max(200,(Array.from(captions).length-1)*160))+1000)})}>Extend scene to fit typing + 1s hold</button>
@@ -708,12 +800,12 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
             <label className="control-label">Reveal time (seconds)<input aria-label="Typing reveal time" type="number" min={.1} max={120} step={.1} key={scene.font_json.typewriter_duration_ms} defaultValue={scene.font_json.typewriter_duration_ms ? scene.font_json.typewriter_duration_ms/1000 : ''} placeholder="Auto" onBlur={e=>{if(e.target.value){const v=Math.min(120,Math.max(.1,Number(e.target.value)||3))*1000;void update({font:{typewriter_duration_ms:v}});}}}/></label></div>
             <p className="hint">Short scenes compress the reveal and make typing faster. Choose Slow, then Extend scene to preserve the slower speed. This switches duration to Fixed; narration may be trimmed to that duration.</p>
             <label className="control-label">Keystroke volume (%)<input aria-label="Keystroke volume" type="number" min={0} max={100} key={scene.font_json.typewriter_volume} defaultValue={scene.font_json.typewriter_volume??50} onBlur={e=>{const v=Math.min(100,Math.max(0,Number(e.target.value)||0));if(v!==(scene.font_json.typewriter_volume??50))void update({font:{typewriter_volume:v}});}}/></label>
-            <p className="hint">{scene.font_json.typewriter_sound_asset_id ? 'Sound: uploaded recording (a short keystroke is extracted).' : 'Sound: keystroke extracted from your supplied typewriter MP3.'}</p>
+            <p className="hint">{scene.font_json.typewriter_sound_asset_id ? 'Sound: uploaded recording (a short keystroke is extracted).' : 'Sound: included keystroke.'}</p>
             <button className="btn upload-btn" disabled={saving} onClick={()=>soundRef.current?.click()}><Upload size={14}/> Upload typewriter sound</button>
             {scene.font_json.typewriter_sound_asset_id && <button className="text-btn" disabled={saving} onClick={()=>update({font:{typewriter_sound_asset_id:null}})}>Use included keystroke</button>}
             <p className="hint">If this recording was previously uploaded as narration, choose Audio → Use no narration to avoid hearing it twice.</p>
           </section><p className="hint">Render the scene to preview captions and synchronized sound together.</p></>}
-          {tab === "Audio" && <><h3>Voice & narration</h3><p className="hint">Connect a local speech component or upload a recording. Select a take before rendering.</p><VoicePanel scene={scene} onChanged={refresh}/></>}
+          {tab === "Overlays" && <OverlayPanel scene={scene} overlays={overlays} selected={ovSelected} onSelect={setOvSelected} onChange={changeOverlays} disabled={saving}/>}{tab === "Audio" && <>{acceptedTake?.audio_asset && <AudioClipEditor key={acceptedTake.id} scene={scene} take={acceptedTake} disabled={saving} onChanged={refresh} onRemove={()=>run(()=>removeSceneAudio(scene))}/>}<FinishingPanel project={project} disabled={saving} onChanged={refresh}/><h3>Voice & narration</h3><p className="hint">Connect a local speech component or upload a recording. Select a take before rendering.</p><VoicePanel scene={{...scene,spoken_text:text}} onChanged={refresh} beforeGenerate={flush}/></>}
           <section className="timing-section"><h3><Clock size={15}/> Scene duration</h3><label className="control-label">Timing mode<select aria-label="Timing mode" value={scene.timing_mode} disabled={saving} onChange={e => update({timing_mode:e.target.value})}><option value="audio_driven">Match narration</option><option value="fixed">Fixed duration</option></select></label>
           {scene.timing_mode === "fixed" && <label className="control-label">Seconds<input aria-label="Scene duration in seconds" type="number" min={1} max={120} step={0.5} defaultValue={(scene.requested_duration_ms || 5000)/1000} key={scene.requested_duration_ms} onBlur={e => {const v=Math.max(1,Math.min(120,Number(e.target.value)||5)); if (v*1000 !== scene.requested_duration_ms) void update({requested_duration_ms:Math.round(v*1000)});}}/></label>}
           <p className="hint">{scene.timing_mode === "fixed" ? "Narration is trimmed or padded to fit this length." : "Uses the selected narration take, including lead and trail padding."}</p></section>
@@ -728,7 +820,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
 
 function BuildNotice() {
   const [message,setMessage]=useState("");
-  useEffect(()=>{api.health().then(h=>{if(h.build!=="workspace-2.5")setMessage("Backend update required: this interface is connected to a different backend version. Stop the existing server, install the Workspace 2.5 release into that installation, restart scripts/start.bat, then Ctrl+F5.");}).catch(()=>setMessage("Cannot verify backend version. Check that the SceneForge server is running."));},[]);
+  useEffect(()=>{api.health().then(h=>{if(h.build!==BUILD_ID)setMessage("Backend update required: this interface is connected to an older SceneForge backend, so some settings (such as LUTs) would not be saved. Close every SceneForge and start.bat window, then start SceneForge again from the newest folder.");else if(h.credential_warning)setMessage(h.credential_warning);}).catch(()=>setMessage("Cannot verify backend version. Check that the SceneForge server is running."));},[]);
   return message?<div className="error-box" role="alert">{message}</div>:null;
 }
 export default function App() {
@@ -745,6 +837,7 @@ export default function App() {
   const [exportPanel,setExportPanel]=useState(true);
   const [exportExpanded,setExportExpanded]=useState(false);
   const [mediaVersion,setMediaVersion]=useState(0);
+  useEffect(()=>{const bump=()=>setMediaVersion(v=>v+1);window.addEventListener('sceneforge-media-changed',bump);return()=>window.removeEventListener('sceneforge-media-changed',bump);},[]);
   const [importStatus,setImportStatus]=useState('');
   const [menu,setMenu]=useState('');
   const importRef=useRef<HTMLInputElement>(null),audioImportRef=useRef<HTMLInputElement>(null),folderRef=useRef<HTMLInputElement>(null);
@@ -767,7 +860,50 @@ export default function App() {
       if(failures.length)throw new Error(failures.join('\n'));
     });
   }
-  async function addPoolAssets(assets:Asset[]){if(!project)return;await action(async()=>{for(const asset of assets){if(asset.type==='audio')continue;const scene=await api.addScene(project.id);await api.updateScene(scene.id,{title:asset.original_filename,timing_mode:'fixed',requested_duration_ms:asset.type==='video'?(asset.duration_ms||4000):4000});await api.addShot(scene.id,asset.id);setSelectedId(scene.id);}setHistory([]);setFuture([]);await refresh();});}
+  async function addPoolAssets(assets:Asset[]){if(!project)return;await action(async()=>{for(const {asset,sceneId} of planPoolInsert(project.scenes,assets)){const scene=sceneId?{id:sceneId}:await api.addScene(project.id);await api.updateScene(scene.id,{title:asset.original_filename,timing_mode:'fixed',requested_duration_ms:asset.type==='video'?(asset.duration_ms||4000):4000});await api.addShot(scene.id,asset.id);setSelectedId(scene.id);}setHistory([]);setFuture([]);await refresh();});}
+  // Timeline drops. Audio goes to the target scene's narration lane and the
+  // scene switches to "match narration" so picture and sound stay one clip.
+  // Images/videos dropped on a scene are added to it; dropped after the last
+  // scene they fill empty starter parts, then create new scenes.
+  async function attachAudio(sceneId:string,take:()=>Promise<{id:string}>){
+    const t=await take();await api.selectTake(t.id);
+    await api.updateScene(sceneId,{timing_mode:'audio_driven'});
+  }
+  async function placeVisuals(sceneId:string|null,assets:Asset[]){
+    if(!project)return;
+    if(sceneId){for(const a of assets)await api.addShot(sceneId,a.id);return;}
+    for(const {asset,sceneId:target} of planPoolInsert(projectRef.current?.scenes||project.scenes,assets)){
+      const scene=target?{id:target}:await api.addScene(project.id);
+      await api.updateScene(scene.id,{title:asset.original_filename,timing_mode:'fixed',requested_duration_ms:asset.type==='video'?(asset.duration_ms||4000):4000});
+      await api.addShot(scene.id,asset.id);setSelectedId(scene.id);
+    }
+  }
+  async function dropFilesOnTimeline(sceneId:string|null,files:File[]){
+    if(!project)return;
+    const plan=planFileDrop(files,!!sceneId);
+    const notes:string[]=[];
+    await action(async()=>{
+      if(plan.audio&&sceneId){setImportStatus(`Adding ${plan.audio.name}…`);await attachAudio(sceneId,()=>api.uploadVoiceTake(sceneId,plan.audio!));notes.push(`${plan.audio.name} added to the scene’s audio`);}
+      const uploaded:Asset[]=[];
+      for(const f of plan.visuals){setImportStatus(`Importing ${f.name}…`);uploaded.push(await api.uploadAsset(project.id,f));}
+      await placeVisuals(sceneId,uploaded);
+      if(uploaded.length)notes.push(`${uploaded.length} image/video file(s) ${sceneId?'added to the scene':'placed on the timeline'}`);
+      setMediaVersion(v=>v+1);await refresh();
+    });
+    if(plan.extraAudio.length)notes.push(sceneId?`${plan.extraAudio.length} more audio file(s) skipped — one audio file per scene`:`Audio not added — drop audio onto a scene`);
+    if(plan.rejected.length)notes.push(`Skipped unsupported: ${plan.rejected.slice(0,3).join(', ')}${plan.rejected.length>3?'…':''}`);
+    setImportStatus(notes.join('. ')+(notes.length?'.':''));
+  }
+  async function dropAssetsOnTimeline(sceneId:string|null,dragged:DraggedAsset[]){
+    if(!project)return;
+    const audio=dragged.filter(a=>a.type==='audio'),visual=dragged.filter(a=>a.type==='image'||a.type==='video');
+    await action(async()=>{
+      if(audio[0]&&sceneId)await attachAudio(sceneId,()=>api.useAudioAsset(sceneId,audio[0].id) as Promise<{id:string}>);
+      await placeVisuals(sceneId,visual as unknown as Asset[]);
+      await refresh();
+    });
+    setImportStatus(audio.length&&!sceneId?'Audio not added — drop audio onto a scene.':audio.length>1?'Only the first audio file was added; one audio file per scene.':'');
+  }
   async function usePoolAsset(asset:Asset){if(!selected)return;await action(async()=>{if(asset.type==='audio')await api.useAudioAsset(selected.id,asset.id);else await api.addShot(selected.id,asset.id);await refresh();});}
 
   async function importAudio(file:File|undefined){
@@ -779,7 +915,7 @@ export default function App() {
   const [exportJobId, setExportJobId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [sidebar, setSidebar] = useState(true);
-  const [libraryTab,setLibraryTab] = useState<'Scenes'|'Media Pool'|'Effects'|'Transitions'>('Scenes');
+  const [libraryTab,setLibraryTab] = useState<'Scenes'|'Media Pool'|'Transitions'>('Scenes');
   const [states, setStates] = useState<Record<string,string>>({});
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -790,6 +926,18 @@ export default function App() {
   const failed = Object.values(states).some(s => s === "Save failed");
   const status = failed ? "Save failed" : dirty ? "Saving changes…" : "All changes saved";
   const selected = project?.scenes.find(s => s.id === selectedId) || project?.scenes[0];
+  const closeRef=useRef<()=>Promise<boolean>>(async()=>false);
+  closeRef.current=async()=>{
+    if(busy||exporting)return false;
+    if(!(await saveBeforeClose()))return false;
+    if(!(await saveTitle())||hasActiveWrites())return false;
+    return (await api.closeStatus()).ready;
+  };
+  useEffect(()=>{
+    const target=window as Window & {__sceneForgePrepareClose?:()=>Promise<boolean>};
+    target.__sceneForgePrepareClose=()=>closeRef.current();
+    return()=>{delete target.__sceneForgePrepareClose;};
+  },[]);
   projectRef.current = project;
   useEffect(() => {api.listProjects().then(setProjects).catch(e => setError(e.message)).finally(() => setLoading(false));}, []);
   useEffect(() => {
@@ -803,7 +951,7 @@ export default function App() {
     if(!project||busy||dirty||exporting)return;
     await action(async()=>{const empty=project.scenes.filter(s=>!s.shots.length);
       if(!project.scenes.some(s=>s.shots.length))return;
-      if(empty.length&&!confirm(`Skip ${empty.length} empty scene(s) and render all scenes with media?`))return;
+      if(empty.length&&!await askConfirm(`Skip ${empty.length} empty scene(s) and render all scenes with media?`))return;
       setExportPanel(true);setExportExpanded(false);setExportScenes(structuredClone(project.scenes));
       setExportJobId((await api.exportProject(project.id,empty.length>0)).job_id);
     });
@@ -822,7 +970,7 @@ export default function App() {
     await action(async () => {const p=await api.getProject(id); projectRef.current=p; setProject(p);setMediaVersion(v=>v+1);setImportStatus(''); setTitleDraft(p.title); setSelectedId(p.scenes[0]?.id||""); setStates({}); setExportJobId(null);setHistory([]);setFuture([]);});
   }
   async function removeProject(p:Project) {
-    if(!confirm(`Delete “${p.title}” and its scenes? This cannot be undone. Original and cached media files are retained on disk.`))return;
+    if(!await askConfirm(`Delete “${p.title}” and its scenes? This cannot be undone. Original and cached media files are retained on disk.`))return;
     await action(async()=>{await api.deleteProject(p.id);setProjects(old=>old.filter(x=>x.id!==p.id));});
   }
   async function createProject() {
@@ -831,7 +979,7 @@ export default function App() {
   async function resizeDuration(id:string,ms:number){
     const scene=project?.scenes.find(s=>s.id===id);if(!scene)return;
     const take=scene.voice_takes.find(t=>t.accepted);
-    if(take&&ms<(take.measured_duration_ms||0)+(scene.lead_ms||0)+(scene.trail_ms||0)&&!confirm('This duration may cut narration short. Switch to fixed timing?'))return;
+    if(take&&ms<(take.effective_duration_ms??take.measured_duration_ms??0)+(scene.lead_ms||0)+(scene.trail_ms||0)&&!await askConfirm('This duration may cut narration short. Switch to fixed timing?'))return;
     await record('duration',()=>api.updateScene(id,{timing_mode:scene.timing_mode,requested_duration_ms:scene.requested_duration_ms}),()=>api.updateScene(id,{timing_mode:'fixed',requested_duration_ms:ms}));
   }
   const [titleCard,setTitleCard]=useState(false);
@@ -859,16 +1007,17 @@ export default function App() {
     await action(async () => {[ids[i],ids[j]]=[ids[j],ids[i]]; await api.reorderScenes(project.id,ids); await refresh();});
   }
   async function deleteScene(id:string) {
-    if(!confirm("Delete this scene and its media references?")) return;
+    if(!await askConfirm("Delete this scene and its media references?")) return;
     await action(async () => {await api.deleteScene(id); setStates(prev => {const next={...prev}; delete next[id]; return next;});setHistory([]);setFuture([]); await refresh();});
   }
   async function saveTitle() {
-    if(!project) return;
-    if(titleDraft===project.title) {setStates(prev=>({...prev,title:"Saved"})); return;}
+    if(!project) return true;
+    if(titleDraft===project.title) {setStates(prev=>({...prev,title:"Saved"})); return true;}
     const title=titleDraft.trim()||"Untitled documentary";
     const ok=await action(async () => {await api.updateProject(project.id,{title}); await refresh();});
     if(ok) setTitleDraft(title);
     setStates(prev=>({...prev,title:ok?"Saved":"Save failed"}));
+    return ok;
   }
   if(!project) return <main className="project-home"><BuildNotice/>
     <div className="brand"><span className="brand-mark"><Film size={22}/></span> SceneForge <span className="version-chip">STUDIO</span></div>
@@ -901,14 +1050,13 @@ export default function App() {
     {exportPanel&&exportJob?.status==='succeeded'&&exportJob.artifact_asset_id&&<section className="export-result" aria-label="Export result"><header><CheckCircle2 size={16}/><span>Last export ready · Export again after edits</span><a href={api.assetDownloadUrl(exportJob.artifact_asset_id)} download>Download MP4</a><button aria-label={exportExpanded?'Minimize export result':'Expand export result'} onClick={()=>setExportExpanded(!exportExpanded)}>{exportExpanded?'−':'+'}</button><button aria-label="Close export result" onClick={()=>setExportPanel(false)}><X size={14}/></button></header>{exportExpanded&&<video controls src={api.assetStreamUrl(exportJob.artifact_asset_id)}/>}</section>}
     <div className={`workspace ${sidebar ? "" : "sidebar-collapsed"}`}>
       <nav className="scene-sidebar" aria-label="Scenes"><div className="sidebar-header"><h2><Layers size={16}/> Scenes <span className="count-badge">{project.scenes.length}</span></h2><button className="icon-btn" aria-label={sidebar?"Collapse scene list":"Expand scene list"} title={sidebar?"Collapse scene list":"Expand scene list"} onClick={()=>setSidebar(!sidebar)}>{sidebar?<PanelLeftClose size={16}/>:<PanelLeftOpen size={16}/>}</button></div>
-      {sidebar&&<><div className="library-tabs" aria-label="Asset library">{(['Scenes','Media Pool','Effects','Transitions'] as const).map(t=><button key={t} aria-pressed={libraryTab===t} onClick={()=>setLibraryTab(t)}>{t}</button>)}</div>
+      {sidebar&&<><div className="library-tabs" aria-label="Asset library">{(['Scenes','Media Pool','Transitions'] as const).map(t=><button key={t} aria-pressed={libraryTab===t} onClick={()=>setLibraryTab(t)}>{t}</button>)}</div>
       <div className="library-content">
       {libraryTab==='Media Pool'&&<>{importStatus&&<p className="hint" aria-live="polite">{importStatus}</p>}<MediaPool projectId={project.id} version={mediaVersion} disabled={busy||dirty||exporting} onImport={()=>importRef.current?.click()} onFolder={()=>folderRef.current?.click()} onAdd={addPoolAssets} onUse={usePoolAsset} canUse={!!selected}/></>}
 
-      {libraryTab==='Scenes'&&<><p className="sidebar-hint">PROJECT BIN · Select a part to edit</p><div className="scene-list">{project.scenes.map((s,i)=><button key={s.id} className={`scene-nav ${selected?.id===s.id?"selected":""}`} aria-label={`Select scene ${i+1}: ${s.title}`} aria-current={selected?.id===s.id?"true":undefined} onClick={()=>setSelectedId(s.id)}><div className="scene-thumb">{s.shots[0]?.asset?.type==="image"?<img src={api.assetStreamUrl(s.shots[0].asset_id)} alt=""/>:<Film size={22}/>}<span>{String(i+1).padStart(2,"0")}</span></div><div className="scene-nav-meta"><strong>{s.title}</strong><span>{durationLabel(s)} · {s.shots.length} media</span></div></button>)}</div><button className="btn add-scene" disabled={busy||dirty||exporting} onClick={()=>setTitleCard(true)}><Type size={16}/> Add title card</button><button className="btn add-scene" disabled={busy} onClick={addPart}><Plus size={16}/> Add scene</button></>}
-      {libraryTab==='Effects'&&<><p className="sidebar-hint">APPLY TO · {selected?.title||'Select a part'}</p><div className="library-presets">{EFFECTS.map(fx=><button key={fx.key} aria-pressed={selected?.effect_preset===fx.key} disabled={!selected?.shots.length||busy||dirty||exporting} onClick={()=>selected&&action(async()=>{await api.updateScene(selected.id,{effect_preset:fx.key});await refresh();})}><div className="preset-sample" style={{filter:fx.swatch}}>{selected?.shots[0]?.asset?.type==='image'?<img src={api.assetStreamUrl(selected.shots[0].asset_id)} alt=""/>:<Palette size={24}/>}</div><span>{fx.label}</span></button>)}</div></>}
+      {libraryTab==='Scenes'&&<><p className="sidebar-hint">PROJECT BIN · Select a part to edit</p><div className="scene-list">{project.scenes.map((s,i)=><button key={s.id} className={`scene-nav ${selected?.id===s.id?"selected":""}`} aria-label={`Select scene ${i+1}: ${s.title}`} aria-current={selected?.id===s.id?"true":undefined} onClick={()=>setSelectedId(s.id)}><div className="scene-thumb">{s.shots[0]?<Thumb assetId={s.shots[0].asset_id} type={s.shots[0].asset?.type}/>:<Film size={22}/>}<span>{String(i+1).padStart(2,"0")}</span></div><div className="scene-nav-meta"><strong>{s.title}</strong><span>{durationLabel(s)} · {s.shots.length} media</span></div></button>)}</div><button className="btn add-scene" disabled={busy||dirty||exporting} onClick={()=>setTitleCard(true)}><Type size={16}/> Add title card</button><button className="btn add-scene" disabled={busy} onClick={addPart}><Plus size={16}/> Add scene</button></>}
       {libraryTab==='Transitions'&&<><p className="sidebar-hint">INCOMING TO · {selected?.title||'Select a part'}</p><div className="library-presets transition-presets">{TRANSITIONS.map(([key,label])=><button key={key} aria-pressed={selected?.transition_in_json.type===key} disabled={!selected?.shots.length||selected.id===project.scenes.find(s=>s.shots.length)?.id||busy||dirty||exporting} onClick={()=>selected&&record('transition',()=>api.updateScene(selected.id,{transition_in:selected.transition_in_json}),()=>api.updateScene(selected.id,{transition_in:{type:key,duration_ms:key==='cut'?0:(selected.transition_in_json.duration_ms||500)}}))}><div aria-hidden="true" className={`transition-sample sample-${key}`}><span>A</span><span>B</span></div><span>{label}</span></button>)}</div><p className="hint">Select the incoming part, then a transition. Adjust its duration above the tracks.</p></>}
-      </div><div className="sidebar-bottom"><span className="status-dot"/> Local workspace<span>Workspace 2.5 · Scene editor</span></div></>}
+      </div><div className="sidebar-bottom"><span className="status-dot"/> Local workspace<span>Scene editor</span></div></>}
       </nav>
       <main className="editing-area">
         {project.scenes.map((scene,i)=><PartRow key={`${scene.id}-${editorEpoch}`} scene={scene} project={project} index={i} total={project.scenes.length} active={selected?.id===scene.id} refresh={refresh} onMove={dir=>moveScene(scene.id,dir)} onDelete={()=>deleteScene(scene.id)} onOpenSettings={()=>setSettingsOpen(true)} onSaveState={(id,state)=>setStates(prev=>({...prev,[id]:state}))}/>)}
@@ -916,7 +1064,7 @@ export default function App() {
         <div id="sequence-viewer"/>
       </main>
     </div>
-    <ProjectTimeline onDuration={resizeDuration} onRender={()=>void renderFullVideo()} exportScenes={exportScenes} exportAsset={exportJob?.status==="succeeded"?exportJob.artifact_asset_id:null} project={project} selectedId={selected?.id||""} disabled={busy||dirty||exporting} onSelect={setSelectedId} onAdd={addPart} onReorder={ids=>record('scene order',()=>api.reorderScenes(project.id,project.scenes.map(s=>s.id)),()=>api.reorderScenes(project.id,ids))} onUpdate={(id,patch)=>record('transition',()=>api.updateScene(id,{transition_in:project.scenes.find(s=>s.id===id)!.transition_in_json}),()=>api.updateScene(id,patch))} onDelete={()=>selected&&void deleteScene(selected.id)} onAudio={()=>audioImportRef.current?.click()} onRemoveAudio={()=>selected&&void action(async()=>{await api.clearNarration(selected.id);await refresh();})} onUndo={undoTimeline} onRedo={redoTimeline} canUndo={!!history.length} canRedo={!!future.length} onSplit={(at,baked)=>selected&&void action(async()=>{const right=await api.splitScene(selected.id,at,baked);setEditorEpoch(v=>v+1);setHistory([]);setFuture([]);await refresh();setSelectedId(right.id);})}/>
+    <ProjectTimeline notice={importStatus} onDropFiles={(id,files)=>void dropFilesOnTimeline(id,files)} onDropAssets={(id,assets)=>void dropAssetsOnTimeline(id,assets)} onDuration={resizeDuration} onRender={()=>void renderFullVideo()} exportScenes={exportScenes} exportAsset={exportJob?.status==="succeeded"?exportJob.artifact_asset_id:null} project={project} selectedId={selected?.id||""} disabled={busy||dirty||exporting} onSelect={setSelectedId} onAdd={addPart} onReorder={ids=>record('scene order',()=>api.reorderScenes(project.id,project.scenes.map(s=>s.id)),()=>api.reorderScenes(project.id,ids))} onUpdate={(id,patch)=>record('transition',()=>api.updateScene(id,{transition_in:project.scenes.find(s=>s.id===id)!.transition_in_json}),()=>api.updateScene(id,patch))} onDelete={()=>selected&&void deleteScene(selected.id)} onAudio={()=>audioImportRef.current?.click()} onRemoveAudio={()=>selected&&void action(async()=>{await removeSceneAudio(selected);await refresh();})} onRemoveSceneAudio={id=>{const s=project.scenes.find(x=>x.id===id);if(s)void action(async()=>{await removeSceneAudio(s);await refresh();setImportStatus(`Audio removed from ${s.title}. Its picture is unchanged.`);});}} onUndo={undoTimeline} onRedo={redoTimeline} canUndo={!!history.length} canRedo={!!future.length} onSplit={(at,baked)=>selected&&void action(async()=>{const right=await api.splitScene(selected.id,at,baked);setEditorEpoch(v=>v+1);setHistory([]);setFuture([]);await refresh();setSelectedId(right.id);})}/>
     {settingsOpen&&<SettingsPanel onClose={()=>setSettingsOpen(false)}/>}
   </div>;
 }

@@ -1,0 +1,272 @@
+# SceneForge Studio 0.3.0 — first public open-source release
+
+- **Open source** under the GNU GPL v3.0 or later.
+- **Installers for Windows, Linux (AppImage, .deb) and macOS (Apple Silicon, experimental)**, built by GitHub Actions and published on GitHub Releases.
+- **Automatic updates** (Help → Check for updates; Help → Receive beta updates). Windows and Linux AppImage update in the background; macOS announces new versions.
+- **Project backups** before every update (Help → Open project backups; the last 5 are kept).
+- Renamed from "SceneForge Desktop Alpha" to **SceneForge Studio**; projects from the Desktop Alpha are copied over automatically on first start (the old folder is left untouched).
+- New README, third-party notices and contributing guide; new app icon.
+- Includes everything since RC4: effects packs A–C, overlays, map routes, split screen, 3D photos, photo restore, word-by-word captions, music and finishing, audio editing, LUTs, old film and more (see the entries below).
+
+# SceneForge Desktop 0.2.0 RC5 (in progress) — photo restore rewritten
+
+- **Restore old photo** no longer damages detailed photos. The previous version treated fine detail (debris, clothing, branches) as dust and smeared it; on a real WWII photo it "repaired" 23 % of the picture. Now:
+  - dust is only removed where it is a tiny isolated speck on a smooth area (sky, smoke, walls), never inside texture, and never more than 0.5 % of the photo;
+  - grain reduction is scaled to the photo's measured noise;
+  - black-and-white photos are processed and saved as black and white;
+  - contrast and sharpening are gentler (no halos).
+  On the same WWII photo, 94–105 % of the detail is kept.
+
+# SceneForge Desktop 0.2.0 RC5 (in progress) — split screen and photo restore fixes
+
+- **Split screen**: the editor preview now shows the layout. When a scene has only one picture, an **Add another image or video to this scene** button appears under Split screen, and the hint says how many pictures the scene has.
+- **Restore old photo**: shows progress and a confirmation naming the restored copy; the Media Pool refreshes right away. If the photo tools are missing (setup.bat not re-run after updating), a clear message says what to do instead of a generic error.
+
+# SceneForge Desktop 0.2.0 RC5 (in progress) — Batch B and C
+
+## Pictures
+- **3D photo (parallax)**: mark the subject of a still photo; the background behind it is filled in automatically and the two layers move at different depths (push in, pull out, drift left or right).
+- **Restore old photo** (Media tab): a cleaned-up copy with less noise, dust and scratches removed, recovered contrast, sharper detail, and small scans upscaled. The original is kept.
+- **Colour wheels**: lift, gamma and gain, shown in the preview.
+- **Split screen**: side by side, top & bottom, three panels, or a 2 × 2 grid, with gap and background colour.
+
+## Motion and timing
+- **Clip speed** for video clips (Motion tab): 0.25×–4×, a slow-motion or fast moment in the middle, and freeze frames. Scene length does not change.
+- **Map route**: a line draws itself across the picture with pins popping in at each stop. Click the preview to add stops and drag them to adjust; solid or dashed, colour, width, start and draw time.
+- **Sync scene cuts to the beat** (Audio → Music & finishing): finds the tempo of the background music and moves fixed-length scene cuts onto beats. Narrated scenes keep their length.
+
+## Captions
+- **Exact word timing with ElevenLabs**: new ElevenLabs voices include per-word timings, and word-by-word captions follow them exactly when the caption matches the narration. Other voices keep the speech/pause detection.
+
+## Fixes
+- The VHS look's rolling tracking band never appeared (FFmpeg evaluates drawbox positions only once); it is now drawn with a per-frame overlay.
+
+## Notes
+- New dependency: OpenCV (headless), about 70 MB, for 3D photo and photo restore. Run `scripts\setup.bat` again after updating.
+- Colorizing black & white photos and automatic subject detection need AI models and are not included yet.
+- Build ID `rc5-batchbc-7`. New tests: `test_batch_b.py` (27 real-render checks); 7 component checks (115 total).
+
+# SceneForge Desktop 0.2.0 RC5 (in progress) — Effects pack
+
+## New looks and scene effects (Effects tab)
+- **VHS** look: colour bleed, scanlines, a rolling tracking band and tape noise.
+- **Split toning**: tint shadows and highlights with two colours; shown in the preview.
+- **Camera shake** with optional **impact zoom** at the start.
+- **Spotlight**: darken everything except an oval or box, with soft edges and timing.
+- **Blur or pixelate areas** (up to 6) to hide faces, names or number plates.
+- **Light leaks**: warm, cool or rainbow light drifting in from the edges.
+- Spotlight, blur areas and light leaks are previewed live in the editor.
+
+## Transitions
+- Wind, Slice, Open, Close and Quick fade (25 in total).
+
+## Overlays
+- **Glide** from one position to another during the overlay's time, **green screen** (make a colour transparent), and **soft edges**.
+
+## Narration and captions
+- **Voice effect** per take (Audio tab): Clean up, 1940s radio / newsreel, Telephone.
+- **Caption style** for word-by-word: Colour fill, Pop (the current word grows), Glow (the current word glows).
+
+## Tests
+- `tests/integration/test_effects_pack.py` (28 real-render checks, in CI); 8 new component checks (108 total). Build ID `rc5-effects-6`.
+
+# SceneForge Desktop 0.2.0 RC5 (in progress) — caption timing, roomier editor
+
+## Word-by-word captions follow the real voice
+- Fixed: in scenes with a fixed length longer than the narration, the highlight was spread over the whole scene and finished late.
+- Word timing is now measured from the narration audio: SceneForge finds where the voice speaks and where it pauses and places the words on the spoken parts. The highlight waits during pauses and ends when the voice ends. Works with every voice engine (ElevenLabs, Chatterbox, Kokoro, uploads) and language, including Arabic. Trimmed takes are respected.
+
+## Editor layout
+- **Scene settings is resizable**: drag its left edge (280–760 px), double-click to reset, arrow keys for fine steps. The width is remembered.
+- When the panel is wide, groups sit side by side (two or three columns).
+- Controls are grouped into cards; number boxes are wider; choice buttons (animations, tone, frame rate) wrap as pills instead of squashing.
+- **Narration script** card is taller, has **Expand**, and shows the word count, the estimated speaking time, and the voice status (length, or "Script changed · generate a new voice"), with a clear **Generate voice** button.
+
+# SceneForge Desktop 0.2.0 RC5 (in progress) — Picture in picture
+
+## Overlays (new Overlays tab)
+- Place images or videos inside a scene: maps, portraits, documents, a second camera angle.
+- **Drag on the preview to move; drag the corner handle to resize.** Arrow keys nudge (Shift for bigger steps).
+- Position, size, rotation, opacity, rounded corners (up to a circle), border and border colour, drop shadow.
+- Show from / until within the scene; entrance and exit animations: Fade, Slide, Rise, Zoom pop; animation length.
+- Up to 8 per scene, with bring forward, send back, duplicate and delete.
+- Videos play silently and loop. Overlays sit above the picture and its effects, below captions and titles.
+- The editor preview matches the render; each card's shadow, border and corner mask are drawn once and cached under `proxies/overlays`.
+
+## Upgrade notes
+- Existing databases gain `scenes.overlays_json` automatically. Build ID is now `rc5-overlays-5`.
+
+## Tests
+- `tests/integration/test_overlays.py` (20 checks, in CI): validation, placement, size and aspect, border, rounded corners, rotation, timing, fade, slide, zoom pop, opacity, looping video, stacking order.
+- 8 new component checks (100 total).
+
+# SceneForge Desktop 0.2.0 RC5 (in progress) — transitions, motion, captions, music, film extras
+
+## Transitions and motion
+- 20 scene transitions: adds Circle close, Zoom in, Smooth slide left/right, Clock wipe, Pixelate, Blur, Diagonal wipe, Squeeze, Fade through grey, and **Film burn** (a hot orange flare that blooms across the cut).
+- **Speed curve** for camera movement (Motion tab): Smooth (ease in and out, the default), Ease in, Ease out, or Constant speed.
+
+## Word-by-word captions
+- Text tab → **Word-by-word highlight**: each word changes to the highlight colour as it is spoken, following the narration. Timing is shared across the narration by word length.
+
+## Music & finishing (Audio tab, whole video, applied on export)
+- **Background music**: loops to the length of the video, with volume and fades, and **gets quieter automatically under narration** (sidechain ducking).
+- **Level loudness for YouTube**: EBU R128 to -14 LUFS / -1.5 dBTP.
+- **Film countdown leader**: 5-4-3-2 with a rotating sweep and the one-frame "2-pop" beep, added before the video (5 s).
+
+## Old film
+- **Projector sound**: clatter at the film frame rate with motor hum, mixed under Old film scenes. The three film styles set it.
+
+## Fixes
+- The motion speed-curve picker read its value after the save was queued, so a choice could be replaced by the previous one. Fixed.
+- Export finishing tolerates older callers without finishing settings.
+
+## Upgrade notes
+- Existing databases gain `projects.finishing_json` automatically. Build ID is now `rc5-finishing-4`.
+
+## Tests
+- `tests/integration/test_finishing.py` (in CI): all 19 transitions render; film burn colour; easing curves; word timing and highlight on real libass frames; easing validation; film burn export length; music looping and ducking; measured loudness; leader length, picture and beep; projector clatter rate.
+- 5 new component checks (92 total).
+
+# SceneForge Desktop 0.2.0 RC5 (in progress) — Old film effect
+
+## Old film (Effects → Old film)
+- A real old-film look, like WWII newsreels and 8 mm home movies:
+  - **Scratches:** vertical lines that drift, wobble, drop out and last up to a few seconds; mostly white, some dark.
+  - **Dust & hair:** specks that change every frame, curly hairs caught in the gate for a few frames, the odd dark blotch.
+  - **Flicker:** exposure that varies from frame to frame, with the gate vignette "breathing" along with it.
+  - **Gate weave:** the picture wobbles in the projector gate, with the occasional frame slip.
+  - **Frame rate:** 16 or 18 fps for the jerky hand-cranked look (24 fps, or keep the project rate). Scene length is unchanged.
+  - **Tone:** Colour, Faded, Sepia, or B & W.
+  - Film grain and slight lens softness scale with the amount of damage.
+- One-click styles: **WWII newsreel**, **8mm home movie**, **Silent era**.
+- The effect plays **live in the editor preview**; the render uses the same settings through FFmpeg.
+- Each scene gets its own damage pattern, and re-rendering a scene gives identical results. The damage layer is cached under `proxies/film` in the data folder and can be deleted safely.
+- Works on top of any look, LUT and adjustment. Titles and captions stay sharp above the film damage.
+
+## Fixes
+- With the **Original** look selected, the colour-slider preview had no effect: the preview combined the CSS value `none` with other filters, which made the whole filter invalid. Fixed.
+
+## Version check
+- Build ID is now `rc5-old-film-3`.
+
+# SceneForge Desktop 0.2.0 RC5 (in progress) — LUT compatibility
+
+## LUTs from DaVinci Resolve
+- **1D LUTs** (`LUT_1D_SIZE`, e.g. gamma, log and HDR conversions) and Resolve's **1D shaper + 3D** LUTs (e.g. ACES LMT) now import and render. Previously they were rejected. All 108 `.cube` files in Resolve's LUT folder import.
+- **Import a whole folder of LUTs** (Effects → Color LUT). Only `.cube` files are imported; other Resolve formats (`.ilut`, `.olut`, `.xml`, `.dat`) are listed as skipped, and broken files are named with the reason. Several files can also be chosen at once in the file picker.
+- The LUT size limit is raised from 12 MB to 32 MB (Resolve's "Samsung Log to Rec709" is a legal 65-point LUT of 12.9 MB).
+- If the backend does not keep a LUT choice, the panel now says so instead of silently doing nothing. Choosing a LUT is no longer blocked by an earlier failed save.
+
+## Version check
+- The backend build ID is now `rc5-looks-audio-2` and is shared with the interface (`BUILD_ID`). A new interface connected to an older backend (for example a `start.bat` window from a previous version that is still open) shows "Backend update required" instead of silently dropping new settings.
+
+# SceneForge Desktop 0.2.0 RC5 (in progress) — audio clip editing, LUT preview
+
+## Scene audio editor
+- Click a scene's audio clip on the timeline (or open Audio) to edit it: waveform with draggable trim handles (arrow keys nudge 0.1 s), Start/End in seconds, Volume 0–200%, Fade in and Fade out, **Play clip** to audition the trimmed, levelled and faded result, and **Reset edits**.
+- Edits are non-destructive: the original file is never changed. **Match narration** uses the trimmed length.
+- **Remove from scene** takes the audio off without touching the picture. The scene keeps its current length, and the audio stays in the takes list and the Media Pool. With a timeline audio clip focused, Delete removes only the audio.
+- Timeline audio clips show their waveform and file name.
+
+## LUT fixes
+- The editor preview now shows the LUT (and colour sliders) exactly as the render will, and Effects → Color LUT shows a before/after comparison. Previously LUTs were only visible after rendering, which made them look like they did nothing.
+- .cube files with a UTF-8 byte-order mark or accented titles now import; `LUT_3D_INPUT_RANGE` is honoured.
+- Fixed a race when the preview and a render built the same grade at the same time.
+
+## Other fixes
+- A lead or trail of 0 now renders as zero; previously it rendered the defaults (0.25 s / 0.4 s), so the render was longer than the timeline showed.
+- Scene cards and the settings header show the scene's current length rather than the length of its last render.
+
+## Upgrade notes
+- Existing databases gain `voice_takes.edit_json` automatically; existing takes keep their data.
+
+## Tests
+- `tests/integration/test_audio_edit.py` (26 checks, in CI): trim, volume, fades and length measured on rendered audio; waveform; removal keeps picture and file; database upgrade.
+- `test_looks.py` now 40 checks, including the graded preview matching the render; 7 new component checks.
+
+# SceneForge Desktop 0.2.0 RC5 (in progress) — looks, grading and timeline drops
+
+## Glitch
+- Tears now reach the whole frame: horizontal bands tile the full height, and the RGB split and noise cover the full frame (previously three fixed strips).
+- **Effect strength** sets tear distance, how many bands tear at once, and burst length. New **Speed** (0.25×–4×) sets how often bursts happen; **Block size** chooses Fine, Medium or Chunky bands. These controls appear when Glitch is selected.
+
+## Adjust (Effects tab)
+- Eleven sliders with number boxes and resets: Exposure, Contrast, Highlights, Shadows, Temperature, Tint, Saturation, Vibrance, Sharpen, Vignette, Grain. Double-click a slider to reset it; **Reset all** clears them.
+- The preview approximates the result live; render the scene for the exact grade.
+- Colour sliders and the LUT are baked into one 3D LUT per scene at render time, so grading adds roughly one filter pass however many sliders are used.
+
+## Color LUT
+- **Import .cube** in Effects → Color LUT, choose it per scene, and set its strength. 3D .cube files up to 65 points and 12 MB; invalid files are rejected with the reason. LUTs show in the rendered scene, not in the preview.
+
+## Drag and drop onto the timeline
+- Drop an audio file from Explorer onto a scene's picture or Narration lane: it becomes that scene's sound, and the scene switches to **Match narration** so picture and audio stay one clip.
+- Drop images or videos onto a scene to add them to it, or after the last scene to fill empty starter parts and then create new scenes. Folders work; files are placed in name order.
+- Items can also be dragged from the Media Pool onto a scene. Skipped files (unsupported types, more than one audio file per scene) are reported in the timeline.
+
+## Upgrade notes
+- Existing databases gain a `look_json` column automatically on first start; existing scenes keep all their data. Back up `backend\data` before upgrading, as always.
+- NumPy is now a runtime dependency (`backend/requirements.txt`); run `scripts\setup.bat` again after updating.
+
+## Tests
+- `tests/integration/test_looks.py` (33 checks, in CI): full-frame glitch, strength and speed; .cube parsing and rejection; LUT import; slider validation; real renders for LUT strength, greyscale, temperature and exposure; database upgrade from RC4.
+- 11 new component checks and 8 new unit checks for the Look panel and timeline drops.
+
+# SceneForge Desktop 0.2.0 RC5 (in progress) — editor fixes
+
+## Captions and text
+- Latin text in captions, text layers and title cards now uses the bundled Noto Sans; Arabic text uses the selected Arabic font. Previously English captions borrowed the Arabic font's small digits and narrow spaces, and missing letters fell back to a different system font on each OS.
+- Arabic-first lines now lay out right-to-left across the whole line, so a trailing English word appears on the left as it should. RC4 laid these lines out left-to-right.
+- Latin system fonts (Arial, Georgia, …) keep an Arabic companion font for Arabic words. **Noto Sans** is added to the font lists. The editor preview picks fonts the same way as the renderer.
+- Existing projects render with the new fonts the next time a scene is rendered. Re-render scenes whose captions mix Arabic and Latin text.
+
+## Media
+- Videos show a real frame in the Media Pool, scene bin, timeline, effect tiles and the scene media list. Images there load small cached thumbnails instead of full-size originals. Thumbnails are stored under `proxies/thumbs` in the data folder and can be deleted safely.
+- **Add to timeline** fills the empty starter parts (Part-1, Part-2, Part-3) before creating new scenes. Empty parts between real scenes are left alone.
+
+## Timeline
+- Playback controls: start, previous scene, previous frame, play/pause, stop, next frame, next scene, end. The duplicate Pause and text Prev/Next buttons are removed.
+- **Render full video** moved to the timeline tools on the right.
+- The lane formerly called Titles is now **Text**: captions show with a captions icon, title layers as a count badge.
+- Keyboard shortcuts: Space play/pause, ←/→ one frame, Shift+←/→ one scene, Home/End, Ctrl+Z / Ctrl+Shift+Z / Ctrl+Y undo/redo, Delete removes the selected scene after confirmation. Shortcuts are ignored while typing or when a dialog is open.
+- Effects are now chosen only in Scene Settings → Effects; the duplicate left-panel Effects tab is removed.
+
+## Tests
+- `tests/integration/test_text_thumbs.py` (18 checks, added to CI): script runs, override-injection escaping, real libass renders for Latin and right-to-left mixed captions, and thumbnail endpoint behavior.
+- `frontend/tests/units.mjs` (10 checks) and 6 new component checks for the transport, shortcuts and removed tab.
+- Verified on Linux (libass 0.17.1). A mixed Arabic/Latin caption render on the Windows build is still needed.
+
+# SceneForge Desktop 0.2.0 RC3
+
+## Close and credential fixes
+- X, Alt+F4 and File → Quit ask **Save and exit** or **Cancel**. Pending narration, captions, titles and project-name changes are saved before stopping the backend. Failed saves and active renders keep the app open.
+- Provider credentials use the native Windows credential vault (macOS Keychain / Linux Secret Service in source installs). Legacy Base64 keys migrate on startup; failed migration is reported and the legacy key cannot be used. No plaintext fallback is permitted.
+- Migration scrubs the active SQLite database and WAL. Older backups remain outside this migration; keep them private or rotate keys if they were shared.
+- Linux CI starts a real Secret Service for credential tests. Windows build commands now stop immediately on a failed command.
+- Corrects Together image routing and ElevenLabs audio file format. Cloud provider calls are tested with fixtures; live billable generation is not performed in CI.
+
+
+## Editing fixes
+- Title text saves as you type and stays editable when switching inspector tabs.
+- Caption typewriter enables captions and can populate an empty caption from the narration script.
+- Direct Edit narration and Edit captions & titles actions reopen the editors.
+- Render text preview updates the rendered scene after text or animation changes. Title overlays use their own Animation selector.
+- Voice generation waits for the latest narration script to save. Regenerate narration after editing its script.
+- In-app confirmation dialogs restore editor focus after closing.
+
+## Earlier changes
+- Automatically starts an existing Stable Diffusion WebUI installation when enabled. The default folder is your user profile's `stable-diffusion-webui` folder.
+- **AI Engines → Choose Stable Diffusion folder** opens the native folder picker, saves the location and starts the service. **Generate image → Local engine setup** contains the automatic startup switch and editable path.
+- Reuses an already-running SD API. On exit, stops only an SD process launched by this app.
+- Voice takes now have a Delete action with confirmation. Deleting selected narration invalidates its old scene render and leaves narration unselected. Shared media files remain available.
+- Prevents audio deletion during an active project render.
+- Explains why voice generation is unavailable when narration text is empty.
+- Removes source-workspace launch instructions from desktop voice errors and improves selected-take contrast.
+
+## Install and use
+Close SceneForge before running the new setup executable. The same application identity and user workspace are retained, preserving saved projects and provider settings. Do not delete your existing workspace.
+
+For SD, select your existing folder containing `webui-user.bat`, with `--api` in its launch options. Model downloads are not required when reusing your installation. Initial model startup can take several minutes; use Check engine or View startup log in Image Studio.
+
+## Release status
+This is an unsigned Windows x64 release candidate. The core editor, private Python runtime, FFmpeg and fonts are bundled. AI engines and model downloads are not bundled. Existing Chatterbox installations remain supported. macOS/Linux installers, signing and automatic engine installation are not included. Real SD inference on the user's GPU remains a manual acceptance check; CI checks launching and stopping a fixture service, not model quality.

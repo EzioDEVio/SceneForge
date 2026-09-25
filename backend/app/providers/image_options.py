@@ -28,14 +28,19 @@ def _decode(value):
 def generate(profile, key, prompt, size, options=None):
     width, height = map(int, size.split('x'))
     try:
-        if profile.name == 'huggingface':
+        if profile.name == 'together':
+            response = requests.post('https://api.together.xyz/v1/images/generations',
+                headers={'Authorization': f'Bearer {key}', 'Content-Type': 'application/json'},
+                json={'model': profile.model or 'black-forest-labs/FLUX.1-schnell-Free', 'prompt': prompt,
+                      'width': width, 'height': height, 'n': 1, 'response_format': 'b64_json'}, timeout=(10, 180))
+        elif profile.name == 'huggingface':
             from huggingface_hub import InferenceClient
             # A HF token routes billing through HF, including any available credits.
             client = InferenceClient(provider='auto', api_key=key, timeout=180)
             image = client.text_to_image(prompt, model=profile.model or 'black-forest-labs/FLUX.1-schnell', width=width, height=height)
             buffer = io.BytesIO(); image.save(buffer, format='PNG')
             return buffer.getvalue()
-        if profile.name == 'cloudflare':
+        elif profile.name == 'cloudflare':
             if len(prompt) > 2048:
                 raise ImageProviderError('Cloudflare prompts must contain at most 2,048 characters.')
             endpoint = f'https://api.cloudflare.com/client/v4/accounts/{profile.base_url}/ai/run/@cf/black-forest-labs/flux-1-schnell'
@@ -62,6 +67,9 @@ def generate(profile, key, prompt, size, options=None):
         data = response.json()
         if profile.name == 'cloudflare':
             return _decode(data['result']['image'])
+        if profile.name == 'together':
+            item = data.get('data', [{}])[0]
+            return _decode(item['b64_json'])
         return _decode(data['images'][0])
     except ImageProviderError: raise
     except requests.Timeout: raise ImageProviderError('Image generation timed out. The local model may still be loading; check its window before retrying.')

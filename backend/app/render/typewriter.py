@@ -7,7 +7,8 @@ import wave
 from pathlib import Path
 
 SAMPLE_RATE = 48000
-DEFAULT_KEY = Path(__file__).resolve().parents[3] / 'assets' / 'sfx' / 'typewriter-key.wav'
+from app.config import RESOURCE_DIR
+DEFAULT_KEY = RESOURCE_DIR / 'assets' / 'sfx' / 'typewriter-key.wav'
 
 
 def graphemes(text: str) -> list[str]:

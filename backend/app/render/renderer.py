@@ -96,15 +96,39 @@ def _narration_duration_ms(scene: Scene) -> tuple[int | None, str | None]:
     take = _accepted_take(scene)
     if not take or not take.audio_asset:
         return None, None
+    from app.render.audio_edit import effective_ms
     audio_path = _resolve_asset_path(take.audio_asset)
-    if take.measured_duration_ms:
-        return take.measured_duration_ms, audio_path
-    p = probe(audio_path)
-    return (p.duration_ms or FALLBACK_SCENE_DURATION_MS), audio_path
+    measured = take.measured_duration_ms or probe(audio_path).duration_ms or FALLBACK_SCENE_DURATION_MS
+    return effective_ms(measured, take.edit_json), audio_path
 
 
 def _canvas(project: Project) -> tuple[int, int]:
     return project.width, project.height
+
+
+def _render_layout(scene, project, shots, layout, total_ms, ctx, work_dir, progress_cb=None) -> str:
+    """Split screen / collage: each panel shows one shot for the whole scene."""
+    from app.render.layouts import LAYOUTS, panels
+    out_w, out_h = _canvas(project)
+    rects = panels(layout, out_w, out_h)[: min(LAYOUTS[layout["type"]], len(shots))]
+    parts = []
+    for i, (shot, (x, y, w, h)) in enumerate(zip(shots, rects)):
+        path = str(work_dir / f"panel_{i}.mp4")
+        _render_single_shot(shot, scene, w, h, project.fps, total_ms, path, ctx)
+        parts.append((path, x, y))
+        if progress_cb:
+            progress_cb("visual", int(100 * (i + 1) / len(rects)))
+    dur = total_ms / 1000
+    inputs = ["-f", "lavfi", "-i", f"color=c={layout['bg'].replace('#', '0x')}:s={out_w}x{out_h}:r={project.fps}:d={dur:.3f}"]
+    graph, base = [], "0:v"
+    for i, (path, x, y) in enumerate(parts):
+        inputs += ["-i", path]
+        graph.append(f"[{base}][{i + 1}:v]overlay=x={x}:y={y}:eof_action=repeat[l{i}]")
+        base = f"l{i}"
+    out = str(work_dir / "scene_layout.mp4")
+    run_ffmpeg([*inputs, "-filter_complex", ";".join(graph), "-map", f"[{base}]", "-t", f"{dur:.3f}", "-r", str(project.fps),
+                "-pix_fmt", "yuv420p", "-c:v", "libx264", "-preset", X264_PRESET, "-crf", X264_CRF, out], cancel_check=ctx.cancel_check)
+    return out
 
 
 def render_scene_visual(
@@ -122,6 +146,10 @@ def render_scene_visual(
     shots = [s for s in scene.shots if s.is_selected] or list(scene.shots)
     if not shots:
         raise FFmpegError(f"Scene {scene.id} has no media shots; add an image or video before generating.")
+
+    layout = (scene.look_json or {}).get("layout")
+    if layout and len(shots) >= 2:
+        return _render_layout(scene, project, shots, layout, total_duration_ms, ctx, work_dir, progress_cb)
 
     n = len(shots)
     explicit_total = sum(s.duration_ms or 0 for s in shots)
@@ -170,6 +198,82 @@ def render_scene_visual(
     return concat_out
 
 
+def _apply_overlays(scene: Scene, project: Project, visual_path: str, total_ms: int, work_dir, ctx: RenderContext) -> str:
+    """Composite picture-in-picture overlays onto the scene picture (before captions)."""
+    from types import SimpleNamespace
+    from app.config import PROXIES_DIR
+    from app.db.database import SessionLocal
+    from app.render.overlays import build_overlay_pass
+    out_w, out_h = _canvas(project)
+    assets = {}
+    with SessionLocal() as db:
+        for o in scene.overlays_json:
+            a = db.get(Asset, o["asset_id"])
+            if a is None or a.type not in ("image", "video"):
+                raise FFmpegError("An overlay's media file is missing. Choose it again in the Overlays tab.")
+            assets[a.id] = SimpleNamespace(type=a.type, width=a.width, height=a.height, path=_resolve_asset_path(a))
+    from app.render import scene_fx as fx
+    look, dur, fps = scene.look_json or {}, total_ms / 1000, project.fps
+    graph_parts, base, inputs = [], "0:v", []
+    if look.get("redact"):
+        g, base = fx.redact_graph(base, look["redact"], out_w, out_h, dur); graph_parts += g
+    if scene.overlays_json:
+        inputs, og = build_overlay_pass(scene.overlays_json, assets, out_w, out_h, fps, total_ms, Path(PROXIES_DIR) / "overlays",
+                                        base=base, first_input=1, final="ovl")
+        graph_parts.append(og); base = "ovl"
+    if look.get("route"):
+        from app.render.routes import route_clip, route_graph
+        g, base = route_graph(base, look["route"], route_clip(look["route"], out_w, out_h, fps, Path(PROXIES_DIR) / "scenefx"), fps); graph_parts += g
+    if look.get("spotlight"):
+        g, base = fx.spotlight_graph(base, look["spotlight"], fx.spotlight_png(look["spotlight"], out_w, out_h, Path(PROXIES_DIR) / "scenefx"), fps, dur); graph_parts += g
+    if look.get("leak") and look["leak"]["amount"] > 0:
+        g, base = fx.leak_graph(base, look["leak"], fx.leak_clip(look["leak"]["color"], look["leak"]["speed"], Path(PROXIES_DIR) / "scenefx"), out_w, out_h, fps); graph_parts += g
+    if look.get("shake") and (look["shake"]["amount"] > 0 or look["shake"]["impact"]):
+        g, base = fx.shake_graph(base, look["shake"], out_w, out_h, fps); graph_parts += g
+    graph_parts.append(f"[{base}]format=yuv420p,setsar=1[vout]")
+    graph = ";".join(graph_parts)
+    out = str(Path(work_dir) / "scene_overlays.mp4")
+    run_ffmpeg(["-i", visual_path, *inputs, "-filter_complex", graph, "-map", "[vout]", "-t", f"{total_ms / 1000:.3f}",
+                "-r", str(project.fps), "-pix_fmt", "yuv420p", "-c:v", "libx264", "-preset", X264_PRESET, "-crf", X264_CRF, out],
+               cancel_check=ctx.cancel_check)
+    return out
+
+
+def _film_damage_for(scene: Scene, width: int, height: int, fps: int) -> str | None:
+    """Scratch/dust clip for the old-film look, seeded by the scene so each
+    scene gets its own damage but re-renders are identical."""
+    import zlib
+    from app.config import PROXIES_DIR
+    from app.render.film_damage import damage_clip
+    from app.render.filters import clean_film, film_fps_for
+    raw = (scene.look_json or {}).get("film")
+    if not raw:
+        return None
+    film = clean_film(raw)
+    return damage_clip(width, height, film_fps_for(film, fps), film["scratches"], film["dust"],
+                       zlib.crc32(scene.id.encode()), Path(PROXIES_DIR) / "film")
+
+
+def _grade_lut_for(scene: Scene) -> str | None:
+    """Bake the scene's colour sliders and imported LUT into one cached LUT."""
+    from app.config import PROXIES_DIR
+    from app.db.database import SessionLocal
+    from app.render.grade import build_grade_lut
+    look = scene.look_json or {}
+    lut = look.get("lut") or {}
+    lut_path = None
+    if lut.get("asset_id"):
+        # Render workers hold detached scenes, so look the asset up directly.
+        with SessionLocal() as db:
+            asset = db.get(Asset, lut["asset_id"])
+            if asset is None or asset.type != "lut" or asset.project_id != scene.project_id:
+                raise FFmpegError("The LUT chosen for this scene is missing. Choose it again in Effects → Color LUT.")
+            lut_path = _resolve_asset_path(asset)
+        if not Path(lut_path).exists():
+            raise FFmpegError("The LUT file for this scene is missing on disk. Import it again in Effects → Color LUT.")
+    return build_grade_lut(look.get("adjust"), lut_path, int(lut.get("strength", 100)), Path(PROXIES_DIR) / "grades", look.get("tone"), look.get("wheels"))
+
+
 def _render_single_shot(
     shot, scene: Scene, out_w: int, out_h: int, fps: int, duration_ms: int, out_path: str, ctx: RenderContext,
     progress_cb=None,
@@ -182,20 +286,30 @@ def _render_single_shot(
     input_args: list[str] = []
     pre_filters = ""
 
-    if asset.type == AssetType.IMAGE:
+    parallax = (scene.look_json or {}).get("parallax")
+    if asset.type == AssetType.IMAGE and parallax:
+        # 2.5D parallax: pre-render the moving layers, then treat as a clip.
+        from app.config import PROXIES_DIR
+        from app.render.photo import parallax_clip
+        src_path = parallax_clip(src_path, parallax, out_w, out_h, fps, duration_s, Path(PROXIES_DIR) / "parallax")
+        input_args = ["-i", src_path, "-t", f"{duration_s:.3f}"]
+        pre_filters = f"fps={fps},"
+    elif asset.type == AssetType.IMAGE:
         input_args = ["-loop", "1", "-framerate", str(fps), "-t", f"{duration_s:.3f}", "-i", src_path]
     else:
+        from app.render.speed import plan as speed_plan
+        src_s, speed_pre, speed_post = speed_plan(getattr(shot, "speed_json", None), duration_s, fps)
         p = probe(src_path)
         src_dur_ms = p.duration_ms or duration_ms
         in_ms = shot.source_in_ms or 0
-        needs_loop = (src_dur_ms - in_ms) < duration_ms
+        needs_loop = (src_dur_ms - in_ms) < src_s * 1000
         if needs_loop:
             input_args = ["-stream_loop", "-1", "-ss", f"{in_ms/1000:.3f}", "-i", src_path, "-t", f"{duration_s:.3f}"]
         else:
             input_args = ["-ss", f"{in_ms/1000:.3f}", "-i", src_path, "-t", f"{duration_s:.3f}"]
         if p.rotation in (90, -90, 270, -270):
             pre_filters = "transpose=1," if p.rotation in (90, -270) else "transpose=2,"
-        pre_filters += f"fps={fps},"
+        pre_filters += (f"{speed_pre}," if speed_pre else "") + f"fps={fps}," + (f"{speed_post}," if speed_post else "")
 
     if shot.crop_json:
         c = shot.crop_json
@@ -203,13 +317,16 @@ def _render_single_shot(
 
     graph, warning = filters.build_shot_video_chain(
         fit=shot.fit,
-        motion_json=shot.motion_json,
+        motion_json={"type": "static"} if (asset.type == AssetType.IMAGE and (scene.look_json or {}).get("parallax")) else shot.motion_json,
         out_w=out_w,
         out_h=out_h,
         fps=fps,
         total_frames=total_frames,
         effect_preset=scene.effect_preset,
         effect_intensity=int(scene.effect_intensity),
+        look=scene.look_json or {},
+        grade_lut_path=_grade_lut_for(scene),
+        film_damage_path=_film_damage_for(scene, out_w, out_h, fps),
     )
     if pre_filters:
         # prepend a normalization stage (fps/rotation) onto the graph's input
@@ -238,6 +355,29 @@ def _render_single_shot(
     run_ffmpeg(args, cancel_check=ctx.cancel_check, on_progress=on_ffmpeg_progress)
 
 
+def _exact_word_times(scene: Scene, lead_ms: int) -> list[tuple[int, int]] | None:
+    """Per-word times from the voice engine (ElevenLabs), in scene time."""
+    from app.render.word_timing import exact_word_times, words_from_alignment
+    take = _accepted_take(scene)
+    alignment = ((take.settings_json or {}) if take else {}).get("alignment")
+    if not alignment:
+        return None
+    edit = take.edit_json or {}
+    spoken = words_from_alignment(alignment, int(edit.get("in_ms") or 0), edit.get("out_ms"))
+    times = exact_word_times(scene.subtitle_text.split(), spoken)
+    return [(s + lead_ms, e + lead_ms) for s, e in times] if times else None
+
+
+def _speech_segments(scene: Scene, narration_path: str, lead_ms: int, total_ms: int) -> list[tuple[int, int]] | None:
+    """Spoken spans of the accepted take (after its trim), in scene time."""
+    from app.render.word_timing import voiced_segments
+    take = _accepted_take(scene)
+    edit = (take.edit_json if take else None) or {}
+    segs = voiced_segments(narration_path, int(edit.get("in_ms") or 0), edit.get("out_ms"))
+    segs = [(s + lead_ms, min(e + lead_ms, total_ms)) for s, e in segs if s + lead_ms < total_ms]
+    return segs or None
+
+
 def mux_audio_and_captions(
     scene: Scene,
     project: Project,
@@ -255,6 +395,10 @@ def mux_audio_and_captions(
             scene.id, scene.subtitle_text if scene.font_json.get("captions_enabled", True) else "", total_duration_ms, scene.font_json, out_w, out_h,
             out_path=str(work_dir / f"{scene.id}_captions.ass"),
             typewriter=bool(scene.font_json.get("typewriter", False)),
+            speech_start_ms=lead_ms if narration_path else 0,
+            speech_ms=_narration_duration_ms(scene)[0] if narration_path else None,
+            speech_segments=_speech_segments(scene, narration_path, lead_ms, total_duration_ms) if narration_path and scene.font_json.get("karaoke") else None,
+            word_times=_exact_word_times(scene, lead_ms) if narration_path and scene.font_json.get("karaoke") else None,
         )
         fonts_dir = escape_path_for_filter(str(BUNDLED_FONT_PATH.parent))
         ass_escaped = escape_path_for_filter(ass_path)
@@ -289,10 +433,17 @@ def mux_audio_and_captions(
 
     final_path = str(work_dir / "part_final.mp4")
     total_s = total_duration_ms / 1000.0
+    # Trim/volume/fade for the accepted take, applied before placement.
+    from app.render.audio_edit import effective_ms, narration_filter
+    take = _accepted_take(scene)
+    edit = (take.edit_json if take else None) or {}
+    clip_ms = effective_ms(take.measured_duration_ms, edit) if take and take.measured_duration_ms else total_duration_ms
+    pre = narration_filter(edit, clip_ms or total_duration_ms)
+    pre = f"{pre}," if pre else ""
     if typing_path:
         if narration_path:
             inputs = ['-i', captioned_path, '-i', narration_path, '-i', typing_path]
-            graph = (f'[1:a]adelay={lead_ms}|{lead_ms},apad,atrim=duration={total_s:.3f}[voice];'
+            graph = (f'[1:a]{pre}adelay={lead_ms}|{lead_ms},apad,atrim=duration={total_s:.3f}[voice];'
                      f'[2:a]apad,atrim=duration={total_s:.3f}[keys];'
                      '[voice][keys]amix=inputs=2:duration=longest:normalize=0,alimiter=limit=0.95:latency=1[aout]')
             args = [*inputs, '-filter_complex', graph, '-map', '0:v', '-map', '[aout]']
@@ -305,7 +456,7 @@ def mux_audio_and_captions(
             "-i", captioned_path,
             "-i", narration_path,
             "-filter_complex",
-            f"[1:a]adelay={lead_ms}|{lead_ms},apad=whole_dur={trail_s:.3f}[aout]",
+            f"[1:a]{pre}adelay={lead_ms}|{lead_ms},apad=whole_dur={trail_s:.3f}[aout]",
             "-map", "0:v", "-map", "[aout]",
             "-t", f"{total_s:.3f}",
             "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
@@ -335,7 +486,10 @@ def render_part(
     work_dir.mkdir(parents=True, exist_ok=True)
     try:
         narration_ms, narration_path = _narration_duration_ms(scene)
-        lead_ms, trail_ms = scene.lead_ms or DEFAULT_LEAD_MS, scene.trail_ms or DEFAULT_TRAIL_MS
+        # 0 is a valid choice (no padding) and must match the timeline,
+        # which also treats 0 as zero; only a missing value uses the default.
+        lead_ms = DEFAULT_LEAD_MS if scene.lead_ms is None else scene.lead_ms
+        trail_ms = DEFAULT_TRAIL_MS if scene.trail_ms is None else scene.trail_ms
         if scene.timing_mode == "fixed" and scene.requested_duration_ms:
             # User explicitly chose a clip duration — this takes priority
             # over narration length. If narration is present it is muxed
@@ -354,11 +508,20 @@ def render_part(
         if progress_cb:
             progress_cb("visual", 0)
         visual_path = render_scene_visual(scene, project, total_ms, ctx, work_dir, progress_cb)
+        from app.render.scene_fx import has_scene_fx
+        if scene.overlays_json or has_scene_fx(scene.look_json):
+            visual_path = _apply_overlays(scene, project, visual_path, total_ms, work_dir, ctx)
         if progress_cb:
             progress_cb("captions_audio", 50)
         final_path = mux_audio_and_captions(
             scene, project, visual_path, total_ms, narration_path, lead_ms, work_dir, ctx
         )
+        film = (scene.look_json or {}).get("film")
+        if film and int(film.get("sound", 0)) > 0:
+            from app.render.finishing import add_projector_sound
+            from app.render.filters import clean_film, film_fps_for
+            f = clean_film(film)
+            final_path = add_projector_sound(final_path, f["sound"], film_fps_for(f, project.fps), work_dir, ctx.cancel_check)
         if progress_cb:
             progress_cb("finalize", 90)
 
@@ -385,7 +548,27 @@ def render_part(
 # Full export with inter-part transitions
 # ---------------------------------------------------------------------------
 
-def render_export(
+# Scene transitions -> FFmpeg xfade. "film_burn" is a custom expression: a
+# hot orange-white flare that blooms across the cut in organic streaks, like
+# film melting in the projector gate. P runs 1 -> 0 during the transition.
+_BURN_HEAT = "clip((1-abs(2*P-1))*1.7*(0.55+0.45*sin(X/W*9+Y/H*5+P*7)*sin(Y/H*7-X/W*3+P*4)),0,1)"
+FILM_BURN_EXPR = (
+    f"if(eq(PLANE,0),(A*P+B*(1-P))+({_BURN_HEAT})*(240-(A*P+B*(1-P))),"
+    f"if(eq(PLANE,1),(A*P+B*(1-P))+({_BURN_HEAT})*(62-(A*P+B*(1-P))),"
+    f"(A*P+B*(1-P))+({_BURN_HEAT})*(192-(A*P+B*(1-P)))))"
+)
+XFADE_NAMES = {
+    "fade_through_black": "fadeblack", "dissolve": "dissolve", "slide": "slideleft",
+    "slide_right": "slideright", "wipe_left": "wipeleft", "wipe_right": "wiperight",
+    "fade_white": "fadewhite", "circle_open": "circleopen", "circle_close": "circleclose",
+    "zoom_in": "zoomin", "smooth_left": "smoothleft", "smooth_right": "smoothright",
+    "radial": "radial", "pixelize": "pixelize", "blur": "hblur", "diagonal": "diagtl",
+    "squeeze": "squeezeh", "fade_grays": "fadegrays", "wind": "hlwind", "slice": "hlslice",
+    "open": "horzopen", "close": "horzclose", "fade_fast": "fadefast", "film_burn": f"custom:expr='{FILM_BURN_EXPR}'",
+}
+
+
+def _render_export_core(
     project: Project,
     scenes: list[Scene],
     scene_paths: dict[str, str],
@@ -451,11 +634,7 @@ def render_export(
             vraw, araw = f"v{i}raw", f"a{i}raw"
             vout, aout = f"v{i}", f"a{i}"
             vnext, anext = f"vn{i}", f"an{i}"
-            xfade_transition = {
-                "fade_through_black": "fadeblack", "dissolve": "dissolve", "slide": "slideleft",
-                "slide_right": "slideright", "wipe_left": "wipeleft", "wipe_right": "wiperight",
-                "fade_white": "fadewhite", "circle_open": "circleopen",
-            }.get(ttype, "fade")
+            xfade_transition = XFADE_NAMES.get(ttype, "fade")
             if dur_ms <= 0:
                 filter_parts.append(f"[{v_label}][{vnext}]concat=n=2:v=1:a=0[{vraw}]")
                 filter_parts.append(f"[{a_label}][{anext}]concat=n=2:v=0:a=1[{araw}]")
@@ -493,3 +672,12 @@ def render_export(
 
 def cancel_running(ctx: RenderContext) -> None:
     ctx.cancel_requested = True
+
+
+def render_export(project: Project, scenes: list[Scene], scene_paths: dict[str, str], *args, **kwargs) -> str:
+    """Assemble the parts, then apply project finishing: countdown leader,
+    background music with ducking, and loudness levelling."""
+    from app.render.finishing import finish_export
+    out_path = _render_export_core(project, scenes, scene_paths, *args, **kwargs)
+    ctx = kwargs.get("ctx") or next((a for a in args if isinstance(a, RenderContext)), None)
+    return finish_export(out_path, project, ctx.cancel_check if ctx else None)
