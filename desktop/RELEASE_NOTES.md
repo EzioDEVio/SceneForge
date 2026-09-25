@@ -1,3 +1,11 @@
+# SceneForge Studio 0.3.1
+
+- **Stable Diffusion no longer starts automatically** after this update (a one-time change). Starting it with SceneForge could slow the whole computer while it loads. Start it from **AI Engines → Stable Diffusion → Start Stable Diffusion now**, or tick **Start automatically with SceneForge** in the same menu.
+- **Guided AI Engines menu**: *Getting started with AI*, *Add or change API keys*, step-by-step help for Stable Diffusion and local voices.
+- **Help → Collect diagnostics for a bug report**: puts logs and system details (no API keys, no media) in a folder on your Desktop.
+- **View → Developer tools** (Ctrl+Shift+I) for bug reports.
+- Release builds now run an **end-to-end test of real editor work** in the packaged app on Windows, Linux and macOS (import, thumbnails, effects, colour preview, narration waveform, provider settings, and a full scene render), with time limits.
+
 # SceneForge Studio 0.3.0 — first public open-source release
 
 - **Open source** under the GNU GPL v3.0 or later.

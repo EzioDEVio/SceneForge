@@ -43,3 +43,12 @@ test('beta channel setting persists', () => {
   u.saveSettings(ud, {beta: true});
   assert.equal(u.loadSettings(ud).beta, true);
 });
+
+test('Stable Diffusion automatic start is switched off once, keeping the folder', () => {
+  const ws = tmp();
+  fs.writeFileSync(path.join(ws, 'local-images.json'), JSON.stringify({folder: 'C:/sd', autostart: true}));
+  assert.equal(u.reviewSdAutostart(ws), true);
+  assert.deepEqual(JSON.parse(fs.readFileSync(path.join(ws, 'local-images.json'))), {folder: 'C:/sd', autostart: false});
+  fs.writeFileSync(path.join(ws, 'local-images.json'), JSON.stringify({folder: 'C:/sd', autostart: true}));
+  assert.equal(u.reviewSdAutostart(ws), false, 'if the user turns it back on, it stays on');
+});

@@ -914,6 +914,7 @@ export default function App() {
   const [exportScenes,setExportScenes] = useState<Scene[]>([]);
   const [exportJobId, setExportJobId] = useState<string | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  useEffect(()=>{const open=()=>setSettingsOpen(true);window.addEventListener('sceneforge-open-settings',open);return()=>window.removeEventListener('sceneforge-open-settings',open);},[]);
   const [sidebar, setSidebar] = useState(true);
   const [libraryTab,setLibraryTab] = useState<'Scenes'|'Media Pool'|'Transitions'>('Scenes');
   const [states, setStates] = useState<Record<string,string>>({});
