@@ -82,4 +82,79 @@ check('freeze frame holds one frame, then playback continues, same length',len(f
 setspeed(speed=1,ramp='none',freeze_at_ms=0,freeze_ms=0)
 check('neutral speed settings are stored as empty',client.get(f'/api/projects/{pid}').json()['scenes'][0]['shots'][-1]['speed_json']=={})
 client.delete(f"/api/scenes/shots/{shot['id']}")
-print(f'{n} batch B checks passed (part 1)')
+
+# --- split screen layouts ------------------------------------------------------
+Image.fromarray(np.full((360,640,3),(220,30,30),np.uint8)).save(t/'red.png');Image.fromarray(np.full((360,640,3),(30,30,220),np.uint8)).save(t/'blue.png')
+Image.fromarray(np.full((360,640,3),(30,200,30),np.uint8)).save(t/'green.png');Image.fromarray(np.full((360,640,3),(230,210,40),np.uint8)).save(t/'yellow.png')
+ids=[up(f)['id'] for f in ('red.png','blue.png','green.png','yellow.png')]
+for i in ids:client.post(f'/api/scenes/{sid}/shots',json={'asset_id':i})
+check('layout settings are validated',client.patch(f'/api/scenes/{sid}',json={'look':{'layout':{'type':'grid9'}}}).status_code==400)
+client.patch(f'/api/scenes/{sid}',json={'look':{'layout':{'type':'split2','gap':20,'bg':'#FFFFFF'}}})
+f2=render()[30]
+check('split screen shows two shots side by side with a gap',f2[90,60,0]>180 and f2[90,260,2]>180 and f2[90,160].min()>200)
+client.patch(f'/api/scenes/{sid}',json={'look':{'layout':{'type':'grid4','gap':0,'bg':'#000000'}}})
+f4=render()[30]
+check('grid layout shows four shots in the four corners',f4[40,60,0]>180 and f4[40,260,2]>180 and f4[140,60,1]>150 and f4[140,260,0]>180 and f4[140,260,1]>150)
+client.patch(f'/api/scenes/{sid}',json={'look':{'layout':None}})
+for x in client.get(f'/api/projects/{pid}').json()['scenes'][0]['shots'][1:]:client.delete(f"/api/scenes/shots/{x['id']}")
+
+# --- animated map route ------------------------------------------------------------
+check('route settings are validated',client.patch(f'/api/scenes/{sid}',json={'look':{'route':{'points':[[10,10]]}}}).status_code==400)
+client.patch(f'/api/scenes/{sid}',json={'look':{'route':{'points':[[10,50],[90,50]],'color':'#FFFFFF','width':12,'style':'solid','pins':True,'start_ms':0,'draw_ms':1500}}})
+rt=render()
+def line_extent(f):
+ cols=np.nonzero((np.abs(f[88:93]-np.array([220,30,30])).sum(axis=-1)>150).any(axis=0))[0]
+ return cols.max() if cols.size else 0
+check('route line draws itself from start to end, then stays',line_extent(rt[8])<line_extent(rt[30])<line_extent(rt[50]) and line_extent(rt[50])>270 and line_extent(rt[59])>270)
+client.patch(f'/api/scenes/{sid}',json={'look':{'route':None}})
+
+# --- beat sync ---------------------------------------------------------------------
+ff('-f','lavfi','-i',"aevalsrc='0.8*sin(2*PI*60*t)*exp(-40*mod(t,0.5))':s=22050:d=12",str(t/'beat.wav'))   # 120 BPM kick
+from app.render.beats import detect_beats,snap_durations
+bpm,beats=detect_beats(str(t/'beat.wav'))
+check(f'beat detection finds the tempo (found {bpm} BPM, expected 120)',abs(bpm-120)<3 and len(beats)>=20 and all(abs((b-beats[0])%0.5)<0.03 or abs((b-beats[0])%0.5-0.5)<0.03 for b in beats))
+new=snap_durations([2300,3100,1700],[True,False,True],[i*0.5 for i in range(40)])
+check('snapping puts every fixed-length cut on a beat and keeps narrated scenes',new[1]==3100 and abs((new[0]/1000)%0.5)<1e-6 and abs(((new[0]+new[1]+new[2])/1000)%0.5)<1e-6)
+music=up('beat.wav')
+check('beat sync needs background music first',client.post(f'/api/projects/{pid}/beat-sync').status_code==400)
+client.patch(f'/api/projects/{pid}',json={'finishing':{'music':{'asset_id':music['id'],'volume':40,'duck':0,'fade_in_ms':0,'fade_out_ms':0}}})
+client.patch(f'/api/scenes/{sid}',json={'timing_mode':'fixed','requested_duration_ms':2300})
+r=client.post(f'/api/projects/{pid}/beat-sync').json()
+d=client.get(f'/api/projects/{pid}').json()['scenes'][0]['requested_duration_ms']
+check('beat sync moves the scene cut onto a beat',abs(r['bpm']-120)<3 and abs((d/1000-beats[0])%0.5)<0.03 or abs((d/1000-beats[0])%0.5-0.5)<0.03)
+client.patch(f'/api/projects/{pid}',json={'finishing':{}})
+
+# --- 2.5D parallax ------------------------------------------------------------------
+yy,xx=np.mgrid[0:360,0:640];bgimg=np.dstack([(xx/640*200).astype(np.uint8),(yy/360*120+60).astype(np.uint8),np.full((360,640),120,np.uint8)])
+bgimg[120:280,260:380]=[250,250,250]    # a bright "subject" in the middle
+Image.fromarray(bgimg).save(t/'photo.png');photo=up('photo.png')
+first=client.get(f'/api/projects/{pid}').json()['scenes'][0]['shots'][0]['id'];client.delete(f'/api/scenes/shots/{first}')
+client.post(f'/api/scenes/{sid}/shots',json={'asset_id':photo['id']})
+check('parallax settings are validated',client.patch(f'/api/scenes/{sid}',json={'look':{'parallax':{'direction':'up'}}}).status_code==400)
+client.patch(f'/api/scenes/{sid}',json={'look':{'parallax':{'x':50,'y':55,'w':25,'h':50,'shape':'rect','direction':'in','amount':100}}})
+px=render()
+def subj_width(f):return np.ptp(np.nonzero((f.min(axis=2)>230).any(axis=0))[0])
+def bg_shift(a,b):return np.abs(a[10:40,10:60]-b[10:40,10:60]).mean()
+check('parallax: the subject grows much more than the background (depth)',subj_width(px[59])>subj_width(px[0])*1.15 and bg_shift(px[0],px[59])<25)
+from app.render.photo import parallax_layers
+import cv2
+bgl,fgl=parallax_layers(str(t/'photo.png'),{'x':50,'y':55,'w':25,'h':50,'shape':'rect','direction':'in','amount':100},t/'plx')
+bgarr=cv2.imread(bgl);fga=cv2.imread(fgl,cv2.IMREAD_UNCHANGED)
+check('background layer has the subject filled in from its surroundings',bgarr[200,320].min()<220)
+check('subject layer has a soft transparent edge',fga[200,320,3]>240 and fga[20,20,3]<5 and 5<fga[200,255,3]<250)
+client.patch(f'/api/scenes/{sid}',json={'look':{'parallax':None}})
+
+# --- photo restore ------------------------------------------------------------------------
+rng=np.random.default_rng(3);old=np.clip(np.full((300,400,3),128.0)+rng.normal(0,18,(300,400,3)),0,255)
+old=(old*0.6+50).astype(np.uint8)                       # low contrast, noisy
+for _ in range(60):                                      # dust specks
+ y,x=rng.integers(5,295),rng.integers(5,395);old[y-1:y+2,x-1:x+2]=255
+Image.fromarray(old).save(t/'old.png');oldid=up('old.png')['id']
+r=client.post(f'/api/assets/{oldid}/restore');rest=r.json()
+check('restore creates a new photo and keeps the original',r.status_code==200 and rest['id']!=oldid and rest['original_filename']=='old (restored).png')
+ra=np.asarray(Image.open(io.BytesIO(client.get(f"/api/assets/{rest['id']}/stream").content)).convert('RGB')).astype(float)
+check('restore upscales small scans',ra.shape[1]>=800)
+small=cv2.resize(ra,(400,300),interpolation=cv2.INTER_AREA)
+check('restore removes dust specks and noise',(small.min(axis=2)>245).sum()<10 and small.std()<old.astype(float).std())
+check('restore rejects non-photos',client.post(f"/api/assets/{music['id']}/restore").status_code==400)
+print(f'{n} batch B/C checks passed')

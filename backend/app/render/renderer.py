@@ -106,6 +106,31 @@ def _canvas(project: Project) -> tuple[int, int]:
     return project.width, project.height
 
 
+def _render_layout(scene, project, shots, layout, total_ms, ctx, work_dir, progress_cb=None) -> str:
+    """Split screen / collage: each panel shows one shot for the whole scene."""
+    from app.render.layouts import LAYOUTS, panels
+    out_w, out_h = _canvas(project)
+    rects = panels(layout, out_w, out_h)[: min(LAYOUTS[layout["type"]], len(shots))]
+    parts = []
+    for i, (shot, (x, y, w, h)) in enumerate(zip(shots, rects)):
+        path = str(work_dir / f"panel_{i}.mp4")
+        _render_single_shot(shot, scene, w, h, project.fps, total_ms, path, ctx)
+        parts.append((path, x, y))
+        if progress_cb:
+            progress_cb("visual", int(100 * (i + 1) / len(rects)))
+    dur = total_ms / 1000
+    inputs = ["-f", "lavfi", "-i", f"color=c={layout['bg'].replace('#', '0x')}:s={out_w}x{out_h}:r={project.fps}:d={dur:.3f}"]
+    graph, base = [], "0:v"
+    for i, (path, x, y) in enumerate(parts):
+        inputs += ["-i", path]
+        graph.append(f"[{base}][{i + 1}:v]overlay=x={x}:y={y}:eof_action=repeat[l{i}]")
+        base = f"l{i}"
+    out = str(work_dir / "scene_layout.mp4")
+    run_ffmpeg([*inputs, "-filter_complex", ";".join(graph), "-map", f"[{base}]", "-t", f"{dur:.3f}", "-r", str(project.fps),
+                "-pix_fmt", "yuv420p", "-c:v", "libx264", "-preset", X264_PRESET, "-crf", X264_CRF, out], cancel_check=ctx.cancel_check)
+    return out
+
+
 def render_scene_visual(
     scene: Scene,
     project: Project,
@@ -121,6 +146,10 @@ def render_scene_visual(
     shots = [s for s in scene.shots if s.is_selected] or list(scene.shots)
     if not shots:
         raise FFmpegError(f"Scene {scene.id} has no media shots; add an image or video before generating.")
+
+    layout = (scene.look_json or {}).get("layout")
+    if layout and len(shots) >= 2:
+        return _render_layout(scene, project, shots, layout, total_duration_ms, ctx, work_dir, progress_cb)
 
     n = len(shots)
     explicit_total = sum(s.duration_ms or 0 for s in shots)
@@ -192,6 +221,9 @@ def _apply_overlays(scene: Scene, project: Project, visual_path: str, total_ms: 
         inputs, og = build_overlay_pass(scene.overlays_json, assets, out_w, out_h, fps, total_ms, Path(PROXIES_DIR) / "overlays",
                                         base=base, first_input=1, final="ovl")
         graph_parts.append(og); base = "ovl"
+    if look.get("route"):
+        from app.render.routes import route_clip, route_graph
+        g, base = route_graph(base, look["route"], route_clip(look["route"], out_w, out_h, fps, Path(PROXIES_DIR) / "scenefx"), fps); graph_parts += g
     if look.get("spotlight"):
         g, base = fx.spotlight_graph(base, look["spotlight"], fx.spotlight_png(look["spotlight"], out_w, out_h, Path(PROXIES_DIR) / "scenefx"), fps, dur); graph_parts += g
     if look.get("leak") and look["leak"]["amount"] > 0:
@@ -254,7 +286,15 @@ def _render_single_shot(
     input_args: list[str] = []
     pre_filters = ""
 
-    if asset.type == AssetType.IMAGE:
+    parallax = (scene.look_json or {}).get("parallax")
+    if asset.type == AssetType.IMAGE and parallax:
+        # 2.5D parallax: pre-render the moving layers, then treat as a clip.
+        from app.config import PROXIES_DIR
+        from app.render.photo import parallax_clip
+        src_path = parallax_clip(src_path, parallax, out_w, out_h, fps, duration_s, Path(PROXIES_DIR) / "parallax")
+        input_args = ["-i", src_path, "-t", f"{duration_s:.3f}"]
+        pre_filters = f"fps={fps},"
+    elif asset.type == AssetType.IMAGE:
         input_args = ["-loop", "1", "-framerate", str(fps), "-t", f"{duration_s:.3f}", "-i", src_path]
     else:
         from app.render.speed import plan as speed_plan
@@ -277,7 +317,7 @@ def _render_single_shot(
 
     graph, warning = filters.build_shot_video_chain(
         fit=shot.fit,
-        motion_json=shot.motion_json,
+        motion_json={"type": "static"} if (asset.type == AssetType.IMAGE and (scene.look_json or {}).get("parallax")) else shot.motion_json,
         out_w=out_w,
         out_h=out_h,
         fps=fps,

@@ -133,7 +133,7 @@ CLEANERS = {"wheels": clean_wheels, "shake": clean_shake, "spotlight": clean_spo
 
 def has_scene_fx(look: dict | None) -> bool:
     look = look or {}
-    return bool(look.get("shake") or look.get("spotlight") or look.get("redact") or look.get("leak"))
+    return bool(look.get("shake") or look.get("spotlight") or look.get("redact") or look.get("leak") or look.get("route"))
 
 
 # --------------------------------------------------------------------------
@@ -262,3 +262,19 @@ def shake_graph(base: str, sk: dict, w: int, h: int, fps: int) -> tuple[list[str
     graph = [f"[{base}]zoompan=z='{margin:.3f}{impact}':d=1:s={w}x{h}:fps={fps}:"
              f"x='iw/2-(iw/zoom/2)+({dx})/zoom':y='ih/2-(ih/zoom/2)+({dy})/zoom'[shk]"]
     return graph, "shk"
+
+
+def _wrap(fn):
+    def clean(d):
+        try:
+            return fn(d)
+        except ValueError as e:
+            raise SceneFxError(str(e)) from None
+    return clean
+
+
+from app.render.layouts import clean_layout  # noqa: E402
+from app.render.photo import clean_parallax  # noqa: E402
+from app.render.routes import clean_route  # noqa: E402
+
+CLEANERS.update(layout=_wrap(clean_layout), route=_wrap(clean_route), parallax=_wrap(clean_parallax))

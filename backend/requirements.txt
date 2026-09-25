@@ -36,3 +36,5 @@ Pillow>=10,<13
 
 # Colour grading: bakes adjustment sliders and imported .cube LUTs into one 3D LUT.
 numpy==2.5.3
+# Photo tools (2.5D parallax background fill, photo restore). Headless: no GUI libraries.
+opencv-python-headless==5.0.0.93

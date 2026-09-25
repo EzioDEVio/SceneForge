@@ -36,4 +36,5 @@ jobs:
             python tests/integration/test_finishing.py
             python tests/integration/test_overlays.py
             python tests/integration/test_effects_pack.py
+            python tests/integration/test_batch_b.py
           '

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hashlib
 import os
+import uuid
 import re
 from pathlib import Path
 
@@ -199,6 +200,33 @@ def asset_waveform(asset_id: str, points: int = 600, db: Session = Depends(get_d
         return waveform(asset.id, path, points)
     except WaveformError as e:
         raise HTTPException(422, str(e))
+
+
+@router.post("/{asset_id}/restore", response_model=schemas.AssetOut)
+def restore_asset(asset_id: str, db: Session = Depends(get_db)):
+    """Make a restored copy of an old photo (denoise, dust and scratch removal,
+    contrast, sharpen, upscale). The original is kept."""
+    from app.render.photo import PhotoError, restore_photo
+    asset = db.get(Asset, asset_id)
+    if not asset or asset.type != "image":
+        raise HTTPException(400, "Choose a photo to restore.")
+    src = Path(MEDIA_DIR) / asset.storage_key
+    folder = Path(MEDIA_DIR) / asset.project_id
+    folder.mkdir(parents=True, exist_ok=True)
+    name = f"restored_{uuid.uuid4().hex[:10]}.png"
+    try:
+        restore_photo(str(src), str(folder / name))
+    except PhotoError as e:
+        raise HTTPException(422, str(e))
+    data = (folder / name).read_bytes()
+    from PIL import Image
+    with Image.open(folder / name) as im:
+        w, h = im.size
+    base = Path(asset.original_filename or "photo").stem
+    new = Asset(project_id=asset.project_id, type="image", content_hash=hashlib.sha256(data).hexdigest(), storage_key=f"{asset.project_id}/{name}",
+                mime="image/png", original_filename=f"{base} (restored).png", width=w, height=h, origin=AssetOrigin.UPLOAD)
+    db.add(new); db.commit(); db.refresh(new)
+    return new
 
 
 @router.get("/{asset_id}/thumbnail")
