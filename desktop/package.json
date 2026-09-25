@@ -1,15 +1,21 @@
 {
   "name": "sceneforge-desktop",
-  "version": "0.2.0-rc.4",
+  "version": "0.3.0",
   "private": true,
-  "description": "SceneForge Desktop Alpha \u2014 local video editor",
-  "author": "SceneForge",
-  "license": "UNLICENSED",
+  "description": "SceneForge Studio \u2014 open-source editor for narrated documentary videos",
+  "author": {
+    "name": "EzioDEVio",
+    "url": "https://github.com/EzioDEVio/SceneForge"
+  },
+  "license": "GPL-3.0-or-later",
   "main": "main.cjs",
   "scripts": {
     "start": "electron .",
     "test": "node --test tests/*.test.cjs",
-    "dist:win": "electron-builder --win nsis --x64 --publish never"
+    "dist:win": "electron-builder --win nsis --x64 --publish never",
+    "dist:mac": "electron-builder --mac dmg zip --publish never",
+    "dist:linux": "electron-builder --linux AppImage deb --x64 --publish never",
+    "release": "electron-builder --publish always"
   },
   "devDependencies": {
     "electron": "44.4.3",
@@ -17,14 +23,16 @@
   },
   "build": {
     "appId": "io.eziodevio.sceneforge",
-    "productName": "SceneForge Desktop Alpha",
+    "productName": "SceneForge Studio",
     "directories": {
-      "output": "release"
+      "output": "release",
+      "buildResources": "icons"
     },
     "files": [
       "main.cjs",
       "backend-process.cjs",
       "close-controller.cjs",
+      "updates.cjs",
       "welcome.html",
       "package.json"
     ],
@@ -48,13 +56,17 @@
       {
         "from": "THIRD_PARTY.md",
         "to": "THIRD_PARTY.md"
+      },
+      {
+        "from": "../LICENSE",
+        "to": "LICENSE.txt"
       }
     ],
     "win": {
       "target": [
         "nsis"
       ],
-      "artifactName": "SceneForge-Desktop-Alpha-${version}-${arch}-Setup.${ext}"
+      "artifactName": "SceneForge-Studio-${version}-Windows-${arch}-Setup.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -63,8 +75,58 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "deleteAppDataOnUninstall": false,
-      "runAfterFinish": false
+      "runAfterFinish": false,
+      "license": "../LICENSE",
+      "artifactName": "SceneForge-Studio-${version}-Windows-${arch}-Setup.${ext}"
     },
-    "publish": null
-  }
+    "publish": [
+      {
+        "provider": "github",
+        "owner": "EzioDEVio",
+        "repo": "SceneForge",
+        "releaseType": "draft"
+      }
+    ],
+    "artifactName": "SceneForge-Studio-${version}-${os}-${arch}.${ext}",
+    "mac": {
+      "target": [
+        "dmg",
+        "zip"
+      ],
+      "category": "public.app-category.video",
+      "identity": null,
+      "artifactName": "SceneForge-Studio-${version}-macOS-${arch}.${ext}"
+    },
+    "dmg": {
+      "artifactName": "SceneForge-Studio-${version}-macOS-${arch}.${ext}"
+    },
+    "linux": {
+      "target": [
+        "AppImage",
+        "deb"
+      ],
+      "category": "AudioVideo",
+      "maintainer": "EzioDEVio <https://github.com/EzioDEVio>",
+      "synopsis": "Narrated documentary video editor",
+      "artifactName": "SceneForge-Studio-${version}-Linux-${arch}.${ext}",
+      "executableName": "sceneforge-studio"
+    },
+    "deb": {
+      "depends": [
+        "libnss3",
+        "libgtk-3-0",
+        "libxss1",
+        "libasound2"
+      ]
+    }
+  },
+  "dependencies": {
+    "electron-updater": "^6.8.9"
+  },
+  "homepage": "https://github.com/EzioDEVio/SceneForge",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/EzioDEVio/SceneForge.git"
+  },
+  "desktopName": "sceneforge-studio.desktop"
 }

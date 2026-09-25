@@ -58,7 +58,7 @@ jobs:
           $setup = Start-Process -FilePath $installer.FullName -ArgumentList @('/S', "/D=$installDir") -Wait -PassThru
           if ($setup.ExitCode -ne 0) { throw "Installer failed: $($setup.ExitCode)" }
           $env:SCENEFORGE_SMOKE_REPORT = Join-Path $env:RUNNER_TEMP 'desktop-smoke.json'
-          $appExe = Join-Path $installDir 'SceneForge Desktop Alpha.exe'
+          $appExe = Join-Path $installDir 'SceneForge Studio.exe'
           $app = Start-Process -FilePath $appExe -ArgumentList '--smoke-test' -PassThru
           if (-not $app.WaitForExit(90000)) { Stop-Process -Id $app.Id; throw 'Desktop startup timed out' }
           if (-not (Test-Path $env:SCENEFORGE_SMOKE_REPORT)) { throw 'No desktop startup report' }
@@ -70,7 +70,7 @@ jobs:
           if ($uninstall.ExitCode -ne 0) { throw 'Uninstall failed' }
       - uses: actions/upload-artifact@v4
         with:
-          name: SceneForge-Windows-Desktop-Alpha
+          name: SceneForge-Studio-Windows
           path: |
             desktop/release/*Setup.exe
             desktop/README.md
