@@ -1,3 +1,8 @@
+# SceneForge Studio 0.3.2
+
+- **Fixed (Windows): the app froze when choosing an effect or look, and then stopped responding.** The release test reproduced it on a clean Windows machine: the first action that loads the maths library (NumPy) hung the whole backend. NumPy and OpenCV are now loaded once at start-up on the main thread, with their maths engine limited to one thread.
+- The backend now writes a diagnostic report to its log if any action takes longer than 20 seconds, showing exactly where it is stuck.
+
 # SceneForge Studio 0.3.1
 
 - **Stable Diffusion no longer starts automatically** after this update (a one-time change). Starting it with SceneForge could slow the whole computer while it loads. Start it from **AI Engines → Stable Diffusion → Start Stable Diffusion now**, or tick **Start automatically with SceneForge** in the same menu.
