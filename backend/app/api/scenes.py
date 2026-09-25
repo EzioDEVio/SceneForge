@@ -59,6 +59,12 @@ def update_scene(scene_id: str, body: schemas.SceneUpdate, db: Session = Depends
         scene.transition_in_json = {"type": body.transition_in["type"], "duration_ms": duration}
     if body.look is not None:
         scene.look_json = _validated_look(scene, body.look, db)
+    if body.overlays is not None:
+        from app.render.overlays import OverlayError, clean_overlays
+        try:
+            scene.overlays_json = clean_overlays(body.overlays, scene.project_id, db)
+        except OverlayError as e:
+            raise HTTPException(400, str(e))
     if body.font is not None:
         from app.db.models import Asset
         for key, low, high in [('typewriter_volume', 0, 100), ('typewriter_delay_ms', 0, 120000), ('typewriter_duration_ms', 100, 120000)]:
@@ -237,7 +243,7 @@ def split_scene(scene_id: str, body: dict, db: Session = Depends(get_db)):
     for sibling in scene.project.scenes:
         if sibling.order_index > scene.order_index: sibling.order_index += 1
     right = Scene(project_id=scene.project_id, order_index=scene.order_index+1, title=scene.title+' · B', timing_mode='fixed', requested_duration_ms=total-at,
-                  effect_preset=scene.effect_preset, effect_intensity=scene.effect_intensity, font_json=deepcopy(scene.font_json), look_json=deepcopy(scene.look_json or {}), transition_in_json={'type':'cut','duration_ms':0})
+                  effect_preset=scene.effect_preset, effect_intensity=scene.effect_intensity, font_json=deepcopy(scene.font_json), look_json=deepcopy(scene.look_json or {}), overlays_json=deepcopy(scene.overlays_json or []), transition_in_json={'type':'cut','duration_ms':0})
     db.add(right);db.flush()
     db.add(Shot(scene_id=right.id,asset_id=shot.asset_id,order_index=0,fit=shot.fit,motion_json=deepcopy(shot.motion_json),crop_json=deepcopy(shot.crop_json),source_in_ms=(shot.source_in_ms or 0)+(at if shot.asset.type=='video' else 0),duration_ms=total-at))
     scene.timing_mode='fixed';scene.requested_duration_ms=at;shot.duration_ms=at;scene.revision+=1
@@ -280,7 +286,7 @@ def _split_rendered(scene, body, db):
         for shot in list(scene.shots):db.delete(shot)
         for take in scene.voice_takes:take.accepted=False
         scene.subtitle_text='';scene.font_json={'captions_enabled':False,'typewriter':False,'layers':[]}
-        scene.effect_preset='original';scene.effect_intensity=100;scene.look_json={};scene.lead_ms=0;scene.trail_ms=0
+        scene.effect_preset='original';scene.effect_intensity=100;scene.look_json={};scene.overlays_json=[];scene.lead_ms=0;scene.trail_ms=0
         scene.timing_mode='fixed';scene.requested_duration_ms=at;scene.revision+=1
         scene.rendered_asset_id=None;scene.rendered_plan_hash=None;scene.measured_duration_ms=None
         for i,(target,offset,duration) in enumerate(((scene,0,at),(right,at,total-at))):

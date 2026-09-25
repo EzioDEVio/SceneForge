@@ -1,3 +1,21 @@
+# SceneForge Desktop 0.2.0 RC5 (in progress) — Picture in picture
+
+## Overlays (new Overlays tab)
+- Place images or videos inside a scene: maps, portraits, documents, a second camera angle.
+- **Drag on the preview to move; drag the corner handle to resize.** Arrow keys nudge (Shift for bigger steps).
+- Position, size, rotation, opacity, rounded corners (up to a circle), border and border colour, drop shadow.
+- Show from / until within the scene; entrance and exit animations: Fade, Slide, Rise, Zoom pop; animation length.
+- Up to 8 per scene, with bring forward, send back, duplicate and delete.
+- Videos play silently and loop. Overlays sit above the picture and its effects, below captions and titles.
+- The editor preview matches the render; each card's shadow, border and corner mask are drawn once and cached under `proxies/overlays`.
+
+## Upgrade notes
+- Existing databases gain `scenes.overlays_json` automatically. Build ID is now `rc5-overlays-5`.
+
+## Tests
+- `tests/integration/test_overlays.py` (20 checks, in CI): validation, placement, size and aspect, border, rounded corners, rotation, timing, fade, slide, zoom pop, opacity, looping video, stacking order.
+- 8 new component checks (100 total).
+
 # SceneForge Desktop 0.2.0 RC5 (in progress) — transitions, motion, captions, music, film extras
 
 ## Transitions and motion

@@ -117,6 +117,7 @@ class SceneUpdate(BaseModel):
     transition_in: dict | None = None
     font: dict | None = None
     look: dict | None = None
+    overlays: list | None = None
     lead_ms: int | None = None
     trail_ms: int | None = None
     requested_duration_ms: int | None = None
@@ -140,6 +141,7 @@ class SceneOut(BaseModel):
     transition_in_json: dict
     font_json: dict
     look_json: dict = {}
+    overlays_json: list = []
     revision: int
     rendered_plan_hash: str | None
     rendered_asset_id: str | None

@@ -34,4 +34,5 @@ jobs:
             python tests/integration/test_audio_edit.py
             python tests/integration/test_old_film.py
             python tests/integration/test_finishing.py
+            python tests/integration/test_overlays.py
           '

@@ -100,6 +100,8 @@ class Scene(Base):
     # Glitch parameters, adjustment sliders and imported-LUT reference:
     # {"glitch": {...}, "adjust": {...}, "lut": {"asset_id", "strength"}}
     look_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Picture-in-picture overlays (render/overlays.py), bottom to top.
+    overlays_json: Mapped[list] = mapped_column(JSON, default=list)
 
     revision: Mapped[int] = mapped_column(Integer, default=1)
     # Hash of the inputs that produced the current rendered part artifact.

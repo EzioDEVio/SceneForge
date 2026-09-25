@@ -26,7 +26,7 @@ let failNextPatch=false;
 let requests=[];
 let next=10;
 let profiles=[];
-let healthBuild="rc5-finishing-4";let oldBackend=false;
+let healthBuild="rc5-overlays-5";let oldBackend=false;
 let failLocal=true;
 let closeReady=true;
 const clone=x=>structuredClone(x);
@@ -46,6 +46,8 @@ globalThis.fetch=async(path,init={})=>{
  else if(path.endsWith('/voices'))result={voices:['af_heart','default']};
  else if(path.endsWith('/image-history'))result=[];
  else if(path.startsWith('/api/assets/luts'))result=[];
+ else if(path.startsWith('/api/assets?'))result=[{id:'pool-img',type:'image',original_filename:'map.png',width:800,height:600},{id:'pool-vid',type:'video',original_filename:'clip.mp4',width:1280,height:720}];
+ else if(/^\/api\/assets\/[^/?]+$/.test(path)&&method==='GET')result={id:path.split('/')[3],type:'image',original_filename:'map.png',width:800,height:600};
  else if(path.startsWith('/api/assets/lut?')&&method==='POST'){const f=body.get('file');if(/broken/.test(f.name))return {ok:false,status:400,statusText:'Bad',json:async()=>({detail:'This LUT could not be read: Expected 35937 entries, found 3.'})};result={id:'lut-'+next++,type:'lut',original_filename:f.name,width:33};}
  else if(path.startsWith('/api/assets/upload')&&method==='POST'){const f=body.get('file');result={id:'up-'+next++,type:/\.(mp4|mov)$/i.test(f.name)?'video':'image',original_filename:f.name,width:640,height:360,duration_ms:null};}
  else if(/\/api\/scenes\/[^/]+\/voice-takes\/upload$/.test(path)){const sc=project.scenes.find(s=>s.id===path.split('/')[3]);const take={id:'take-'+next++,accepted:true,voice:'Uploaded audio',source:'upload',measured_duration_ms:5200,stale:false,edit_json:{},effective_duration_ms:5200,audio_asset:{id:'aud-'+next++,type:'audio',original_filename:body.get('file').name}};sc.voice_takes.forEach(t=>t.accepted=false);sc.voice_takes.push(take);result=take;}
@@ -205,6 +207,26 @@ try{
  await user.click(screen.getByRole('checkbox',{name:'Countdown leader'}));
  await waitFor(()=>assert.ok(requests.some(r=>r.body?.finishing?.leader===true&&r.body.finishing.loudnorm===true)));
  check('YouTube loudness and countdown leader save on the project',true);
+ // Picture-in-picture overlays
+ await user.click(screen.getByRole('tab',{name:'Overlays',exact:true}));
+ await waitFor(()=>assert.ok(within(screen.getByRole('combobox',{name:'Add overlay from media'})).getAllByRole('option').length===3));
+ await user.selectOptions(screen.getByRole('combobox',{name:'Add overlay from media'}),'pool-img');await saved();
+ const ovSave=()=>requests.filter(r=>r.method==='PATCH'&&r.body?.overlays).at(-1)?.body.overlays;
+ check('adding an overlay saves it with default placement',ovSave()?.length===1&&ovSave()[0].asset_id==='pool-img'&&ovSave()[0].width===34&&ovSave()[0].anim_in==='fade');
+ const item=await screen.findByRole('button',{name:/Overlay 1: map\.png\. Drag to move/});
+ check('the overlay appears on the preview, sized to its 4:3 picture',item.dataset.box==='34x25.5@72,30r0'&&!!screen.getByRole('slider',{name:'Resize overlay 1'}));
+ item.focus();fireEvent.keyDown(item,{key:'ArrowRight',shiftKey:true});await saved();
+ check('arrow keys nudge the overlay on the preview and save',ovSave()[0].x===77);
+ fireEvent.change(screen.getByRole('slider',{name:'Overlay Rotation'}),{target:{value:'15'}});
+ await user.click(within(screen.getByRole('radiogroup',{name:'Overlay entrance'})).getByRole('radio',{name:'Zoom pop'}));await saved();
+ check('rotation and entrance animation save',ovSave()[0].rotation===15&&ovSave()[0].anim_in==='zoom');
+ check('preview shows the rotation live',screen.getByRole('button',{name:/Overlay 1: map\.png/}).dataset.box.endsWith('r15'));
+ await user.click(screen.getByRole('button',{name:'Duplicate overlay 1'}));await saved();
+ check('duplicate adds a second overlay offset from the first',ovSave().length===2&&ovSave()[1].x===81&&ovSave()[1].id!==ovSave()[0].id);
+ await user.click(screen.getByRole('button',{name:'Send overlay 2 back'}));await saved();
+ check('stacking order can be changed',ovSave()[0].x===81);
+ await user.click(screen.getByRole('button',{name:'Delete overlay 2'}));await user.click(screen.getByRole('button',{name:'Delete overlay 1'}));await saved();
+ check('deleting overlays removes them from the scene and the preview',ovSave().length===0&&!screen.queryByRole('button',{name:/Drag to move/}));
  await user.click(screen.getByRole('tab',{name:'Effects',exact:true}));
  await user.click(screen.getByRole('button',{name:'Original',exact:true}));await saved();
  const narration=screen.getAllByRole('button').filter(b=>b.className.includes('narration-clip'))[0];

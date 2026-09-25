@@ -9,6 +9,8 @@ import {LookPanel, adjustPreviewFilter, WhiteBalanceFilter, PreviewFinish, grade
 import {AudioClipEditor, removeSceneAudio} from "./AudioClipEditor";
 import {FilmPreview, filmToneFilter} from "./FilmPreview";
 import {FinishingPanel} from "./FinishingPanel";
+import {OverlayCanvas, OverlayPanel} from "./Overlays";
+import type {Overlay} from "./api";
 import {sceneDuration} from "./duration";
 import {TitleDesigner,TitleDesign,ANIMATIONS} from './TitleDesigner';
 import React, { useEffect, useRef, useState } from "react";
@@ -533,10 +535,10 @@ function TextLayers({scene,onChange}:{scene:Scene;onChange:(layers:NonNullable<S
   </section>;
 }
 
-type InspectorTab = "Media" | "Motion" | "Effects" | "Text" | "Audio";
+type InspectorTab = "Media" | "Motion" | "Effects" | "Overlays" | "Text" | "Audio";
 const INSPECTOR_TABS: {name: InspectorTab; Icon: typeof Film}[] = [
   {name: "Media", Icon: ImageIcon}, {name: "Motion", Icon: Film},
-  {name: "Effects", Icon: Palette}, {name: "Text", Icon: Type}, {name: "Audio", Icon: Volume2},
+  {name: "Effects", Icon: Palette}, {name: "Overlays", Icon: Layers}, {name: "Text", Icon: Type}, {name: "Audio", Icon: Volume2},
 ];
 
 function durationLabel(scene: Scene) {
@@ -593,6 +595,13 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
   const isGenerating = !!job && ["queued", "running", "cancelling"].includes(job.status);
   const rendered = scene.rendered_asset_id;
   const acceptedTake = scene.voice_takes.find(t => t.accepted);
+  // Overlays are edited live (canvas drag + panel); the draft is saved with the scene.
+  const [ovDraft, setOvDraft] = useState<Overlay[] | null>(null);
+  const [ovSelected, setOvSelected] = useState(0);
+  useEffect(() => {setOvDraft(null); setOvSelected(0);}, [scene.id]);
+  const overlays = ovDraft ?? scene.overlays_json ?? [];
+  const ovRef = useRef(overlays); ovRef.current = overlays;   // latest overlays for drag-release saves
+  const changeOverlays = (next: Overlay[], save = true) => {setOvDraft(next); if (save) draft({overlays: next});};
   // Timeline narration clicks open this scene's Audio tab.
   useEffect(() => {const open = (e: Event) => {const d = (e as CustomEvent).detail; if (d?.sceneId === scene.id && d.tab) setTab(d.tab);}; window.addEventListener('sceneforge-open-tab', open); return () => window.removeEventListener('sceneforge-open-tab', open);}, [scene.id]);
 
@@ -706,7 +715,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
             <span className="aspect-badge">{project.aspect}</span>
           </div>
           <div className="canvas-viewport">
-            <div className="preview-canvas" style={{aspectRatio: project.aspect.replace(":", "/"), width: `min(${zoom}%, calc((var(--stage-height) - 40px) * ${canvasRatio * zoom / 100}))`}}><WhiteBalanceFilter id={wbFilterId} adjust={liveAdjust}/>{previewMode !== "render" && shot && <PreviewFinish adjust={liveAdjust}/>}{previewMode !== "render" && shot && liveFilm && <FilmPreview film={liveFilm}/>}
+            <div className="preview-canvas" style={{aspectRatio: project.aspect.replace(":", "/"), width: `min(${zoom}%, calc((var(--stage-height) - 40px) * ${canvasRatio * zoom / 100}))`}}><WhiteBalanceFilter id={wbFilterId} adjust={liveAdjust}/>{previewMode !== "render" && shot && <PreviewFinish adjust={liveAdjust}/>}{previewMode !== "render" && shot && liveFilm && <FilmPreview film={liveFilm}/>}{previewMode !== "render" && shot && overlays.length > 0 && <OverlayCanvas overlays={overlays} frameAspect={project.width / project.height} selected={ovSelected} onSelect={i => {setOvSelected(i); setTab("Overlays");}} onChange={(i, patch, commit) => {const next = ovRef.current.map((x, k) => k === i ? {...x, ...patch} : x); ovRef.current = next; changeOverlays(next, !!commit);}} onCommit={() => draft({overlays: ovRef.current})}/>}
               {previewMode === "render" && rendered ? <video ref={videoRef} className="canvas-media" controls preload="metadata" src={api.assetStreamUrl(rendered)}/> :
                 shot ? shot.asset?.type === "image" ? (shot.crop_json?<svg className="canvas-media" role="img" aria-label={`Cropped source for ${scene.title}`} viewBox={`${shot.crop_json.x*(shot.asset.width||1)} ${shot.crop_json.y*(shot.asset.height||1)} ${shot.crop_json.width*(shot.asset.width||1)} ${shot.crop_json.height*(shot.asset.height||1)}`} preserveAspectRatio={shot.fit==='cover'?'xMidYMid slice':'xMidYMid meet'} style={{filter:mediaFilter}}><image href={gradedSrc||api.assetStreamUrl(shot.asset_id)} width={shot.asset.width||1} height={shot.asset.height||1}/></svg>:<img className="canvas-media" src={gradedSrc||api.assetStreamUrl(shot.asset_id)} alt={`Source media for ${scene.title}`} style={{objectFit: shot.fit === "cover" ? "cover" : "contain", filter:mediaFilter}}/>) :
                   <video ref={videoRef} className="canvas-media" controls preload="metadata" poster={gradedSrc||undefined} src={api.assetStreamUrl(shot.asset_id)} style={{objectFit:shot.fit === "cover" ? "cover" : "contain",filter:mediaFilter}}/> :
@@ -775,7 +784,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
             {scene.font_json.typewriter_sound_asset_id && <button className="text-btn" disabled={saving} onClick={()=>update({font:{typewriter_sound_asset_id:null}})}>Use included keystroke</button>}
             <p className="hint">If this recording was previously uploaded as narration, choose Audio → Use no narration to avoid hearing it twice.</p>
           </section><p className="hint">Render the scene to preview captions and synchronized sound together.</p></>}
-          {tab === "Audio" && <>{acceptedTake?.audio_asset && <AudioClipEditor key={acceptedTake.id} scene={scene} take={acceptedTake} disabled={saving} onChanged={refresh} onRemove={()=>run(()=>removeSceneAudio(scene))}/>}<FinishingPanel project={project} disabled={saving} onChanged={refresh}/><h3>Voice & narration</h3><p className="hint">Connect a local speech component or upload a recording. Select a take before rendering.</p><VoicePanel scene={{...scene,spoken_text:text}} onChanged={refresh} beforeGenerate={flush}/></>}
+          {tab === "Overlays" && <OverlayPanel scene={scene} overlays={overlays} selected={ovSelected} onSelect={setOvSelected} onChange={changeOverlays} disabled={saving}/>}{tab === "Audio" && <>{acceptedTake?.audio_asset && <AudioClipEditor key={acceptedTake.id} scene={scene} take={acceptedTake} disabled={saving} onChanged={refresh} onRemove={()=>run(()=>removeSceneAudio(scene))}/>}<FinishingPanel project={project} disabled={saving} onChanged={refresh}/><h3>Voice & narration</h3><p className="hint">Connect a local speech component or upload a recording. Select a take before rendering.</p><VoicePanel scene={{...scene,spoken_text:text}} onChanged={refresh} beforeGenerate={flush}/></>}
           <section className="timing-section"><h3><Clock size={15}/> Scene duration</h3><label className="control-label">Timing mode<select aria-label="Timing mode" value={scene.timing_mode} disabled={saving} onChange={e => update({timing_mode:e.target.value})}><option value="audio_driven">Match narration</option><option value="fixed">Fixed duration</option></select></label>
           {scene.timing_mode === "fixed" && <label className="control-label">Seconds<input aria-label="Scene duration in seconds" type="number" min={1} max={120} step={0.5} defaultValue={(scene.requested_duration_ms || 5000)/1000} key={scene.requested_duration_ms} onBlur={e => {const v=Math.max(1,Math.min(120,Number(e.target.value)||5)); if (v*1000 !== scene.requested_duration_ms) void update({requested_duration_ms:Math.round(v*1000)});}}/></label>}
           <p className="hint">{scene.timing_mode === "fixed" ? "Narration is trimmed or padded to fit this length." : "Uses the selected narration take, including lead and trail padding."}</p></section>

@@ -169,6 +169,28 @@ def render_scene_visual(
     return concat_out
 
 
+def _apply_overlays(scene: Scene, project: Project, visual_path: str, total_ms: int, work_dir, ctx: RenderContext) -> str:
+    """Composite picture-in-picture overlays onto the scene picture (before captions)."""
+    from types import SimpleNamespace
+    from app.config import PROXIES_DIR
+    from app.db.database import SessionLocal
+    from app.render.overlays import build_overlay_pass
+    out_w, out_h = _canvas(project)
+    assets = {}
+    with SessionLocal() as db:
+        for o in scene.overlays_json:
+            a = db.get(Asset, o["asset_id"])
+            if a is None or a.type not in ("image", "video"):
+                raise FFmpegError("An overlay's media file is missing. Choose it again in the Overlays tab.")
+            assets[a.id] = SimpleNamespace(type=a.type, width=a.width, height=a.height, path=_resolve_asset_path(a))
+    inputs, graph = build_overlay_pass(scene.overlays_json, assets, out_w, out_h, project.fps, total_ms, Path(PROXIES_DIR) / "overlays")
+    out = str(Path(work_dir) / "scene_overlays.mp4")
+    run_ffmpeg(["-i", visual_path, *inputs, "-filter_complex", graph, "-map", "[vout]", "-t", f"{total_ms / 1000:.3f}",
+                "-r", str(project.fps), "-pix_fmt", "yuv420p", "-c:v", "libx264", "-preset", X264_PRESET, "-crf", X264_CRF, out],
+               cancel_check=ctx.cancel_check)
+    return out
+
+
 def _film_damage_for(scene: Scene, width: int, height: int, fps: int) -> str | None:
     """Scratch/dust clip for the old-film look, seeded by the scene so each
     scene gets its own damage but re-renders are identical."""
@@ -403,6 +425,8 @@ def render_part(
         if progress_cb:
             progress_cb("visual", 0)
         visual_path = render_scene_visual(scene, project, total_ms, ctx, work_dir, progress_cb)
+        if scene.overlays_json:
+            visual_path = _apply_overlays(scene, project, visual_path, total_ms, work_dir, ctx)
         if progress_cb:
             progress_cb("captions_audio", 50)
         final_path = mux_audio_and_captions(

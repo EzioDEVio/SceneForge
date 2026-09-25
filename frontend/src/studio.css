@@ -154,3 +154,15 @@
 .look-panel .film-option .segmented{display:flex;gap:2px;padding:2px}.look-panel .film-option .segmented button{flex:1;border:0;background:transparent;border-radius:3px;font-size:11px;padding:4px 6px}
 .switch-label{display:inline-flex;align-items:center;gap:6px;font-size:11px;color:#c3c9d6;cursor:pointer}.switch-label input{accent-color:#a58fe9}
 .finishing-panel{margin-bottom:14px;border-bottom:1px solid var(--line)}.finishing-toggle{display:flex;margin:10px 0 0;line-height:1.3}
+/* Picture-in-picture overlays */
+.overlay-canvas{position:absolute;inset:0;z-index:4;container-type:inline-size;pointer-events:none}
+.overlay-item{position:absolute;box-sizing:border-box;overflow:hidden;cursor:move;pointer-events:auto;touch-action:none}
+.overlay-item img,.overlay-item video{width:100%;height:100%;object-fit:cover;display:block;pointer-events:none}
+.overlay-item.selected{outline:2px dashed #cbbcff;outline-offset:3px;overflow:visible}.overlay-item.selected>img,.overlay-item.selected>video{border-radius:inherit}
+.overlay-item:focus-visible{outline:2px solid #a699f0}
+.overlay-handle{position:absolute;right:-9px;bottom:-9px;width:14px;height:14px;border-radius:3px;background:#e6dcff;border:2px solid #6653dc;cursor:nwse-resize}
+.overlay-list{list-style:none;margin:10px 0;padding:0;display:flex;flex-direction:column;gap:4px}
+.overlay-list li{display:grid;grid-template-columns:minmax(0,1fr) repeat(4,22px);align-items:center;gap:3px;padding:3px;border-radius:5px;border:1px solid transparent}
+.overlay-list li.selected{border-color:#8472c1;background:#2e2a3a}
+.overlay-pick{display:flex;align-items:center;gap:8px;background:none;border:0;color:var(--text);font-size:11px;text-align:left;min-width:0}.overlay-pick img{width:40px;height:24px;object-fit:cover;border-radius:3px}
+.overlay-panel .adjust-row .unit{font-size:10px;color:var(--muted)}

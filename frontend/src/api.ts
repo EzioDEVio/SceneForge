@@ -62,7 +62,7 @@ export type FontSettings = {
 };
 
 /** Must match BUILD_ID in backend/app/main.py. */
-export const BUILD_ID = "rc5-finishing-4";
+export const BUILD_ID = "rc5-overlays-5";
 
 export type Adjust = Partial<Record<'exposure'|'contrast'|'highlights'|'shadows'|'temperature'|'tint'|'saturation'|'vibrance'|'sharpen'|'vignette'|'grain', number>>;
 export type Look = {
@@ -71,6 +71,9 @@ export type Look = {
   lut?: {asset_id: string; strength: number} | null;
   film?: FilmLook | null;
 };
+export type Overlay = {id: string; asset_id: string; x: number; y: number; width: number; rotation: number; opacity: number;
+  radius: number; border: number; border_color: string; shadow: number; start_ms: number; end_ms: number | null;
+  anim_in: 'none' | 'fade' | 'slide_left' | 'slide_up' | 'zoom'; anim_out: 'none' | 'fade' | 'slide_left' | 'slide_up' | 'zoom'; anim_ms: number};
 export type Finishing = {music?: {asset_id: string; volume: number; duck: number; fade_in_ms: number; fade_out_ms: number} | null; loudnorm?: boolean; leader?: boolean};
 export type FilmLook = {scratches: number; dust: number; flicker: number; weave: number; sound: number; fps: 0 | 16 | 18 | 24; tone: 'color' | 'faded' | 'sepia' | 'bw'};
 
@@ -91,6 +94,7 @@ export type Scene = {
   transition_in_json: { type: string; duration_ms: number };
   font_json: FontSettings;
   look_json?: Look;
+  overlays_json?: Overlay[];
   revision: number;
   rendered_plan_hash: string | null;
   rendered_asset_id: string | null;
@@ -235,6 +239,7 @@ export const api = {
       body: JSON.stringify({ scenes, replace_existing: replaceExisting }),
     }),
 
+  getAsset: (assetId: string) => req<Asset>(`/api/assets/${assetId}`),
   assetStreamUrl: (assetId: string) => `/api/assets/${assetId}/stream`,
   assetThumbUrl: (assetId: string, width = 320) => `/api/assets/${assetId}/thumbnail?w=${width}`,
   gradedFrameUrl: (sceneId: string, key: string, width = 1280, shotId?: string) => `/api/scenes/${sceneId}/graded-frame?w=${width}&k=${key}${shotId ? `&shot_id=${shotId}` : ''}`,
