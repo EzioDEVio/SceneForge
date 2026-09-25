@@ -1,3 +1,13 @@
+# SceneForge Studio 0.3.0 — first public open-source release
+
+- **Open source** under the GNU GPL v3.0 or later.
+- **Installers for Windows, Linux (AppImage, .deb) and macOS (Apple Silicon, experimental)**, built by GitHub Actions and published on GitHub Releases.
+- **Automatic updates** (Help → Check for updates; Help → Receive beta updates). Windows and Linux AppImage update in the background; macOS announces new versions.
+- **Project backups** before every update (Help → Open project backups; the last 5 are kept).
+- Renamed from "SceneForge Desktop Alpha" to **SceneForge Studio**; projects from the Desktop Alpha are copied over automatically on first start (the old folder is left untouched).
+- New README, third-party notices and contributing guide; new app icon.
+- Includes everything since RC4: effects packs A–C, overlays, map routes, split screen, 3D photos, photo restore, word-by-word captions, music and finishing, audio editing, LUTs, old film and more (see the entries below).
+
 # SceneForge Desktop 0.2.0 RC5 (in progress) — photo restore rewritten
 
 - **Restore old photo** no longer damages detailed photos. The previous version treated fine detail (debris, clothing, branches) as dust and smeared it; on a real WWII photo it "repaired" 23 % of the picture. Now:

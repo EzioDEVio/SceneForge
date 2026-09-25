@@ -1,170 +1,120 @@
-<div align="center">
-
-<img src="docs/sceneforge-banner.svg" alt="SceneForge Studio — Your story, frame by frame" width="100%" />
+<p align="center"><img src="docs/sceneforge-banner.svg" alt="SceneForge Studio — Your story, frame by frame" width="100%"></p>
 
 # SceneForge Studio
 
-**Turn scripts, images and narration into a finished video — one scene at a time.**
+**Free, open-source desktop editor for narrated documentary videos.** Turn a script, photos, clips and a voice into a finished film, one scene at a time, with film-style looks, captions that follow the narration, music, maps and more. Arabic and English are first-class.
 
-![Status](https://img.shields.io/badge/status-desktop_preview-7963e9?style=flat-square)
-![Python](https://img.shields.io/badge/backend-Python_3.11%2B-3776AB?style=flat-square&logo=python&logoColor=white)
-![React](https://img.shields.io/badge/editor-React_%2B_TypeScript-149ECA?style=flat-square&logo=react&logoColor=white)
-![FFmpeg](https://img.shields.io/badge/rendering-FFmpeg-007808?style=flat-square&logo=ffmpeg&logoColor=white)
+[Download](#download) · [What it can do](#what-it-can-do) · [AI providers](#ai-providers) · [Build from source](#build-from-source) · [Contributing](CONTRIBUTING.md) · [License](#license)
 
-[Quick start](#quick-start) · [Editor](#the-editor) · [Providers](#image-and-voice-providers) · [Effects guide](docs/EFFECTS_GUIDE.md) · [Roadmap](#roadmap) · [Contributing](CONTRIBUTING.md)
+![SceneForge Studio editor with an animated map route](docs/screenshots/editor-map-route.png)
 
-</div>
+## Download
 
-SceneForge is a local web editor for documentary, educational and narrated-image videos. Arrange parts on a timeline, add camera movement, captions and narration, then export one MP4. Arabic text and local multilingual narration are part of the workflow.
+Get the installer for your system from the **[latest release](https://github.com/EzioDEVio/SceneForge/releases/latest)**.
 
-> **Current release: Workspace 2.5.** The editor runs in your browser with a local Python backend. An EXE/MSI installer, bundled runtimes and automatic model installation are planned, not included. Cloud generation is optional and uses your own provider account.
+| System | File | First launch |
+|---|---|---|
+| **Windows 10/11** (64-bit) | `SceneForge-Studio-<version>-Windows-x64-Setup.exe` | Windows may show *"Windows protected your PC"*. Click **More info → Run anyway**. This appears because SceneForge is a free project without a paid code-signing certificate. |
+| **Linux** (64-bit) | `.AppImage` (any distribution) or `.deb` (Ubuntu/Debian) | AppImage: make it executable (`chmod +x`) and run it. Deb: `sudo apt install ./SceneForge-Studio-*.deb` |
+| **macOS** (Apple Silicon) | `.dmg` | Drag SceneForge to Applications. The first time, **right-click the app → Open → Open** (macOS blocks unsigned apps on a normal double-click). *macOS builds are experimental.* |
 
-See [Workspace 2.5 setup and validation](START_HERE_WORKSPACE_2_5.md) for this release.
+**Updates:** on Windows and Linux (AppImage) SceneForge downloads new versions in the background and asks to restart. On macOS it tells you when a new version is out and opens the download page. Help → *Receive beta updates* opts in to test versions.
 
-![Workspace 2](docs/workspace-2.png)
+**Your projects are safe across updates:** they live in your user folder, separate from the app, and the project database is backed up automatically before a new version opens it (Help → *Open project backups*; the last 5 are kept).
 
-## The editor
+## What it can do
 
-| Workspace | What you can do |
-|---|---|
-| Project library | Create, find, rename and delete projects |
-| Media | Upload images/clips, generate images, reuse generation history, select fit |
-| Motion | Zoom, pan, close-up, diagonal moves and combined push/pan or pull/pan |
-| Effects | Color looks, film grain, full-frame glitch, strength adjustment and rendered preview |
-| Text | Arabic-capable fonts, captions, timed text layers and typewriter sound |
-| Audio | Connect local Chatterbox/Kokoro or upload recorded narration |
-| Timeline | Resizable full-width dock, picture/narration/title lanes, source thumbnails, ruler seek, reordering and visible transitions |
-| Export | Render scenes and combine them into one MP4 with audio and transitions |
+![Effects panel](docs/screenshots/effects-panel.png)
 
-Workspace 2.5 adds a persistent Media Pool with explicit timeline insertion, automatic startup of installed voice containers, scene deletion, direct static-visual and confirmed rendered-scene splitting, transition undo/redo, slider and direct-manipulation crop/focal framing and scene-linked audio import. See the release guide for the precise limitations.
+**Scenes and timeline** — scene-by-scene timeline with picture, narration and text lanes; drag-and-drop images, videos, audio and whole folders; 25 transitions including film burn, wind and clock wipe; keyboard shortcuts; undo/redo; split scenes; resizable settings panel.
 
-The timeline is a **scene assembly timeline**, not a multitrack NLE. Its narration strip shows whether a take is selected; it is not a waveform. Use the rendered export to preview the complete movie. Empty scenes stay visible as dashed timeline placeholders and can be skipped at export with confirmation.
+**Pictures and motion** — Ken Burns zoom and pan with smooth easing; **3D photo (parallax)**, which gives still photos depth; **picture-in-picture overlays** you drag and resize on the preview, with borders, rounded corners, shadows, animations, glide paths and green screen; **split screen** (side by side, top & bottom, three panels, 2×2); **animated map routes** you draw by clicking on the preview; video clip speed, slow-motion ramps and freeze frames; **restore old photo** (dust, grain, contrast and sharpness for archive scans).
 
-## Quick start
+**Looks** — 18 looks including VHS and full-frame glitch; **Old film** (scratches, dust, hair, flicker, gate weave, 16/18 fps projector motion, black & white or sepia, projector sound); colour sliders, **colour wheels**, split toning and **.cube LUT import** (3D, 1D and DaVinci Resolve shaper LUTs); camera shake with impact zoom; spotlight; blur or pixelate areas to hide faces and names; light leaks.
 
-<details open>
-<summary><strong>Windows · recommended setup</strong></summary>
+**Text** — captions with correct Arabic right-to-left layout; **word-by-word captions** that follow the voice (exact timing with ElevenLabs, measured from the audio for other voices) in fill, pop or glow styles; animated title layers; typewriter reveal with sound.
 
-Install Python 3.11+, Node.js 20+ and FFmpeg/ffprobe, available on PATH. Git is needed only for cloning. Then:
+![Word-by-word captions](docs/screenshots/word-by-word-captions.png)
 
-```powershell
+**Sound** — narration from AI voices or your own recordings; trim, volume, fades and waveform editing; voice effects (clean up, 1940s radio, telephone); background music that loops and **ducks under narration** automatically; **sync scene cuts to the beat**; loudness levelling for YouTube (-14 LUFS); film countdown leader.
+
+**Export** — one MP4 with everything rendered by FFmpeg, bundled with the app.
+
+## AI providers
+
+AI is optional. You can build a complete video from your own photos, clips and recordings without any account.
+
+| Purpose | Cloud (your own account/key) | Local (free, on your computer) |
+|---|---|---|
+| Images | OpenAI, Google Gemini, Cloudflare Workers AI, Hugging Face | Stable Diffusion via AUTOMATIC1111 (point SceneForge at its folder: *AI Engines* menu) |
+| Voice | ElevenLabs (with exact word timing), Together AI | Chatterbox (multilingual incl. Arabic), Kokoro |
+
+Keys are stored in your operating system's credential store (Windows Credential Manager, macOS Keychain, Linux Secret Service), never in the project files.
+
+**Coming next:** an AI providers workspace with a built-in model manager and free offline engines (Piper voices, Whisper captions, a compact Stable Diffusion engine), so no separate installs or Docker are needed. See the [roadmap](#roadmap).
+
+## Build from source
+
+Requirements: Python 3.11+, Node.js 20+, and FFmpeg (only for running from source; the installers bundle it).
+
+**Windows**
+```bat
 git clone https://github.com/EzioDEVio/SceneForge.git
 cd SceneForge
 scripts\setup.bat
 scripts\start.bat
 ```
+Then open http://127.0.0.1:8000.
 
-Open **http://127.0.0.1:8000**. Keep the server window open while editing. Stop it with Ctrl+C.
-
-The setup creates `backend/.venv`, installs dependencies, and builds the frontend. No provider key is needed to upload media and export video.
-
-</details>
-
-<details>
-<summary><strong>macOS / Linux · manual development setup</strong></summary>
-
-Install Python, Node and FFmpeg first:
-
+**macOS / Linux**
 ```bash
-python3 -m venv backend/.venv
-backend/.venv/bin/python -m pip install -r backend/requirements.txt
-npm --prefix frontend ci
-npm --prefix frontend run build
-cd backend
-.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+git clone https://github.com/EzioDEVio/SceneForge.git && cd SceneForge
+python3 -m venv .venv && .venv/bin/pip install -r backend/requirements.txt
+npm --prefix frontend ci && npm --prefix frontend run build
+cd backend && ../.venv/bin/python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
 ```
 
-The Windows launchers are the primary supported startup path. Local voice engine performance depends on your hardware.
+**Build the desktop installers yourself**
+```bash
+pip install -r desktop/requirements-build.txt
+npm --prefix frontend ci && npm --prefix frontend run build
+npm --prefix desktop ci
+python desktop/scripts/fetch_ffmpeg.py        # downloads and verifies FFmpeg for your OS
+python desktop/scripts/build_backend.py       # bundles the Python backend
+npm --prefix desktop run dist:win             # or dist:mac / dist:linux
+```
 
-</details>
+## Releasing (maintainers)
 
-### Update an existing ZIP installation
-
-Stop the server and back up `backend/data`. Copy the repository's app files into your existing app root; retain its `backend/data` and `.venv`. Run setup, restart and refresh with Ctrl+F5. Do not run two copies against port 8000. `/api/health` should report `workspace-2.2`. Old APPLY_* update scripts are not required.
-
-## Make your first video
-
-1. Create a project and select its aspect ratio.
-2. Add an image or clip to each part. Add narration or choose no narration.
-3. Choose motion, an effect and optional captions/typewriter text.
-4. Arrange parts on the timeline. Select an incoming part to choose a transition.
-5. Render a scene to inspect exact motion/effects/audio.
-6. Choose **Export video**, then preview or download the full MP4.
-
-Transitions include Cut, Dissolve, Fade through black/white, Slide left/right, Wipe left/right and Circle reveal. A transition moves with its incoming part when reordered; the first exported part has no incoming transition. Overlap is capped at half of each neighbouring scene. Narration crossfades too, so use short transitions or silent handles.
-
-Timeline timings are estimates derived from the selected take or fixed duration. Frame rounding and rendering determine the final output length. Motion currently requires Cover fit; Fit/Blur fit preserve the full source image.
-
-## Image and voice providers
-
-| Service | Role | Setup / cost model |
-|---|---|---|
-| OpenAI | Image generation | Your API key; paid usage |
-| Google Gemini | Image generation | Your API key and supported image model |
-| Cloudflare Workers AI | FLUX.1 Schnell images | API token + Account ID; limited daily allowance |
-| Hugging Face | Routed image generation | HF token; small monthly credits, model availability varies |
-| AUTOMATIC1111 | Local image generation | Local image model and engine running with `--api` |
-| Chatterbox | Local multilingual narration | Separate service; current launcher uses Docker Desktop |
-| Kokoro | Local narration | Separate service; current launcher uses Docker Desktop; no Arabic |
-| Recorded audio | Narration | Upload WAV, MP3 or other supported audio |
-
-**Anthropic:** Claude analyzes images and writes prompts, but does not offer photo/illustration generation. It is not presented as an image engine. See [Anthropic's explanation](https://support.claude.com/en/articles/9002504-can-claude-produce-images).
-
-See [provider setup](START_HERE_WORKSPACE_2_5.md). Free allowances are not unlimited; check [Cloudflare billing](https://developers.cloudflare.com/workers-ai/platform/pricing/) and [HF credits](https://huggingface.co/docs/inference-providers/pricing/). Local models and their licenses are separate downloads. Azure is not integrated.
+1. Set the version in `desktop/package.json` (e.g. `0.3.1`, or `0.3.1-beta.1` for a beta).
+2. Commit, then tag and push: `git tag v0.3.1 && git push origin v0.3.1`.
+3. The **Release** workflow tests everything, builds Windows, Linux and macOS installers on GitHub's machines, and attaches them to a **draft** release.
+4. Review the draft and click **Publish release**. Only then do users' apps offer the update.
 
 ## Architecture
 
-| Directory | Responsibility |
+| Folder | What it is |
 |---|---|
-| `frontend/src` | React editor, timeline and API client |
-| `backend/app/api` | FastAPI endpoints and validation |
-| `backend/app/render` | FFmpeg filters, captions, sound, transitions and cache hashes |
-| `backend/app/workers` | Render jobs, progress and cancellation |
-| `backend/app/providers` | Image generation and local narration adapters |
-| `services` | Optional voice service containers |
-| `assets` | Bundled fonts and synthetic typewriter sound |
-| `tests` | API/render integration tests |
-| `scripts` | Windows setup and launchers |
-
-Data lives in `backend/data` by default. Set `SCENEFORGE_DATA_DIR` to relocate it. Deleting a project removes its database records but retains media files on disk. Back up the whole data folder, not just the SQLite database.
-
-Provider keys currently use reversible local obfuscation, **not an OS credential vault**. Keep the app bound to localhost and protect your data folder. See [security notes](SECURITY.md).
-
-## Development and validation
-
-```bash
-npm --prefix frontend ci
-npm --prefix frontend run build
-npm --prefix frontend test
-python -m pip install -r backend/requirements.txt numpy httpx
-python tests/integration/test_combined.py
-python tests/integration/test_editor_plus.py
-python tests/integration/test_timeline.py
-```
-
-Run integration scripts sequentially; some reserve a fixed local port. FFmpeg must be installed. React checks use jsdom, not browser screenshots. Hosted APIs are mocked; no CI job spends provider credits or downloads large voice/image models. See [validation scope](docs/VALIDATION.md).
+| `frontend/` | React + TypeScript editor |
+| `backend/app/` | FastAPI server, SQLite database, FFmpeg rendering (`render/`), providers |
+| `desktop/` | Electron shell, updater, packaging and build scripts |
+| `assets/` | Bundled fonts and sounds |
+| `tests/` | Integration tests that render real video and measure the result |
 
 ## Roadmap
 
-- [x] Local scene editor, image generation, captions and full-video export
-- [x] Local voice service connections and audio upload
-- [x] Project deletion and search
-- [x] Scene timeline, transition palette and expanded motion
-- [ ] Select additional aged-film effects from the [effects guide](docs/EFFECTS_GUIDE.md)
-- [ ] Continuous timeline playback, scrubbing, trimming and audio waveforms
-- [ ] Desktop shell, EXE/MSI installation and managed model downloads
-- [ ] OS-backed credential storage and production release hardening
+- [x] Scene editor, timeline, transitions, captions, export
+- [x] Film looks, LUTs, colour grading, overlays, map routes, split screen, 3D photos
+- [x] Word-by-word captions, music ducking, beat sync, loudness
+- [x] Desktop installers for Windows, Linux and macOS with automatic updates
+- [ ] AI providers workspace and model manager with free offline engines (Piper, Whisper, Stable Diffusion)
+- [ ] Colorize black & white photos; automatic subject detection for 3D photos (local AI models)
+- [ ] Signed installers (free open-source signing programmes are being considered)
 
-## Contributing
+## License
 
-Report bugs with steps, app build, OS and redacted logs. For render issues, include aspect ratio, duration, selected effects and whether narration is present. See [CONTRIBUTING.md](CONTRIBUTING.md).
+SceneForge Studio is free software: you can redistribute it and/or modify it under the terms of the **GNU General Public License v3.0 or later** as published by the Free Software Foundation. See [LICENSE](LICENSE).
 
-## Licensing and acknowledgements
+It is distributed in the hope that it will be useful, but WITHOUT ANY WARRANTY. Bundled components (FFmpeg, Electron, Python libraries, Noto fonts) keep their own licenses; see [desktop/THIRD_PARTY.md](desktop/THIRD_PARTY.md). AI models and cloud services are not part of SceneForge and have their own terms.
 
-A project-wide redistribution license has not yet been selected. Do not infer one from the repository being accessible. Bundled Noto fonts carry the SIL Open Font License; see `assets/fonts/OFL-LICENSE.txt`. The synthetic keystroke source is documented in `assets/sfx/SOURCE.md`. FFmpeg, dependencies and optional models retain their respective licenses.
-
-## Desktop packaging
-
-See [Desktop Alpha plan](docs/DESKTOP_PLAN.md) for the proposed cross-platform installer, managed native AI components, hardware checks, and release gates. Installers are not included in Workspace 2.5.
-
-Windows Desktop Alpha development is on the desktop branch; see [core installer instructions](desktop/README.md). This branch retains the Workspace 2.5 web editor. Native model installation and public signed releases remain separate milestones.
+Copyright © 2026 EzioDEVio and SceneForge contributors.
