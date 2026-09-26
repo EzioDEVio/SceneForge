@@ -84,6 +84,7 @@ def update_scene(scene_id: str, body: schemas.SceneUpdate, db: Session = Depends
             sound = db.get(Asset, sound_id)
             if not sound or sound.project_id != scene.project_id or sound.type != 'audio':
                 raise HTTPException(400, 'Choose an audio asset belonging to this project.')
+        _validate_caption_style(body.font)
         if 'caption_animation' in body.font and body.font['caption_animation'] not in CAPTION_ANIMATIONS:
             raise HTTPException(400, 'Caption animation must be one of: ' + ', '.join(CAPTION_ANIMATIONS) + '.')
         if 'caption_animation_ms' in body.font:
@@ -317,6 +318,35 @@ def _split_rendered(scene, body, db):
 # Entrance animations available for captions (titles have more: slides, typewriter, …).
 CAPTION_ANIMATIONS = ("none", "fade", "zoom", "blur", "glitch", "bounce", "wobble", "neon", "letters-pop", "letters-fade",
                       "letters-flip", "letters-blur", "words-pop", "words-fade", "words-flip", "shine")
+
+
+_CAPTION_CHOICES = {"case": ("none", "upper", "lower", "title"), "position": ("bottom", "middle", "top"),
+                    "halign": ("left", "center", "right"), "background": ("none", "box"),
+                    "exit_animation": ("none", "fade", "pop"), "loop": ("none", "pulse"), "split": ("full", "phrases"),
+                    "karaoke_style": ("fill", "pop", "glow", "box", "color", "underline")}
+_CAPTION_RANGES = {"spacing": (-5, 40), "shadow": (0, 10), "shadow_opacity": (0, 100), "box_opacity": (0, 100),
+                   "box_padding": (0, 40), "offset_y": (-40, 40), "max_width": (30, 100), "exit_ms": (50, 5000),
+                   "phrase_words": (1, 8), "outline_width": (0, 12)}
+_CAPTION_COLORS = ("shadow_color", "box_color", "outline_color", "highlight_color", "color")
+
+
+def _validate_caption_style(font: dict) -> None:
+    """Caption style settings (Captions Pro): clear 400 errors for bad values."""
+    import re as _re
+    for key in ("bold", "italic", "underline"):
+        if key in font and not isinstance(font[key], bool):
+            raise HTTPException(400, f"Caption {key} must be true or false.")
+    for key, options in _CAPTION_CHOICES.items():
+        if key in font and font[key] not in options:
+            raise HTTPException(400, f"Caption {key} must be one of: " + ", ".join(options) + ".")
+    for key, (lo, hi) in _CAPTION_RANGES.items():
+        if key in font:
+            v = font[key]
+            if isinstance(v, bool) or not isinstance(v, (int, float)) or not lo <= v <= hi:
+                raise HTTPException(400, f"Caption {key} must be between {lo} and {hi}.")
+    for key in _CAPTION_COLORS:
+        if key in font and (not isinstance(font[key], str) or not _re.fullmatch(r"#[0-9A-Fa-f]{6}", font[key])):
+            raise HTTPException(400, f"Caption {key} must look like #RRGGBB.")
 
 
 def _validated_look(scene, look: dict, db) -> dict:

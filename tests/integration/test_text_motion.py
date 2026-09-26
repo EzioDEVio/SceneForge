@@ -86,4 +86,34 @@ def cap_ink(at):
  return int((np.frombuffer(raw,np.uint8)>128).sum())
 x1,x2,x3=cap_ink(0.1),cap_ink(0.7),cap_ink(2.0)
 check(f'caption letters appear progressively on screen ({x1} → {x2} → {x3})',x1<x2<x3)
-print(f'{n} text motion, annotation, look and caption checks passed')
+
+# --- Captions Pro: style engine and phrase captions -------------------------------------
+for bad in ({'bold':'yes'},{'case':'shout'},{'position':'side'},{'box_opacity':150},{'phrase_words':12},{'shadow_color':'black'},{'karaoke_style':'sparkle'}):
+ check('caption style rejects '+str(bad)[:30],client.patch(f'/api/scenes/{sid}',json={'font':bad}).status_code==400)
+check('caption style saves',client.patch(f'/api/scenes/{sid}',json={'font':{'family':'Poppins','bold':True,'italic':True,'case':'upper','background':'box','split':'phrases','phrase_words':3,'karaoke':True,'karaoke_style':'box'}}).status_code==200)
+def style_line(font,text='Hello world'):
+ path=write_ass_file('s',text,3000,font,640,360,out_path=str(t/'s.ass'))
+ return [x for x in pathlib.Path(path).read_text(encoding='utf-8-sig').splitlines() if x.startswith('Style:')][0].split(',')
+st=style_line({'family':'Noto Sans','bold':True,'italic':True,'underline':True,'spacing':3,'shadow':2})
+check('bold, italic, underline, spacing and shadow go into the caption style',st[7]=='-1' and st[8]=='-1' and st[9]=='-1' and float(st[13])==3 and float(st[17])==2)
+bx=style_line({'family':'Noto Sans','background':'box','box_color':'#FF0000','box_opacity':100,'box_padding':14})
+check('background box uses the chosen colour, opacity and padding',bx[15]=='3' and bx[5].upper()=='&H000000FF' and bx[16]=='14')
+check('position top-right sets the right alignment',style_line({'position':'top','halign':'right'})[18]=='9')
+up=pathlib.Path(write_ass_file('u','hello world',3000,{'case':'upper'},640,360,out_path=str(t/'u.ass'))).read_text(encoding='utf-8-sig')
+check('UPPERCASE transforms the caption text','HELLO WORLD' in up)
+words='one two three four five six seven'.split()
+wt=[(i*500,i*500+400) for i in range(7)]
+ph=pathlib.Path(write_ass_file('p',' '.join(words),5000,{'split':'phrases','phrase_words':3},640,360,out_path=str(t/'p.ass'),word_times=wt)).read_text(encoding='utf-8-sig')
+evs=[x for x in ph.splitlines() if x.startswith('Dialogue: 0,')]
+check('phrase captions: 7 words in phrases of 3 give 3 events, each starting with its first word',len(evs)==3 and [e.split(',')[1] for e in evs]==['0:00:00.00','0:00:01.50','0:00:03.00'])
+hk=pathlib.Path(write_ass_file('h',' '.join(words),5000,{'split':'phrases','phrase_words':3,'karaoke':True,'karaoke_style':'box','highlight_color':'#00FF00'},640,360,out_path=str(t/'h.ass'),word_times=wt)).read_text(encoding='utf-8-sig')
+check('box highlight inside phrases: one event per word, the spoken word gets the marker',len([x for x in hk.splitlines() if x.startswith('Dialogue: 0,')])==7 and hk.count(r'\3c&H0000FF00')>=7)
+def ink_at(font,at,text='In the year 711 a small force crossed'):
+ path=write_ass_file('i',text,5000,font,640,360,out_path=str(t/'i.ass'),speech_start_ms=0,speech_ms=4500)
+ raw=subprocess.check_output(['ffmpeg','-v','error','-f','lavfi','-i','color=c=black:s=640x360:d=5','-vf',f"ass={path}:fontsdir={root/'assets'/'fonts'}",'-ss',str(at),'-frames:v','1','-f','rawvideo','-pix_fmt','gray','-'])
+ return np.frombuffer(raw,np.uint8).reshape(360,640)
+full,ph1=ink_at({'size':40},1.0),ink_at({'size':40,'split':'phrases','phrase_words':2},1.0)
+check('phrase captions show only a few words at a time on screen',0<(ph1>128).sum()<(full>128).sum()*0.6)
+top=ink_at({'size':40,'position':'top'},1.0)
+check('top position draws the caption in the top of the frame',(top[:120]>128).sum()>100 and (top[240:]>128).sum()==0)
+print(f'{n} text motion, annotation, look, caption and Captions Pro checks passed')

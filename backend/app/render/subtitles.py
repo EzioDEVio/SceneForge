@@ -17,7 +17,7 @@ from __future__ import annotations
 import re
 
 from app.config import TMP_DIR
-from app.render.fontruns import tag_runs
+from app.render.fontruns import tag_runs, text_scale
 from app.render.typewriter import reveal_schedule
 
 
@@ -37,6 +37,110 @@ from app.render.fontruns import ALL_FAMILIES as LAYER_FAMILIES  # every bundled 
 _ARABIC_RE = re.compile(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]")
 
 
+def _exit_loop_tags(font_json: dict, span_ms: int) -> str:
+    """Exit animation (fade / pop out) and a looping pulse for one caption event."""
+    tags = ""
+    exit_ms = int(font_json.get("exit_ms", 400))
+    exit_ms = max(50, min(exit_ms, span_ms // 3 or 50))
+    ex = font_json.get("exit_animation", "none")
+    if ex == "fade":
+        tags += r"\fad(0,%d)" % exit_ms
+    elif ex == "pop":
+        tags += r"\t(%d,%d,\fscx0\fscy0\alpha&HFF&)" % (max(0, span_ms - exit_ms), span_ms)
+    if font_json.get("loop") == "pulse":
+        period, t, grow = 700, 0, True
+        while t + period <= max(0, span_ms - (exit_ms if ex != "none" else 0)) and t < 60000:
+            tags += r"\t(%d,%d,\fscx%d\fscy%d)" % (t, t + period, 106 if grow else 100, 106 if grow else 100)
+            t += period; grow = not grow
+    return tags
+
+
+def _phrase_events(text, font_json, duration_ms, family, primary, outline, outline_w, size,
+                   speech_start_ms, speech_ms, speech_segments, word_times, ts, runs, tag_runs, escape_text):
+    """CapCut-style phrase captions: a few words at a time, each phrase shown while its words
+    are spoken (exact voice timing, measured speech, or an even spread), with the phrase's
+    entrance, word highlight, exit and loop applied per phrase."""
+    from app.render.word_timing import word_starts
+    words = text.split()
+    n = max(1, min(8, int(font_json.get("phrase_words", 3) or 3)))
+    weights = [len(w) + 2 for w in words]
+    if word_times and len(word_times) == len(words):
+        starts = [s for s, _ in word_times]
+        last_end = word_times[-1][1]
+    elif speech_segments:
+        starts = word_starts(weights, speech_segments)
+        last_end = speech_segments[-1][1]
+    else:
+        start = max(0, int(speech_start_ms))
+        span = max(500, int(speech_ms if speech_ms else duration_ms - start))
+        starts, acc, total = [], 0.0, sum(weights)
+        for w in weights:
+            starts.append(int(start + span * acc / total)); acc += w
+        last_end = start + span
+    hi = _hex_to_ass_color(font_json.get("highlight_color", "#FFD84D"), alpha=0)
+    style = font_json.get("karaoke_style", "fill") if font_json.get("karaoke") else None
+    anim = font_json.get("caption_animation", "none")
+    a = int(font_json.get("caption_animation_ms", 400))
+    events = []
+    for c in range(0, len(words), n):
+        chunk = words[c:c + n]
+        c_start = starts[c]
+        c_end = starts[c + n] if c + n < len(words) else min(duration_ms, last_end + 500)
+        c_end = max(c_end, c_start + 200)
+        span = c_end - c_start
+        enter = _entrance_tags(anim, min(a, max(100, span // 2)))
+        tail = _exit_loop_tags(font_json, span)
+        head = lambda s0, s1, layer=0: f"Dialogue: {layer},{ts(s0)},{ts(s1)},Default,,0,0,0,,"
+        if style in ("pop", "glow", "box", "color", "underline"):
+            w_starts = [starts[c + k] for k in range(len(chunk))] + [c_end]
+            for k in range(len(chunk)):
+                parts = []
+                for j, w in enumerate(chunk):
+                    first, tagged = tag_runs(w + (" " if j < len(chunk) - 1 else ""), family, escape_text)
+                    cur = j == k
+                    if cur and style == "pop":
+                        parts.append(f"{{\\fn{first}\\1c{hi}\\fscx122\\fscy122}}{tagged}{{\\fscx100\\fscy100}}")
+                    elif cur and style == "box":
+                        parts.append(f"{{\\fn{first}\\3c{hi}\\bord{max(4, size // 4)}\\blur1}}{tagged}{{\\3c{outline}\\bord{outline_w}\\blur0}}")
+                    elif cur and style == "underline":
+                        parts.append(f"{{\\fn{first}\\1c{hi}\\u1}}{tagged}{{\\u0}}")
+                    elif cur and style == "glow":
+                        parts.append(f"{{\\fn{first}\\1c{hi}\\3c{hi}\\bord3\\blur4}}{tagged}{{\\3c{outline}\\bord{outline_w}\\blur0}}")
+                    else:
+                        color = hi if (style == "fill" and j < k) else primary
+                        parts.append(f"{{\\fn{first}\\1c{color}}}{tagged}")
+                s0, s1 = w_starts[k], w_starts[k + 1]
+                tags = (enter if k == 0 else "") + (_exit_loop_tags(font_json, s1 - s0) if k == len(chunk) - 1 else "")
+                events.append(head(s0, s1) + ("{" + tags + "}" if tags else "") + "".join(parts) + "\n")
+        elif style == "fill":
+            parts = [f"{{\\1c{hi}\\2c{primary}}}"]
+            ends = [starts[c + k + 1] if c + k + 1 < len(words) else last_end for k in range(len(chunk))]
+            for k, w in enumerate(chunk):
+                first, tagged = tag_runs(w + (" " if k < len(chunk) - 1 else ""), family, escape_text)
+                parts.append(f"{{\\k{max(1, round((ends[k] - starts[c + k]) / 10))}\\fn{first}}}{tagged}")
+            events.append(head(c_start, c_end) + "{" + enter + tail + "}" + "".join(parts) + "\n")
+        else:
+            events.append(head(c_start, c_end) + ("{" + enter + tail + "}" if enter + tail else "") + runs(" ".join(chunk), family) + "\n")
+    return events
+
+
+def _entrance_tags(anim: str, a: int) -> str:
+    """Entrance for one phrase (letter animations become word-level pops per phrase)."""
+    return {
+        "fade": r"\fad(%d,0)" % a,
+        "zoom": r"\fscx30\fscy30\t(0,%d,\fscx100\fscy100)" % a,
+        "blur": r"\blur12\t(0,%d,\blur0)" % a,
+        "bounce": r"\fscx0\fscy0\t(0,%d,\fscx115\fscy115)\t(%d,%d,\fscx100\fscy100)" % (a * 2 // 3, a * 2 // 3, a),
+        "letters-pop": r"\fscx40\fscy40\alpha&HFF&\t(0,%d,\fscx110\fscy110\alpha&H00&)\t(%d,%d,\fscx100\fscy100)" % (a * 2 // 3, a * 2 // 3, a),
+        "words-pop": r"\fscx40\fscy40\alpha&HFF&\t(0,%d,\fscx110\fscy110\alpha&H00&)\t(%d,%d,\fscx100\fscy100)" % (a * 2 // 3, a * 2 // 3, a),
+        "letters-fade": r"\fad(%d,0)" % a, "words-fade": r"\fad(%d,0)" % a,
+        "letters-flip": r"\frx90\t(0,%d,\frx0)" % a, "words-flip": r"\frx90\t(0,%d,\frx0)" % a,
+        "letters-blur": r"\blur12\t(0,%d,\blur0)" % a,
+        "glitch": r"\fscx130\fax0.2\t(0,%d,\fscx100\fax0)" % a,
+        "wobble": r"\frz-6\t(0,%d,\frz4)\t(%d,%d,\frz0)" % (a // 2, a // 2, a),
+    }.get(anim, "")
+
+
 def write_ass_file(
     scene_id: str,
     text: str,
@@ -52,16 +156,38 @@ def write_ass_file(
     word_times: list[tuple[int, int]] | None = None,
 ) -> str:
     family = font_json.get("family", "Noto Naskh Arabic")
-    size = int(font_json.get("size", 44))
+    size = int(round(int(font_json.get("size", 44)) * text_scale(family, text)))
     primary = _hex_to_ass_color(font_json.get("color", "#FFFFFF"), alpha=0)
     outline = _hex_to_ass_color(font_json.get("outline_color", "#000000"), alpha=0)
     outline_w = int(font_json.get("outline_width", 2))
     position = font_json.get("position", "bottom")
-    alignment = _ALIGNMENT.get(position, 2)
+    halign = font_json.get("halign", "center")
+    column = {"left": 0, "center": 1, "right": 2}.get(halign, 1)
+    row = {"bottom": 1, "middle": 4, "top": 7}.get(position, 1)
+    alignment = row + column
+    # Shadow: depth, colour and opacity (BackColour); background box uses OutlineColour + Outline as padding.
+    shadow_depth = float(font_json.get("shadow", 0) or 0)
+    shadow_alpha = int(round(255 * (1 - float(font_json.get("shadow_opacity", 60)) / 100)))
+    back_color = _hex_to_ass_color(font_json.get("shadow_color", "#000000"), alpha=shadow_alpha)
     background = font_json.get("background", "none")
     border_style = 3 if background == "box" else 1
-    back_color = _hex_to_ass_color("#000000", alpha=96) if background == "box" else "&H00000000"
-    margin_v = 60
+    if background == "box":
+        box_alpha = int(round(255 * (1 - float(font_json.get("box_opacity", 60)) / 100)))
+        outline = _hex_to_ass_color(font_json.get("box_color", "#000000"), alpha=box_alpha)
+        outline_w = int(font_json.get("box_padding", 10))
+    bold = -1 if font_json.get("bold") else 0
+    italic = -1 if font_json.get("italic") else 0
+    underline = -1 if font_json.get("underline") else 0
+    spacing = float(font_json.get("spacing", 0) or 0)
+    margin_v = max(0, int(round(canvas_h * (0.055 + float(font_json.get("offset_y", 0) or 0) / 100))))
+    side = int(round(canvas_w * (100 - float(font_json.get("max_width", 90) or 90)) / 200))
+    case = font_json.get("case", "none")
+    if case == "upper":
+        text = text.upper()
+    elif case == "lower":
+        text = text.lower()
+    elif case == "title":
+        text = " ".join(w[:1].upper() + w[1:] for w in text.split(" "))
 
     def ts(ms: int) -> str:
         cs = int(round(ms)) // 10
@@ -80,7 +206,7 @@ WrapStyle: 0
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,{family},{size},{primary},{primary},{outline},{back_color},0,0,0,0,100,100,0,0,{border_style},{outline_w},0,{alignment},40,40,{margin_v},-1
+Style: Default,{family},{size},{primary},{primary},{outline},{back_color},{bold},{italic},{underline},0,100,100,{spacing},0,{border_style},{outline_w},{shadow_depth},{alignment},{side},{side},{margin_v},-1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -94,7 +220,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         first, tagged = tag_runs(value, chosen_family, escape_text)
         return "{\\fn%s}%s" % (first, tagged) if tagged else ""
 
-    if font_json.get("karaoke") and text.strip() and not typewriter:
+    split = font_json.get("split", "full")
+    if split == "phrases" and text.strip() and not typewriter:
+        events = _phrase_events(text, font_json, duration_ms, family, primary, outline, outline_w, size,
+                                speech_start_ms, speech_ms, speech_segments, word_times, ts, runs, tag_runs, escape_text)
+    elif font_json.get("karaoke") and text.strip() and not typewriter:
         # Word-by-word highlight: each word switches from the caption colour
         # to the highlight colour as it is spoken. No word timings are
         # available from the voice engines, so the narration span is shared
@@ -123,7 +253,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 t += span * weight / total
             ends = starts[1:] + [start + span]
         style = font_json.get("karaoke_style", "fill")
-        if style in ("pop", "glow"):
+        if style in ("pop", "glow", "box", "color", "underline"):
             # One event per word: spoken words in the highlight colour, the
             # current word popped (bigger) or glowing, the rest in the caption colour.
             tagged_words = [tag_runs(w + (" " if i < len(words) - 1 else ""), family, escape_text) for i, w in enumerate(words)]
@@ -132,6 +262,13 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
                 for j, (first, tagged) in enumerate(tagged_words):
                     if j == current and style == "pop":
                         out.append(f"{{\\fn{first}\\1c{hi}\\fscx122\\fscy122}}{tagged}{{\\fscx100\\fscy100}}")
+                    elif j == current and style == "box":
+                        # a thick outline in the highlight colour forms a marker behind the word
+                        out.append(f"{{\\fn{first}\\3c{hi}\\bord{max(4, size // 4)}\\blur1}}{tagged}{{\\3c{outline}\\bord{outline_w}\\blur0}}")
+                    elif style == "color":
+                        out.append(f"{{\\fn{first}\\1c{hi if j == current else primary}}}{tagged}")
+                    elif style == "underline":
+                        out.append(f"{{\\fn{first}\\1c{hi if j == current else primary}\\u{1 if j == current else 0}}}{tagged}")
                     else:
                         out.append(f"{{\\fn{first}\\1c{hi if j <= spoken and (j < spoken or j == current) else primary}}}{tagged}")
                 return "".join(out)
@@ -198,7 +335,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     # Caption entrance animation (plain captions only: typewriter and word-by-word highlight
     # already animate the captions their own way).
     cap_anim = font_json.get('caption_animation', 'none')
-    if cap_anim not in (None, 'none') and text.strip() and not (typewriter or font_json.get('typewriter')) and not font_json.get('karaoke') and events:
+    if split != 'phrases' and text.strip() and not (typewriter or font_json.get('typewriter')) and events and (font_json.get('exit_animation', 'none') != 'none' or font_json.get('loop') == 'pulse'):
+        # exit and loop for whole-text captions: prefix the caption line(s)
+        tail = _exit_loop_tags(font_json, duration_ms)
+        events = [e.replace(',Default,,0,0,0,,', ',Default,,0,0,0,,{' + tail + '}', 1) if e.startswith('Dialogue: 0,') else e for e in events]
+    if split != 'phrases' and cap_anim not in (None, 'none') and text.strip() and not (typewriter or font_json.get('typewriter')) and not font_json.get('karaoke') and events:
         a = int(font_json.get('caption_animation_ms', 900))
         cap_color = _hex_to_ass_color(font_json.get('color', '#FFFFFF'))
         cap_hi = _hex_to_ass_color(font_json.get('highlight_color', '#FFD84D'), alpha=0)
@@ -255,7 +396,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         align={'left':4,'center':5,'right':6}.get(layer.get('align','center'),5)
         family=layer.get('family','Noto Naskh Arabic')
         if family not in LAYER_FAMILIES: family='Noto Naskh Arabic'
-        overrides = r'{\an%d%s\fs%d\c%s\b%d\bord%.1f\shad%.1f\fsp%.1f%s}' % (align,position_tag,layer.get('size',64),color,int(layer.get('bold',False)),layer.get('outline_width',0),layer.get('shadow',0),float(layer.get('spacing',0) or 0),extra)
+        layer_size = int(round(int(layer.get('size', 64)) * text_scale(family, layer.get('text', ''))))
+        overrides = r'{\an%d%s\fs%d\c%s\b%d\bord%.1f\shad%.1f\fsp%.1f%s}' % (align,position_tag,layer_size,color,int(layer.get('bold',False)),layer.get('outline_width',0),layer.get('shadow',0),float(layer.get('spacing',0) or 0),extra)
         if animation == 'typewriter':
             schedule = reveal_schedule(layer['text'],span,{'typewriter_delay_ms':0,'typewriter_duration_ms':anim_ms})
             for j,event in enumerate(schedule):
