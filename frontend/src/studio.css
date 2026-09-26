@@ -320,3 +320,5 @@ button:hover>.sample-radial span+span{animation-name:tx-radial}
 button:hover>.sample-fade_fast span+span{animation-duration:.9s}
 @media (prefers-reduced-motion:reduce){button:hover>.transition-sample span+span{animation:none!important;opacity:1}}
 .route-label-row{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;align-items:center;margin:5px 0}.route-label-row input{width:100%}
+.annot-add{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.annot-add .btn{font-size:11px;padding:5px 9px}
+.fx-callout{position:absolute;transform:translate(-50%,-50%);background:#121218e6;color:#fff;border:2px solid;border-radius:8px;padding:2px 9px;font-size:clamp(9px,1.6cqw,15px);font-weight:700;white-space:nowrap}

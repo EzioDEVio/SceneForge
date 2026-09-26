@@ -229,6 +229,9 @@ try{
  await user.click(screen.getByRole('switch',{name:'Spotlight'}));await saved();
  check('turning an effect off removes it',lk().some(l=>'spotlight' in l&&l.spotlight===null)&&!document.querySelector('.scenefx-preview .fx-layer:not(.fx-leak)'));
  check('VHS look is offered',!!screen.getByRole('button',{name:'VHS',exact:true}));
+ await user.click(within(screen.getByRole('group',{name:'Add annotation'})).getByRole('button',{name:/Circle/}));
+ await user.click(within(screen.getByRole('group',{name:'Add annotation'})).getByRole('button',{name:/Callout/}));await saved();
+ check('annotations save and preview on the picture',lk().some(l=>l.annotations?.length===2&&l.annotations[0].type==='circle'&&l.annotations[1].type==='callout')&&!!document.querySelector('.scenefx-preview ellipse')&&!!document.querySelector('.fx-callout'));
  // Batch B/C controls
  await user.click(screen.getByRole('switch',{name:'Colour wheels'}));
  const liftDisc=screen.getByRole('slider',{name:'Lift colour wheel'});liftDisc.focus();fireEvent.keyDown(liftDisc,{key:'ArrowLeft'});fireEvent.keyDown(liftDisc,{key:'ArrowLeft'});await saved();

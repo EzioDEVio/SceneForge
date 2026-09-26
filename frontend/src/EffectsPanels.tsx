@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {Vibrate, Focus, EyeOff, Sun, Blend, Plus, Trash2, Palette, LayoutGrid, Route as RouteIcon, Box as BoxIcon, MousePointerClick, Undo2} from 'lucide-react';
+import {Vibrate, Focus, EyeOff, Sun, Blend, Plus, Trash2, Palette, LayoutGrid, Route as RouteIcon, Box as BoxIcon, MousePointerClick, Undo2, PenLine} from 'lucide-react';
 import type {Look, Scene} from './api';
 
 export type Shake = {amount: number; speed: number; impact: boolean};
@@ -16,6 +16,16 @@ const LAYOUT: Layout = {type: 'split2', gap: 8, bg: '#000000'};
 const ROUTE: RouteFx = {points: [], color: '#E8413C', width: 8, style: 'solid', pins: true, start_ms: 0, draw_ms: 3000, arrow: true, marker: 'none', labels: [], curve: false};
 const PARALLAX: Parallax = {x: 50, y: 55, w: 40, h: 70, shape: 'ellipse', direction: 'in', amount: 50};
 const ZERO3 = () => [0, 0, 0];
+export type Annotation = {id: string; type: 'arrow' | 'circle' | 'underline' | 'box' | 'callout'; style: string; x: number; y: number; x2: number; y2: number;
+  color: string; width: number; text: string; start_ms: number; draw_ms: number; end_ms: number | null};
+const ANNOT_NEW: Record<Annotation['type'], Partial<Annotation>> = {
+  arrow: {x: 30, y: 65, x2: 50, y2: 45, style: 'curved', color: '#FFD84D'},
+  circle: {x: 38, y: 30, x2: 62, y2: 70, style: 'hand', color: '#FF4D4D'},
+  underline: {x: 30, y: 75, x2: 70, y2: 75, style: 'highlighter', color: '#FFE14D'},
+  box: {x: 30, y: 30, x2: 70, y2: 70, style: 'neat', color: '#4DD2FF'},
+  callout: {x: 70, y: 25, x2: 55, y2: 50, style: 'neat', color: '#FFFFFF', text: 'Label'},
+};
+const ANNOT_LABEL: Record<Annotation['type'], string> = {arrow: 'Arrow', circle: 'Circle', underline: 'Underline', box: 'Box', callout: 'Callout'};
 
 /** One colour wheel: drag the dot towards a colour to tint that range, the
  *  slider sets its brightness. Stored as an [r, g, b] offset in -100..100. */
@@ -109,13 +119,15 @@ function StopLabelInput({index, value, onCommit}: {index: number; value: string;
 export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEditing, onRouteEditing, onAddMedia}: {scene: Scene; disabled: boolean; onDraft: (look: Look) => void;
   liveRoute?: RouteFx | null; routeEditing?: boolean; onRouteEditing?: (on: boolean) => void; onAddMedia?: () => void}) {
   const look = (scene.look_json || {}) as any;
-  const pick = (l: any) => ({shake: l.shake || null, spotlight: l.spotlight || null, redact: l.redact || [], leak: l.leak || null, tone: l.tone || null, wheels: l.wheels || null, layout: l.layout || null, parallax: l.parallax || null});
+  const pick = (l: any) => ({annotations: l.annotations || [], shake: l.shake || null, spotlight: l.spotlight || null, redact: l.redact || [], leak: l.leak || null, tone: l.tone || null, wheels: l.wheels || null, layout: l.layout || null, parallax: l.parallax || null});
   const [st, setSt] = useState(pick(look));
   useEffect(() => {setSt(pick((scene.look_json || {}) as any));}, [scene.id]);
   const route: RouteFx | null = liveRoute === undefined ? (look.route || null) : liveRoute;
   const videoOrImages = scene.shots.length;
   const put = (key: string, value: any) => {setSt(s => ({...s, [key]: value})); onDraft({[key]: value === null || (Array.isArray(value) && !value.length) ? null : value} as any);};
   const {shake, spotlight: sp, redact, leak, tone, wheels, layout, parallax: plx} = st;
+  const annots: Annotation[] = (st as any).annotations || [];
+  const setAnnot = (i: number, p: Partial<Annotation>) => put('annotations', annots.map((a, k) => k === i ? {...a, ...p} : a));
   return <div className="look-panel scene-fx-panel">
     <Section title="Split toning" Icon={Blend} on={!!tone} onToggle={on => put('tone', on ? {...TONE} : null)} disabled={disabled} hint="Tint shadows and highlights with two colours, like a film grade. Shows in the preview.">
       {tone && <>
@@ -125,6 +137,32 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
         <Row label="Balance" value={tone.balance} min={-100} max={100} onChange={balance => put('tone', {...tone, balance})} disabled={disabled}/>
       </>}
     </Section>
+    <section className="look-section" aria-label="Annotations">
+      <div className="look-heading"><h3><PenLine size={15}/> Annotations</h3><span className="hint">{annots.length}/10</span></div>
+      <p className="hint">Arrows, circles, underlines, boxes and callouts that draw themselves on screen to point things out. Shown on the preview; render to see them draw.</p>
+      <div className="annot-add" role="group" aria-label="Add annotation">
+        {(Object.keys(ANNOT_NEW) as Annotation['type'][]).map(t => <button key={t} className="btn" disabled={disabled || annots.length >= 10}
+          onClick={() => put('annotations', [...annots, {id: 'an' + Math.random().toString(36).slice(2, 8), type: t, width: 8, text: '', start_ms: 0, draw_ms: 800, end_ms: null, ...ANNOT_NEW[t]} as Annotation])}><Plus size={12}/> {ANNOT_LABEL[t]}</button>)}
+      </div>
+      {annots.map((a, i) => <fieldset key={a.id} className="adjust-group"><legend>{i + 1}. {ANNOT_LABEL[a.type]}</legend>
+        {a.type === 'arrow' && <Pills label="Shape" value={a.style} options={[['curved', 'Curved'], ['straight', 'Straight']]} onChange={style => setAnnot(i, {style})} disabled={disabled}/>}
+        {a.type === 'circle' && <Pills label="Shape" value={a.style} options={[['hand', 'Hand-drawn'], ['neat', 'Neat']]} onChange={style => setAnnot(i, {style})} disabled={disabled}/>}
+        {a.type === 'underline' && <Pills label="Shape" value={a.style} options={[['highlighter', 'Highlighter'], ['line', 'Line']]} onChange={style => setAnnot(i, {style})} disabled={disabled}/>}
+        {a.type === 'callout' && <label className="control-label">Text<StopLabelInput index={i} value={a.text} onCommit={text => setAnnot(i, {text})}/></label>}
+        <Row label={a.type === 'callout' ? 'Label left–right' : 'Start left–right'} value={a.x} min={-10} max={110} step={0.5} unit="%" onChange={x => setAnnot(i, {x})} disabled={disabled}/>
+        <Row label={a.type === 'callout' ? 'Label up–down' : 'Start up–down'} value={a.y} min={-10} max={110} step={0.5} unit="%" onChange={y => setAnnot(i, {y})} disabled={disabled}/>
+        <Row label={a.type === 'callout' || a.type === 'arrow' ? 'Points to left–right' : 'End left–right'} value={a.x2} min={-10} max={110} step={0.5} unit="%" onChange={x2 => setAnnot(i, {x2})} disabled={disabled}/>
+        {a.type !== 'underline' && <Row label={a.type === 'callout' || a.type === 'arrow' ? 'Points to up–down' : 'End up–down'} value={a.y2} min={-10} max={110} step={0.5} unit="%" onChange={y2 => setAnnot(i, {y2})} disabled={disabled}/>}
+        <Row label="Thickness" value={a.width} min={2} max={40} unit="px" onChange={width => setAnnot(i, {width})} disabled={disabled}/>
+        <div className="adjust-row changed"><label>Colour</label><input type="color" aria-label={`Annotation ${i + 1} colour`} value={a.color} disabled={disabled} onChange={e => setAnnot(i, {color: e.target.value.toUpperCase()})}/><span/><span/></div>
+        <div className="audio-times">
+          <label>Start (s)<input aria-label={`Annotation ${i + 1} start seconds`} type="number" min={0} step={0.1} value={(a.start_ms / 1000).toFixed(1)} disabled={disabled} onChange={e => setAnnot(i, {start_ms: Math.max(0, Math.round(Number(e.target.value) * 1000) || 0)})}/></label>
+          <label>Draw (s)<input aria-label={`Annotation ${i + 1} draw seconds`} type="number" min={0.1} max={10} step={0.1} value={(a.draw_ms / 1000).toFixed(1)} disabled={disabled} onChange={e => setAnnot(i, {draw_ms: Math.max(100, Math.min(10000, Math.round(Number(e.target.value) * 1000) || 800))})}/></label>
+          <label>Until (s)<input aria-label={`Annotation ${i + 1} end seconds`} type="number" min={0} step={0.1} placeholder="scene end" value={a.end_ms === null ? '' : (a.end_ms / 1000).toFixed(1)} disabled={disabled} onChange={e => setAnnot(i, {end_ms: e.target.value === '' ? null : Math.max(a.start_ms + 100, Math.round(Number(e.target.value) * 1000))})}/></label>
+        </div>
+        <button className="text-btn" disabled={disabled} onClick={() => put('annotations', annots.filter((_, k) => k !== i))}><Trash2 size={12}/> Remove</button>
+      </fieldset>)}
+    </section>
     <Section title="Colour wheels" Icon={Palette} on={!!wheels} onToggle={on => put('wheels', on ? {lift: ZERO3(), gamma: ZERO3(), gain: ZERO3()} : null)} disabled={disabled} hint="Lift tints the shadows, Gamma the midtones, Gain the highlights. Drag a dot towards a colour; double-click to reset. Shows in the preview.">
       {wheels && <div className="wheels-row">
         {(['lift', 'gamma', 'gain'] as const).map(k => <ColorWheel key={k} label={k[0].toUpperCase() + k.slice(1)} value={wheels[k]} disabled={disabled} onChange={v => put('wheels', {...wheels, [k]: v})}/>)}
@@ -213,6 +251,7 @@ export function SceneFxPreview({look, shots = [], filter}: {look: any; shots?: {
   const layout: Layout | undefined = look.layout;
   const sp: Spot | undefined = look.spotlight, redact: Redact[] = look.redact || [], leak: Leak | undefined = look.leak;
   const plx: Parallax | undefined = look.parallax, route: RouteFx | undefined = look.route;
+  const annots: Annotation[] = look.annotations || [];
   const hole = sp ? (sp.shape === 'ellipse' ? `radial-gradient(ellipse ${sp.w / 2}% ${sp.h / 2}% at ${sp.x}% ${sp.y}%, transparent ${Math.max(0, 100 - sp.feather)}%, rgba(0,0,0,${sp.dim / 100}) 100%)` : undefined) : undefined;
   const leakColors = {warm: ['255,140,40', '255,70,30'], cool: ['80,170,255', '140,90,255'], rainbow: ['255,80,60', '70,150,255']};
   const cells: [number, number, number, number][] = !layout ? [] : ({
@@ -225,6 +264,14 @@ export function SceneFxPreview({look, shots = [], filter}: {look: any; shots?: {
       {cells.slice(0, shots.length).map(([x, y, w, h], i) => <div key={i} className="fx-cell" style={{left: `calc(${x}% + ${x > 0 ? gapPct : 0}%)`, top: `calc(${y}% + ${y > 0 ? gapPct * 16 / 9 : 0}%)`,
         width: `calc(${w}% - ${gapPct}%)`, height: `calc(${h}% - ${gapPct * 16 / 9}%)`, backgroundImage: `url(/api/assets/${shots[i].asset_id}/thumbnail?w=640)`}}/>)}
     </div>}
+    {annots.length > 0 && <svg className="fx-route" viewBox="0 0 100 100" preserveAspectRatio="none">
+      {annots.map(a => {const sw = `${Math.max(1.5, a.width / 3)}px`;
+        if (a.type === 'circle') return <ellipse key={a.id} cx={(a.x + a.x2) / 2} cy={(a.y + a.y2) / 2} rx={Math.abs(a.x2 - a.x) / 2} ry={Math.abs(a.y2 - a.y) / 2} fill="none" stroke={a.color} style={{strokeWidth: sw}} vectorEffect="non-scaling-stroke"/>;
+        if (a.type === 'box') return <rect key={a.id} x={Math.min(a.x, a.x2)} y={Math.min(a.y, a.y2)} width={Math.abs(a.x2 - a.x)} height={Math.abs(a.y2 - a.y)} fill="none" stroke={a.color} style={{strokeWidth: sw}} vectorEffect="non-scaling-stroke"/>;
+        if (a.type === 'underline') return <line key={a.id} x1={a.x} y1={a.y} x2={a.x2} y2={a.y} stroke={a.color} strokeOpacity={a.style === 'highlighter' ? 0.45 : 1} style={{strokeWidth: a.style === 'highlighter' ? `${a.width * 1.3}px` : sw}} vectorEffect="non-scaling-stroke"/>;
+        return <line key={a.id} x1={a.x} y1={a.y} x2={a.x2} y2={a.y2} stroke={a.color} strokeDasharray={a.type === 'callout' ? '2 1' : undefined} style={{strokeWidth: sw}} vectorEffect="non-scaling-stroke"/>;})}
+    </svg>}
+    {annots.filter(a => a.type === 'callout' && a.text).map(a => <div key={a.id} className="fx-callout" style={{left: `${a.x}%`, top: `${a.y}%`, borderColor: a.color}} dir="auto">{a.text}</div>)}
     {plx && <div className={`fx-subject ${plx.shape}`} style={{left: `${plx.x - plx.w / 2}%`, top: `${plx.y - plx.h / 2}%`, width: `${plx.w}%`, height: `${plx.h}%`}}><span>Subject</span></div>}
     {route && route.points.length > 1 && <svg className="fx-route" viewBox="0 0 100 100" preserveAspectRatio="none">
       <polyline points={route.points.map(p => p.join(',')).join(' ')} fill="none" stroke={route.color} strokeWidth={route.width / 10} vectorEffect="non-scaling-stroke" style={{strokeWidth: `${route.width / 3}px`}} strokeDasharray={route.style === 'dashed' ? '6 4' : undefined} strokeLinecap="round" strokeLinejoin="round"/>

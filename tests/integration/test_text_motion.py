@@ -36,4 +36,26 @@ a,b,c=ink(L(animation='letters-fade'),0.15),ink(L(animation='letters-fade'),0.7)
 check(f'letters appear progressively on screen ({a} → {b} → {c} lit pixels)',a<b<c and c>1500)
 wa,wb=ink(L(text='قرطبة الأندلس',animation='words-fade',family='Noto Naskh Arabic'),0.25),ink(L(text='قرطبة الأندلس',animation='words-fade',family='Noto Naskh Arabic'),2.0)
 check('Arabic words appear one after another',0<wa<wb*0.7)
-print(f'{n} text motion checks passed')
+
+# --- annotations -------------------------------------------------------------
+from app.render.annotations import clean_annotations,annotation_clip
+bad=[{'type':'star'},{'type':'arrow','x':500},{'type':'circle','style':'curved'},{'type':'callout','text':'x'*81}]
+check('annotation settings are validated',all(client.patch(f'/api/scenes/{sid}',json={'look':{'annotations':[b]}}).status_code==400 for b in bad) and client.patch(f'/api/scenes/{sid}',json={'look':{'annotations':[{'type':'arrow'}]*11}}).status_code==400)
+check('annotations save on the scene',client.patch(f'/api/scenes/{sid}',json={'look':{'annotations':[{'type':'circle','style':'hand'},{'type':'callout','text':'قرطبة'}]}}).json()['look_json']['annotations'][1]['text']=='قرطبة')
+def frame(a,dur,at):
+ c=annotation_clip(clean_annotations([a])[0],640,360,30,dur,t/'an')
+ raw=subprocess.check_output(['ffmpeg','-v','error','-i',c,'-vf',f'select=eq(n\\,{at})','-frames:v','1','-f','rawvideo','-pix_fmt','rgba','-'])
+ return np.frombuffer(raw,np.uint8).reshape(360,640,4).astype(int)
+arrow={'type':'arrow','style':'straight','x':10,'y':50,'x2':90,'y2':50,'width':10,'draw_ms':1000}
+early,late=frame(arrow,3000,6),frame(arrow,3000,40)
+reach=lambda f:np.nonzero((f[...,3]>200).any(axis=0))[0]
+check('arrow grows from start to target, then its head appears',reach(early).max()<320 and reach(late).max()>570 and (late[140:220,560:600,3]>200).sum()>(late[170:190,300:340,3]>200).sum()//2)
+circ=frame({'type':'circle','style':'neat','x':30,'y':20,'x2':70,'y2':80,'width':8,'draw_ms':1000},3000,15)
+circ_end=frame({'type':'circle','style':'neat','x':30,'y':20,'x2':70,'y2':80,'width':8,'draw_ms':1000},3000,40)
+check('circle sweeps clockwise from the top: right half at mid-draw, complete at the end',(circ[:,330:,3]>200).sum()>300 and (circ[:,:310,3]>200).sum()<50 and (circ_end[:,:310,3]>200).sum()>300)
+hl=frame({'type':'underline','style':'highlighter','x':10,'y':50,'x2':90,'width':10,'draw_ms':300},3000,40)
+check('highlighter is translucent',0<hl[180,320,3]<160)
+fade=frame({'type':'box','x':20,'y':20,'x2':80,'y2':80,'width':8,'draw_ms':300,'end_ms':2000},3000,58)
+full=frame({'type':'box','x':20,'y':20,'x2':80,'y2':80,'width':8,'draw_ms':300,'end_ms':2000},3000,40)
+check('annotations fade out before their end time',0<fade[...,3].max()<full[...,3].max())
+print(f'{n} text motion + annotation checks passed')
