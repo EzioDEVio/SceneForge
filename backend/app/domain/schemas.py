@@ -257,7 +257,9 @@ class TextLayer(BaseModel):
     outline_width: float = Field(default=0, ge=0, le=10)
     shadow: float = Field(default=0, ge=0, le=10)
     exit_ms: int = Field(default=0, ge=0, le=10000)
-    animation: str = Field(default="none", pattern=r"^(none|fade|slide|slide-right|slide-up|slide-down|zoom|reveal|typewriter|blur|glitch)$")
+    animation: str = Field(default="none", pattern=r"^(none|fade|slide|slide-right|slide-up|slide-down|zoom|reveal|typewriter|blur|glitch|letters-fade|letters-pop|letters-flip|letters-blur|words-fade|words-pop|words-flip|shine|bounce|neon|wobble)$")
+    spacing: float = Field(default=0, ge=-5, le=40)          # letter spacing (ASS \fsp)
+    highlight: str = Field(default="#FFD84D", pattern=r"^#[0-9a-fA-F]{6}$")   # colour for shine / neon glow
     animation_ms: int = Field(default=800, ge=100, le=10000)
     id: str = Field(max_length=80)
     text: str = Field(max_length=2000)

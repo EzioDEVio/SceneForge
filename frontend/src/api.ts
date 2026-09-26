@@ -1,4 +1,4 @@
-export interface TextLayer { family?:string;outline_width?:number;shadow?:number;align?:string;exit_ms?:number; animation?:string;animation_ms?:number;id:string;text:string;x:number;y:number;size:number;color:string;start_ms:number;end_ms:number;bold:boolean;}
+export interface TextLayer { family?:string;outline_width?:number;shadow?:number;align?:string;exit_ms?:number; animation?:string;animation_ms?:number;spacing?:number;highlight?:string;id:string;text:string;x:number;y:number;size:number;color:string;start_ms:number;end_ms:number;bold:boolean;}
 // Thin fetch wrapper + types matching backend/app/domain/schemas.py.
 // Uses relative /api paths so it works both under the Vite dev proxy and
 // the production build served from the same FastAPI origin.
@@ -62,7 +62,7 @@ export type FontSettings = {
 };
 
 /** Must match BUILD_ID in backend/app/main.py. */
-export const BUILD_ID = "rc5-batchbc-7";
+export const BUILD_ID = "v0.4-motion-8";
 
 export type Adjust = Partial<Record<'exposure'|'contrast'|'highlights'|'shadows'|'temperature'|'tint'|'saturation'|'vibrance'|'sharpen'|'vignette'|'grain', number>>;
 export type Look = {

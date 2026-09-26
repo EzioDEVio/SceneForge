@@ -14,6 +14,8 @@ which is the classic mistake that breaks shaping.
 """
 from __future__ import annotations
 
+import re
+
 from app.config import TMP_DIR
 from app.render.fontruns import tag_runs
 from app.render.typewriter import reveal_schedule
@@ -30,6 +32,9 @@ def _hex_to_ass_color(hex_color: str, alpha: int = 0) -> str:
 
 _ALIGNMENT = {"bottom": 2, "top": 8, "middle": 5}
 LAYER_FAMILIES = ("Noto Naskh Arabic", "Noto Sans Arabic", "Noto Sans")
+
+
+_ARABIC_RE = re.compile(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]")
 
 
 def write_ass_file(
@@ -162,6 +167,34 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             substr = runs(event['text'], family)
             events.append(f"Dialogue: 0,{ts(event['time_ms'])},{ts(end)},Default,,0,0,0,,{substr}\n")
 
+    def unit_animated(text: str, family: str, animation: str, anim_ms: int, base: str, hi: str) -> str:
+        """Per-letter (or per-word) animation with inline ASS tags. libass keeps doing the
+        layout, bidi and shaping; only timing tags are added between units. Arabic letters must
+        stay joined (tags between them break shaping), so Arabic text animates by word."""
+        by_word = animation.startswith('words-') or _ARABIC_RE.search(text) is not None or animation == 'shine' and _ARABIC_RE.search(text)
+        units = re.findall(r'\s*\S+\s*', text) if by_word else [c for c in re.findall(r'\S\s*|\s+', text)]
+        units = [u for u in units if u] or [text]
+        n = len(units)
+        d = int(max(120, min(450, anim_ms * 0.55)))
+        kind = animation.split('-', 1)[-1] if animation != 'shine' else 'shine'
+        out = []
+        for i, u in enumerate(units):
+            o = int((anim_ms - d) * i / (n - 1)) if n > 1 else 0
+            if kind == 'fade':
+                tags = r'\alpha&HFF&\t(%d,%d,\alpha&H00&)' % (o, o + d)
+            elif kind == 'pop':
+                m = o + int(d * 0.6)
+                tags = r'\alpha&HFF&\fscx40\fscy40\t(%d,%d,\alpha&H00&\fscx118\fscy118)\t(%d,%d,\fscx100\fscy100)' % (o, m, m, o + d)
+            elif kind == 'flip':
+                tags = r'\alpha&HFF&\frx90\t(%d,%d,\alpha&H00&\frx0)' % (o, o + d)
+            elif kind == 'blur':
+                tags = r'\alpha&HFF&\blur12\t(%d,%d,\alpha&H00&\blur0)' % (o, o + d)
+            else:   # shine: a highlight sweeps across, text visible throughout
+                m = o + int(d * 0.4)
+                tags = r'\t(%d,%d,\1c%s)\t(%d,%d,\1c%s)' % (o, m, hi, m, o + d, base)
+            out.append('{' + tags + '}' + runs(u, family))
+        return ''.join(out)
+
     for index, layer in enumerate(font_json.get('layers', [])):
         start = min(duration_ms, int(layer.get('start_ms', 0)))
         end = min(duration_ms, int(layer.get('end_ms', 0)) or duration_ms)
@@ -185,16 +218,32 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         if animation=='reveal': extra += r'\clip(0,0,0,%d)\t(0,%d,\clip(0,0,%d,%d))' % (canvas_h,anim_ms,canvas_w,canvas_h)
         if animation=='glitch':
             extra += r'\fscx130\fax0.2\t(0,%d,\fscx85\fax-0.2)\t(%d,%d,\fscx100\fax0)' % (anim_ms//2,anim_ms//2,anim_ms)
+        a = anim_ms
+        if animation=='bounce':
+            extra += r'\fscx0\fscy0\t(0,%d,\fscx115\fscy115)\t(%d,%d,\fscx92\fscy92)\t(%d,%d,\fscx100\fscy100)' % (a*50//100,a*50//100,a*75//100,a*75//100,a)
+        if animation=='wobble':
+            extra += r'\frz-7\t(0,%d,\frz6)\t(%d,%d,\frz-3)\t(%d,%d,\frz2)\t(%d,%d,\frz0)' % (a//4,a//4,a//2,a//2,a*3//4,a*3//4,a)
+        flicker = (r'\alpha&HFF&\t(0,%d,\alpha&H00&)\t(%d,%d,\alpha&HB0&)\t(%d,%d,\alpha&H00&)\t(%d,%d,\alpha&H90&)\t(%d,%d,\alpha&H00&)'
+                   % (a//10,a*15//100,a*20//100,a*25//100,a*30//100,a*45//100,a*50//100,a*55//100,a*60//100))
+        if animation=='neon': extra += flicker
+        hi_color = _hex_to_ass_color(layer.get('highlight', '#FFD84D'))
         align={'left':4,'center':5,'right':6}.get(layer.get('align','center'),5)
         family=layer.get('family','Noto Naskh Arabic')
         if family not in LAYER_FAMILIES: family='Noto Naskh Arabic'
-        overrides = r'{\an%d%s\fs%d\c%s\b%d\bord%.1f\shad%.1f%s}' % (align,position_tag,layer.get('size',64),color,int(layer.get('bold',False)),layer.get('outline_width',0),layer.get('shadow',0),extra)
+        overrides = r'{\an%d%s\fs%d\c%s\b%d\bord%.1f\shad%.1f\fsp%.1f%s}' % (align,position_tag,layer.get('size',64),color,int(layer.get('bold',False)),layer.get('outline_width',0),layer.get('shadow',0),float(layer.get('spacing',0) or 0),extra)
         if animation == 'typewriter':
             schedule = reveal_schedule(layer['text'],span,{'typewriter_delay_ms':0,'typewriter_duration_ms':anim_ms})
             for j,event in enumerate(schedule):
                 stop = schedule[j+1]['time_ms'] if j+1<len(schedule) else span
                 event_overrides=overrides if j==len(schedule)-1 else overrides.replace(r'\fad(0,%d)' % exit_ms,'')
                 events.append(f"Dialogue: {index+1},{ts(start+event['time_ms'])},{ts(start+stop)},Default,,0,0,0,,{event_overrides}{runs(event['text'], family)}\n")
+        elif animation.startswith(('letters-','words-')) or animation == 'shine':
+            events.append(f"Dialogue: {index+1},{ts(start)},{ts(end)},Default,,0,0,0,,{overrides}{unit_animated(layer['text'], family, animation, anim_ms, color, hi_color)}\n")
+        elif animation == 'neon':
+            # glow: a blurred outline in the highlight colour underneath, sharp text on top, both flickering on
+            halo = overrides.replace('}', r'\1a&HFF&\3c%s\bord%d\blur10\shad0}' % (hi_color, max(4, int(layer.get('size',64)) // 10)), 1)
+            events.append(f"Dialogue: {index+1},{ts(start)},{ts(end)},Default,,0,0,0,,{halo}{runs(layer['text'], family)}\n")
+            events.append(f"Dialogue: {index+1},{ts(start)},{ts(end)},Default,,0,0,0,,{overrides}{runs(layer['text'], family)}\n")
         else:
             events.append(f"Dialogue: {index+1},{ts(start)},{ts(end)},Default,,0,0,0,,{overrides}{runs(layer['text'], family)}\n")
 

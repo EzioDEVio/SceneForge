@@ -38,3 +38,5 @@ Pillow>=10,<13
 numpy==2.5.3
 # Photo tools (2.5D parallax background fill, photo restore). Headless: no GUI libraries.
 opencv-python-headless==5.0.0.93
+arabic-reshaper==3.0.1
+python-bidi==0.6.11

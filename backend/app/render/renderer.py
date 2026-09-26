@@ -224,6 +224,10 @@ def _apply_overlays(scene: Scene, project: Project, visual_path: str, total_ms: 
     if look.get("route"):
         from app.render.routes import route_clip, route_graph
         g, base = route_graph(base, look["route"], route_clip(look["route"], out_w, out_h, fps, Path(PROXIES_DIR) / "scenefx"), fps); graph_parts += g
+    if look.get("annotations"):
+        from app.render.annotations import annotation_clip, annotations_graph
+        clips = [annotation_clip(a, out_w, out_h, fps, total_ms, Path(PROXIES_DIR) / "scenefx") for a in look["annotations"]]
+        g, base = annotations_graph(base, look["annotations"], clips); graph_parts += g
     if look.get("spotlight"):
         g, base = fx.spotlight_graph(base, look["spotlight"], fx.spotlight_png(look["spotlight"], out_w, out_h, Path(PROXIES_DIR) / "scenefx"), fps, dur); graph_parts += g
     if look.get("leak") and look["leak"]["amount"] > 0:

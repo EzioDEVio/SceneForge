@@ -27,7 +27,7 @@ let failNextPatch=false;
 let requests=[];
 let next=10;
 let profiles=[];
-let healthBuild="rc5-batchbc-7";let oldBackend=false;
+let healthBuild="v0.4-motion-8";let oldBackend=false;
 let failLocal=true;
 let closeReady=true;
 const clone=x=>structuredClone(x);
@@ -229,6 +229,9 @@ try{
  await user.click(screen.getByRole('switch',{name:'Spotlight'}));await saved();
  check('turning an effect off removes it',lk().some(l=>'spotlight' in l&&l.spotlight===null)&&!document.querySelector('.scenefx-preview .fx-layer:not(.fx-leak)'));
  check('VHS look is offered',!!screen.getByRole('button',{name:'VHS',exact:true}));
+ await user.click(within(screen.getByRole('group',{name:'Add annotation'})).getByRole('button',{name:/Circle/}));
+ await user.click(within(screen.getByRole('group',{name:'Add annotation'})).getByRole('button',{name:/Callout/}));await saved();
+ check('annotations save and preview on the picture',lk().some(l=>l.annotations?.length===2&&l.annotations[0].type==='circle'&&l.annotations[1].type==='callout')&&!!document.querySelector('.scenefx-preview ellipse')&&!!document.querySelector('.fx-callout'));
  // Batch B/C controls
  await user.click(screen.getByRole('switch',{name:'Colour wheels'}));
  const liftDisc=screen.getByRole('slider',{name:'Lift colour wheel'});liftDisc.focus();fireEvent.keyDown(liftDisc,{key:'ArrowLeft'});fireEvent.keyDown(liftDisc,{key:'ArrowLeft'});await saved();
@@ -245,8 +248,11 @@ try{
  check('clicking the preview adds a route stop where clicked',lk().some(l=>l.route?.points?.length===4&&l.route.points[3][0]===75&&l.route.points[3][1]===20));
  await user.click(within(screen.getByRole('radiogroup',{name:'Moving icon'})).getByRole('radio',{name:'Plane'}));
  await user.click(screen.getByRole('checkbox',{name:'Curved route'}));
- await user.type(screen.getByRole('textbox',{name:'Label for stop 1'}),'Cadiz');await saved();
- check('route icon, curve and stop labels save',lk().some(l=>l.route?.marker==='plane'&&l.route.curve===true&&l.route.labels?.[0]==='Cadiz'));
+ const lab=screen.getByRole('textbox',{name:'Label for stop 1'});
+ await user.type(lab,'قادس Cadiz');
+ check('typing a stop label is not interrupted by saves (field stays enabled and focused)',!lab.disabled&&document.activeElement===lab&&lab.value==='قادس Cadiz');
+ lab.blur();await saved();
+ check('route icon, curve and stop labels save (Arabic included)',lk().some(l=>l.route?.marker==='plane'&&l.route.curve===true&&l.route.labels?.[0]==='قادس Cadiz'));
  await user.click(screen.getByRole('button',{name:'Done editing points'}));
  check('finishing route editing hides the point editor',!document.querySelector('.route-canvas'));
  await user.click(screen.getByRole('switch',{name:'Map route'}));await user.click(screen.getByRole('switch',{name:'3D photo (parallax)'}));await user.click(screen.getByRole('switch',{name:'Colour wheels'}));await saved();
