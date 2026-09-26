@@ -52,3 +52,13 @@ test('Stable Diffusion automatic start is switched off once, keeping the folder'
   fs.writeFileSync(path.join(ws, 'local-images.json'), JSON.stringify({folder: 'C:/sd', autostart: true}));
   assert.equal(u.reviewSdAutostart(ws), false, 'if the user turns it back on, it stays on');
 });
+
+test('update errors are explained in plain language', () => {
+  assert.equal(u.explainUpdateError(new Error('HttpError: 404 Not Found "latest.yml"')).kind, 'no-release');
+  assert.equal(u.explainUpdateError(new Error('Cannot find latest.yml in the latest release artifacts')).kind, 'no-release');
+  assert.equal(u.explainUpdateError(new Error('getaddrinfo ENOTFOUND github.com')).kind, 'offline');
+  assert.equal(u.explainUpdateError(new Error('net::ERR_INTERNET_DISCONNECTED')).kind, 'offline');
+  assert.equal(u.explainUpdateError(new Error('API rate limit exceeded (403)')).kind, 'rate-limit');
+  const other = u.explainUpdateError(new Error('something odd'));
+  assert.equal(other.kind, 'error'); assert.match(other.message, /something odd/);
+});

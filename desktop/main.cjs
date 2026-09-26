@@ -47,7 +47,7 @@ async function boot(){
   try{updates.backupOnVersionChange(dataDir,app.getVersion());}catch(e){console.error('version backup failed',e);}
   try{sdAutostartTurnedOff=updates.reviewSdAutostart(dataDir);}catch(e){console.error('SD autostart review failed',e);}
  }
- window=new BrowserWindow({title:'SceneForge',width:1500,height:950,minWidth:1100,minHeight:720,show:!smoke,backgroundColor:'#202329',webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,partition:'sceneforge-desktop'}});
+ window=new BrowserWindow({title:'SceneForge',width:1500,height:950,minWidth:1100,minHeight:720,show:!smoke,backgroundColor:'#202329',webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,partition:'sceneforge-desktop',preload:path.join(__dirname,'preload.cjs')}});
  window.on('close',e=>{if(quitting)return;e.preventDefault();void requestClose();});
  window.webContents.setWindowOpenHandler(()=>({action:'deny'}));
  window.webContents.on('will-navigate',(e,url)=>{if(!origin||!isOwnURL(url,origin))e.preventDefault()});
@@ -77,38 +77,51 @@ async function boot(){
  }
  const aiGuide=()=>dialog.showMessageBox(window,{type:'info',title:'AI in SceneForge',message:'AI is optional: you can make a whole video from your own photos, clips and recordings.',
   detail:'There are two kinds of AI engines:\n\n• Cloud services (OpenAI, Gemini, ElevenLabs, Together, Cloudflare, Hugging Face): fast and high quality, paid or with free allowances. Create an account on their website, copy your API key, then choose AI Engines → Add or change API keys. Keys are stored in your system\'s credential store.\n\n• Local engines (free, run on your computer): Stable Diffusion for images and Chatterbox/Kokoro for voices. They need to be installed separately; see the menu items below for step-by-step help.\n\nThen: images are generated from a scene\'s Media tab (Generate image), voices from the Audio tab (Voice & narration).',buttons:['OK']});
- Menu.setApplicationMenu(Menu.buildFromTemplate([
+ // ---- bridge for the editor's AI Engines and About panels (preload.cjs) ----
+ const {ipcMain}=require('electron');
+ const fromApp=e=>{try{return new URL(e.senderFrame.url).origin===origin;}catch{return false;}};
+ const guard=fn=>async(e,...a)=>{if(!fromApp(e))throw Error('Not allowed');return fn(...a);};
+ const openPanel=(panel)=>window.webContents.executeJavaScript(`window.dispatchEvent(new CustomEvent('sceneforge-open-panel',{detail:${JSON.stringify(panel)}}))`);
+ for(const ch of ['sf:info','sf:check-updates','sf:set-beta','sf:choose-sd-folder','sf:open-external','sf:open-logs','sf:diagnostics'])ipcMain.removeHandler(ch);
+ ipcMain.handle('sf:info',guard(async()=>({version:app.getVersion(),electron:process.versions.electron,chrome:process.versions.chrome,platform:process.platform,arch:process.arch,
+  packaged:app.isPackaged,beta:updater.beta(),workspace:dataDir})));
+ ipcMain.handle('sf:check-updates',guard(async()=>app.isPackaged?updater.check(false):{status:'error',kind:'dev',message:'Updates are only available in the installed app.'}));
+ ipcMain.handle('sf:set-beta',guard(async on=>{const r=updater.setBeta(on);rebuildMenu();if(on)updater.check(false);return r;}));
+ ipcMain.handle('sf:choose-sd-folder',guard(async()=>{const r=await dialog.showOpenDialog(window,{title:'Choose the folder containing webui-user.bat',properties:['openDirectory']});return r.canceled?null:r.filePaths[0];}));
+ ipcMain.handle('sf:open-external',guard(async url=>{if(!/^https:\/\//.test(url))throw Error('Only https links can be opened');await shell.openExternal(url);return true;}));
+ ipcMain.handle('sf:open-logs',guard(async()=>{fs.mkdirSync(path.join(dataDir,'logs'),{recursive:true});return shell.openPath(path.join(dataDir,'logs'));}));
+ ipcMain.handle('sf:diagnostics',guard(async()=>{await collectDiagnostics();return true;}));
+ const rebuildMenu=()=>Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate()));
+ const menuTemplate=()=>([
   {label:'File',submenu:[{label:'Open workspace folder',click:()=>shell.openPath(dataDir)},{label:'Open logs',click:()=>shell.openPath(path.join(dataDir,'logs'))},{type:'separator'},{role:'quit'}]},
   {label:'AI Engines',submenu:[
-   {label:'Getting started with AI…',click:()=>aiGuide()},
-   {label:'Add or change API keys (OpenAI, ElevenLabs, Gemini…)…',click:()=>window.webContents.executeJavaScript("window.dispatchEvent(new Event('sceneforge-open-settings'))")},
+   {label:'AI engines & providers…',accelerator:'CmdOrCtrl+Shift+A',click:()=>openPanel({panel:'ai'})},
+   {label:'Getting started with AI',click:()=>openPanel({panel:'ai',section:'start'})},
    {type:'separator'},
-   {label:'Stable Diffusion (local images)',submenu:[
-    {label:'What is this?',click:()=>dialog.showMessageBox(window,{type:'info',title:'Stable Diffusion',message:'Generate images on your own computer, free',detail:'SceneForge can use AUTOMATIC1111 Stable Diffusion WebUI if it is installed on this PC.\n\n1. Install AUTOMATIC1111 (see its GitHub page) and make sure it runs.\n2. In its webui-user.bat, add --api to COMMANDLINE_ARGS.\n3. Here, choose "Choose Stable Diffusion folder…" and pick the folder containing webui-user.bat.\n4. In a scene, use Media → Generate image and pick the local engine.\n\nIt needs a capable graphics card and takes a few minutes to start. It uses a lot of memory while running.',buttons:['OK','Open AUTOMATIC1111 on GitHub'],defaultId:0}).then(r=>{if(r.response===1)shell.openExternal('https://github.com/AUTOMATIC1111/stable-diffusion-webui')})},
-    {label:'Choose Stable Diffusion folder…',click:async()=>{try{const result=await dialog.showOpenDialog(window,{title:'Choose the folder containing webui-user.bat',properties:['openDirectory']});if(result.canceled)return;const value=await api('/api/local-image-settings',{method:'PUT',body:JSON.stringify({folder:result.filePaths[0],autostart:false})});await dialog.showMessageBox(window,{message:'Stable Diffusion folder saved',detail:'Use "Start Stable Diffusion now" when you want to generate images. Automatic start is off so SceneForge opens quickly; you can turn it on in this menu.'});}catch(e){dialog.showErrorBox('Local engine setup',String(e.message||e));}}},
-    {label:'Start Stable Diffusion now',click:async()=>{try{const state=await api('/api/local-image-start',{method:'POST'});await dialog.showMessageBox(window,{message:state.ready?'Stable Diffusion is ready':(state.message||'Starting Stable Diffusion… this can take a few minutes')});}catch(e){dialog.showErrorBox('Stable Diffusion',String(e.message||e));}}},
-    {label:'Start automatically with SceneForge',type:'checkbox',checked:!!sdSettings.autostart,enabled:!!sdSettings.folder,click:async item=>{try{await api('/api/local-image-settings',{method:'PUT',body:JSON.stringify({folder:sdSettings.folder,autostart:item.checked})});sdSettings.autostart=item.checked;}catch(e){item.checked=!item.checked;dialog.showErrorBox('Stable Diffusion',String(e.message||e));}}}
-   ]},
-   {label:'Local voices (Chatterbox, Kokoro)…',click:()=>dialog.showMessageBox(window,{type:'info',title:'Local voices',message:'Free narration voices on your own computer',detail:'Chatterbox (many languages, including Arabic) and Kokoro (English) run in Docker Desktop.\n\n1. Install Docker Desktop and start it.\n2. In a scene, open Audio → Voice & narration and click Connect Chatterbox or Connect Kokoro.\n3. Choose the engine, a voice and a language, then Generate.\n\nNo account or key is needed. The first start downloads the voice model and can take several minutes.'})},
+   {label:'Cloud providers and API keys',click:()=>openPanel({panel:'ai',section:'cloud'})},
+   {label:'Stable Diffusion (local images)',click:()=>openPanel({panel:'ai',section:'sd'})},
+   {label:'Local voices (Chatterbox, Kokoro)',click:()=>openPanel({panel:'ai',section:'voices'})},
   ]},
   {label:'Edit',submenu:[{role:'undo'},{role:'redo'},{type:'separator'},{role:'cut'},{role:'copy'},{role:'paste'},{role:'selectAll'}]},
   {label:'View',submenu:[{role:'reload'},{role:'resetZoom'},{role:'zoomIn'},{role:'zoomOut'},{role:'togglefullscreen'},{type:'separator'},{label:'Developer tools (for bug reports)',accelerator:'CmdOrCtrl+Shift+I',click:()=>window.webContents.toggleDevTools()}]},
   {label:'Help',submenu:[
    {label:'Check for updates…',enabled:app.isPackaged,click:()=>updater.check(true)},
-   {label:'Receive beta updates',type:'checkbox',checked:updater.beta(),enabled:app.isPackaged,click:item=>updater.setBeta(item.checked)},
+   {label:'Receive beta updates',type:'checkbox',checked:updater.beta(),enabled:app.isPackaged,click:item=>{const r=updater.setBeta(item.checked);dialog.showMessageBox(window,{type:'info',message:item.checked?'Beta updates on':'Beta updates off',detail:r.message});if(item.checked)updater.check(false);}},
    {label:'Collect diagnostics for a bug report…',click:()=>collectDiagnostics()},
    {label:'Open project backups',click:()=>{fs.mkdirSync(path.join(dataDir,'backups'),{recursive:true});shell.openPath(path.join(dataDir,'backups'));}},
    {type:'separator'},
    {label:'SceneForge on GitHub',click:()=>shell.openExternal('https://github.com/EzioDEVio/SceneForge')},
-   {label:'About SceneForge Studio',click:()=>dialog.showMessageBox(window,{type:'info',message:`SceneForge Studio ${app.getVersion()}`,detail:'Free and open-source software under the GNU General Public License v3.0 or later. It comes with ABSOLUTELY NO WARRANTY. Bundled components (FFmpeg, fonts, libraries) keep their own licenses; see THIRD_PARTY.md in the installation folder.\n\nProjects are stored separately from the app and are backed up before each update.'})}
+   {label:'About SceneForge Studio',click:()=>openPanel({panel:'about'})}
   ]}
- ]));
+ ]);
+ rebuildMenu();
  await window.loadURL(origin);
  if(sdAutostartTurnedOff)setTimeout(()=>dialog.showMessageBox(window,{type:'info',title:'Stable Diffusion',message:'Stable Diffusion no longer starts automatically',
   detail:'It is a heavy engine and can slow the whole computer down while it starts. Start it when you need it: AI Engines → Stable Diffusion → Start Stable Diffusion now. To start it with SceneForge again, tick "Start automatically with SceneForge" in the same menu.'}),1500);
  if(!smoke&&app.isPackaged){
   updater=updates.setupUpdates({app,dialog,shell,getWindow:()=>window,workspaceDir:dataDir,userDataDir:app.getPath('userData'),
    log:m=>{try{fs.appendFileSync(path.join(dataDir,'logs','updates.log'),`${new Date().toISOString()} ${m}\n`);}catch{}}});
+  rebuildMenu();                                               // show the saved beta setting
   setTimeout(()=>updater.check(false),15000);                 // after startup settles
   setInterval(()=>updater.check(false),6*60*60*1000);         // and every 6 hours
  }
