@@ -27,7 +27,7 @@ let failNextPatch=false;
 let requests=[];
 let next=10;
 let profiles=[];
-let healthBuild="rc5-batchbc-7";let oldBackend=false;
+let healthBuild="v0.4-motion-8";let oldBackend=false;
 let failLocal=true;
 let closeReady=true;
 const clone=x=>structuredClone(x);
