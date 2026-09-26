@@ -14,8 +14,14 @@ from __future__ import annotations
 
 import unicodedata
 
-ARABIC_FAMILIES = ("Noto Naskh Arabic", "Noto Sans Arabic")
+ARABIC_FAMILIES = ("Noto Naskh Arabic", "Noto Sans Arabic", "Amiri", "Tajawal", "Lalezar")
 LATIN_DEFAULT = "Noto Sans"
+# Arabic families that carry their own Latin letters (keep one design for both scripts).
+_OWN_LATIN = {"Amiri", "Tajawal", "Lalezar"}
+# Latin display families paired with a matching Arabic design.
+_ARABIC_PARTNER = {"Poppins": "Tajawal", "Bebas Neue": "Lalezar", "Anton": "Lalezar", "Pacifico": "Amiri"}
+ALL_FAMILIES = ("Noto Naskh Arabic", "Noto Sans Arabic", "Noto Sans", "Amiri", "Tajawal", "Lalezar",
+                "Poppins", "Bebas Neue", "Anton", "Pacifico")
 # Latin families whose design matches a serif Arabic companion better.
 _SERIF_LATIN = {"Times New Roman", "Georgia"}
 
@@ -29,7 +35,9 @@ def font_pair(family: str | None) -> tuple[str, str]:
     """Return (arabic_family, latin_family) for a user-selected family."""
     family = (family or ARABIC_FAMILIES[0]).strip()
     if family in ARABIC_FAMILIES:
-        return family, LATIN_DEFAULT
+        return family, (family if family in _OWN_LATIN else LATIN_DEFAULT)
+    if family in _ARABIC_PARTNER:
+        return _ARABIC_PARTNER[family], family
     arabic = "Noto Naskh Arabic" if family in _SERIF_LATIN else "Noto Sans Arabic"
     return arabic, family
 

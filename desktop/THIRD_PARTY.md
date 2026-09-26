@@ -18,6 +18,7 @@ the build scripts that fetch these components, is at https://github.com/EzioDEVi
 | React, lucide-react and frontend dependencies | MIT / ISC | See `frontend/package.json` |
 | electron-updater | MIT | Automatic updates from GitHub Releases |
 | Noto Sans, Noto Naskh Arabic, Noto Sans Arabic | SIL Open Font License 1.1 | `assets/fonts/OFL-LICENSE.txt` |
+| Poppins, Bebas Neue, Anton, Pacifico, Amiri, Tajawal, Lalezar (from github.com/google/fonts) | SIL Open Font License 1.1 | `assets/fonts/licenses/OFL-*.txt` |
 | Synthetic typewriter sound | Generated for SceneForge | `assets/sfx/SOURCE.md` |
 
 ## Not bundled

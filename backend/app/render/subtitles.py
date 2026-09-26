@@ -31,7 +31,7 @@ def _hex_to_ass_color(hex_color: str, alpha: int = 0) -> str:
 
 
 _ALIGNMENT = {"bottom": 2, "top": 8, "middle": 5}
-LAYER_FAMILIES = ("Noto Naskh Arabic", "Noto Sans Arabic", "Noto Sans")
+from app.render.fontruns import ALL_FAMILIES as LAYER_FAMILIES  # every bundled family
 
 
 _ARABIC_RE = re.compile(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]")
