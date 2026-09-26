@@ -1,4 +1,20 @@
-# SceneForge Studio 0.3.5
+# SceneForge Studio 0.4.0 — Motion & Text
+
+## New: text animations (Text tab → Text overlays, and the Title Designer)
+- **Letter by letter:** Letters pop, Letters fade, Letters flip, Letters blur in, and **Shine** (a highlight sweeps across the text).
+- **Word by word:** Words pop, Words fade, Words flip. Arabic text animates word by word automatically, so letters stay joined.
+- **Whole line:** Bounce, Neon flicker (with a coloured glow) and Wobble.
+- **Letter spacing** and a highlight/glow colour for Shine and Neon.
+- **One-click text styles:** Documentary, Bold pop, Neon, Cinematic, Headline, Golden shine, Arabic title.
+- The Title Designer's *Play rendered preview* shows the real animation before you add the card.
+
+## New: animated annotations (Effects → Annotations)
+- **Arrow** (curved or straight), **Circle** (hand-drawn or neat), **Underline** (line or highlighter), **Box**, and **Callout** (a label with a pointer, Arabic supported). They draw themselves on screen with their own start, draw and end times, and fade out at the end. Up to 10 per scene, previewed on the picture.
+
+## New looks
+- **Glow** (soft bloom), **Duotone** (deep blue to warm gold), **Newspaper** (high-contrast print on paper).
+
+## Also in this release (from 0.3.5)
 
 ## Fixes
 - **Arabic map-route stop labels now render correctly**: joined letters, right-to-left, in the Noto Naskh Arabic font, including mixed text such as "قرطبة 711". (The labels used a font without Arabic letters, and Windows lacks the shaping engine the image library relies on; shaping is now done by bundled libraries that work the same on every system.)
