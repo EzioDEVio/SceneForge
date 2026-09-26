@@ -1,3 +1,14 @@
+# SceneForge Studio 0.3.4
+
+## New
+- **Map routes: arrowhead, moving icon, stop labels, curved paths.** The line can end in an arrowhead that stays visible at the destination; a plane, ship, car, dot or pin can ride along the route and turn with it; each stop can have a label (a city or a date) that appears when the line reaches it; and the route can follow a smooth curve through the stops.
+- **Right-click menu** everywhere: undo/redo, cut, copy, paste, paste as plain text, select all, spelling suggestions, and copy image.
+- **Paste media from anywhere**: copy an image, video or audio file (from a browser, Explorer or a screenshot) and paste it into the scene with Ctrl+V or right-click → Paste. Text boxes keep normal paste.
+- A hint above the looks grid: hover a look to preview it, click to apply.
+
+## Fixes
+- **After an update the app could keep showing the previous version's editor**, so some new features (such as the look preview) did not appear. The editor page is now always re-checked, and the saved copy is cleared once whenever the app version changes.
+
 # SceneForge Studio 0.3.3
 
 - **AI engines & providers panel** (AI Engines menu, Ctrl+Shift+A): a getting-started guide, which cloud providers are connected (with where to get a key), step-by-step Stable Diffusion setup with Choose folder / Start now / Start automatically, and local voice help. Replaces the plain message boxes.

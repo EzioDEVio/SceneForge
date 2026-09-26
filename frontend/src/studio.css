@@ -319,3 +319,4 @@ button:hover>.sample-slice span+span{animation-name:tx-slice}
 button:hover>.sample-radial span+span{animation-name:tx-radial}
 button:hover>.sample-fade_fast span+span{animation-duration:.9s}
 @media (prefers-reduced-motion:reduce){button:hover>.transition-sample span+span{animation:none!important;opacity:1}}
+.route-label-row{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;align-items:center;margin:5px 0}.route-label-row input{width:100%}

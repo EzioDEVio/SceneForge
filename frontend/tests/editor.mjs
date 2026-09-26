@@ -243,6 +243,10 @@ try{
  const rc=document.querySelector('.route-canvas');rc.getBoundingClientRect=()=>({left:0,top:0,width:200,height:100,right:200,bottom:100});
  fireEvent.pointerDown(rc,{clientX:150,clientY:20});await saved();
  check('clicking the preview adds a route stop where clicked',lk().some(l=>l.route?.points?.length===4&&l.route.points[3][0]===75&&l.route.points[3][1]===20));
+ await user.click(within(screen.getByRole('radiogroup',{name:'Moving icon'})).getByRole('radio',{name:'Plane'}));
+ await user.click(screen.getByRole('checkbox',{name:'Curved route'}));
+ await user.type(screen.getByRole('textbox',{name:'Label for stop 1'}),'Cadiz');await saved();
+ check('route icon, curve and stop labels save',lk().some(l=>l.route?.marker==='plane'&&l.route.curve===true&&l.route.labels?.[0]==='Cadiz'));
  await user.click(screen.getByRole('button',{name:'Done editing points'}));
  check('finishing route editing hides the point editor',!document.querySelector('.route-canvas'));
  await user.click(screen.getByRole('switch',{name:'Map route'}));await user.click(screen.getByRole('switch',{name:'3D photo (parallax)'}));await user.click(screen.getByRole('switch',{name:'Colour wheels'}));await saved();

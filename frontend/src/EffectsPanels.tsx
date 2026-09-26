@@ -9,10 +9,11 @@ export type Leak = {amount: number; speed: number; color: 'warm' | 'cool' | 'rai
 export type Tone = {shadow: string; highlight: string; amount: number; balance: number};
 export type Wheels = {lift: number[]; gamma: number[]; gain: number[]};
 export type Layout = {type: 'split2' | 'split2v' | 'split3' | 'grid4'; gap: number; bg: string};
-export type RouteFx = {points: number[][]; color: string; width: number; style: 'solid' | 'dashed'; pins: boolean; start_ms: number; draw_ms: number};
+export type RouteFx = {points: number[][]; color: string; width: number; style: 'solid' | 'dashed'; pins: boolean; start_ms: number; draw_ms: number;
+  arrow?: boolean; marker?: 'none' | 'dot' | 'plane' | 'ship' | 'car' | 'pin'; labels?: string[]; curve?: boolean};
 export type Parallax = {x: number; y: number; w: number; h: number; shape: 'ellipse' | 'rect'; direction: 'in' | 'out' | 'left' | 'right'; amount: number};
 const LAYOUT: Layout = {type: 'split2', gap: 8, bg: '#000000'};
-const ROUTE: RouteFx = {points: [], color: '#E8413C', width: 8, style: 'solid', pins: true, start_ms: 0, draw_ms: 3000};
+const ROUTE: RouteFx = {points: [], color: '#E8413C', width: 8, style: 'solid', pins: true, start_ms: 0, draw_ms: 3000, arrow: true, marker: 'none', labels: [], curve: false};
 const PARALLAX: Parallax = {x: 50, y: 55, w: 40, h: 70, shape: 'ellipse', direction: 'in', amount: 50};
 const ZERO3 = () => [0, 0, 0];
 
@@ -138,6 +139,15 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
         <Row label="Line width" value={route.width} min={2} max={30} unit="px" onChange={width => onDraft({route: {...route, width}} as any)} disabled={disabled}/>
         <Pills label="Line" value={route.style} options={[['solid', 'Solid'], ['dashed', 'Dashed']]} onChange={style => onDraft({route: {...route, style}} as any)} disabled={disabled}/>
         <label className="switch-label finishing-toggle"><input type="checkbox" aria-label="Route pins" checked={route.pins} disabled={disabled} onChange={e => onDraft({route: {...route, pins: e.target.checked}} as any)}/> Pins at each stop</label>
+        <label className="switch-label finishing-toggle"><input type="checkbox" aria-label="Route arrowhead" checked={route.arrow !== false} disabled={disabled} onChange={e => onDraft({route: {...route, arrow: e.target.checked}} as any)}/> Arrowhead at the end of the line</label>
+        <label className="switch-label finishing-toggle"><input type="checkbox" aria-label="Curved route" checked={!!route.curve} disabled={disabled} onChange={e => onDraft({route: {...route, curve: e.target.checked}} as any)}/> Smooth curved path</label>
+        <Pills label="Moving icon" value={route.marker || 'none'} options={[['none', 'None'], ['dot', 'Dot'], ['plane', 'Plane'], ['ship', 'Ship'], ['car', 'Car'], ['pin', 'Pin']]} onChange={marker => onDraft({route: {...route, marker}} as any)} disabled={disabled}/>
+        <fieldset className="adjust-group route-labels"><legend>Stop labels</legend>
+          {route.points.map((_, i) => <label key={i} className="route-label-row"><span className="step-no">{i + 1}</span>
+            <input aria-label={`Label for stop ${i + 1}`} maxLength={40} placeholder={`Stop ${i + 1} name (optional)`} value={(route.labels || [])[i] || ''} disabled={disabled}
+              onChange={e => {const labels = [...(route.labels || [])]; while (labels.length < route.points.length) labels.push(''); labels[i] = e.target.value; onDraft({route: {...route, labels: labels.slice(0, route.points.length)}} as any);}}/></label>)}
+          <p className="hint">Names appear when the line reaches each stop, e.g. cities or dates.</p>
+        </fieldset>
         <div className="audio-times">
           <label>Start (s)<input aria-label="Route start seconds" type="number" min={0} step={0.1} value={(route.start_ms / 1000).toFixed(1)} disabled={disabled} onChange={e => onDraft({route: {...route, start_ms: Math.max(0, Math.round(Number(e.target.value) * 1000) || 0)}} as any)}/></label>
           <label>Draw time (s)<input aria-label="Route draw seconds" type="number" min={0.3} max={20} step={0.1} value={(route.draw_ms / 1000).toFixed(1)} disabled={disabled} onChange={e => onDraft({route: {...route, draw_ms: Math.max(300, Math.min(20000, Math.round(Number(e.target.value) * 1000) || 3000))}} as any)}/></label>

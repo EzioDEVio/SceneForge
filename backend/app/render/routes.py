@@ -20,7 +20,10 @@ import numpy as np
 
 from app.config import FFMPEG_BIN
 
-ROUTE_DEFAULT = {"points": [[20, 70], [45, 45], [75, 35]], "color": "#E8413C", "width": 8, "style": "solid", "pins": True, "start_ms": 0, "draw_ms": 3000}
+ROUTE_DEFAULT = {"points": [[20, 70], [45, 45], [75, 35]], "color": "#E8413C", "width": 8, "style": "solid", "pins": True, "start_ms": 0, "draw_ms": 3000,
+                 # extras: arrowhead, a moving icon, stop labels, smooth curved path
+                 "arrow": True, "marker": "none", "labels": [], "curve": False}
+MARKERS = ("none", "dot", "plane", "ship", "car", "pin")
 
 
 class RouteError(ValueError):
@@ -47,27 +50,87 @@ def clean_route(d) -> dict:
             raise RouteError(f"Route {key} must be between {lo} and {hi}.")
     if d["style"] not in ("solid", "dashed") or not isinstance(d["pins"], bool):
         raise RouteError("Route style must be solid or dashed, and pins true or false.")
+    if not isinstance(d["arrow"], bool) or not isinstance(d["curve"], bool):
+        raise RouteError("Route arrow and curve must be true or false.")
+    if d["marker"] not in MARKERS:
+        raise RouteError("Route icon must be one of: " + ", ".join(MARKERS) + ".")
+    labels = d["labels"]
+    if not isinstance(labels, list) or len(labels) > 20 or any(not isinstance(x, str) or len(x) > 40 for x in labels):
+        raise RouteError("Stop labels must be up to 20 texts of at most 40 characters.")
     return {"points": clean_pts, "color": d["color"].upper(), "width": int(d["width"]), "style": d["style"],
-            "pins": d["pins"], "start_ms": int(d["start_ms"]), "draw_ms": int(d["draw_ms"])}
+            "pins": d["pins"], "start_ms": int(d["start_ms"]), "draw_ms": int(d["draw_ms"]),
+            "arrow": d["arrow"], "marker": d["marker"], "labels": [x.strip() for x in labels], "curve": d["curve"]}
+
+
+def _smooth(pts: list[tuple[float, float]], samples: int = 24) -> tuple[list[tuple[float, float]], list[int]]:
+    """Catmull-Rom curve through the stops. Returns (dense points, index of each stop in them)."""
+    if len(pts) < 3:
+        return pts, list(range(len(pts)))
+    ext = [pts[0]] + pts + [pts[-1]]
+    out, idx = [pts[0]], [0]
+    for i in range(1, len(ext) - 2):
+        p0, p1, p2, p3 = ext[i - 1], ext[i], ext[i + 1], ext[i + 2]
+        for k in range(1, samples + 1):
+            t = k / samples; t2, t3 = t * t, t * t * t
+            out.append(tuple(0.5 * (2 * p1[j] + (-p0[j] + p2[j]) * t + (2 * p0[j] - 5 * p1[j] + 4 * p2[j] - p3[j]) * t2
+                                    + (-p0[j] + 3 * p1[j] - 3 * p2[j] + p3[j]) * t3) for j in (0, 1)))
+        idx.append(len(out) - 1)
+    return out, idx
+
+
+def _icon(kind: str, size: float) -> list[tuple[float, float]]:
+    """Icon outline pointing along +x, centred on (0, 0)."""
+    s = size
+    if kind == "plane":
+        return [(1.0*s, 0), (0.3*s, 0.12*s), (0.1*s, 0.75*s), (-0.1*s, 0.75*s), (-0.05*s, 0.12*s), (-0.6*s, 0.1*s), (-0.8*s, 0.4*s),
+                (-0.95*s, 0.4*s), (-0.85*s, 0), (-0.95*s, -0.4*s), (-0.8*s, -0.4*s), (-0.6*s, -0.1*s), (-0.05*s, -0.12*s),
+                (-0.1*s, -0.75*s), (0.1*s, -0.75*s), (0.3*s, -0.12*s)]
+    if kind == "ship":
+        return [(1.0*s, 0), (0.55*s, 0.42*s), (-0.85*s, 0.42*s), (-0.85*s, -0.42*s), (0.55*s, -0.42*s)]
+    if kind == "car":
+        return [(0.9*s, 0.3*s), (0.9*s, -0.3*s), (0.55*s, -0.45*s), (-0.75*s, -0.45*s), (-0.9*s, -0.3*s), (-0.9*s, 0.3*s), (-0.75*s, 0.45*s), (0.55*s, 0.45*s)]
+    return []
+
+
+def _rotate(poly, angle, cx, cy):
+    ca, sa = math.cos(angle), math.sin(angle)
+    return [(cx + x * ca - y * sa, cy + x * sa + y * ca) for x, y in poly]
 
 
 def route_clip(route: dict, w: int, h: int, fps: int, cache: Path) -> str:
     """Transparent clip of the route being drawn (draw_ms long, plus 0.4 s for the last pin)."""
     from PIL import Image, ImageDraw, ImageFilter
-    key = hashlib.sha256(f"v1|{w}x{h}|{fps}|{sorted((k, str(v)) for k, v in route.items())}".encode()).hexdigest()[:20]
+    key = hashlib.sha256(f"v5|{w}x{h}|{fps}|{sorted((k, str(v)) for k, v in route.items())}".encode()).hexdigest()[:20]
     cache.mkdir(parents=True, exist_ok=True)
     out = cache / f"route_{key}.mov"
     if out.exists():
         return str(out)
     scale = 0.5 if w > 1280 else 1.0                          # draw at half size for big frames
     W, H = int(w * scale), int(h * scale)
-    pts = [(x / 100 * W, y / 100 * H) for x, y in route["points"]]
+    stops = [(x / 100 * W, y / 100 * H) for x, y in route["points"]]
+    pts, stop_idx = _smooth(stops) if route.get("curve") else (stops, list(range(len(stops))))
     seg = [math.dist(pts[i], pts[i + 1]) for i in range(len(pts) - 1)]
     total = sum(seg) or 1
+    cum = [0.0]
+    for L in seg:
+        cum.append(cum[-1] + L)
+    stop_when = [cum[i] / total for i in stop_idx]
     lw = max(1, int(route["width"] * H / 1080))
     col = tuple(int(route["color"][i:i + 2], 16) for i in (1, 3, 5))
     n = int(round((route["draw_ms"] + 400) / 1000 * fps))
     draw_frames = max(1, int(round(route["draw_ms"] / 1000 * fps)))
+    from PIL import ImageFont
+    try:
+        from app.config import RESOURCE_DIR
+        font = ImageFont.truetype(str(Path(RESOURCE_DIR) / "assets/fonts/NotoSans-Bold.ttf"), max(10, int(H * 0.034)))
+    except Exception:
+        font = ImageFont.load_default()
+    labels = route.get("labels") or []
+    ease = lambda f: 0.5 - 0.5 * math.cos(math.pi * min(1.0, f / draw_frames))
+    # Frame at which each stop is reached; pins pop and labels fade in from then, by the clock
+    # (progress stops increasing once drawing ends, so it cannot time the last stop).
+    reach = [next((f for f in range(n) if ease(f) >= w - 1e-9), n - 1) for w in stop_when]
+    end_up = math.sin(math.atan2(pts[-1][1] - pts[-2][1], pts[-1][0] - pts[-2][0])) < -0.3 if len(pts) > 1 else False
     frames = []
     for f in range(n):
         prog = min(1.0, f / draw_frames)
@@ -98,20 +161,54 @@ def route_clip(route: dict, w: int, h: int, fps: int, cache: Path) -> str:
             else:
                 d.line(path, fill=col + (255,), width=lw, joint="curve")
             hx, hy = path[-1]
-            glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
-            ImageDraw.Draw(glow).ellipse([hx - lw * 2.2, hy - lw * 2.2, hx + lw * 2.2, hy + lw * 2.2], fill=col + (200,))
-            img = Image.alpha_composite(glow.filter(ImageFilter.GaussianBlur(lw * 1.2)), img)
-            d = ImageDraw.Draw(img)
-            d.ellipse([hx - lw, hy - lw, hx + lw, hy + lw], fill=(255, 255, 255, 255))
+            px_, py_ = path[-2]
+            ang = math.atan2(hy - py_, hx - px_)
+            marker = route.get("marker", "none")
+            if marker in ("none", "dot"):
+                glow = Image.new("RGBA", (W, H), (0, 0, 0, 0))
+                ImageDraw.Draw(glow).ellipse([hx - lw * 2.2, hy - lw * 2.2, hx + lw * 2.2, hy + lw * 2.2], fill=col + (200,))
+                img = Image.alpha_composite(glow.filter(ImageFilter.GaussianBlur(lw * 1.2)), img)
+                d = ImageDraw.Draw(img)
+            if marker in ("plane", "ship", "car"):
+                poly = _rotate(_icon(marker, max(lw * 4.5, H * 0.05)), ang, hx, hy)
+                d.polygon(poly, fill=(255, 255, 255, 255), outline=(20, 20, 20, 255), width=max(1, lw // 4))
+            elif marker == "pin":
+                r = max(lw * 2.2, H * 0.018)
+                d.ellipse([hx - r, hy - 2.6 * r, hx + r, hy - 0.6 * r], fill=(255, 255, 255, 255), outline=col + (255,), width=max(2, lw // 2))
+                d.polygon([(hx - r * 0.55, hy - 1.2 * r), (hx + r * 0.55, hy - 1.2 * r), (hx, hy)], fill=(255, 255, 255, 255))
+            elif not route.get("arrow", True):
+                d.ellipse([hx - lw, hy - lw, hx + lw, hy + lw], fill=(255, 255, 255, 255))
         if route["pins"]:
-            for (px, py), when in zip(pts, [0.0] + [sum(seg[:i + 1]) / total for i in range(len(seg))]):
-                age = (prog - when) * route["draw_ms"] / 1000 if prog >= when else -1
+            for (px, py), when, rf in zip(stops, stop_when, reach):
+                age = (f - rf) / fps if f >= rf else -1
                 if age < 0:
                     continue
                 pop = min(1.0, age / 0.25); pop = 1 + 0.35 * math.sin(math.pi * pop) if pop < 1 else 1   # overshoot pop
                 r = lw * 1.8 * pop
                 d.ellipse([px - r - 2, py - r - 2, px + r + 2, py + r + 2], fill=(255, 255, 255, 255))
                 d.ellipse([px - r, py - r, px + r, py + r], fill=col + (255,))
+        # arrowhead drawn after the pins so the destination pin never covers it
+        if len(path) > 1 and route.get("arrow", True) and marker in ("none", "dot", "pin"):   # an icon already shows the direction
+            a = lw * 3.2    # arrowhead just ahead of the line's end, clear of the final pin
+            off = (lw * 1.8 + 3) if route["pins"] else 0
+            bx_, by_ = hx + math.cos(ang) * off, hy + math.sin(ang) * off
+            tip = (bx_ + math.cos(ang) * a * 0.9, by_ + math.sin(ang) * a * 0.9)
+            d.polygon([tip, (bx_ + math.cos(ang + 2.5) * a * 0.75, by_ + math.sin(ang + 2.5) * a * 0.75),
+                       (bx_ + math.cos(ang - 2.5) * a * 0.75, by_ + math.sin(ang - 2.5) * a * 0.75)], fill=col + (255,))
+        for k, (text, (px, py), when) in enumerate(zip(labels, stops, stop_when)):
+            if not text or f < reach[k]:
+                continue
+            age = (f - reach[k]) / fps
+            alpha = int(255 * min(1.0, age / 0.3))
+            layer = Image.new("RGBA", (W, H), (0, 0, 0, 0)); ld = ImageDraw.Draw(layer)
+            tw, th = ld.textbbox((0, 0), text, font=font)[2:]
+            bx, by = px - tw / 2 - 8, py - lw * 2.6 - th - 16
+            last_below = k == len(stops) - 1 and route.get("arrow", True) and end_up   # keep the final arrowhead clear
+            by = py + lw * 2.6 + 6 if (by <= 4 or last_below) else by   # below the stop near the top edge, or under the arrow
+            bx = min(max(4, bx), W - tw - 20)
+            ld.rounded_rectangle([bx, by, bx + tw + 16, by + th + 10], radius=8, fill=(15, 15, 20, int(alpha * 0.8)))
+            ld.text((bx + 8, by + 3), text, font=font, fill=(255, 255, 255, alpha))
+            img = Image.alpha_composite(img, layer)
         frames.append(np.asarray(img))
     tmp = out.with_name(f"{out.stem}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp.mov")
     flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0  # type: ignore[attr-defined]

@@ -107,6 +107,20 @@ def line_extent(f):
  return cols.max() if cols.size else 0
 check('route line draws itself from start to end, then stays',line_extent(rt[8])<line_extent(rt[30])<line_extent(rt[50]) and line_extent(rt[50])>270 and line_extent(rt[59])>270)
 client.patch(f'/api/scenes/{sid}',json={'look':{'route':None}})
+for bad,why in [({'points':[[10,50],[90,50]],'marker':'rocket'},'unknown icon'),({'points':[[10,50],[90,50]],'labels':['x'*41]},'label over 40 characters'),({'points':[[10,50],[90,50]],'curve':'yes'},'curve not true/false')]:
+ check('route extras validate '+why,client.patch(f'/api/scenes/{sid}',json={'look':{'route':bad}}).status_code==400)
+from app.render.routes import clean_route,route_clip
+rx=clean_route({'points':[[12,72],[38,40],[62,62],[86,28]],'color':'#E8413C','width':8,'arrow':True,'labels':['A','B','C','Toledo'],'curve':True,'draw_ms':1000})
+rc=route_clip(rx,640,360,30,t/'routes')
+end=np.frombuffer(subprocess.check_output(['ffmpeg','-v','error','-i',rc,'-vf','select=eq(n\\,41)','-frames:v','1','-f','rawvideo','-pix_fmt','rgba','-']),np.uint8).reshape(360,640,4).astype(int)
+lx,ly=int(0.86*640),int(0.28*360)
+box=end[ly+8:ly+50,lx-60:lx+60]
+check('the last stop gets its label once the route is finished',(box[...,3]>150).mean()>0.1 and ((box[...,:3].min(axis=-1)>220)&(box[...,3]>200)).sum()>20)
+tipzone=end[ly-30:ly,lx:lx+30]
+check('the arrowhead stays visible past the destination pin',((np.abs(tipzone[...,:3]-np.array([232,65,60])).sum(axis=-1)<60)&(tipzone[...,3]>200)).sum()>15)
+pl=clean_route({'points':[[10,50],[90,50]],'marker':'plane','draw_ms':1000})
+mid=np.frombuffer(subprocess.check_output(['ffmpeg','-v','error','-i',route_clip(pl,640,360,30,t/'routes'),'-vf','select=eq(n\\,15)','-frames:v','1','-f','rawvideo','-pix_fmt','rgba','-']),np.uint8).reshape(360,640,4).astype(int)
+check('a moving plane icon rides along the route',((mid[...,:3].min(axis=-1)>230)&(mid[...,3]>200)).sum()>150)
 
 # --- beat sync ---------------------------------------------------------------------
 ff('-f','lavfi','-i',"aevalsrc='0.8*sin(2*PI*60*t)*exp(-40*mod(t,0.5))':s=22050:d=12",str(t/'beat.wav'))   # 120 BPM kick
