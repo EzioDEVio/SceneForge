@@ -243,9 +243,26 @@ try{
  const rc=document.querySelector('.route-canvas');rc.getBoundingClientRect=()=>({left:0,top:0,width:200,height:100,right:200,bottom:100});
  fireEvent.pointerDown(rc,{clientX:150,clientY:20});await saved();
  check('clicking the preview adds a route stop where clicked',lk().some(l=>l.route?.points?.length===4&&l.route.points[3][0]===75&&l.route.points[3][1]===20));
+ await user.click(within(screen.getByRole('radiogroup',{name:'Moving icon'})).getByRole('radio',{name:'Plane'}));
+ await user.click(screen.getByRole('checkbox',{name:'Curved route'}));
+ await user.type(screen.getByRole('textbox',{name:'Label for stop 1'}),'Cadiz');await saved();
+ check('route icon, curve and stop labels save',lk().some(l=>l.route?.marker==='plane'&&l.route.curve===true&&l.route.labels?.[0]==='Cadiz'));
  await user.click(screen.getByRole('button',{name:'Done editing points'}));
  check('finishing route editing hides the point editor',!document.querySelector('.route-canvas'));
  await user.click(screen.getByRole('switch',{name:'Map route'}));await user.click(screen.getByRole('switch',{name:'3D photo (parallax)'}));await user.click(screen.getByRole('switch',{name:'Colour wheels'}));await saved();
+ // Paste media from anywhere into the active scene; text fields keep normal paste
+ const beforeUploads=requests.filter(r=>r.path.startsWith('/api/assets/upload')).length;
+ const pasteEv=new dom.window.Event('paste',{bubbles:true,cancelable:true});
+ Object.defineProperty(pasteEv,'clipboardData',{value:{files:[new File(['png'],'image.png',{type:'image/png'})]}});
+ document.body.dispatchEvent(pasteEv);
+ await waitFor(()=>assert.ok(requests.filter(r=>r.path.startsWith('/api/assets/upload')).length===beforeUploads+1));await saved();
+ const up=requests.filter(r=>r.path.startsWith('/api/assets/upload')).at(-1).body.get('file');
+ check('pasting an image adds it to the scene, with a readable file name',pasteEv.defaultPrevented&&/^pasted-.*\.png$/.test(up.name)&&requests.some(r=>r.method==='POST'&&/\/api\/scenes\/[^/]+\/shots$/.test(r.path)));
+ const ta=document.querySelector('textarea');const pasteText=new dom.window.Event('paste',{bubbles:true,cancelable:true});
+ Object.defineProperty(pasteText,'clipboardData',{value:{files:[new File(['png'],'image.png',{type:'image/png'})]}});
+ ta.dispatchEvent(pasteText);
+ check('pasting inside a text field is left to the text field',!pasteText.defaultPrevented);
+ check('looks grid explains hover preview',!!screen.queryAllByText(/Hover a look to preview it/).length);
  // Picture-in-picture overlays
  await user.click(screen.getByRole('tab',{name:'Overlays',exact:true}));
  await waitFor(()=>assert.ok(within(screen.getByRole('combobox',{name:'Add overlay from media'})).getAllByRole('option').length===3));

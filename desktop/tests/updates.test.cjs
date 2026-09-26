@@ -62,3 +62,10 @@ test('update errors are explained in plain language', () => {
   const other = u.explainUpdateError(new Error('something odd'));
   assert.equal(other.kind, 'error'); assert.match(other.message, /something odd/);
 });
+
+test('the saved editor files are cleared exactly once per new app version', () => {
+  const ws = tmp();
+  assert.equal(u.versionChangedSinceCache(ws, '0.3.4'), true);
+  assert.equal(u.versionChangedSinceCache(ws, '0.3.4'), false);
+  assert.equal(u.versionChangedSinceCache(ws, '0.3.5'), true);
+});

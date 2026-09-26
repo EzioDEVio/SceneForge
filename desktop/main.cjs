@@ -6,6 +6,7 @@ const {createCloseController}=require('./close-controller.cjs');
 const updates=require('./updates.cjs');
 let updater={check:async()=>{},setBeta:()=>{},beta:()=>false};
 let sdAutostartTurnedOff=false;
+let versionChanged=false;
 let window,backend,quitting=false,origin;
 const smoke=process.argv.includes('--smoke-test');
 let failedStartup=false;
@@ -46,6 +47,7 @@ async function boot(){
   try{updates.migrateLegacyWorkspace(app.getPath('appData'),dataDir);}catch(e){console.error('workspace migration failed',e);}
   try{updates.backupOnVersionChange(dataDir,app.getVersion());}catch(e){console.error('version backup failed',e);}
   try{sdAutostartTurnedOff=updates.reviewSdAutostart(dataDir);}catch(e){console.error('SD autostart review failed',e);}
+  try{versionChanged=updates.versionChangedSinceCache(dataDir,app.getVersion());}catch{}
  }
  window=new BrowserWindow({title:'SceneForge',width:1500,height:950,minWidth:1100,minHeight:720,show:!smoke,backgroundColor:'#202329',webPreferences:{sandbox:true,contextIsolation:true,nodeIntegration:false,webSecurity:true,partition:'sceneforge-desktop',preload:path.join(__dirname,'preload.cjs')}});
  window.on('close',e=>{if(quitting)return;e.preventDefault();void requestClose();});
@@ -115,6 +117,23 @@ async function boot(){
   ]}
  ]);
  rebuildMenu();
+ // A new version must not show the previous version's saved editor files.
+ if(versionChanged){try{await session.fromPartition('sceneforge-desktop').clearCache();}catch(e){console.error('cache clear failed',e);}}
+ // Right-click menu: Cut / Copy / Paste / Select all (+ spelling), like any desktop app.
+ window.webContents.on('context-menu',(_e,p)=>{
+  const items=[];
+  for(const s of (p.dictionarySuggestions||[]).slice(0,5))items.push({label:s,click:()=>window.webContents.replaceMisspelling(s)});
+  if(p.misspelledWord)items.push({label:'Add to dictionary',click:()=>window.webContents.session.addWordToSpellCheckerDictionary(p.misspelledWord)},{type:'separator'});
+  if(p.isEditable)items.push({role:'undo',enabled:p.editFlags.canUndo},{role:'redo',enabled:p.editFlags.canRedo},{type:'separator'},
+   {role:'cut',enabled:p.editFlags.canCut},{role:'copy',enabled:p.editFlags.canCopy},{role:'paste',enabled:p.editFlags.canPaste},
+   {label:'Paste as plain text',role:'pasteAndMatchStyle',enabled:p.editFlags.canPaste},{type:'separator'},{role:'selectAll'});
+  else{
+   if(p.selectionText)items.push({role:'copy'});
+   if(p.mediaType==='image'&&p.srcURL)items.push({label:'Copy image',click:()=>window.webContents.copyImageAt(p.x,p.y)});
+   items.push({label:'Paste image or video into this scene',click:()=>window.webContents.paste()});
+  }
+  if(items.length)Menu.buildFromTemplate(items).popup({window});
+ });
  await window.loadURL(origin);
  if(sdAutostartTurnedOff)setTimeout(()=>dialog.showMessageBox(window,{type:'info',title:'Stable Diffusion',message:'Stable Diffusion no longer starts automatically',
   detail:'It is a heavy engine and can slow the whole computer down while it starts. Start it when you need it: AI Engines → Stable Diffusion → Start Stable Diffusion now. To start it with SceneForge again, tick "Start automatically with SceneForge" in the same menu.'}),1500);
