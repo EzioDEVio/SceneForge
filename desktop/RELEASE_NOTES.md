@@ -1,3 +1,8 @@
+# SceneForge Studio 0.4.1
+
+- **Caption animations** (Text tab → *Caption animation ✦*): the captions themselves can now use the new animations: letters pop/fade/flip/blur-in, words pop/fade/flip, shine, bounce, zoom, blur, neon, wobble and glitch, with an adjustable length. Arabic captions animate word by word. (Typewriter and Word-by-word highlight still animate captions their own way; turn them off to use a caption animation.)
+- **✦ Add animated title** button at the top of the Text tab: adds a letter-pop title in one click (edit it under Text overlays).
+
 # SceneForge Studio 0.4.0 — Motion & Text
 
 ## New: text animations (Text tab → Text overlays, and the Title Designer)

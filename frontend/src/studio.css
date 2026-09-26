@@ -322,3 +322,6 @@ button:hover>.sample-fade_fast span+span{animation-duration:.9s}
 .route-label-row{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;align-items:center;margin:5px 0}.route-label-row input{width:100%}
 .annot-add{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.annot-add .btn{font-size:11px;padding:5px 9px}
 .fx-callout{position:absolute;transform:translate(-50%,-50%);background:#121218e6;color:#fff;border:2px solid;border-radius:8px;padding:2px 9px;font-size:clamp(9px,1.6cqw,15px);font-weight:700;white-space:nowrap}
+.text-quick{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:10px 12px;border-radius:8px;background:linear-gradient(135deg,#352f5c,#2b2f38 70%);border:1px solid #4d4480}
+.text-quick .hint{margin:0;flex:1;min-width:160px}
+.caption-anim{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:4px 10px;align-items:end;margin:10px 0}.caption-anim .hint{grid-column:1/-1;margin:0}

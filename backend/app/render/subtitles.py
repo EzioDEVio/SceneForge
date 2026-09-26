@@ -195,6 +195,31 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             out.append('{' + tags + '}' + runs(u, family))
         return ''.join(out)
 
+    # Caption entrance animation (plain captions only: typewriter and word-by-word highlight
+    # already animate the captions their own way).
+    cap_anim = font_json.get('caption_animation', 'none')
+    if cap_anim not in (None, 'none') and text.strip() and not (typewriter or font_json.get('typewriter')) and not font_json.get('karaoke') and events:
+        a = int(font_json.get('caption_animation_ms', 900))
+        cap_color = _hex_to_ass_color(font_json.get('color', '#FFFFFF'))
+        cap_hi = _hex_to_ass_color(font_json.get('highlight_color', '#FFD84D'), alpha=0)
+        line_tags = {
+            'fade': r'\fad(%d,0)' % a,
+            'zoom': r'\fscx30\fscy30\t(0,%d,\fscx100\fscy100)' % a,
+            'blur': r'\blur12\t(0,%d,\blur0)' % a,
+            'glitch': r'\fscx130\fax0.2\t(0,%d,\fscx85\fax-0.2)\t(%d,%d,\fscx100\fax0)' % (a // 2, a // 2, a),
+            'bounce': r'\fscx0\fscy0\t(0,%d,\fscx115\fscy115)\t(%d,%d,\fscx92\fscy92)\t(%d,%d,\fscx100\fscy100)' % (a // 2, a // 2, a * 3 // 4, a * 3 // 4, a),
+            'wobble': r'\frz-7\t(0,%d,\frz6)\t(%d,%d,\frz-3)\t(%d,%d,\frz2)\t(%d,%d,\frz0)' % (a // 4, a // 4, a // 2, a // 2, a * 3 // 4, a * 3 // 4, a),
+            'neon': (r'\alpha&HFF&\t(0,%d,\alpha&H00&)\t(%d,%d,\alpha&HB0&)\t(%d,%d,\alpha&H00&)\t(%d,%d,\alpha&H90&)\t(%d,%d,\alpha&H00&)'
+                     % (a // 10, a * 15 // 100, a * 20 // 100, a * 25 // 100, a * 30 // 100, a * 45 // 100, a * 50 // 100, a * 55 // 100, a * 60 // 100)),
+        }
+        head = f"Dialogue: 0,{ts(0)},{ts(duration_ms)},Default,,0,0,0,,"
+        if cap_anim.startswith(('letters-', 'words-')) or cap_anim == 'shine':
+            events[0] = head + unit_animated(text, family, cap_anim, a, cap_color, cap_hi) + "\n"
+        elif cap_anim in line_tags:
+            events[0] = head + '{' + line_tags[cap_anim] + '}' + runs(text, family) + "\n"
+            if cap_anim == 'neon':
+                events.insert(0, head.replace('Dialogue: 0,', 'Dialogue: 0,', 1) + '{' + line_tags['neon'] + r'\1a&HFF&\3c%s\bord6\blur10\shad0' % cap_hi + '}' + runs(text, family) + "\n")
+
     for index, layer in enumerate(font_json.get('layers', [])):
         start = min(duration_ms, int(layer.get('start_ms', 0)))
         end = min(duration_ms, int(layer.get('end_ms', 0)) or duration_ms)

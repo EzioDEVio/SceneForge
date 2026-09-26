@@ -84,6 +84,13 @@ def update_scene(scene_id: str, body: schemas.SceneUpdate, db: Session = Depends
             sound = db.get(Asset, sound_id)
             if not sound or sound.project_id != scene.project_id or sound.type != 'audio':
                 raise HTTPException(400, 'Choose an audio asset belonging to this project.')
+        if 'caption_animation' in body.font and body.font['caption_animation'] not in CAPTION_ANIMATIONS:
+            raise HTTPException(400, 'Caption animation must be one of: ' + ', '.join(CAPTION_ANIMATIONS) + '.')
+        if 'caption_animation_ms' in body.font:
+            v = body.font['caption_animation_ms']
+            if isinstance(v, bool) or not isinstance(v, (int, float)) or not 100 <= v <= 10000:
+                raise HTTPException(400, 'Caption animation length must be between 100 and 10000 ms.')
+            body.font['caption_animation_ms'] = int(v)
         if 'layers' in body.font:
             from pydantic import ValidationError
             try:
@@ -305,6 +312,11 @@ def _split_rendered(scene, body, db):
         db.rollback()
         for path in paths:path.unlink(missing_ok=True)
         raise
+
+
+# Entrance animations available for captions (titles have more: slides, typewriter, …).
+CAPTION_ANIMATIONS = ("none", "fade", "zoom", "blur", "glitch", "bounce", "wobble", "neon", "letters-pop", "letters-fade",
+                      "letters-flip", "letters-blur", "words-pop", "words-fade", "words-flip", "shine")
 
 
 def _validated_look(scene, look: dict, db) -> dict:

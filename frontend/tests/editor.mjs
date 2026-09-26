@@ -201,6 +201,10 @@ try{
  if(curve){fireEvent.change(curve,{target:{value:'ease_out'}});await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.body?.motion?.easing==='ease_out')),{timeout:2000});await saved();}
  check('motion speed curve saves with the shot motion',!!curve&&requests.some(r=>r.method==='PATCH'&&r.body?.motion?.easing==='ease_out'));
  await user.click(screen.getByRole('tab',{name:'Text',exact:true}));
+ await user.selectOptions(screen.getByRole('combobox',{name:'Caption animation'}),'letters-pop');await saved();
+ check('caption animation saves from the Text tab',requests.some(r=>r.body?.font?.caption_animation==='letters-pop'));
+ await user.click(screen.getByRole('button',{name:/Add animated title/}));await saved();
+ check('Add animated title creates a letter-pop title overlay',requests.some(r=>(r.body?.font?.layers||[]).some(l=>l.animation==='letters-pop'&&l.text==='Animated title')));
  await user.click(screen.getByRole('checkbox',{name:'Word-by-word highlight'}));await saved();
  check('word-by-word highlight saves and turns captions on',requests.some(r=>r.body?.font?.karaoke===true&&r.body.font.captions_enabled===true));
  check('highlight colour picker appears',!!screen.getByLabelText('Highlight colour'));

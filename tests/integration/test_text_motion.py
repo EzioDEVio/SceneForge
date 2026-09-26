@@ -68,4 +68,22 @@ for look in ('glow','duotone','newsprint'):
  ok=client.patch(f'/api/scenes/{sid}',json={'effect_preset':look}).status_code==200
  out=np.frombuffer(subprocess.check_output(['ffmpeg','-v','error','-i',str(t/'src.png'),'-filter_complex',f'[0]{_EFFECT_FILTERS[EffectPreset(look)]}[o]','-map','[o]','-f','rawvideo','-pix_fmt','rgb24','-']),np.uint8).astype(int)
  check(f'{look} look is accepted and changes the picture',ok and np.abs(out-src).mean()>8)
-print(f'{n} text motion, annotation and look checks passed')
+
+# --- caption animations ---------------------------------------------------------
+check('caption animation is accepted',client.patch(f'/api/scenes/{sid}',json={'font':{'caption_animation':'letters-pop','caption_animation_ms':1200}}).status_code==200)
+check('unknown caption animation is rejected',client.patch(f'/api/scenes/{sid}',json={'font':{'caption_animation':'explode'}}).status_code==400)
+def cap_ass(font,text='THE BATTLE'):
+ path=write_ass_file('c',text,3000,{'size':48,**font},640,360,out_path=str(t/'c.ass'))
+ return [x for x in pathlib.Path(path).read_text(encoding='utf-8-sig').splitlines() if x.startswith('Dialogue')]
+ev=cap_ass({'caption_animation':'letters-pop','caption_animation_ms':1200})
+check('caption letters get per-letter animation',len(re.findall(r'\\fscx40',ev[0]))==9)
+check('Arabic captions animate by word',len(re.findall(r'\\alpha&HFF&',cap_ass({'caption_animation':'words-fade'},'قرطبة الأندلس')[0]))==2)
+check('caption animation is skipped when typewriter or word-by-word is on',r'\fscx40' not in ''.join(cap_ass({'caption_animation':'letters-pop','typewriter':True})) and r'\fscx40' not in ''.join(cap_ass({'caption_animation':'letters-pop','karaoke':True})))
+check('neon captions draw a glow layer',len(cap_ass({'caption_animation':'neon'}))==2)
+def cap_ink(at):
+ path=write_ass_file('c','THE BATTLE',3000,{'size':48,'caption_animation':'letters-fade','caption_animation_ms':1200},640,360,out_path=str(t/'cr.ass'))
+ raw=subprocess.check_output(['ffmpeg','-v','error','-f','lavfi','-i','color=c=black:s=640x360:d=3','-vf',f"ass={path}:fontsdir={root/'assets'/'fonts'}",'-ss',str(at),'-frames:v','1','-f','rawvideo','-pix_fmt','gray','-'])
+ return int((np.frombuffer(raw,np.uint8)>128).sum())
+x1,x2,x3=cap_ink(0.1),cap_ink(0.7),cap_ink(2.0)
+check(f'caption letters appear progressively on screen ({x1} → {x2} → {x3})',x1<x2<x3)
+print(f'{n} text motion, annotation, look and caption checks passed')
