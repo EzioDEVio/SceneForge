@@ -118,6 +118,9 @@ box=end[ly+8:ly+50,lx-60:lx+60]
 check('the last stop gets its label once the route is finished',(box[...,3]>150).mean()>0.1 and ((box[...,:3].min(axis=-1)>220)&(box[...,3]>200)).sum()>20)
 tipzone=end[ly-30:ly,lx:lx+30]
 check('the arrowhead stays visible past the destination pin',((np.abs(tipzone[...,:3]-np.array([232,65,60])).sum(axis=-1)<60)&(tipzone[...,3]>200)).sum()>15)
+from app.render.routes import _label_text,_label_font
+shaped=_label_text('قرطبة')
+check('Arabic stop labels are shaped (joined letter forms) and use the Arabic font',any('\ufe70'<=c<='\ufeff' for c in shaped) and 'Naskh' in _label_font('قرطبة',20).getname()[0] and _label_text('Toledo')=='Toledo')
 pl=clean_route({'points':[[10,50],[90,50]],'marker':'plane','draw_ms':1000})
 mid=np.frombuffer(subprocess.check_output(['ffmpeg','-v','error','-i',route_clip(pl,640,360,30,t/'routes'),'-vf','select=eq(n\\,15)','-frames:v','1','-f','rawvideo','-pix_fmt','rgba','-']),np.uint8).reshape(360,640,4).astype(int)
 check('a moving plane icon rides along the route',((mid[...,:3].min(axis=-1)>230)&(mid[...,3]>200)).sum()>150)

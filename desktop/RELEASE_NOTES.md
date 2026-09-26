@@ -1,3 +1,12 @@
+# SceneForge Studio 0.3.5
+
+## Fixes
+- **Arabic map-route stop labels now render correctly**: joined letters, right-to-left, in the Noto Naskh Arabic font, including mixed text such as "قرطبة 711". (The labels used a font without Arabic letters, and Windows lacks the shaping engine the image library relies on; shaping is now done by bundled libraries that work the same on every system.)
+- **Typing a stop label is no longer interrupted.** Background saves used to disable the editor for a moment, which greyed out the timeline, took the cursor out of the field and dropped keystrokes. Stop labels now keep their text while you type and save after a short pause or when you leave the field.
+
+## Tests
+- The release end-to-end test now renders an Arabic-labelled map route in the installed app on every system.
+
 # SceneForge Studio 0.3.4
 
 ## New

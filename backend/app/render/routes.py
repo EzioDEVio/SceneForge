@@ -62,6 +62,30 @@ def clean_route(d) -> dict:
             "arrow": d["arrow"], "marker": d["marker"], "labels": [x.strip() for x in labels], "curve": d["curve"]}
 
 
+_ARABIC = re.compile(r"[\u0600-\u06FF\u0750-\u077F\u08A0-\u08FF\uFB50-\uFDFF\uFE70-\uFEFF]")
+
+
+def _label_text(text: str) -> str:
+    """Labels are drawn with Pillow's basic layout, which neither joins Arabic letters nor
+    orders right-to-left text. Shape and reorder Arabic here (same result on every OS;
+    Pillow's RAQM engine is often missing on Windows)."""
+    if not _ARABIC.search(text or ""):
+        return text
+    import arabic_reshaper
+    from bidi import get_display
+    return get_display(arabic_reshaper.reshape(text))
+
+
+def _label_font(original: str, size: int):
+    from PIL import ImageFont
+    from app.config import RESOURCE_DIR
+    name = "NotoNaskhArabic-Bold.ttf" if _ARABIC.search(original or "") else "NotoSans-Bold.ttf"
+    try:
+        return ImageFont.truetype(str(Path(RESOURCE_DIR) / "assets/fonts" / name), size, layout_engine=ImageFont.Layout.BASIC)
+    except Exception:
+        return ImageFont.load_default()
+
+
 def _smooth(pts: list[tuple[float, float]], samples: int = 24) -> tuple[list[tuple[float, float]], list[int]]:
     """Catmull-Rom curve through the stops. Returns (dense points, index of each stop in them)."""
     if len(pts) < 3:
@@ -100,7 +124,7 @@ def _rotate(poly, angle, cx, cy):
 def route_clip(route: dict, w: int, h: int, fps: int, cache: Path) -> str:
     """Transparent clip of the route being drawn (draw_ms long, plus 0.4 s for the last pin)."""
     from PIL import Image, ImageDraw, ImageFilter
-    key = hashlib.sha256(f"v5|{w}x{h}|{fps}|{sorted((k, str(v)) for k, v in route.items())}".encode()).hexdigest()[:20]
+    key = hashlib.sha256(f"v6|{w}x{h}|{fps}|{sorted((k, str(v)) for k, v in route.items())}".encode()).hexdigest()[:20]
     cache.mkdir(parents=True, exist_ok=True)
     out = cache / f"route_{key}.mov"
     if out.exists():
@@ -119,13 +143,8 @@ def route_clip(route: dict, w: int, h: int, fps: int, cache: Path) -> str:
     col = tuple(int(route["color"][i:i + 2], 16) for i in (1, 3, 5))
     n = int(round((route["draw_ms"] + 400) / 1000 * fps))
     draw_frames = max(1, int(round(route["draw_ms"] / 1000 * fps)))
-    from PIL import ImageFont
-    try:
-        from app.config import RESOURCE_DIR
-        font = ImageFont.truetype(str(Path(RESOURCE_DIR) / "assets/fonts/NotoSans-Bold.ttf"), max(10, int(H * 0.034)))
-    except Exception:
-        font = ImageFont.load_default()
-    labels = route.get("labels") or []
+    labels = [_label_text(t) for t in (route.get("labels") or [])]
+    size = max(10, int(H * 0.034))
     ease = lambda f: 0.5 - 0.5 * math.cos(math.pi * min(1.0, f / draw_frames))
     # Frame at which each stop is reached; pins pop and labels fade in from then, by the clock
     # (progress stops increasing once drawing ends, so it cannot time the last stop).
@@ -201,6 +220,7 @@ def route_clip(route: dict, w: int, h: int, fps: int, cache: Path) -> str:
             age = (f - reach[k]) / fps
             alpha = int(255 * min(1.0, age / 0.3))
             layer = Image.new("RGBA", (W, H), (0, 0, 0, 0)); ld = ImageDraw.Draw(layer)
+            font = _label_font(route["labels"][k], size)
             tw, th = ld.textbbox((0, 0), text, font=font)[2:]
             bx, by = px - tw / 2 - 8, py - lw * 2.6 - th - 16
             last_below = k == len(stops) - 1 and route.get("arrow", True) and end_up   # keep the final arrowhead clear

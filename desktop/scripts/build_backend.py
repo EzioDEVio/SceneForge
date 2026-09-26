@@ -6,4 +6,5 @@ subprocess.run([sys.executable,'-m','PyInstaller','--noconfirm','--clean','--one
  '--paths',str(root/'backend'),'--collect-submodules','app','--collect-submodules','uvicorn',
  '--hidden-import','PIL.PngImagePlugin','--hidden-import','PIL.JpegImagePlugin',
  '--hidden-import','keyring.backends.Windows','--hidden-import','keyring.backends.SecretService','--hidden-import','keyring.backends.macOS',
- '--collect-submodules','cv2','--hidden-import','numpy',str(root/'backend/desktop_entry.py')],check=True,cwd=root)
+ '--collect-submodules','cv2','--hidden-import','numpy',
+ '--collect-all','arabic_reshaper','--collect-all','bidi',str(root/'backend/desktop_entry.py')],check=True,cwd=root)

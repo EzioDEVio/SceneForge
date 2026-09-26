@@ -88,6 +88,23 @@ const Timing = ({v, set, disabled, name}: {v: {start_ms: number; end_ms: number 
     <label>Until (s)<input aria-label={`${name} end seconds`} type="number" min={0} step={0.1} placeholder="scene end" value={v.end_ms === null ? '' : (v.end_ms / 1000).toFixed(1)} disabled={disabled} onChange={e => set({end_ms: e.target.value === '' ? null : Math.max(v.start_ms + 100, Math.round(Number(e.target.value) * 1000))})}/></label>
   </div>;
 
+/** A text field that keeps its own text while typing and saves after a short pause or on
+ *  leaving the field. It is never disabled by a background save, so typing is not
+ *  interrupted (a disabled input loses focus and drops keystrokes). */
+function StopLabelInput({index, value, onCommit}: {index: number; value: string; onCommit: (text: string) => void}) {
+  const [text, setText] = useState(value);
+  const focused = React.useRef(false);
+  const timer = React.useRef<ReturnType<typeof setTimeout>>();
+  const latest = React.useRef(onCommit); latest.current = onCommit;
+  useEffect(() => {if (!focused.current) setText(value);}, [value]);
+  useEffect(() => () => {if (timer.current) clearTimeout(timer.current);}, []);
+  const commit = (t: string) => {if (timer.current) clearTimeout(timer.current); if (t !== value) latest.current(t);};
+  return <input aria-label={`Label for stop ${index + 1}`} maxLength={40} dir="auto" placeholder={`Stop ${index + 1} name (optional)`} value={text}
+    onFocus={() => {focused.current = true;}} onBlur={() => {focused.current = false; commit(text);}}
+    onKeyDown={e => {if (e.key === 'Enter') (e.target as HTMLInputElement).blur();}}
+    onChange={e => {const t = e.target.value; setText(t); if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(() => commit(t), 700);}}/>;
+}
+
 /** Scene effects: camera shake, spotlight, blur/pixelate regions, light leaks, split toning. */
 export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEditing, onRouteEditing, onAddMedia}: {scene: Scene; disabled: boolean; onDraft: (look: Look) => void;
   liveRoute?: RouteFx | null; routeEditing?: boolean; onRouteEditing?: (on: boolean) => void; onAddMedia?: () => void}) {
@@ -144,8 +161,8 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
         <Pills label="Moving icon" value={route.marker || 'none'} options={[['none', 'None'], ['dot', 'Dot'], ['plane', 'Plane'], ['ship', 'Ship'], ['car', 'Car'], ['pin', 'Pin']]} onChange={marker => onDraft({route: {...route, marker}} as any)} disabled={disabled}/>
         <fieldset className="adjust-group route-labels"><legend>Stop labels</legend>
           {route.points.map((_, i) => <label key={i} className="route-label-row"><span className="step-no">{i + 1}</span>
-            <input aria-label={`Label for stop ${i + 1}`} maxLength={40} placeholder={`Stop ${i + 1} name (optional)`} value={(route.labels || [])[i] || ''} disabled={disabled}
-              onChange={e => {const labels = [...(route.labels || [])]; while (labels.length < route.points.length) labels.push(''); labels[i] = e.target.value; onDraft({route: {...route, labels: labels.slice(0, route.points.length)}} as any);}}/></label>)}
+            <StopLabelInput index={i} value={(route.labels || [])[i] || ''}
+              onCommit={text => {const labels = [...(route.labels || [])]; while (labels.length < route.points.length) labels.push(''); labels[i] = text; onDraft({route: {...route, labels: labels.slice(0, route.points.length)}} as any);}}/></label>)}
           <p className="hint">Names appear when the line reaches each stop, e.g. cities or dates.</p>
         </fieldset>
         <div className="audio-times">

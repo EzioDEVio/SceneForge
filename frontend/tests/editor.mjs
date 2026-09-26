@@ -245,8 +245,11 @@ try{
  check('clicking the preview adds a route stop where clicked',lk().some(l=>l.route?.points?.length===4&&l.route.points[3][0]===75&&l.route.points[3][1]===20));
  await user.click(within(screen.getByRole('radiogroup',{name:'Moving icon'})).getByRole('radio',{name:'Plane'}));
  await user.click(screen.getByRole('checkbox',{name:'Curved route'}));
- await user.type(screen.getByRole('textbox',{name:'Label for stop 1'}),'Cadiz');await saved();
- check('route icon, curve and stop labels save',lk().some(l=>l.route?.marker==='plane'&&l.route.curve===true&&l.route.labels?.[0]==='Cadiz'));
+ const lab=screen.getByRole('textbox',{name:'Label for stop 1'});
+ await user.type(lab,'قادس Cadiz');
+ check('typing a stop label is not interrupted by saves (field stays enabled and focused)',!lab.disabled&&document.activeElement===lab&&lab.value==='قادس Cadiz');
+ lab.blur();await saved();
+ check('route icon, curve and stop labels save (Arabic included)',lk().some(l=>l.route?.marker==='plane'&&l.route.curve===true&&l.route.labels?.[0]==='قادس Cadiz'));
  await user.click(screen.getByRole('button',{name:'Done editing points'}));
  check('finishing route editing hides the point editor',!document.querySelector('.route-canvas'));
  await user.click(screen.getByRole('switch',{name:'Map route'}));await user.click(screen.getByRole('switch',{name:'3D photo (parallax)'}));await user.click(screen.getByRole('switch',{name:'Colour wheels'}));await saved();

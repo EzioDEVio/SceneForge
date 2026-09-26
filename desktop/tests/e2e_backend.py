@@ -92,7 +92,9 @@ try:
     step("local image engine settings", 5, lambda: request("GET", "/api/local-image-settings"))
     step("add overlay + old film", 5, lambda: request("PATCH", f"/api/scenes/{sid}", {"timing_mode": "fixed", "requested_duration_ms": 3000,
          "overlays": [{"asset_id": asset["id"], "x": 70, "y": 30, "width": 30}],
-         "look": {"film": {"scratches": 60, "dust": 50, "flicker": 40, "weave": 35, "fps": 18, "tone": "bw"}}}))
+         "look": {"film": {"scratches": 60, "dust": 50, "flicker": 40, "weave": 35, "fps": 18, "tone": "bw"},
+                  # Arabic stop labels exercise the bundled shaping libraries (python-bidi has a compiled part)
+                  "route": {"points": [[15, 70], [50, 40], [85, 55]], "labels": ["قرطبة", "غرناطة 711", "Toledo"], "marker": "plane", "curve": True, "draw_ms": 1500}}}))
     job = step("start scene render", 5, lambda: request("POST", f"/api/scenes/{sid}/render"))
 
     def wait():
@@ -105,7 +107,7 @@ try:
                 return st
             time.sleep(1)
         raise RuntimeError("render did not finish")
-    step("render 3 s scene (overlay + old film + grade + narration)", 240, wait)
+    step("render 3 s scene (overlay + old film + grade + narration + Arabic map route)", 240, wait)
 finally:
     try:
         proc.stdin.close(); proc.wait(timeout=20)
