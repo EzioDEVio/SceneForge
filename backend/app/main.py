@@ -76,6 +76,17 @@ def close_status():
 # (scripts/dev.*) instead — this mount is a no-op until dist/ exists.
 _frontend_dist = RESOURCE_DIR / "frontend" / "dist"
 if _frontend_dist.exists():
+    @app.middleware("http")
+    async def _editor_cache_policy(request, call_next):
+        # Hashed files under /assets never change; the page itself (index.html) must be
+        # re-checked every time, or an updated app can keep showing the previous editor.
+        response = await call_next(request)
+        path = request.url.path
+        if path.startswith("/assets/"):
+            response.headers["Cache-Control"] = "public, max-age=31536000, immutable"
+        elif not path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-cache"
+        return response
     app.mount("/", StaticFiles(directory=str(_frontend_dist), html=True), name="frontend")
 
 @app.on_event("shutdown")

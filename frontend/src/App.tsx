@@ -670,6 +670,30 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
     setPreviewMode("source");
     if (await flush()) await run(() => api.updateScene(scene.id, patch));
   }
+  // Paste images, videos or audio from anywhere (browser, Explorer, screenshots) into this
+  // scene. Text fields keep normal paste; only the active scene listens.
+  useEffect(() => {
+    if (!active) return;
+    const onPaste = (e: ClipboardEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t && (t.closest('input, textarea, select, [contenteditable="true"]'))) return;
+      const files = Array.from(e.clipboardData?.files || []);
+      if (!files.length) return;
+      e.preventDefault();
+      void (async () => {
+        let added = 0;
+        for (const raw of files) {
+          const ext = raw.type.split('/')[1]?.replace('jpeg', 'jpg').replace('quicktime', 'mov') || 'png';
+          const file = raw.name && raw.name !== 'image.png' ? raw : new File([raw], `pasted-${new Date().toISOString().replace(/[:.]/g, '-')}.${ext}`, {type: raw.type});
+          if (raw.type.startsWith('image/') || raw.type.startsWith('video/')) {await upload(file); added++;}
+          else if (raw.type.startsWith('audio/')) {await run(async () => {await api.uploadVoiceTake(scene.id, file);}); added++;}
+        }
+        if (!added) setError('Only images, videos and audio can be pasted into a scene.');
+      })();
+    };
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, [active, scene.id]);
   async function upload(file: File) {
     await run(async () => {
       const asset = await api.uploadAsset(project.id, file);
@@ -789,7 +813,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
             {shot && <label className="control-label">Frame fit<select aria-label="Frame fit" value={shot.fit} disabled={saving} onChange={e => {const fit = e.currentTarget.value; setPreviewMode("source"); void run(() => api.updateShot(shot.id, {fit}));}}><option value="cover">Fill frame (crop)</option><option value="contain">Fit inside frame (show entire image)</option></select><span className="hint">Fit preserves the whole image with bars where needed. Fill crops the edges to cover the frame.</span></label>}
           </>}
           {tab === "Motion" && <>{shot&&<FramingControls key={shot.id} shot={shot} save={run}/>}{shot&&shot.asset?.type==="video"&&<SpeedControls key={"sp"+shot.id} shot={shot} disabled={saving} save={speed=>run(()=>api.updateShot(shot.id,{speed}))}/>}<h3>Camera movement</h3><p className="hint">Applied to {shot ? `media ${scene.shots.indexOf(shot)+1}` : "selected media"}. {shot?.fit !== "cover" ? "Motion requires Fill frame; Fit inside frame keeps the entire image still." : "Render to preview the movement."}</p><div className="motion-box">{MOTIONS.map(({key,label,Icon}) => <button key={key} className={`motion-btn ${activeMotion === key ? "selected" : ""}`} aria-pressed={activeMotion === key} disabled={!shot || saving || shot.fit !== "cover"} onClick={() => run(() => api.updateShot(shot.id,{motion:{type:key,easing:(shot.motion_json as any)?.easing||"ease_in_out"}}))}><Icon size={19}/><span>{label}</span></button>)}</div>{shot&&<label className="control-label">Speed curve<select aria-label="Motion speed curve" value={(shot.motion_json as any)?.easing||"ease_in_out"} disabled={saving||shot.fit!=="cover"} onChange={e=>{const easing=e.target.value; /* read now: the controlled select resets before the queued save runs */ void run(()=>api.updateShot(shot.id,{motion:{...(shot.motion_json||{type:"static"}),easing}}));}}><option value="ease_in_out">Smooth (ease in and out)</option><option value="ease_in">Ease in (starts slow)</option><option value="ease_out">Ease out (ends slow)</option><option value="linear">Constant speed</option></select></label>}</>}
-          {tab === "Effects" && <><h3>Image looks</h3><p className="hint">Choose a look for the whole scene.</p><label className="search-control"><Search size={15}/><input aria-label="Search effects" placeholder="Search effects…" value={search} onChange={e => setSearch(e.target.value)}/></label><div className="effects-grid">{EFFECTS.filter(f => f.label.toLowerCase().includes(search.toLowerCase())).map(fx => <button key={fx.key} className={`effect-tile ${scene.effect_preset === fx.key ? "selected" : ""}`} aria-pressed={scene.effect_preset === fx.key} disabled={saving} onMouseEnter={() => {setPreviewMode("source"); setHoverFx(fx.key);}} onMouseLeave={() => setHoverFx(null)} onFocus={() => setHoverFx(fx.key)} onBlur={() => setHoverFx(null)} onClick={() => {setHoverFx(null);setPreviewMode("source"); void update({effect_preset:fx.key});}}>
+          {tab === "Effects" && <><h3>Image looks</h3><p className="hint">Choose a look for the whole scene.</p><label className="search-control"><Search size={15}/><input aria-label="Search effects" placeholder="Search effects…" value={search} onChange={e => setSearch(e.target.value)}/></label><p className="hint looks-hint">Hover a look to preview it on the picture · click to apply</p><div className="effects-grid">{EFFECTS.filter(f => f.label.toLowerCase().includes(search.toLowerCase())).map(fx => <button key={fx.key} className={`effect-tile ${scene.effect_preset === fx.key ? "selected" : ""}`} aria-pressed={scene.effect_preset === fx.key} disabled={saving} onMouseEnter={() => {setPreviewMode("source"); setHoverFx(fx.key);}} onMouseLeave={() => setHoverFx(null)} onFocus={() => setHoverFx(fx.key)} onBlur={() => setHoverFx(null)} onClick={() => {setHoverFx(null);setPreviewMode("source"); void update({effect_preset:fx.key});}}>
             <div className="effect-image">{shot?.asset && shot.asset.type !== "audio" ? <img src={api.assetThumbUrl(shot.asset_id)} alt="" style={{filter:fx.swatch}}/> : <div className="effect-swatch" style={{filter:fx.swatch}}/>}{scene.effect_preset === fx.key && <CheckCircle2 size={17}/>}</div><span>{fx.label}</span></button>)}</div>{!EFFECTS.some(f => f.label.toLowerCase().includes(search.toLowerCase())) && <p className="hint">No matching effects.</p>}<p className="hint">Thumbnails are approximate. Glitch tears the whole frame in bursts; choose its speed and block size below. Render to check the exact result.</p><button className="btn" disabled={!shot||saving||isGenerating} onClick={render}><Play size={14}/> Render effect preview</button><label className="control-label">Effect strength · {scene.effect_intensity}%<input aria-label="Effect strength" type="range" min={0} max={100} step={5} disabled={saving||scene.effect_preset==="original"} key={scene.effect_intensity} defaultValue={scene.effect_intensity} onChange={e=>draft({effect_intensity:Number(e.target.value)})} onBlur={()=>void flush()}/></label><button className="text-btn" disabled={saving || scene.effect_preset === "original"} onClick={() => {setPreviewMode("source"); void update({effect_preset:"original"});}}>Reset to original</button><LookPanel scene={scene} disabled={saving} onDraft={look=>draft({look})} onSaveNow={async look=>{setPreviewMode("source");
   // Save pending edits first, but do not let an earlier failed save block this independent LUT change.
   await flush();await run(async()=>{const saved:any=await api.updateScene(scene.id,{look});

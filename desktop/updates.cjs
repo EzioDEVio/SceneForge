@@ -96,6 +96,15 @@ function explainUpdateError(err) {
   return {kind: 'error', message: 'The update check failed: ' + m.slice(0, 300)};
 }
 
+/** True once per new app version (used to clear the saved editor files). */
+function versionChangedSinceCache(workspaceDir, version) {
+  const stateFile = path.join(workspaceDir, 'app-state.json');
+  const state = readJSON(stateFile, {});
+  const changed = state.cacheVersion !== version;
+  if (changed) writeJSON(stateFile, {...state, cacheVersion: version});
+  return changed;
+}
+
 function loadSettings(userDataDir) { return readJSON(path.join(userDataDir, 'update-settings.json'), {beta: false}); }
 function saveSettings(userDataDir, settings) { writeJSON(path.join(userDataDir, 'update-settings.json'), settings); }
 
@@ -166,4 +175,4 @@ function setupUpdates({app, dialog, shell, getWindow, workspaceDir, userDataDir,
   return {check, setBeta, beta: () => !!loadSettings(userDataDir).beta};
 }
 
-module.exports = {explainUpdateError, migrateLegacyWorkspace, backupOnVersionChange, reviewSdAutostart, backupDatabase, loadSettings, saveSettings, setupUpdates, KEEP_BACKUPS, RELEASES_URL};
+module.exports = {versionChangedSinceCache, explainUpdateError, migrateLegacyWorkspace, backupOnVersionChange, reviewSdAutostart, backupDatabase, loadSettings, saveSettings, setupUpdates, KEEP_BACKUPS, RELEASES_URL};
