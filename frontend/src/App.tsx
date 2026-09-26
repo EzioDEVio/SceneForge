@@ -67,6 +67,9 @@ const EFFECTS: { key: string; label: string; swatch: string }[] = [
   { key: "sharpen", label: "Sharpen", swatch: "contrast(1.08)" },
   { key: "negative", label: "Negative", swatch: "invert(1)" },
   { key: "vhs", label: "VHS", swatch: "saturate(1.3) contrast(1.08) hue-rotate(-6deg) blur(0.4px)" },
+  { key: "glow", label: "Glow", swatch: "brightness(1.08) contrast(1.05) saturate(1.1) drop-shadow(0 0 6px rgba(255,255,255,.45))" },
+  { key: "duotone", label: "Duotone", swatch: "grayscale(1) sepia(1) hue-rotate(190deg) saturate(2.2) contrast(1.1)" },
+  { key: "newsprint", label: "Newspaper", swatch: "grayscale(1) contrast(1.55) sepia(0.18) brightness(1.02)" },
   { key: "old_film", label: "Old film", swatch: "sepia(0.5) contrast(1.1) brightness(0.85) saturate(0.7)" },
 ];
 

@@ -58,4 +58,14 @@ check('highlighter is translucent',0<hl[180,320,3]<160)
 fade=frame({'type':'box','x':20,'y':20,'x2':80,'y2':80,'width':8,'draw_ms':300,'end_ms':2000},3000,58)
 full=frame({'type':'box','x':20,'y':20,'x2':80,'y2':80,'width':8,'draw_ms':300,'end_ms':2000},3000,40)
 check('annotations fade out before their end time',0<fade[...,3].max()<full[...,3].max())
-print(f'{n} text motion + annotation checks passed')
+
+# --- new looks ------------------------------------------------------------------
+from app.render.filters import _EFFECT_FILTERS
+from app.domain.constants import EffectPreset
+subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i','testsrc2=s=320x180','-frames:v','1',str(t/'src.png')],check=True)
+src=np.frombuffer(subprocess.check_output(['ffmpeg','-v','error','-i',str(t/'src.png'),'-f','rawvideo','-pix_fmt','rgb24','-']),np.uint8).astype(int)
+for look in ('glow','duotone','newsprint'):
+ ok=client.patch(f'/api/scenes/{sid}',json={'effect_preset':look}).status_code==200
+ out=np.frombuffer(subprocess.check_output(['ffmpeg','-v','error','-i',str(t/'src.png'),'-filter_complex',f'[0]{_EFFECT_FILTERS[EffectPreset(look)]}[o]','-map','[o]','-f','rawvideo','-pix_fmt','rgb24','-']),np.uint8).astype(int)
+ check(f'{look} look is accepted and changes the picture',ok and np.abs(out-src).mean()>8)
+print(f'{n} text motion, annotation and look checks passed')

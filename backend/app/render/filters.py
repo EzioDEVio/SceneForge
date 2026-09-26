@@ -174,6 +174,14 @@ _EFFECT_FILTERS: dict[str, str] = {
                        # drawbox positions are evaluated once, so the rolling band is an overlay (per-frame t)
                        "color=c=white:s=4096x40,format=rgba,colorchannelmixer=aa=0.12[vhsb];"
                        "[vhsm][vhsb]overlay=x=0:y='mod(t*80,H)':shortest=1"),
+    # Glow / bloom: a blurred, brightened copy screen-blended over the picture.
+    EffectPreset.GLOW: ("split[gl0][gl1];[gl1]gblur=sigma=14,eq=brightness=0.04:contrast=1.1[gl2];"
+                        "[gl0][gl2]blend=all_mode=screen:all_opacity=0.55"),
+    # Duotone: luminance mapped from deep blue (27,42,107) to warm gold (242,201,76).
+    EffectPreset.DUOTONE: ("hue=s=0,lutrgb=r='27+val*(242-27)/255':g='42+val*(201-42)/255':b='107+val*(76-107)/255'"),
+    # Newspaper print: high-contrast greyscale on warm paper, with print grain.
+    EffectPreset.NEWSPRINT: ("hue=s=0,eq=contrast=1.55:brightness=0.02,noise=alls=16:allf=u,"
+                             "colorchannelmixer=.95:0:0:0:0:.92:0:0:0:0:.82:0,unsharp=3:3:0.6"),
     EffectPreset.OLD_FILM: "curves=preset=vintage,eq=saturation=0.75:contrast=1.05,noise=alls=22:allf=t+u,vignette=PI/3.5",
 }
 
