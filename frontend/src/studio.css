@@ -325,3 +325,13 @@ button:hover>.sample-fade_fast span+span{animation-duration:.9s}
 .text-quick{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin:0 0 12px;padding:10px 12px;border-radius:8px;background:linear-gradient(135deg,#352f5c,#2b2f38 70%);border:1px solid #4d4480}
 .text-quick .hint{margin:0;flex:1;min-width:160px}
 .caption-anim{display:grid;grid-template-columns:minmax(0,2fr) minmax(0,1fr);gap:4px 10px;align-items:end;margin:10px 0}.caption-anim .hint{grid-column:1/-1;margin:0}
+/* Captions Pro */
+.caption-pro{display:flex;flex-direction:column;gap:2px;margin-top:10px}
+.caption-group legend{display:flex;align-items:center;gap:5px}
+.caption-presets{display:grid;grid-template-columns:repeat(auto-fill,minmax(92px,1fr));gap:6px;margin-top:6px}
+.caption-preset{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 4px 6px;border:1px solid #444956;border-radius:8px;background:linear-gradient(160deg,#3b4254,#1d2129);color:#fff;min-height:70px;justify-content:center}
+.caption-preset:hover{border-color:#8f7cf0}.caption-preset small{font-size:9.5px;color:#aeb4c2}
+.caption-preset-sample{line-height:1.2;max-width:100%;overflow:hidden;white-space:nowrap}
+.style-toggles{display:flex;gap:4px;margin:6px 0}.icon-toggle{width:34px;height:30px;border:1px solid #444956;border-radius:6px;background:#262930;color:#c9cfdb;display:grid;place-items:center}
+.icon-toggle.on{background:#5b49d6;border-color:#7b69ea;color:#fff}
+.caption-preview{container-type:normal;line-height:1.35;word-wrap:break-word}

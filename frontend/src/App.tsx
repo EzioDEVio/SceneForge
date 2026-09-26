@@ -12,6 +12,7 @@ import {FinishingPanel} from "./FinishingPanel";
 import {OverlayCanvas, OverlayPanel} from "./Overlays";
 import {InspectorResizer} from "./InspectorResizer";
 import {AIEnginesPanel, AboutPanel} from "./InfoPanels";
+import {CaptionStylePanel, CaptionPreview} from "./CaptionsPro";
 import {SceneEffectsPanel, SceneFxPreview, RouteCanvas} from "./EffectsPanels";
 import {SpeedControls} from "./SpeedControls";
 import type {Overlay} from "./api";
@@ -476,67 +477,6 @@ function VoicePanel({ scene, onChanged, beforeGenerate }: { scene: Scene; onChan
   );
 }
 
-const CAPTION_ANIMS = ['none','fade','letters-pop','letters-fade','letters-flip','letters-blur','words-pop','words-fade','words-flip','shine','bounce','zoom','blur','neon','wobble','glitch'];
-/** Entrance animation for the captions themselves (same engine as titles). */
-function CaptionAnimation({font, onChange}: {font: Scene["font_json"]; onChange: (f: Partial<Scene["font_json"]>) => void}) {
-  const f = font as any;
-  const busy = f.typewriter || f.karaoke;
-  return <div className="caption-anim">
-    <label className="control-label">Caption animation ✦<select aria-label="Caption animation" value={f.caption_animation || 'none'} disabled={busy} onChange={e => onChange({caption_animation: e.target.value} as any)}>
-      {CAPTION_ANIMS.map(v => <option key={v} value={v}>{ANIMATION_LABELS[v] || v}</option>)}</select></label>
-    <label className="control-label">Length (s)<input aria-label="Caption animation seconds" type="number" min={0.1} max={10} step={0.1} disabled={busy || !f.caption_animation || f.caption_animation === 'none'} value={((f.caption_animation_ms || 900) / 1000).toFixed(1)} onChange={e => onChange({caption_animation_ms: Math.max(100, Math.min(10000, Math.round(Number(e.target.value) * 1000) || 900))} as any)}/></label>
-    <p className="hint">{busy ? 'Turn off Typewriter and Word-by-word highlight to use a caption animation.' : 'How the captions appear. Arabic animates word by word. Render text preview to see it.'}</p>
-  </div>;
-}
-
-function FontPanel({ scene, onChange }: { scene: Scene; onChange: (f: Partial<Scene["font_json"]>) => void }) {
-  const f = scene.font_json;
-  return (
-    <div className="font-panel">
-      <label>Family
-        <select value={f.family} onChange={(e) => onChange({ family: e.target.value })}>
-          {FONT_FAMILIES.map((x) => <option key={x} value={x}>{x}</option>)}
-        </select>
-      </label>
-      <label>Size <input type="number" min={16} max={96} key={f.size} defaultValue={f.size} onBlur={(e) => {const size = Math.max(16, Math.min(96, Number(e.target.value) || f.size)); e.target.value = String(size); if (size !== f.size) onChange({size});}} /></label>
-      <label>Color <input type="color" value={f.color} onChange={(e) => onChange({ color: e.target.value })} /></label>
-      <label>Outline color <input type="color" value={f.outline_color} onChange={(e) => onChange({ outline_color: e.target.value })} /></label>
-      <label>Outline width <input type="number" min={0} max={8} key={f.outline_width} defaultValue={f.outline_width} onBlur={(e) => {const outline_width = Math.max(0, Math.min(8, Number(e.target.value) || 0)); e.target.value = String(outline_width); if (outline_width !== f.outline_width) onChange({outline_width});}} /></label>
-      <label>Background
-        <select value={f.background} onChange={(e) => onChange({ background: e.target.value })}>
-          <option value="none">None</option>
-          <option value="box">Box</option>
-        </select>
-      </label>
-      <label>Position
-        <select value={f.position} onChange={(e) => onChange({ position: e.target.value })}>
-          <option value="bottom">Bottom</option>
-          <option value="top">Top</option>
-          <option value="middle">Middle</option>
-        </select>
-      </label>
-      <label style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-        <input type="checkbox" checked={f.captions_enabled} onChange={(e) => onChange({ captions_enabled: e.target.checked })} />
-        Captions enabled
-      </label>
-      <label style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-        <input type="checkbox" checked={!!f.typewriter} onChange={(e) => onChange({ typewriter: e.target.checked, ...(e.target.checked ? {captions_enabled:true} : {}) })} />
-        Typewriter reveal (captions)
-      </label>
-      <label style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
-        <input type="checkbox" aria-label="Word-by-word highlight" checked={!!(f as any).karaoke} onChange={(e) => onChange({ karaoke: e.target.checked, ...(e.target.checked ? {captions_enabled:true, typewriter:false} : {}) } as any)} />
-        Word-by-word highlight (follows the narration)
-      </label>
-      {(f as any).karaoke && <label>Caption style<select aria-label="Caption style" value={(f as any).karaoke_style || "fill"} onChange={(e) => onChange({ karaoke_style: e.target.value } as any)}><option value="fill">Colour fill</option><option value="pop">Pop (current word grows)</option><option value="glow">Glow (current word glows)</option></select></label>}
-      {(f as any).karaoke && <label>Highlight colour<input type="color" aria-label="Highlight colour" value={(f as any).highlight_color || "#FFD84D"} onChange={(e) => onChange({ highlight_color: e.target.value } as any)} /></label>}
-      {!f.captions_enabled && (
-        <small className="hint">Font changes have no visible effect while captions are disabled.</small>
-      )}
-      
-    </div>
-  );
-}
-
 function TextLayers({scene,onChange}:{scene:Scene;onChange:(layers:NonNullable<Scene["font_json"]["layers"]>)=>void}) {
   const [layers,setLayers]=useState(scene.font_json.layers||[]);
   const latest=useRef(layers);
@@ -773,7 +713,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
                   <video ref={videoRef} className="canvas-media" controls preload="metadata" poster={gradedSrc||undefined} src={api.assetStreamUrl(shot.asset_id)} style={{objectFit:shot.fit === "cover" ? "cover" : "contain",filter:mediaFilter}}/> :
                   <div className="canvas-empty"><div className="empty-icon"><ImageIcon size={30}/></div><h3>Start with a visual</h3><p>Add an image or video to bring this scene to life.</p><button className="btn btn-primary" onClick={() => fileRef.current?.click()}><Plus size={15}/> Add media</button><button className="text-btn" onClick={() => setChatOpen(true)}><Sparkles size={14}/> Or generate an image</button></div>}
               {previewMode==="source"&&shot?.asset?.type==="image"&&scene.effect_preset==="glitch"&&strength>0&&<img aria-hidden="true" className="canvas-media glitch-slice glitch-full" src={api.assetStreamUrl(shot.asset_id)} alt="" style={{objectFit:shot.fit==="cover"?"cover":"contain",opacity:strength}}/>}
-              {previewMode==="source"&&shot&&(scene.font_json.layers||[]).map(l=><div className="canvas-text-layer" key={l.id} dir="auto" style={{left:`${l.x}%`,top:`${l.y}%`,fontSize:`${l.size/project.width*100}cqw`,color:l.color,fontFamily:previewFontFamily(l.family||scene.font_json.family),fontWeight:l.bold?700:400,textAlign:(l.align||"center") as any,transform:`translate(${l.align==="left"?0:l.align==="right"?-100:-50}%,-50%)`,WebkitTextStroke:`${(l.outline_width||0)/project.width*100}cqw black`,textShadow:l.shadow?`${l.shadow/project.width*100}cqw ${l.shadow/project.width*100}cqw black`:"none"}}>{l.text}</div>)}
+              {previewMode==="source"&&shot&&<CaptionPreview font={scene.font_json as any} text={captions} projectW={project.width} projectH={project.height}/>}{previewMode==="source"&&shot&&(scene.font_json.layers||[]).map(l=><div className="canvas-text-layer" key={l.id} dir="auto" style={{left:`${l.x}%`,top:`${l.y}%`,fontSize:`${l.size/project.width*100}cqw`,color:l.color,fontFamily:previewFontFamily(l.family||scene.font_json.family),fontWeight:l.bold?700:400,textAlign:(l.align||"center") as any,transform:`translate(${l.align==="left"?0:l.align==="right"?-100:-50}%,-50%)`,WebkitTextStroke:`${(l.outline_width||0)/project.width*100}cqw black`,textShadow:l.shadow?`${l.shadow/project.width*100}cqw ${l.shadow/project.width*100}cqw black`:"none"}}>{l.text}</div>)}
             </div>
           </div>
           <footer className="preview-footer">
@@ -829,7 +769,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
   await flush();await run(async()=>{const saved:any=await api.updateScene(scene.id,{look});
   // An old backend ignores "look" without an error; say so instead of silently doing nothing.
   if(look.lut&&saved?.look_json?.lut?.asset_id!==look.lut.asset_id)throw new Error("The LUT was not saved because this SceneForge backend is out of date. Close every SceneForge and start.bat window, run setup.bat in the newest folder, then start it again.");});}}/><SceneEffectsPanel scene={scene} disabled={saving} onDraft={look=>draft({look})} liveRoute={liveRoute} routeEditing={routeEditing} onRouteEditing={setRouteEditing} onAddMedia={() => fileRef.current?.click()}/></>}
-          {tab === "Text" && <><div className="text-quick"><button className="btn btn-primary" disabled={draftLayers.length >= 12} onClick={() => {const next = [...draftLayers, {id: 'ttl' + Math.random().toString(36).slice(2, 8), text: 'Animated title', x: 50, y: 22, size: 72, color: '#FFE14D', bold: true, start_ms: 0, end_ms: 0, family: 'Noto Sans', align: 'center', outline_width: 4, shadow: 0, animation: 'letters-pop', animation_ms: 900, exit_ms: 400, spacing: 0}]; setDraftLayers(next); draft({font: {layers: next}}); setTimeout(() => document.querySelector('.text-layers article:last-of-type input, .text-layers article:last-of-type textarea')?.scrollIntoView?.({block: 'center'}), 80);}}>✦ Add animated title</button><span className="hint">Titles and labels with letter-by-letter animations. Edit them under Text overlays below.</span></div><h3>On-screen captions</h3><p className="hint">Caption text is independent of narration.</p><textarea aria-label="On-screen captions" dir="auto" className="caption-box" value={captions} onChange={e => {setCaptions(e.target.value); draft({subtitle_text:e.target.value});}} onBlur={() => void flush()} placeholder="Write the text to appear on your video…"/><button className="text-btn" onClick={() => {setCaptions(text); draft({subtitle_text:text});}}><Copy size={13}/> Copy narration to captions</button><CaptionAnimation font={scene.font_json} onChange={f => void update({font:f})}/><fieldset><FontPanel scene={scene} onChange={f => {if(f.typewriter&&!captions.trim()&&text.trim()){setCaptions(text);draft({subtitle_text:text});}void update({font:f});}}/><TextLayers key={`tl-${draftLayers.length}`} scene={{...scene,font_json:{...scene.font_json,layers:draftLayers}}} onChange={layers=>{setDraftLayers(layers);draft({font:{layers}});}}/></fieldset><button className="btn btn-primary" disabled={!shot||isGenerating} onClick={render}>Render text preview</button><p className="hint">Caption typewriter applies to On-screen captions. For a title, choose typewriter under its Text overlay Animation. Render text preview to see the result.</p><section className="typewriter-controls"><h3>Typewriter timing & sound</h3>
+          {tab === "Text" && <><div className="text-quick"><button className="btn btn-primary" disabled={draftLayers.length >= 12} onClick={() => {const next = [...draftLayers, {id: 'ttl' + Math.random().toString(36).slice(2, 8), text: 'Animated title', x: 50, y: 22, size: 72, color: '#FFE14D', bold: true, start_ms: 0, end_ms: 0, family: 'Noto Sans', align: 'center', outline_width: 4, shadow: 0, animation: 'letters-pop', animation_ms: 900, exit_ms: 400, spacing: 0}]; setDraftLayers(next); draft({font: {layers: next}}); setTimeout(() => document.querySelector('.text-layers article:last-of-type input, .text-layers article:last-of-type textarea')?.scrollIntoView?.({block: 'center'}), 80);}}>✦ Add animated title</button><span className="hint">Titles and labels with letter-by-letter animations. Edit them under Text overlays below.</span></div><h3>On-screen captions</h3><p className="hint">Caption text is independent of narration.</p><textarea aria-label="On-screen captions" dir="auto" className="caption-box" value={captions} onChange={e => {setCaptions(e.target.value); draft({subtitle_text:e.target.value});}} onBlur={() => void flush()} placeholder="Write the text to appear on your video…"/><button className="text-btn" onClick={() => {setCaptions(text); draft({subtitle_text:text});}}><Copy size={13}/> Copy narration to captions</button><fieldset><CaptionStylePanel scene={scene} onChange={f => {if(f.typewriter&&!captions.trim()&&text.trim()){setCaptions(text);draft({subtitle_text:text});}void update({font:f});}}/><TextLayers key={`tl-${draftLayers.length}`} scene={{...scene,font_json:{...scene.font_json,layers:draftLayers}}} onChange={layers=>{setDraftLayers(layers);draft({font:{layers}});}}/></fieldset><button className="btn btn-primary" disabled={!shot||isGenerating} onClick={render}>Render text preview</button><p className="hint">Caption typewriter applies to On-screen captions. For a title, choose typewriter under its Text overlay Animation. Render text preview to see the result.</p><section className="typewriter-controls"><h3>Typewriter timing & sound</h3>
             <p className="hint">Enable Captions and Typewriter reveal above. Sound follows each reveal, not the original recording’s rhythm.</p>
             <label className="check-label"><input type="checkbox" checked={!!scene.font_json.typewriter_sound} disabled={saving} onChange={e=>update({font:{typewriter_sound:e.target.checked}})}/> Synchronized keystrokes</label>
             <div className="button-row">{[{label:"Slow",ms:220},{label:"Natural",ms:160},{label:"Fast",ms:80}].map(p=><button className="btn" disabled={saving} key={p.label} onClick={()=>update({font:{typewriter_duration_ms:Math.min(120000,Math.max(100,(Array.from(captions).length-1)*p.ms))}})}>{p.label}</button>)}</div><button className="text-btn" disabled={saving} onClick={()=>update({timing_mode:"fixed",requested_duration_ms:Math.max(scene.requested_duration_ms||4000,(scene.font_json.typewriter_delay_ms||0)+(scene.font_json.typewriter_duration_ms||Math.max(200,(Array.from(captions).length-1)*160))+1000)})}>Extend scene to fit typing + 1s hold</button>

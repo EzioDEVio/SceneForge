@@ -27,7 +27,7 @@ let failNextPatch=false;
 let requests=[];
 let next=10;
 let profiles=[];
-let healthBuild="v0.4-motion-8";let oldBackend=false;
+let healthBuild="v0.5-captions-9";let oldBackend=false;
 let failLocal=true;
 let closeReady=true;
 const clone=x=>structuredClone(x);
@@ -201,6 +201,17 @@ try{
  if(curve){fireEvent.change(curve,{target:{value:'ease_out'}});await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.body?.motion?.easing==='ease_out')),{timeout:2000});await saved();}
  check('motion speed curve saves with the shot motion',!!curve&&requests.some(r=>r.method==='PATCH'&&r.body?.motion?.easing==='ease_out'));
  await user.click(screen.getByRole('tab',{name:'Text',exact:true}));
+ // Captions Pro
+ await user.click(screen.getByRole('button',{name:'Apply Viral bold caption style'}));await saved();
+ check('a caption style preset applies font, case, phrases and box highlight',requests.some(r=>r.body?.font?.family==='Anton'&&r.body.font.case==='upper'&&r.body.font.split==='phrases'&&r.body.font.karaoke_style==='box'));
+ await user.click(screen.getByRole('button',{name:'Italic'}));await saved();
+ check('italic toggle saves',requests.some(r=>r.body?.font?.italic===true));
+ await user.click(within(screen.getByRole('radiogroup',{name:'Vertical'})).getByRole('radio',{name:'Top'}));await saved();
+ check('caption position saves',requests.some(r=>r.body?.font?.position==='top'));
+ await user.click(screen.getByRole('checkbox',{name:'Background box'}));await saved();
+ check('background box saves',requests.some(r=>r.body?.font?.background==='box'));
+ check('the caption preview is drawn on the picture',!!document.querySelector('.preview-canvas .caption-preview'));
+ await user.click(screen.getByRole('button',{name:'Apply Classic caption style'}));await saved();
  await user.selectOptions(screen.getByRole('combobox',{name:'Caption animation'}),'letters-pop');await saved();
  check('caption animation saves from the Text tab',requests.some(r=>r.body?.font?.caption_animation==='letters-pop'));
  await user.click(screen.getByRole('button',{name:/Add animated title/}));await saved();
@@ -349,8 +360,9 @@ try{
  await waitFor(()=>assert.ok(requests.filter(r=>r.path.endsWith('/clear-selection')).length>clears||!project.scenes[0].voice_takes.some(v=>v.accepted)||true));
  check('Delete on a focused audio clip never deletes the scene',project.scenes.length===scenesBefore&&!requests.some(r=>r.method==='DELETE'&&r.path===`/api/scenes/${project.scenes[0].id}`));
  await user.click(screen.getByRole('tab',{name:'Text',exact:true}));
- await user.selectOptions(screen.getByLabelText('Family'),'Noto Sans Arabic');await saved();
- check('font selection retains other font settings',project.scenes.find(s=>s.id===firstId).font_json.family==='Noto Sans Arabic'&&project.scenes.find(s=>s.id===firstId).font_json.size===40);
+ const sizeBefore=project.scenes.find(s=>s.id===firstId).font_json.size;
+ await user.selectOptions(screen.getByLabelText('Caption font'),'Noto Sans Arabic');await saved();
+ check('font selection retains other font settings',project.scenes.find(s=>s.id===firstId).font_json.family==='Noto Sans Arabic'&&project.scenes.find(s=>s.id===firstId).font_json.size===sizeBefore);
  await user.click(screen.getByRole('checkbox',{name:'Synchronized keystrokes'}));await saved();
  check('typewriter sound settings save independently',project.scenes.find(s=>s.id===firstId).font_json.typewriter_sound===true);
  await user.click(screen.getByRole('button',{name:'Copy narration to captions'}));await saved();
