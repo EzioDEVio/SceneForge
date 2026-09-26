@@ -181,7 +181,7 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
 }
 
 /** Live approximations over the editor preview. */
-export function SceneFxPreview({look, shots = []}: {look: any; shots?: {asset_id: string; asset?: {type?: string}}[]}) {
+export function SceneFxPreview({look, shots = [], filter}: {look: any; shots?: {asset_id: string; asset?: {type?: string}}[]; filter?: string}) {
   if (!look) return null;
   const layout: Layout | undefined = look.layout;
   const sp: Spot | undefined = look.spotlight, redact: Redact[] = look.redact || [], leak: Leak | undefined = look.leak;
@@ -194,7 +194,7 @@ export function SceneFxPreview({look, shots = []}: {look: any; shots?: {asset_id
     grid4: [[0, 0, 50, 50], [50, 0, 50, 50], [0, 50, 50, 50], [50, 50, 50, 50]]} as Record<string, [number, number, number, number][]>)[layout.type];
   const gapPct = layout ? layout.gap / 1080 * 100 / 2 : 0;
   return <div className="scenefx-preview" aria-hidden="true">
-    {layout && shots.length >= 2 && <div className="fx-layout" style={{background: layout.bg}}>
+    {layout && shots.length >= 2 && <div className="fx-layout" style={{background: layout.bg, filter}}>
       {cells.slice(0, shots.length).map(([x, y, w, h], i) => <div key={i} className="fx-cell" style={{left: `calc(${x}% + ${x > 0 ? gapPct : 0}%)`, top: `calc(${y}% + ${y > 0 ? gapPct * 16 / 9 : 0}%)`,
         width: `calc(${w}% - ${gapPct}%)`, height: `calc(${h}% - ${gapPct * 16 / 9}%)`, backgroundImage: `url(/api/assets/${shots[i].asset_id}/thumbnail?w=640)`}}/>)}
     </div>}

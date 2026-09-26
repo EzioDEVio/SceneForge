@@ -1,6 +1,6 @@
 {
   "name": "sceneforge-desktop",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "private": true,
   "description": "SceneForge Studio \u2014 open-source editor for narrated documentary videos",
   "author": {
@@ -34,7 +34,8 @@
       "close-controller.cjs",
       "updates.cjs",
       "welcome.html",
-      "package.json"
+      "package.json",
+      "preload.cjs"
     ],
     "extraResources": [
       {
@@ -66,7 +67,8 @@
       "target": [
         "nsis"
       ],
-      "artifactName": "SceneForge-Studio-${version}-Windows-${arch}-Setup.${ext}"
+      "artifactName": "SceneForge-Studio-${version}-Windows-${arch}-Setup.${ext}",
+      "icon": "icon.ico"
     },
     "nsis": {
       "oneClick": false,
@@ -75,9 +77,18 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "deleteAppDataOnUninstall": false,
-      "runAfterFinish": false,
+      "runAfterFinish": true,
       "license": "../LICENSE",
-      "artifactName": "SceneForge-Studio-${version}-Windows-${arch}-Setup.${ext}"
+      "artifactName": "SceneForge-Studio-${version}-Windows-${arch}-Setup.${ext}",
+      "installerIcon": "icon.ico",
+      "uninstallerIcon": "icon.ico",
+      "installerHeaderIcon": "icon.ico",
+      "installerSidebar": "installerSidebar.bmp",
+      "uninstallerSidebar": "uninstallerSidebar.bmp",
+      "installerHeader": "installerHeader.bmp",
+      "shortcutName": "SceneForge Studio",
+      "uninstallDisplayName": "SceneForge Studio ${version}",
+      "menuCategory": false
     },
     "publish": [
       {

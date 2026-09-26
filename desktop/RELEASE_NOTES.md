@@ -1,3 +1,12 @@
+# SceneForge Studio 0.3.3
+
+- **AI engines & providers panel** (AI Engines menu, Ctrl+Shift+A): a getting-started guide, which cloud providers are connected (with where to get a key), step-by-step Stable Diffusion setup with Choose folder / Start now / Start automatically, and local voice help. Replaces the plain message boxes.
+- **About panel** (Help → About): version, update check with a clear result, beta updates switch, license, GitHub, Report a problem, Collect diagnostics, Open logs.
+- **Clearer update messages**: "no published release yet", "can't reach GitHub", or the actual error, instead of always "check your internet". Turning beta updates on or off now confirms it and checks for a beta straight away.
+- **Preview looks before applying**: hover over a look to see it on the picture ("Previewing … · click to apply"), including split-screen scenes.
+- **Animated transition previews**: every transition in the Transitions list plays its real motion on hover.
+- **Branded Windows installer**: SceneForge icon on the installer and uninstaller, sidebar artwork on the welcome and finish pages, a header on every step including the progress page, and "Run SceneForge Studio" at the end.
+
 # SceneForge Studio 0.3.2
 
 - **Fixed (Windows): the app froze when choosing an effect or look, and then stopped responding.** The release test reproduced it on a clean Windows machine: the first action that loads the maths library (NumPy) hung the whole backend. NumPy and OpenCV are now loaded once at start-up on the main thread, with their maths engine limited to one thread.

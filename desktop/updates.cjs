@@ -84,6 +84,18 @@ function reviewSdAutostart(workspaceDir) {
   return changed;
 }
 
+/** Plain-language reason for an update-check failure. */
+function explainUpdateError(err) {
+  const m = String((err && (err.message || err)) || '');
+  if (/404|Cannot find latest|No published versions|latest\.yml|HttpError: 404/i.test(m))
+    return {kind: 'no-release', message: 'No published release was found yet. (Draft releases are not visible to the app.) Try again once a release is published.'};
+  if (/ENOTFOUND|EAI_AGAIN|ETIMEDOUT|ECONNREFUSED|ECONNRESET|net::ERR_|getaddrinfo|socket hang up|network/i.test(m))
+    return {kind: 'offline', message: 'Could not reach GitHub. Check your internet connection and try again.'};
+  if (/rate limit|403/i.test(m))
+    return {kind: 'rate-limit', message: 'GitHub is limiting requests right now. Try again in a little while.'};
+  return {kind: 'error', message: 'The update check failed: ' + m.slice(0, 300)};
+}
+
 function loadSettings(userDataDir) { return readJSON(path.join(userDataDir, 'update-settings.json'), {beta: false}); }
 function saveSettings(userDataDir, settings) { writeJSON(path.join(userDataDir, 'update-settings.json'), settings); }
 
@@ -112,8 +124,7 @@ function setupUpdates({app, dialog, shell, getWindow, workspaceDir, userDataDir,
   });
   autoUpdater.on('error', err => {
     log('update error: ' + (err && err.message));
-    if (manual) dialog.showMessageBox(getWindow(), {type: 'warning', message: 'Could not check for updates', detail: 'Check your internet connection and try again later.'});
-    manual = false;
+    manual = false;   // manual checks report through check() instead
   });
   autoUpdater.on('update-downloaded', async info => {
     if (prompted) return;
@@ -126,15 +137,33 @@ function setupUpdates({app, dialog, shell, getWindow, workspaceDir, userDataDir,
     if (r.response === 0) setImmediate(() => autoUpdater.quitAndInstall());
   });
 
+  /** Check for updates. With `isManual`, the result is shown to the user.
+   *  Returns {status: 'up-to-date'|'available'|'error', version?, message}. */
   async function check(isManual = false) {
-    manual = isManual;
-    try { await autoUpdater.checkForUpdates(); } catch (e) { log('check failed: ' + e.message); }
+    let result;
+    try {
+      const r = await autoUpdater.checkForUpdates();
+      const latest = r && r.updateInfo && r.updateInfo.version;
+      const available = r && (r.isUpdateAvailable ?? (latest && latest !== app.getVersion()));
+      result = available
+        ? {status: 'available', version: latest, message: mac ? `SceneForge ${latest} is available to download.` : `SceneForge ${latest} is downloading; you will be asked to restart when it is ready.`}
+        : {status: 'up-to-date', version: app.getVersion(), message: `You have the latest version (${app.getVersion()}).`};
+    } catch (e) {
+      log('check failed: ' + (e && e.message));
+      result = {status: 'error', ...explainUpdateError(e)};
+    }
+    if (isManual && result.status !== 'available') {   // 'available' shows its own prompts
+      await dialog.showMessageBox(getWindow(), {type: result.status === 'error' ? 'warning' : 'info',
+        message: result.status === 'error' ? 'Could not check for updates' : 'SceneForge is up to date', detail: result.message});
+    }
+    return result;
   }
   function setBeta(on) {
     saveSettings(userDataDir, {...loadSettings(userDataDir), beta: !!on});
     autoUpdater.allowPrerelease = !!on;
+    return {beta: !!on, message: on ? 'Beta updates are on. You will be offered test versions before they are released to everyone.' : 'Beta updates are off. You will only receive regular releases.'};
   }
   return {check, setBeta, beta: () => !!loadSettings(userDataDir).beta};
 }
 
-module.exports = {migrateLegacyWorkspace, backupOnVersionChange, reviewSdAutostart, backupDatabase, loadSettings, saveSettings, setupUpdates, KEEP_BACKUPS, RELEASES_URL};
+module.exports = {explainUpdateError, migrateLegacyWorkspace, backupOnVersionChange, reviewSdAutostart, backupDatabase, loadSettings, saveSettings, setupUpdates, KEEP_BACKUPS, RELEASES_URL};
