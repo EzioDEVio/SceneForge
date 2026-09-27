@@ -229,7 +229,7 @@ try{
  // Effects pack controls
  await user.click(screen.getByRole('tab',{name:'Effects',exact:true}));
  await user.click(screen.getByRole('switch',{name:'Camera shake'}));
- check('the timeline stays usable while an effect change is saving (no flicker)',!screen.getByRole('button',{name:/Add part/}).disabled&&!screen.getByRole('switch',{name:'Spotlight'}).disabled);
+check('the timeline stays usable while an effect change is saving (no flicker)',!screen.getByRole('button',{name:/Add part/}).disabled&&!screen.getByRole('switch',{name:'Spotlight'}).disabled);
  await user.click(screen.getByRole('checkbox',{name:'Impact zoom'}));await saved();
  const lk=()=>requests.filter(r=>r.method==='PATCH'&&r.body?.look).map(r=>r.body.look);
  check('camera shake with impact zoom saves',lk().some(l=>l.shake?.impact===true&&l.shake.amount===40));
