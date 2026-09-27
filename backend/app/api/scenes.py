@@ -192,6 +192,16 @@ def update_shot(shot_id: str, body: dict, db: Session = Depends(get_db)):
     for field in ("fit", "source_in_ms", "source_out_ms", "duration_ms", "is_selected", "order_index"):
         if field in body:
             setattr(shot, field, body[field])
+    if "audio" in body:
+        a = body["audio"]
+        if not isinstance(a, dict) or set(a) - {"volume", "mute", "duck"}:
+            raise HTTPException(400, "Clip sound settings are volume, mute and duck.")
+        v = a.get("volume", 100)
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not 0 <= v <= 200:
+            raise HTTPException(400, "Clip volume must be between 0 and 200%.")
+        if not isinstance(a.get("mute", False), bool) or not isinstance(a.get("duck", True), bool):
+            raise HTTPException(400, "Clip mute and duck must be true or false.")
+        shot.audio_json = {"volume": round(float(v), 1), "mute": a.get("mute", False), "duck": a.get("duck", True)}
     if "motion" in body:
         from app.render.filters import EASINGS
         motion = body["motion"]

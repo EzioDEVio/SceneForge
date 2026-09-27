@@ -46,6 +46,9 @@ def visual_hash_of(scene: Scene) -> str:
             "fit": s.fit,
             "crop": s.crop_json,
             "motion": s.motion_json,
+            "speed": getattr(s, "speed_json", None) or {},      # speed / ramps / freeze change the picture
+            "sound": getattr(s, "audio_json", None) or {},      # clip volume / mute / ducking change the mix
+            "selected": s.is_selected,
         }
         for s in scene.shots
     ]

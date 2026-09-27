@@ -25,3 +25,20 @@ export function SpeedControls({shot, disabled, save}: {shot: Shot; disabled: boo
     {(sp.speed !== 1 || sp.ramp !== 'none' || sp.freeze_ms > 0) && <button className="text-btn" disabled={disabled} onClick={() => set({...NEUTRAL})}>Reset speed</button>}
   </section>;
 }
+
+
+/** Sound of a video clip: volume, mute, and lowering it under narration (so the voice stays clear). */
+export function ClipSoundControls({shot, save}: {shot: Shot; save: (a: {volume: number; mute: boolean; duck: boolean}) => void}) {
+  const a0 = ((shot as any).audio_json || {}) as {volume?: number; mute?: boolean; duck?: boolean};
+  const [a, setA] = React.useState({volume: a0.volume ?? 100, mute: !!a0.mute, duck: a0.duck ?? true});
+  const commit = (p: Partial<typeof a>) => {const next = {...a, ...p}; setA(next); save(next);};
+  return <section className="clip-sound" aria-label="Clip sound">
+    <h4>Clip sound</h4>
+    <label className="switch-label finishing-toggle"><input type="checkbox" aria-label="Mute clip sound" checked={a.mute} onChange={e => commit({mute: e.target.checked})}/> Mute this clip's sound</label>
+    <div className="adjust-row changed"><label>Volume</label>
+      <input type="range" aria-label="Clip volume" min={0} max={200} step={5} value={a.volume} disabled={a.mute} onChange={e => setA({...a, volume: Number(e.target.value)})} onMouseUp={() => save(a)} onKeyUp={() => save(a)} onTouchEnd={() => save(a)}/>
+      <input type="number" aria-label="Clip volume value" min={0} max={200} value={a.volume} disabled={a.mute} onChange={e => commit({volume: Math.max(0, Math.min(200, Number(e.target.value) || 0))})}/><span className="unit">%</span></div>
+    <label className="switch-label finishing-toggle"><input type="checkbox" aria-label="Lower clip sound under narration" checked={a.duck} disabled={a.mute} onChange={e => commit({duck: e.target.checked})}/> Lower it under narration (voice stays clear)</label>
+    <p className="hint">The clip's own sound plays with it in the render. With narration, it drops to about a third so the voice is heard clearly.</p>
+  </section>;
+}

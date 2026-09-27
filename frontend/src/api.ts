@@ -34,6 +34,7 @@ export type VoiceTake = {
   provider: string | null;
   voice: string | null;
   measured_duration_ms: number | null;
+  natural_duration_ms?: number | null;
   accepted: boolean;
   stale: boolean;
   audio_asset?: Asset;
@@ -100,6 +101,7 @@ export type Scene = {
   rendered_plan_hash: string | null;
   rendered_asset_id: string | null;
   measured_duration_ms: number | null;
+  natural_duration_ms?: number | null;
   shots: Shot[];
   voice_takes: VoiceTake[];
   is_stale: boolean;

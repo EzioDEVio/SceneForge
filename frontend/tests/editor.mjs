@@ -225,9 +225,8 @@ try{
  await user.click(screen.getByRole('tab',{name:'Audio',exact:true}));
  await user.click(screen.getByRole('checkbox',{name:'Level loudness for YouTube'}));
  await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.path===`/api/projects/${project.id}`&&r.body?.finishing?.loudnorm===true)));
- await user.click(screen.getByRole('checkbox',{name:'Countdown leader'}));
- await waitFor(()=>assert.ok(requests.some(r=>r.body?.finishing?.leader===true&&r.body.finishing.loudnorm===true)));
- check('YouTube loudness and countdown leader save on the project',true);
+ await waitFor(()=>assert.ok(requests.some(r=>r.body?.finishing?.loudnorm===true)));
+ check('YouTube loudness saves on the project (the whole-video countdown switch is gone)',!screen.queryByRole('checkbox',{name:'Countdown leader'}));
  check('restore old photo is offered for image scenes',(await (async()=>{await user.click(screen.getByRole('tab',{name:'Media',exact:true}));const b=screen.queryByRole('button',{name:/Restore old photo/});await user.click(screen.getByRole('tab',{name:'Audio',exact:true}));return !!b;})()));
  // Effects pack controls
  await user.click(screen.getByRole('tab',{name:'Effects',exact:true}));
@@ -248,6 +247,12 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getByRole('switch',{name:'Spotlight'}));await saved();
  check('turning an effect off removes it',lk().some(l=>'spotlight' in l&&l.spotlight===null)&&!document.querySelector('.scenefx-preview .fx-layer:not(.fx-leak)'));
  check('VHS look is offered',!!screen.getByRole('button',{name:'VHS',exact:true}));
+ check('no Insert countdown button on the timeline side any more',!screen.queryByRole('button',{name:/Insert countdown/}));
+ await user.click(screen.getByRole('switch',{name:'Countdown intro'}));
+ await user.click(within(screen.getByRole('radiogroup',{name:'Countdown style'})).getByRole('radio',{name:'Modern'}));await saved();
+ check('Countdown intro is an effect you switch on for a scene',lk().some(l=>l.countdown?.style==='modern'&&l.countdown.seconds===5));
+ await user.click(screen.getByRole('switch',{name:'Countdown intro'}));await saved();
+ check('switching Countdown intro off removes it',lk().at(-1).countdown===null);
  await user.click(within(screen.getByRole('group',{name:'Add annotation'})).getByRole('button',{name:/Circle/}));
  await user.click(within(screen.getByRole('group',{name:'Add annotation'})).getByRole('button',{name:/Callout/}));await saved();
  check('annotations save and preview on the picture',lk().some(l=>l.annotations?.length===2&&l.annotations[0].type==='circle'&&l.annotations[1].type==='callout')&&!!document.querySelector('.scenefx-preview ellipse')&&!!document.querySelector('.fx-callout'));
@@ -470,14 +475,6 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getByRole('button',{name:'Fit preview to window'}));
  await waitFor(()=>assert.ok(!pc().style.transform));
  check('Fit returns the preview to normal size',!pc().style.transform);
- await user.click(screen.getByRole('button',{name:/Insert countdown/}));
- const cdlg=await screen.findByRole('dialog',{name:'Insert countdown'});
- await user.click(within(cdlg).getByRole('radio',{name:/Film leader/}));
- await user.selectOptions(within(cdlg).getByRole('combobox',{name:'Countdown tone'}),'sepia');
- await user.selectOptions(within(cdlg).getByRole('combobox',{name:'Countdown beeps'}),'two-pop');
- await user.click(within(cdlg).getByRole('button',{name:'Insert countdown'}));
- await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/insert-countdown'))));
- check('Insert countdown sends the chosen style, tone and beeps',requests.some(r=>r.path.endsWith('/insert-countdown')&&r.body.style==='film'&&r.body.tone==='sepia'&&r.body.beep==='two-pop'));
  // Duplicate / copy / paste
  const clipsBefore=project.scenes.length;
  const firstClip=document.querySelector('.picture-clip');

@@ -171,7 +171,8 @@ def finish_export(export_path: str, project, cancel_check=None) -> str:
     from app.db.database import SessionLocal
     from app.db.models import Asset
     fin = getattr(project, "finishing_json", None) or {}  # older callers pass minimal project objects
-    music, leader, loud = fin.get("music"), fin.get("leader"), fin.get("loudnorm")
+    music, loud = fin.get("music"), fin.get("loudnorm")
+    leader = False   # retired: the countdown is now a scene effect (Effects → Countdown intro)
     if not (music or leader or loud):
         return export_path
     duration = (probe(export_path).duration_ms or 0) / 1000
