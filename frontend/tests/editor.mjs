@@ -495,6 +495,9 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  // restore the mock project for the checks that follow
  project.scenes=project.scenes.filter(x=>!x.id.startsWith('dup-')&&!x.id.startsWith('cd-'));
  for(const x of project.scenes){x.voice_takes=x.voice_takes.filter(v=>!v.id.startsWith('pt-'));x.voice_takes.forEach(v=>v.accepted=v.id===acceptedBefore[x.id]);}
+ fireEvent.keyDown(document.body,{key:'n',ctrlKey:true});
+ const newName=await screen.findByRole('textbox',{name:'New project name'});
+ check('Ctrl+N (File → New project) returns to the project page ready to type a name',document.activeElement===newName);
  cleanup();
  render(React.createElement(App));
  await user.click(await screen.findByRole('button',{name:/Renamed project Open project/}));
