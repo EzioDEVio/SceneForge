@@ -47,6 +47,8 @@ globalThis.fetch=async(path,init={})=>{
  else if(path.endsWith('/voices'))result={voices:['af_heart','default']};
  else if(path.endsWith('/image-history'))result=[];
  else if(path.startsWith('/api/assets/luts'))result=[];
+ else if(/\/api\/scenes\/[^/]+\/duplicate$/.test(path)){const src=project.scenes.find(x=>x.id===path.split('/')[3]);const dup=clone(src);dup.id='dup-'+next++;dup.title=src.title+' (copy)';dup.shots=dup.shots.map(sh=>({...sh,id:'dsh-'+next++}));project.scenes.splice(project.scenes.indexOf(src)+1,0,dup);result=dup;}
+ else if(/\/api\/scenes\/[^/]+\/paste-audio$/.test(path)){const tgt=project.scenes.find(x=>x.id===path.split('/')[3]);const src=project.scenes.flatMap(x=>x.voice_takes).find(v=>v.id===body.take_id);tgt.voice_takes.forEach(v=>v.accepted=false);tgt.voice_takes.push({...clone(src),id:'pt-'+next++,accepted:true});result=tgt;}
  else if(/\/api\/projects\/[^/]+\/beat-sync$/.test(path))result={bpm:120,beats:[0.5,1,1.5],scenes_changed:2,scenes_kept:1};
  else if(/\/api\/assets\/[^/]+\/restore$/.test(path))result={id:'restored-'+next++,type:'image',original_filename:'photo (restored).png',width:1600,height:1200};
  else if(path.startsWith('/api/assets?'))result=[{id:'pool-img',type:'image',original_filename:'map.png',width:800,height:600},{id:'pool-vid',type:'video',original_filename:'clip.mp4',width:1280,height:720}];
@@ -229,6 +231,7 @@ try{
  // Effects pack controls
  await user.click(screen.getByRole('tab',{name:'Effects',exact:true}));
  await user.click(screen.getByRole('switch',{name:'Camera shake'}));
+check('the timeline stays usable while an effect change is saving (no flicker)',!screen.getByRole('button',{name:/Add part/}).disabled&&!screen.getByRole('switch',{name:'Spotlight'}).disabled);
  await user.click(screen.getByRole('checkbox',{name:'Impact zoom'}));await saved();
  const lk=()=>requests.filter(r=>r.method==='PATCH'&&r.body?.look).map(r=>r.body.look);
  check('camera shake with impact zoom saves',lk().some(l=>l.shake?.impact===true&&l.shake.amount===40));
@@ -459,6 +462,33 @@ try{
  await screen.findByRole('button',{name:'Use this image'});
  check('image studio sends chosen provider and composition',requests.some(r=>r.path.endsWith('/generate-image')&&r.body.provider_id==='provider-gemini'&&r.body.size==='1536x1024'));
  await user.click(screen.getByRole('button',{name:'Close',exact:true}));
+ await user.click(screen.getByRole('button',{name:'Zoom preview in'}));
+ const pc=()=>[...document.querySelectorAll('.preview-canvas')].find(el=>el.offsetParent!==null||el.closest('.scene-editor:not([hidden])'));
+ await waitFor(()=>assert.ok(/scale\(1\.25\)/.test(pc()?.style.transform||'')));
+ check('timeline zoom tool magnifies the preview',/scale\(1\.25\)/.test(pc().style.transform));
+ await user.click(screen.getByRole('button',{name:'Fit preview to window'}));
+ await waitFor(()=>assert.ok(!pc().style.transform));
+ check('Fit returns the preview to normal size',!pc().style.transform);
+ // Duplicate / copy / paste
+ const clipsBefore=project.scenes.length;
+ const firstClip=document.querySelector('.picture-clip');
+ fireEvent.contextMenu(firstClip,{clientX:100,clientY:100});
+ await user.click(await screen.findByRole('menuitem',{name:/Duplicate scene/}));
+ await waitFor(()=>assert.ok(project.scenes.length===clipsBefore+1));
+ check('right-click → Duplicate scene adds an exact copy after it',project.scenes[1].title.endsWith('(copy)')&&project.scenes[1].effect_preset===project.scenes[0].effect_preset);
+ const withAudio=project.scenes.find(x=>x.voice_takes.some(v=>v.accepted));const acceptedBefore=Object.fromEntries(project.scenes.map(x=>[x.id,x.voice_takes.find(v=>v.accepted)?.id]));
+ const target=project.scenes.find(x=>x!==withAudio&&x.id!==project.scenes[1].id);
+ const narr=[...document.querySelectorAll('.narration-clip')].find(b=>b.dataset.sceneId===withAudio.id);
+ fireEvent.contextMenu(narr,{clientX:120,clientY:220});
+ await user.click(await screen.findByRole('menuitem',{name:/Copy audio/}));
+ const tgtNarr=[...document.querySelectorAll('.narration-clip')].find(b=>b.dataset.sceneId===target.id);
+ fireEvent.contextMenu(tgtNarr,{clientX:120,clientY:220});
+ await user.click(await screen.findByRole('menuitem',{name:/Paste .* audio here/}));
+ await waitFor(()=>assert.ok(requests.some(r=>r.path===`/api/scenes/${target.id}/paste-audio`)));
+ check('copy audio from one scene and paste it into another',requests.some(r=>r.path===`/api/scenes/${target.id}/paste-audio`&&r.body.take_id===withAudio.voice_takes.find(v=>v.accepted).id));
+ // restore the mock project for the checks that follow
+ project.scenes=project.scenes.filter(x=>!x.id.startsWith('dup-'));
+ for(const x of project.scenes){x.voice_takes=x.voice_takes.filter(v=>!v.id.startsWith('pt-'));x.voice_takes.forEach(v=>v.accepted=v.id===acceptedBefore[x.id]);}
  cleanup();
  render(React.createElement(App));
  await user.click(await screen.findByRole('button',{name:/Renamed project Open project/}));

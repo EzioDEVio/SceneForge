@@ -116,4 +116,21 @@ full,ph1=ink_at({'size':40},1.0),ink_at({'size':40,'split':'phrases','phrase_wor
 check('phrase captions show only a few words at a time on screen',0<(ph1>128).sum()<(full>128).sum()*0.6)
 top=ink_at({'size':40,'position':'top'},1.0)
 check('top position draws the caption in the top of the frame',(top[:120]>128).sum()>100 and (top[240:]>128).sum()==0)
-print(f'{n} text motion, annotation, look, caption and Captions Pro checks passed')
+
+# --- duplicate scene / paste audio ------------------------------------------------------
+subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i','sine=d=1','-ar','48000',str(t/'v.wav')],check=True)
+take=client.post(f'/api/scenes/{sid}/voice-takes/upload',files={'file':('v.wav',open(t/'v.wav','rb'))}).json()
+client.patch(f'/api/scenes/{sid}',json={'effect_preset':'vhs','look':{'annotations':[{'type':'circle'}]}})
+before=client.get(f"/api/projects/{p['id']}").json()['scenes']
+d=client.post(f'/api/scenes/{sid}/duplicate')
+after=client.get(f"/api/projects/{p['id']}").json()['scenes']
+cp=after[[x['id'] for x in after].index(sid)+1]
+check('duplicate scene: an exact copy placed right after the original',d.status_code==200 and len(after)==len(before)+1 and cp['title'].endswith('(copy)') and cp['effect_preset']=='vhs' and len(cp['look_json']['annotations'])==1 and len(cp['voice_takes'])==len([x for x in before if x['id']==sid][0]['voice_takes']))
+client.patch(f"/api/scenes/{cp['id']}",json={'effect_preset':'sepia'})
+check('the copy is independent of the original',[x for x in client.get(f"/api/projects/{p['id']}").json()['scenes'] if x['id']==sid][0]['effect_preset']=='vhs')
+other=[x for x in after if x['id'] not in (sid,cp['id'])][0]['id']
+r=client.post(f'/api/scenes/{other}/paste-audio',json={'take_id':take['id']})
+check('paste audio copies the clip into another scene as its selected audio',r.status_code==200 and [v['accepted'] for v in r.json()['voice_takes']].count(True)==1)
+p2=client.post('/api/projects',json={'title':'Other','aspect':'16:9'}).json();s2=client.get(f"/api/projects/{p2['id']}").json()['scenes'][0]['id']
+check('audio cannot be pasted into another project',client.post(f'/api/scenes/{s2}/paste-audio',json={'take_id':take['id']}).status_code==400)
+print(f'{n} text motion, annotation, look, caption, Captions Pro and duplicate checks passed')

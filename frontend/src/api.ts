@@ -179,6 +179,8 @@ export const api = {
     req<Project>(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   addScene: (projectId: string) =>
     req<Scene>(`/api/projects/${projectId}/scenes`, { method: "POST", body: JSON.stringify({}) }),
+  duplicateScene: (sceneId: string) => req<Scene>(`/api/scenes/${sceneId}/duplicate`, {method: 'POST'}),
+  pasteAudio: (sceneId: string, takeId: string) => req<Scene>(`/api/scenes/${sceneId}/paste-audio`, {method: 'POST', body: JSON.stringify({take_id: takeId})}),
   reorderScenes: (projectId: string, sceneIds: string[]) =>
     req(`/api/projects/${projectId}/scene-order`, { method: "PUT", body: JSON.stringify({ scene_ids: sceneIds }) }),
   updateScene: (sceneId: string, body: Record<string, any>) =>
