@@ -187,7 +187,7 @@ export function AutoCaptions({scene, onDone}: {scene: Scene; onDone: (s: Scene) 
       <label className="control-label">Language<select aria-label="Speech language" value={lang} onChange={e => setLang(e.target.value)}>{LANGS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
       <label className="control-label">Service<select aria-label="Transcription service" value={provider} onChange={e => setProvider(e.target.value)}><option value="auto">Automatic (your saved key)</option><option value="elevenlabs">ElevenLabs Scribe</option><option value="openai">OpenAI Whisper</option></select></label>
       <button className="btn btn-primary" disabled={busy} onClick={() => void go()}>{busy ? 'Transcribing…' : 'Generate captions'}</button>
-      {msg && <p className="info-status" role="status">{msg}</p>}
+      {msg && <p className="info-status" aria-live="polite">{msg}</p>}
     </div>}
   </div>;
 }
