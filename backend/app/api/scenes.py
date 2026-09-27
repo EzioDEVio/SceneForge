@@ -479,3 +479,62 @@ def graded_frame_endpoint(scene_id: str, w: int = 1280, shot_id: str | None = No
     except ThumbnailError as e:
         raise HTTPException(422, str(e))
     return FileResponse(out, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
+
+
+def _copy_row(row, **overrides):
+    """A new ORM object of the same class with every column copied (JSON deep-copied),
+    except its id and whatever is overridden. New columns are included automatically."""
+    from copy import deepcopy
+    cls = type(row)
+    values = {}
+    for col in cls.__table__.columns:
+        if col.key == "id":
+            continue
+        v = getattr(row, col.key)
+        values[col.key] = deepcopy(v) if isinstance(v, (dict, list)) else v
+    values.update(overrides)
+    return cls(**values)
+
+
+@router.post("/{scene_id}/duplicate", response_model=schemas.SceneOut)
+def duplicate_scene(scene_id: str, db: Session = Depends(get_db)):
+    """Exact copy placed right after the original: pictures, effects, looks, captions,
+    titles, overlays and audio takes, so the copy can be given different effects."""
+    from app.db.models import Shot, VoiceTake
+    scene = db.get(Scene, scene_id)
+    if not scene:
+        raise HTTPException(404, "Scene not found")
+    project = db.get(Project, scene.project_id)
+    for s in project.scenes:
+        if s.order_index > scene.order_index:
+            s.order_index += 1
+    copy = _copy_row(scene, order_index=scene.order_index + 1, title=(scene.title or "Scene") + " (copy)",
+                     rendered_asset_id=None, revision=1)
+    db.add(copy); db.flush()
+    for shot in scene.shots:
+        db.add(_copy_row(shot, scene_id=copy.id))
+    for take in scene.voice_takes:
+        db.add(_copy_row(take, scene_id=copy.id))
+    project.revision += 1
+    db.commit(); db.refresh(copy)
+    return copy
+
+
+@router.post("/{scene_id}/paste-audio", response_model=schemas.SceneOut)
+def paste_audio(scene_id: str, body: dict, db: Session = Depends(get_db)):
+    """Copy an audio take (narration or any audio clip) from another scene of the same
+    project into this scene, with its trim, volume and fades, and make it the selected take."""
+    from app.db.models import VoiceTake
+    scene = db.get(Scene, scene_id)
+    take = db.get(VoiceTake, (body or {}).get("take_id"))
+    if not scene or not take:
+        raise HTTPException(404, "Scene or audio clip not found")
+    source = db.get(Scene, take.scene_id)
+    if not source or source.project_id != scene.project_id:
+        raise HTTPException(400, "Audio can only be pasted within the same project.")
+    for t in scene.voice_takes:
+        t.accepted = False
+    db.add(_copy_row(take, scene_id=scene.id, accepted=True))
+    scene.revision += 1
+    db.commit(); db.refresh(scene)
+    return scene

@@ -905,6 +905,18 @@ export default function App() {
   const exporting = !!exportJob && ["queued", "running", "cancelling"].includes(exportJob.status);
   const dirty = Object.values(states).some(s => s !== "Saved");
   const statesRef = useRef(states); statesRef.current = states;
+  const [clip, setClip] = useState<{kind:'scene'|'audio';id:string;label:string}|null>(null);
+  async function duplicateScene(id:string, after?:string){
+    if(!project)return;
+    await action(async()=>{const dup=await api.duplicateScene(id);
+      if(after&&after!==id){const ids=project.scenes.map(s=>s.id).filter(x=>x!==dup.id);const at=ids.indexOf(after);ids.splice(at+1,0,dup.id);await api.reorderScenes(project.id,ids);}
+      await refresh();setSelectedId(dup.id);setImportStatus(`Duplicated “${dup.title}”. Change its effects without affecting the original.`);});
+  }
+  async function pasteClip(targetId:string){
+    if(!clip||!project)return;
+    if(clip.kind==='scene'){await duplicateScene(clip.id,targetId);return;}
+    await action(async()=>{await api.pasteAudio(targetId,clip.id);await refresh();setImportStatus(`Pasted ${clip.label}. Adjust its volume and fades in the Audio tab.`);});
+  }
   const failed = Object.values(states).some(s => s === "Save failed");
   const status = failed ? "Save failed" : dirty ? "Saving changes…" : "All changes saved";
   const selected = project?.scenes.find(s => s.id === selectedId) || project?.scenes[0];
@@ -1049,7 +1061,7 @@ export default function App() {
         <div id="sequence-viewer"/>
       </main>
     </div>
-    <ProjectTimeline notice={importStatus} onDropFiles={(id,files)=>void dropFilesOnTimeline(id,files)} onDropAssets={(id,assets)=>void dropAssetsOnTimeline(id,assets)} onDuration={resizeDuration} onRender={()=>void renderFullVideo()} exportScenes={exportScenes} exportAsset={exportJob?.status==="succeeded"?exportJob.artifact_asset_id:null} project={project} selectedId={selected?.id||""} disabled={busy||exporting} onSelect={setSelectedId} onAdd={addPart} onReorder={ids=>record('scene order',()=>api.reorderScenes(project.id,project.scenes.map(s=>s.id)),()=>api.reorderScenes(project.id,ids))} onUpdate={(id,patch)=>record('transition',()=>api.updateScene(id,{transition_in:project.scenes.find(s=>s.id===id)!.transition_in_json}),()=>api.updateScene(id,patch))} onDelete={()=>selected&&void deleteScene(selected.id)} onAudio={()=>audioImportRef.current?.click()} onRemoveAudio={()=>selected&&void action(async()=>{await removeSceneAudio(selected);await refresh();})} onRemoveSceneAudio={id=>{const s=project.scenes.find(x=>x.id===id);if(s)void action(async()=>{await removeSceneAudio(s);await refresh();setImportStatus(`Audio removed from ${s.title}. Its picture is unchanged.`);});}} onUndo={undoTimeline} onRedo={redoTimeline} canUndo={!!history.length} canRedo={!!future.length} onSplit={(at,baked)=>selected&&void action(async()=>{const right=await api.splitScene(selected.id,at,baked);setEditorEpoch(v=>v+1);setHistory([]);setFuture([]);await refresh();setSelectedId(right.id);})}/>
+    <ProjectTimeline notice={importStatus} onDropFiles={(id,files)=>void dropFilesOnTimeline(id,files)} onDropAssets={(id,assets)=>void dropAssetsOnTimeline(id,assets)} onDuration={resizeDuration} onRender={()=>void renderFullVideo()} exportScenes={exportScenes} exportAsset={exportJob?.status==="succeeded"?exportJob.artifact_asset_id:null} project={project} selectedId={selected?.id||""} disabled={busy||exporting} onSelect={setSelectedId} onAdd={addPart} clipboard={clip} onClipboard={c=>{setClip(c);setImportStatus(c.kind==='scene'?`Copied scene “${c.label}”. Select a scene and press Ctrl+V (or right-click → Paste) to paste it after that scene.`:`Copied ${c.label}. Select another scene's narration and press Ctrl+V to paste.`);}} onDuplicate={id=>void duplicateScene(id)} onPaste={id=>void pasteClip(id)} onReorder={ids=>record('scene order',()=>api.reorderScenes(project.id,project.scenes.map(s=>s.id)),()=>api.reorderScenes(project.id,ids))} onUpdate={(id,patch)=>record('transition',()=>api.updateScene(id,{transition_in:project.scenes.find(s=>s.id===id)!.transition_in_json}),()=>api.updateScene(id,patch))} onDelete={()=>selected&&void deleteScene(selected.id)} onAudio={()=>audioImportRef.current?.click()} onRemoveAudio={()=>selected&&void action(async()=>{await removeSceneAudio(selected);await refresh();})} onRemoveSceneAudio={id=>{const s=project.scenes.find(x=>x.id===id);if(s)void action(async()=>{await removeSceneAudio(s);await refresh();setImportStatus(`Audio removed from ${s.title}. Its picture is unchanged.`);});}} onUndo={undoTimeline} onRedo={redoTimeline} canUndo={!!history.length} canRedo={!!future.length} onSplit={(at,baked)=>selected&&void action(async()=>{const right=await api.splitScene(selected.id,at,baked);setEditorEpoch(v=>v+1);setHistory([]);setFuture([]);await refresh();setSelectedId(right.id);})}/>
     {settingsOpen&&<SettingsPanel onClose={()=>setSettingsOpen(false)}/>}
     {infoPanel?.panel==='ai'&&<AIEnginesPanel section={infoPanel.section} onClose={()=>setInfoPanel(null)} onOpenSettings={()=>{setInfoPanel(null);setSettingsOpen(true);}}/>}
     {infoPanel?.panel==='about'&&<AboutPanel onClose={()=>setInfoPanel(null)}/>}
