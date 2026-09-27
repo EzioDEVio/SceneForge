@@ -359,3 +359,5 @@ button:hover>.sample-fade_fast span+span{animation-duration:.9s}
 .countdown-thumb.minimal{background:#000;color:#fff}.countdown-thumb b{position:relative;z-index:1}
 .countdown-options{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin:12px 0}
 .clip-sound{margin:10px 0;padding:10px 12px;border:1px solid #3a3f4b;border-radius:8px;background:#262a32}.clip-sound h4{margin:0 0 6px;font-size:12px;color:#e8eaf0}
+.auto-captions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:4px 0}.auto-captions-panel{flex-basis:100%;display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;padding:10px;border:1px solid #4d4480;border-radius:8px;background:#2b2840}
+.auto-captions-panel .hint,.auto-captions-panel .info-status{grid-column:1/-1;margin:0}.auto-captions-panel .btn{grid-column:1/-1}

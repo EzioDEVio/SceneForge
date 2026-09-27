@@ -81,14 +81,15 @@ def shot_durations(scene, shots, total_ms: int) -> list[int]:
     return plan
 
 
-def clip_audio(scene, shots, durations, media_root, work_dir: Path, ffmpeg_bin: str, has_narration: bool) -> str | None:
-    """WAV of the video clips' own sound, cut like the picture; None when nothing is audible."""
+def clip_audio(scene, shots, durations, media_root, work_dir: Path, ffmpeg_bin: str, has_narration: bool, original: bool = False) -> str | None:
+    """WAV of the video clips' own sound, cut like the picture; None when nothing is audible.
+    original=True (for automatic captions) ignores mute, volume and ducking."""
     import subprocess
     from app.render.ffmpeg_utils import probe
     parts, audible = [], False
     for i, (shot, ms) in enumerate(zip(shots, durations)):
         seg = work_dir / f"clipaudio_{i}.wav"
-        a = getattr(shot, "audio_json", None) or {}
+        a = {} if original else (getattr(shot, "audio_json", None) or {})
         asset = shot.asset
         src = Path(media_root) / asset.storage_key if asset else None
         vol = float(a.get("volume", 100)) / 100 * (0.35 if has_narration and a.get("duck", True) else 1.0)

@@ -48,6 +48,7 @@ globalThis.fetch=async(path,init={})=>{
  else if(path.endsWith('/image-history'))result=[];
  else if(path.startsWith('/api/assets/luts'))result=[];
  else if(/\/api\/projects\/[^/]+\/insert-countdown$/.test(path)){const sc={...clone(project.scenes[0]),id:'cd-'+next++,title:'Film leader',shots:[],voice_takes:[]};project.scenes.unshift(sc);result=sc;}
+ else if(/\/api\/scenes\/[^/]+\/auto-captions$/.test(path)){const sc=project.scenes.find(x=>x.id===path.split('/')[3]);sc.subtitle_text='hello from speech';sc.font_json={...sc.font_json,captions_enabled:true,transcript:{language:'en',source:'narration',words:[['hello',0,300],['from',300,600],['speech',600,900]]}};result=sc;}
  else if(/\/api\/scenes\/[^/]+\/duplicate$/.test(path)){const src=project.scenes.find(x=>x.id===path.split('/')[3]);const dup=clone(src);dup.id='dup-'+next++;dup.title=src.title+' (copy)';dup.shots=dup.shots.map(sh=>({...sh,id:'dsh-'+next++}));project.scenes.splice(project.scenes.indexOf(src)+1,0,dup);result=dup;}
  else if(/\/api\/scenes\/[^/]+\/paste-audio$/.test(path)){const tgt=project.scenes.find(x=>x.id===path.split('/')[3]);const src=project.scenes.flatMap(x=>x.voice_takes).find(v=>v.id===body.take_id);tgt.voice_takes.forEach(v=>v.accepted=false);tgt.voice_takes.push({...clone(src),id:'pt-'+next++,accepted:true});result=tgt;}
  else if(/\/api\/projects\/[^/]+\/beat-sync$/.test(path))result={bpm:120,beats:[0.5,1,1.5],scenes_changed:2,scenes_kept:1};
@@ -215,6 +216,11 @@ try{
  check('background box saves',requests.some(r=>r.body?.font?.background==='box'));
  check('the caption preview is drawn on the picture',!!document.querySelector('.preview-canvas .caption-preview'));
  await user.click(screen.getByRole('button',{name:'Apply Classic caption style'}));await saved();
+ await user.click(screen.getByRole('button',{name:/Captions from speech/}));
+ await user.selectOptions(screen.getByRole('combobox',{name:'Speech language'}),'ar');
+ await user.click(screen.getByRole('button',{name:'Generate captions'}));
+ await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/auto-captions'))));
+ check('Captions from speech sends the chosen language and reports the detected one',requests.some(r=>r.path.endsWith('/auto-captions')&&r.body.language==='ar')&&!!(await screen.findByText(/language: en/)));
  await user.selectOptions(screen.getByRole('combobox',{name:'Caption animation'}),'letters-pop');await saved();
  check('caption animation saves from the Text tab',requests.some(r=>r.body?.font?.caption_animation==='letters-pop'));
  await user.click(screen.getByRole('button',{name:/Add animated title/}));await saved();

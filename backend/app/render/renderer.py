@@ -365,6 +365,24 @@ def _exact_word_times(scene: Scene, lead_ms: int) -> list[tuple[int, int]] | Non
     return [(s + lead_ms, e + lead_ms) for s, e in times] if times else None
 
 
+def _caption_word_times(scene: Scene, lead_ms: int, narration_path) -> list[tuple[int, int]] | None:
+    """Exact per-word caption timing: from the voice engine (ElevenLabs narration) or from an
+    automatic-captions transcript (any narration or video sound), when the captions still match."""
+    font = scene.font_json or {}
+    if not (font.get("karaoke") or font.get("split") == "phrases"):
+        return None
+    if narration_path:
+        exact = _exact_word_times(scene, lead_ms)
+        if exact:
+            return exact
+    tr = font.get("transcript") or {}
+    if tr.get("words"):
+        from app.render.word_timing import exact_word_times
+        spoken = [(w, int(s), int(e)) for w, s, e in tr["words"]]
+        return exact_word_times(scene.subtitle_text.split(), spoken)
+    return None
+
+
 def _speech_segments(scene: Scene, narration_path: str, lead_ms: int, total_ms: int) -> list[tuple[int, int]] | None:
     """Spoken spans of the accepted take (after its trim), in scene time."""
     from app.render.word_timing import voiced_segments
@@ -396,7 +414,7 @@ def mux_audio_and_captions(
             speech_start_ms=lead_ms if narration_path else 0,
             speech_ms=_narration_duration_ms(scene)[0] if narration_path else None,
             speech_segments=_speech_segments(scene, narration_path, lead_ms, total_duration_ms) if narration_path and scene.font_json.get("karaoke") else None,
-            word_times=_exact_word_times(scene, lead_ms) if narration_path and scene.font_json.get("karaoke") else None,
+            word_times=_caption_word_times(scene, lead_ms, narration_path),
         )
         fonts_dir = escape_path_for_filter(str(BUNDLED_FONT_PATH.parent))
         ass_escaped = escape_path_for_filter(ass_path)

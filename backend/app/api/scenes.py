@@ -548,3 +548,69 @@ def paste_audio(scene_id: str, body: dict, db: Session = Depends(get_db)):
     scene.revision += 1
     db.commit(); db.refresh(scene)
     return scene
+
+
+
+@router.post("/{scene_id}/auto-captions", response_model=schemas.SceneOut)
+def auto_captions(scene_id: str, body: dict | None = None, db: Session = Depends(get_db)):
+    """Captions from the speech in this scene: the narration if there is one, otherwise the
+    video clips' own sound (cut exactly as they play). Language is detected automatically
+    unless given. The words and their times become the captions (editable)."""
+    import tempfile
+    from pathlib import Path as _P
+    from app.config import FFMPEG_BIN, MEDIA_DIR, DEFAULT_LEAD_MS
+    from app.providers import transcribe as tr
+    from app.render.media import clip_audio, selected_shots, shot_durations, media_duration_ms
+    body = body or {}
+    scene = db.get(Scene, scene_id)
+    if not scene:
+        raise HTTPException(404, "Scene not found")
+    provider = body.get("provider", "auto")
+    language = (body.get("language") or "").strip() or None
+    if provider not in ("auto", "elevenlabs", "openai") or (language and len(language) > 8):
+        raise HTTPException(400, "Provider must be auto, elevenlabs or openai; language a short code like en or ar.")
+    take = next((t for t in scene.voice_takes if t.accepted), None)
+    work = _P(tempfile.mkdtemp(prefix="sf-stt-"))
+    offset = 0
+    try:
+        if take and take.audio_asset and body.get("source", "auto") != "clips":
+            src = _P(MEDIA_DIR) / take.audio_asset.storage_key
+            edit = take.edit_json or {}
+            wav = work / "speech.wav"
+            args = [FFMPEG_BIN, "-y", "-v", "error"]
+            if edit.get("in_ms"):
+                args += ["-ss", f"{int(edit['in_ms'])/1000:.3f}"]
+            args += ["-i", str(src)]
+            if edit.get("out_ms"):
+                args += ["-t", f"{(int(edit['out_ms'])-int(edit.get('in_ms') or 0))/1000:.3f}"]
+            import subprocess
+            subprocess.run(args + ["-ac", "1", "-ar", "16000", str(wav)], check=True, capture_output=True, timeout=300)
+            offset = DEFAULT_LEAD_MS if scene.lead_ms is None else scene.lead_ms
+            source = "narration"
+        else:
+            shots = selected_shots(scene)
+            total = media_duration_ms(scene)
+            if not shots or not total:
+                raise HTTPException(400, "This scene has no narration or video with sound to transcribe.")
+            wav = clip_audio(scene, shots, shot_durations(scene, shots, total), MEDIA_DIR, work, FFMPEG_BIN, has_narration=False, original=True)
+            if not wav:
+                raise HTTPException(400, "The videos in this scene have no sound to transcribe.")
+            source = "clips"
+        try:
+            result = tr.transcribe(db, str(wav), provider, language)
+        except tr.TranscribeError as e:
+            raise HTTPException(400, str(e))
+    finally:
+        import shutil
+        shutil.rmtree(work, ignore_errors=True)
+    if not result["words"]:
+        raise HTTPException(400, "No speech was recognised in this scene.")
+    words = [[w, s + offset, e + offset] for w, s, e in result["words"]]
+    scene.subtitle_text = " ".join(w for w, _, _ in words)
+    font = dict(scene.font_json or {})
+    font["transcript"] = {"language": result["language"], "provider": result["provider"], "source": source, "words": words}
+    font["captions_enabled"] = True
+    scene.font_json = font
+    scene.revision += 1
+    db.commit(); db.refresh(scene)
+    return scene

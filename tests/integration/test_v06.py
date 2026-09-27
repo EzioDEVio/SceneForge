@@ -74,4 +74,25 @@ c.patch(f"/api/scenes/{vs[0]['id']}",json={'look':{'countdown':{'style':'minimal
 out3=export_of(vid)
 d3=float(subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','csv=p=0',str(out3)]))
 check(f'countdown intro plays before the scene and adds its length ({d3:.2f} s)',abs(d3-12)<0.25)
+
+# --- automatic captions from speech ----------------------------------------------------------
+from app.providers import transcribe as tr
+sc0=c.get(f'/api/projects/{vid}').json()['scenes'][1]
+r=c.post(f"/api/scenes/{sc0['id']}/auto-captions",json={})
+check('without an ElevenLabs/OpenAI key, auto captions explain what is needed',r.status_code==400 and 'key' in r.json()['detail'])
+seen={}
+def fake(db,path,provider='auto',language=None):
+ seen['dur']=float(subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','csv=p=0',path]));seen['lang']=language
+ return {'language':'ar','text':'مرحبا بكم في الأندلس','words':[['مرحبا',200,700],['بكم',800,1100],['في',1200,1400],['الأندلس',1500,2400]],'provider':'elevenlabs'}
+tr.transcribe=fake
+r=c.post(f"/api/scenes/{sc0['id']}/auto-captions",json={'language':'ar'})
+j=r.json()
+check('auto captions transcribe the video clip sound and save text + word timing',r.status_code==200 and j['subtitle_text']=='مرحبا بكم في الأندلس' and j['font_json']['transcript']['source']=='clips' and j['font_json']['captions_enabled'] and abs(seen['dur']-3)<0.3 and seen['lang']=='ar')
+from app.db.database import SessionLocal
+from app.db.models import Scene as _S
+from app.render.renderer import _caption_word_times
+c.patch(f"/api/scenes/{sc0['id']}",json={'font':{'split':'phrases','phrase_words':2}})
+with SessionLocal() as db:
+ wt=_caption_word_times(db.get(_S,sc0['id']),0,None)
+check('phrase captions use the transcript word times exactly',wt==[(200,700),(800,1100),(1200,1400),(1500,2400)])
 print(f'{n} v0.6 checks passed')

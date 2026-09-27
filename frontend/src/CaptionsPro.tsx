@@ -1,6 +1,6 @@
 import React from 'react';
 import {Bold, Italic, Underline, Type, Palette, Square, Move, Rows3, Highlighter, Sparkles, Wand2} from 'lucide-react';
-import type {Scene} from './api';
+import {api, type Scene} from './api';
 import {previewFontFamily} from './fonts';
 import {ANIMATION_LABELS} from './TitleDesigner';
 
@@ -155,5 +155,39 @@ export function CaptionStylePanel({scene, onChange}: {scene: Scene; onChange: (f
       <label className="switch-label finishing-toggle"><input type="checkbox" checked={!!f.typewriter} onChange={e => set({typewriter: e.target.checked, ...(e.target.checked ? {captions_enabled: true, karaoke: false, split: 'full'} : {})})}/> Typewriter reveal (captions)</label>
       <p className="hint">{busyAnim ? 'Typewriter reveal animates the captions on its own; turn it off to use the animations above.' : 'In phrases mode each phrase gets the entrance, exit and pulse. Arabic animates word by word. Render text preview for the exact result.'}</p>
     </Group>
+  </div>;
+}
+
+
+const LANGS: [string, string][] = [['', 'Detect automatically'], ['ar', 'Arabic'], ['en', 'English'], ['fr', 'French'], ['es', 'Spanish'], ['de', 'German'], ['tr', 'Turkish'],
+  ['fa', 'Persian'], ['ur', 'Urdu'], ['hi', 'Hindi'], ['id', 'Indonesian'], ['pt', 'Portuguese'], ['it', 'Italian'], ['ru', 'Russian'], ['zh', 'Chinese'], ['ja', 'Japanese'], ['ko', 'Korean']];
+
+/** CapCut-style automatic captions: transcribe the speech in the scene (narration, or the
+ *  videos' own sound) with the language detected, then style them with Captions Pro. */
+export function AutoCaptions({scene, onDone}: {scene: Scene; onDone: (s: Scene) => void}) {
+  const [open, setOpen] = React.useState(false);
+  const [lang, setLang] = React.useState('');
+  const [provider, setProvider] = React.useState('auto');
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState('');
+  const tr = (scene.font_json as any)?.transcript;
+  const hasNarr = scene.voice_takes.some(t => t.accepted);
+  const hasVideo = scene.shots.some(s => s.asset?.type === 'video');
+  async function go() {
+    setBusy(true); setMsg('Listening to the speech…');
+    try {const sc = await api.autoCaptions(scene.id, {provider, language: lang}); const t = (sc.font_json as any)?.transcript;
+      setMsg(`Done: ${t?.words?.length || 0} words${t?.language ? ` · language: ${t.language}` : ''}. Edit the text if needed, then style it below.`); onDone(sc);}
+    catch (e: any) {setMsg(e.message || String(e));} finally {setBusy(false);}
+  }
+  return <div className="auto-captions">
+    <button className="text-btn" disabled={!hasNarr && !hasVideo} title={!hasNarr && !hasVideo ? 'Add narration or a video with sound first' : ''} onClick={() => setOpen(o => !o)}>✦ Captions from speech</button>
+    {tr?.language && !open && <span className="info-badge ok">{tr.language} · {tr.source === 'clips' ? 'from video sound' : 'from narration'}</span>}
+    {open && <div className="auto-captions-panel">
+      <p className="hint">Turns the speech in this scene into captions with exact word timing: {hasNarr ? 'the narration' : 'the videos’ own sound'}. Works with any language.</p>
+      <label className="control-label">Language<select aria-label="Speech language" value={lang} onChange={e => setLang(e.target.value)}>{LANGS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+      <label className="control-label">Service<select aria-label="Transcription service" value={provider} onChange={e => setProvider(e.target.value)}><option value="auto">Automatic (your saved key)</option><option value="elevenlabs">ElevenLabs Scribe</option><option value="openai">OpenAI Whisper</option></select></label>
+      <button className="btn btn-primary" disabled={busy} onClick={() => void go()}>{busy ? 'Transcribing…' : 'Generate captions'}</button>
+      {msg && <p className="info-status" role="status">{msg}</p>}
+    </div>}
   </div>;
 }

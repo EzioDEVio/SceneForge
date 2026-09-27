@@ -183,6 +183,8 @@ export const api = {
     req<Scene>(`/api/projects/${projectId}/scenes`, { method: "POST", body: JSON.stringify({}) }),
   insertCountdown: (projectId: string, body: {style: string; seconds: number; beep: string; tone: string; color?: string; after_scene_id?: string | null}) =>
     req<Scene>(`/api/projects/${projectId}/insert-countdown`, {method: 'POST', body: JSON.stringify(body)}),
+  autoCaptions: (sceneId: string, body: {provider?: string; language?: string; source?: string}) =>
+    req<Scene>(`/api/scenes/${sceneId}/auto-captions`, {method: 'POST', body: JSON.stringify(body)}),
   duplicateScene: (sceneId: string) => req<Scene>(`/api/scenes/${sceneId}/duplicate`, {method: 'POST'}),
   pasteAudio: (sceneId: string, takeId: string) => req<Scene>(`/api/scenes/${sceneId}/paste-audio`, {method: 'POST', body: JSON.stringify({take_id: takeId})}),
   reorderScenes: (projectId: string, sceneIds: string[]) =>
