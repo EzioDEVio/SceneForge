@@ -1,3 +1,8 @@
+# SceneForge Studio 0.5.1
+
+- **Move and resize annotations directly on the picture.** In the Effects tab, every annotation shows handles on the preview: drag a point to change where it starts or ends (or its corners, for circles and boxes), and drag the ✥ handle to move the whole shape. The sliders update as you drag.
+- **Accurate arrow preview.** Curved arrows now preview as curves with their arrowhead, matching the render (they used to preview as a straight line).
+
 # SceneForge Studio 0.5.0 — Captions Pro
 
 Captions now have CapCut-level styling. Everything is in **Text → Caption styles**, with a live preview on the picture.
