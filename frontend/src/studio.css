@@ -347,3 +347,14 @@ button:hover>.sample-fade_fast span+span{animation-duration:.9s}
 .canvas-viewport{overflow:hidden}.canvas-viewport.magnified{cursor:zoom-in}
 .inspect-zoom{display:inline-flex;align-items:center;gap:2px;margin-right:10px}.inspect-zoom .text-btn{min-width:44px;justify-content:center}
 .tl-zoom{display:inline-flex;gap:2px;margin-left:4px;padding-left:6px;border-left:1px solid #49505d}
+/* Countdown dialog */
+.countdown-styles{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.countdown-style{display:flex;flex-direction:column;gap:5px;align-items:stretch;text-align:left;padding:8px;border:1px solid #444956;border-radius:9px;background:#262a32;color:#e8eaf0}
+.countdown-style.selected{border-color:#8f7cf0;box-shadow:0 0 0 2px #8f7cf055}.countdown-style small{font-size:10.5px;color:#9aa0ad;line-height:1.35}
+.countdown-thumb{aspect-ratio:16/9;border-radius:6px;display:grid;place-items:center;position:relative;overflow:hidden;font:700 28px 'Noto Sans',sans-serif}
+.countdown-thumb.film{background:conic-gradient(#666 0 120deg,#999 120deg);color:#111}.countdown-thumb.film.sepia{filter:sepia(1)}
+.countdown-thumb.film::before{content:"";position:absolute;width:62%;aspect-ratio:1;border:2px solid #eee;border-radius:50%}
+.countdown-thumb.film::after{content:"";position:absolute;inset:50% 0 auto;height:1px;background:#222}
+.countdown-thumb.modern{background:#10111a;color:#fff}.countdown-thumb.modern::before{content:"";position:absolute;width:56%;aspect-ratio:1;border-radius:50%;border:3px solid var(--ring,#8f7cf0);box-shadow:0 0 12px var(--ring,#8f7cf0)}
+.countdown-thumb.minimal{background:#000;color:#fff}.countdown-thumb b{position:relative;z-index:1}
+.countdown-options{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;margin:12px 0}

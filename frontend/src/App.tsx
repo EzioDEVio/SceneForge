@@ -13,6 +13,7 @@ import {OverlayCanvas, OverlayPanel} from "./Overlays";
 import {InspectorResizer} from "./InspectorResizer";
 import {AIEnginesPanel, AboutPanel} from "./InfoPanels";
 import {CaptionStylePanel, CaptionPreview} from "./CaptionsPro";
+import {CountdownDialog} from "./EffectScenes";
 import {SceneEffectsPanel, SceneFxPreview, RouteCanvas, AnnotationCanvas} from "./EffectsPanels";
 import {SpeedControls} from "./SpeedControls";
 import type {Overlay} from "./api";
@@ -24,7 +25,7 @@ import {
   ArrowLeft, ArrowRight, ArrowUp, ArrowDown,
   Download, Play, Loader2, Trash2, X, Plus, Upload, Sparkles, Volume2,
   FileText, ImageIcon, Clock, Palette, Type, Wand2, Film, Settings, Key, Check,
-  ChevronRight, Layers, Copy, PanelLeftClose, PanelLeftOpen, Search, CheckCircle2,
+  ChevronRight, Layers, Copy, PanelLeftClose, PanelLeftOpen, Search, CheckCircle2, Timer,
 } from "lucide-react";
 import { api, subscribeJob, Project, Scene, Shot, Job, VoiceTake, ProviderProfile, Asset, VoiceOption } from "./api";
 
@@ -929,6 +930,7 @@ export default function App() {
   const dirty = Object.values(states).some(s => s !== "Saved");
   const statesRef = useRef(states); statesRef.current = states;
   const [clip, setClip] = useState<{kind:'scene'|'audio';id:string;label:string}|null>(null);
+  const [countdownOpen, setCountdownOpen] = useState(false);
   async function duplicateScene(id:string, after?:string){
     if(!project)return;
     await action(async()=>{const dup=await api.duplicateScene(id);
@@ -1074,7 +1076,7 @@ export default function App() {
       <div className="library-content">
       {libraryTab==='Media Pool'&&<>{importStatus&&<p className="hint" aria-live="polite">{importStatus}</p>}<MediaPool projectId={project.id} version={mediaVersion} disabled={busy||exporting} onImport={()=>importRef.current?.click()} onFolder={()=>folderRef.current?.click()} onAdd={addPoolAssets} onUse={usePoolAsset} canUse={!!selected}/></>}
 
-      {libraryTab==='Scenes'&&<><p className="sidebar-hint">PROJECT BIN · Select a part to edit</p><div className="scene-list">{project.scenes.map((s,i)=><button key={s.id} className={`scene-nav ${selected?.id===s.id?"selected":""}`} aria-label={`Select scene ${i+1}: ${s.title}`} aria-current={selected?.id===s.id?"true":undefined} onClick={()=>setSelectedId(s.id)}><div className="scene-thumb">{s.shots[0]?<Thumb assetId={s.shots[0].asset_id} type={s.shots[0].asset?.type}/>:<Film size={22}/>}<span>{String(i+1).padStart(2,"0")}</span></div><div className="scene-nav-meta"><strong>{s.title}</strong><span>{durationLabel(s)} · {s.shots.length} media</span></div></button>)}</div><button className="btn add-scene" disabled={busy||exporting} onClick={()=>setTitleCard(true)}><Type size={16}/> Add title card</button><button className="btn add-scene" disabled={busy} onClick={addPart}><Plus size={16}/> Add scene</button></>}
+      {libraryTab==='Scenes'&&<><p className="sidebar-hint">PROJECT BIN · Select a part to edit</p><div className="scene-list">{project.scenes.map((s,i)=><button key={s.id} className={`scene-nav ${selected?.id===s.id?"selected":""}`} aria-label={`Select scene ${i+1}: ${s.title}`} aria-current={selected?.id===s.id?"true":undefined} onClick={()=>setSelectedId(s.id)}><div className="scene-thumb">{s.shots[0]?<Thumb assetId={s.shots[0].asset_id} type={s.shots[0].asset?.type}/>:<Film size={22}/>}<span>{String(i+1).padStart(2,"0")}</span></div><div className="scene-nav-meta"><strong>{s.title}</strong><span>{durationLabel(s)} · {s.shots.length} media</span></div></button>)}</div><button className="btn add-scene" disabled={busy||exporting} onClick={()=>setTitleCard(true)}><Type size={16}/> Add title card</button><button className="btn add-scene" disabled={busy||exporting} onClick={()=>setCountdownOpen(true)}><Timer size={16}/> Insert countdown</button><button className="btn add-scene" disabled={busy} onClick={addPart}><Plus size={16}/> Add scene</button></>}
       {libraryTab==='Transitions'&&<><p className="sidebar-hint">INCOMING TO · {selected?.title||'Select a part'}</p><div className="library-presets transition-presets">{TRANSITIONS.map(([key,label])=><button key={key} aria-pressed={selected?.transition_in_json.type===key} disabled={!selected?.shots.length||selected.id===project.scenes.find(s=>s.shots.length)?.id||busy||exporting} onClick={()=>selected&&record('transition',()=>api.updateScene(selected.id,{transition_in:selected.transition_in_json}),()=>api.updateScene(selected.id,{transition_in:{type:key,duration_ms:key==='cut'?0:(selected.transition_in_json.duration_ms||500)}}))}><div aria-hidden="true" className={`transition-sample sample-${key}`}><span>A</span><span>B</span></div><span>{label}</span></button>)}</div><p className="hint">Select the incoming part, then a transition. Adjust its duration above the tracks.</p></>}
       </div><div className="sidebar-bottom"><span className="status-dot"/> Local workspace<span>Scene editor</span></div></>}
       </nav>
@@ -1086,6 +1088,9 @@ export default function App() {
     </div>
     <ProjectTimeline notice={importStatus} onDropFiles={(id,files)=>void dropFilesOnTimeline(id,files)} onDropAssets={(id,assets)=>void dropAssetsOnTimeline(id,assets)} onDuration={resizeDuration} onRender={()=>void renderFullVideo()} exportScenes={exportScenes} exportAsset={exportJob?.status==="succeeded"?exportJob.artifact_asset_id:null} project={project} selectedId={selected?.id||""} disabled={busy||exporting} onSelect={setSelectedId} onAdd={addPart} clipboard={clip} onClipboard={c=>{setClip(c);setImportStatus(c.kind==='scene'?`Copied scene “${c.label}”. Select a scene and press Ctrl+V (or right-click → Paste) to paste it after that scene.`:`Copied ${c.label}. Select another scene's narration and press Ctrl+V to paste.`);}} onDuplicate={id=>void duplicateScene(id)} onPaste={id=>void pasteClip(id)} onReorder={ids=>record('scene order',()=>api.reorderScenes(project.id,project.scenes.map(s=>s.id)),()=>api.reorderScenes(project.id,ids))} onUpdate={(id,patch)=>record('transition',()=>api.updateScene(id,{transition_in:project.scenes.find(s=>s.id===id)!.transition_in_json}),()=>api.updateScene(id,patch))} onDelete={()=>selected&&void deleteScene(selected.id)} onAudio={()=>audioImportRef.current?.click()} onRemoveAudio={()=>selected&&void action(async()=>{await removeSceneAudio(selected);await refresh();})} onRemoveSceneAudio={id=>{const s=project.scenes.find(x=>x.id===id);if(s)void action(async()=>{await removeSceneAudio(s);await refresh();setImportStatus(`Audio removed from ${s.title}. Its picture is unchanged.`);});}} onUndo={undoTimeline} onRedo={redoTimeline} canUndo={!!history.length} canRedo={!!future.length} onSplit={(at,baked)=>selected&&void action(async()=>{const right=await api.splitScene(selected.id,at,baked);setEditorEpoch(v=>v+1);setHistory([]);setFuture([]);await refresh();setSelectedId(right.id);})}/>
     {settingsOpen&&<SettingsPanel onClose={()=>setSettingsOpen(false)}/>}
+    {countdownOpen&&project&&<CountdownDialog selectedTitle={selected?.title} onClose={()=>setCountdownOpen(false)} onInsert={async(opts,where)=>{
+      await action(async()=>{const sc=await api.insertCountdown(project.id,{...opts,after_scene_id:where==='after'?selected?.id:null});await refresh();setSelectedId(sc.id);
+        setImportStatus(`Inserted “${sc.title}”. Its sound is on the Narration lane; change its volume in the Audio tab.`);});setCountdownOpen(false);}}/>}
     {infoPanel?.panel==='ai'&&<AIEnginesPanel section={infoPanel.section} onClose={()=>setInfoPanel(null)} onOpenSettings={()=>{setInfoPanel(null);setSettingsOpen(true);}}/>}
     {infoPanel?.panel==='about'&&<AboutPanel onClose={()=>setInfoPanel(null)}/>}
   </div>;

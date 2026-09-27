@@ -47,6 +47,7 @@ globalThis.fetch=async(path,init={})=>{
  else if(path.endsWith('/voices'))result={voices:['af_heart','default']};
  else if(path.endsWith('/image-history'))result=[];
  else if(path.startsWith('/api/assets/luts'))result=[];
+ else if(/\/api\/projects\/[^/]+\/insert-countdown$/.test(path)){const sc={...clone(project.scenes[0]),id:'cd-'+next++,title:'Film leader',shots:[],voice_takes:[]};project.scenes.unshift(sc);result=sc;}
  else if(/\/api\/scenes\/[^/]+\/duplicate$/.test(path)){const src=project.scenes.find(x=>x.id===path.split('/')[3]);const dup=clone(src);dup.id='dup-'+next++;dup.title=src.title+' (copy)';dup.shots=dup.shots.map(sh=>({...sh,id:'dsh-'+next++}));project.scenes.splice(project.scenes.indexOf(src)+1,0,dup);result=dup;}
  else if(/\/api\/scenes\/[^/]+\/paste-audio$/.test(path)){const tgt=project.scenes.find(x=>x.id===path.split('/')[3]);const src=project.scenes.flatMap(x=>x.voice_takes).find(v=>v.id===body.take_id);tgt.voice_takes.forEach(v=>v.accepted=false);tgt.voice_takes.push({...clone(src),id:'pt-'+next++,accepted:true});result=tgt;}
  else if(/\/api\/projects\/[^/]+\/beat-sync$/.test(path))result={bpm:120,beats:[0.5,1,1.5],scenes_changed:2,scenes_kept:1};
@@ -469,6 +470,15 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getByRole('button',{name:'Fit preview to window'}));
  await waitFor(()=>assert.ok(!pc().style.transform));
  check('Fit returns the preview to normal size',!pc().style.transform);
+ await user.click(screen.getByRole('button',{name:/Insert countdown/}));
+ const cdlg=await screen.findByRole('dialog',{name:'Insert countdown'});
+ await user.click(within(cdlg).getByRole('radio',{name:/Film leader/}));
+ await user.selectOptions(within(cdlg).getByRole('combobox',{name:'Countdown tone'}),'sepia');
+ await user.selectOptions(within(cdlg).getByRole('combobox',{name:'Countdown beeps'}),'two-pop');
+ await user.click(within(cdlg).getByRole('button',{name:'Insert countdown'}));
+ await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/insert-countdown'))));
+ check('Insert countdown sends the chosen style, tone and beeps',requests.some(r=>r.path.endsWith('/insert-countdown')&&r.body.style==='film'&&r.body.tone==='sepia'&&r.body.beep==='two-pop'));
+ project.scenes=project.scenes.filter(x=>!x.id.startsWith('cd-'));
  // Duplicate / copy / paste
  const clipsBefore=project.scenes.length;
  const firstClip=document.querySelector('.picture-clip');
