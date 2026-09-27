@@ -116,8 +116,8 @@ function StopLabelInput({index, value, onCommit}: {index: number; value: string;
 }
 
 /** Scene effects: camera shake, spotlight, blur/pixelate regions, light leaks, split toning. */
-export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEditing, onRouteEditing, onAddMedia}: {scene: Scene; disabled: boolean; onDraft: (look: Look) => void;
-  liveRoute?: RouteFx | null; routeEditing?: boolean; onRouteEditing?: (on: boolean) => void; onAddMedia?: () => void}) {
+export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEditing, onRouteEditing, onAddMedia, liveAnnotations}: {scene: Scene; disabled: boolean; onDraft: (look: Look) => void;
+  liveRoute?: RouteFx | null; routeEditing?: boolean; onRouteEditing?: (on: boolean) => void; onAddMedia?: () => void; liveAnnotations?: Annotation[]}) {
   const look = (scene.look_json || {}) as any;
   const pick = (l: any) => ({annotations: l.annotations || [], shake: l.shake || null, spotlight: l.spotlight || null, redact: l.redact || [], leak: l.leak || null, tone: l.tone || null, wheels: l.wheels || null, layout: l.layout || null, parallax: l.parallax || null});
   const [st, setSt] = useState(pick(look));
@@ -126,7 +126,8 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
   const videoOrImages = scene.shots.length;
   const put = (key: string, value: any) => {setSt(s => ({...s, [key]: value})); onDraft({[key]: value === null || (Array.isArray(value) && !value.length) ? null : value} as any);};
   const {shake, spotlight: sp, redact, leak, tone, wheels, layout, parallax: plx} = st;
-  const annots: Annotation[] = (st as any).annotations || [];
+  // The live list (shared with the on-picture handles) wins, so dragging and sliders never overwrite each other.
+  const annots: Annotation[] = liveAnnotations ?? ((st as any).annotations || []);
   const setAnnot = (i: number, p: Partial<Annotation>) => put('annotations', annots.map((a, k) => k === i ? {...a, ...p} : a));
   return <div className="look-panel scene-fx-panel">
     <Section title="Split toning" Icon={Blend} on={!!tone} onToggle={on => put('tone', on ? {...TONE} : null)} disabled={disabled} hint="Tint shadows and highlights with two colours, like a film grade. Shows in the preview.">
@@ -246,7 +247,7 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
 }
 
 /** Live approximations over the editor preview. */
-export function SceneFxPreview({look, shots = [], filter}: {look: any; shots?: {asset_id: string; asset?: {type?: string}}[]; filter?: string}) {
+export function SceneFxPreview({look, shots = [], filter, aspect = 16 / 9}: {look: any; shots?: {asset_id: string; asset?: {type?: string}}[]; filter?: string; aspect?: number}) {
   if (!look) return null;
   const layout: Layout | undefined = look.layout;
   const sp: Spot | undefined = look.spotlight, redact: Redact[] = look.redact || [], leak: Leak | undefined = look.leak;
@@ -269,6 +270,9 @@ export function SceneFxPreview({look, shots = [], filter}: {look: any; shots?: {
         if (a.type === 'circle') return <ellipse key={a.id} cx={(a.x + a.x2) / 2} cy={(a.y + a.y2) / 2} rx={Math.abs(a.x2 - a.x) / 2} ry={Math.abs(a.y2 - a.y) / 2} fill="none" stroke={a.color} style={{strokeWidth: sw}} vectorEffect="non-scaling-stroke"/>;
         if (a.type === 'box') return <rect key={a.id} x={Math.min(a.x, a.x2)} y={Math.min(a.y, a.y2)} width={Math.abs(a.x2 - a.x)} height={Math.abs(a.y2 - a.y)} fill="none" stroke={a.color} style={{strokeWidth: sw}} vectorEffect="non-scaling-stroke"/>;
         if (a.type === 'underline') return <line key={a.id} x1={a.x} y1={a.y} x2={a.x2} y2={a.y} stroke={a.color} strokeOpacity={a.style === 'highlighter' ? 0.45 : 1} style={{strokeWidth: a.style === 'highlighter' ? `${a.width * 1.3}px` : sw}} vectorEffect="non-scaling-stroke"/>;
+        if (a.type === 'arrow') {const g = arrowGeometry(a, aspect);
+          return <g key={a.id}><path d={g.path} fill="none" stroke={a.color} style={{strokeWidth: sw}} vectorEffect="non-scaling-stroke" strokeLinecap="round"/>
+            <polygon points={g.head} fill={a.color}/></g>;}
         return <line key={a.id} x1={a.x} y1={a.y} x2={a.x2} y2={a.y2} stroke={a.color} strokeDasharray={a.type === 'callout' ? '2 1' : undefined} style={{strokeWidth: sw}} vectorEffect="non-scaling-stroke"/>;})}
     </svg>}
     {annots.filter(a => a.type === 'callout' && a.text).map(a => <div key={a.id} className="fx-callout" style={{left: `${a.x}%`, top: `${a.y}%`, borderColor: a.color}} dir="auto">{a.text}</div>)}
@@ -302,5 +306,54 @@ export function RouteCanvas({route, onChange}: {route: RouteFx; onChange: (r: Ro
   }
   return <div ref={box} className="route-canvas" aria-label="Route editor: click to add a stop" onPointerDown={add}>
     {route.points.map((p, i) => <span key={i} className="route-point" role="button" aria-label={`Route stop ${i + 1}`} tabIndex={0} style={{left: `${p[0]}%`, top: `${p[1]}%`, background: route.color}} onPointerDown={e => drag(i, e)}>{i + 1}</span>)}
+  </div>;
+}
+
+
+/** Arrow path and head in the preview's 0–100 box, matching the renderer (quadratic curve
+ *  whose control point sits a quarter of the length to the side, computed in real proportions). */
+export function arrowGeometry(a: Annotation, aspect: number) {
+  const X = (v: number) => v * aspect, x1 = X(a.x), x2 = X(a.x2), y1 = a.y, y2 = a.y2;
+  let cx = (x1 + x2) / 2, cy = (y1 + y2) / 2;
+  if (a.style === 'curved') {cx += -(y2 - y1) * 0.25; cy += (x2 - x1) * 0.25;}
+  const back = (px: number) => px / aspect;
+  const path = a.style === 'curved' ? `M ${a.x} ${a.y} Q ${back(cx)} ${cy} ${a.x2} ${a.y2}` : `M ${a.x} ${a.y} L ${a.x2} ${a.y2}`;
+  const tx = x2 - (a.style === 'curved' ? cx : x1), ty = y2 - (a.style === 'curved' ? cy : y1);   // direction at the tip
+  const ang = Math.atan2(ty, tx), s = Math.max(1.8, a.width * 0.28);
+  const pt = (d: number, r: number) => `${back(x2 + Math.cos(ang + d) * r)},${y2 + Math.sin(ang + d) * r}`;
+  return {path, head: [pt(0, s * 0.9), pt(2.5, s * 0.75), pt(-2.5, s * 0.75)].join(' ')};
+}
+
+/** Drag annotations on the picture: each point handle moves one end (or corner), the centre
+ *  handle moves the whole shape. Changes are live and saved on release. */
+export function AnnotationCanvas({annots, onChange, selected, onSelect}: {annots: Annotation[]; onChange: (next: Annotation[], save: boolean) => void; selected?: string; onSelect?: (id: string) => void}) {
+  const box = React.useRef<HTMLDivElement>(null);
+  const clamp = (v: number) => Math.max(-10, Math.min(110, +v.toFixed(2)));
+  function drag(i: number, part: 'start' | 'end' | 'move', e: React.PointerEvent) {
+    e.preventDefault(); e.stopPropagation(); onSelect?.(annots[i].id);
+    const r = box.current!.getBoundingClientRect(), a0 = annots[i], sx = e.clientX, sy = e.clientY;
+    let latest = annots;
+    const move = (ev: PointerEvent) => {
+      const dx = (ev.clientX - sx) / r.width * 100, dy = (ev.clientY - sy) / r.height * 100;
+      const p: Partial<Annotation> = part === 'start' ? {x: clamp(a0.x + dx), y: clamp(a0.y + dy), ...(a0.type === 'underline' ? {y2: clamp(a0.y + dy)} : {})}
+        : part === 'end' ? {x2: clamp(a0.x2 + dx), ...(a0.type === 'underline' ? {} : {y2: clamp(a0.y2 + dy)})}
+        : {x: clamp(a0.x + dx), y: clamp(a0.y + dy), x2: clamp(a0.x2 + dx), y2: clamp(a0.y2 + dy)};
+      latest = annots.map((a, k) => k === i ? {...a, ...p} : a);
+      onChange(latest, false);
+    };
+    const up = () => {window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up); onChange(latest, true);};
+    window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
+  }
+  const names: Record<Annotation['type'], [string, string]> = {arrow: ['start', 'tip'], circle: ['corner', 'opposite corner'], box: ['corner', 'opposite corner'], underline: ['start', 'end'], callout: ['label', 'pointer']};
+  return <div ref={box} className="annot-canvas">
+    {annots.map((a, i) => {
+      const y2 = a.type === 'underline' ? a.y : a.y2;
+      const on = selected === a.id;
+      return <React.Fragment key={a.id}>
+        <span className={`annot-handle ${on ? 'on' : ''}`} role="button" tabIndex={0} aria-label={`Annotation ${i + 1} ${names[a.type][0]}`} style={{left: `${a.x}%`, top: `${a.y}%`, borderColor: a.color}} onPointerDown={e => drag(i, 'start', e)}/>
+        <span className={`annot-handle ${on ? 'on' : ''}`} role="button" tabIndex={0} aria-label={`Annotation ${i + 1} ${names[a.type][1]}`} style={{left: `${a.x2}%`, top: `${y2}%`, borderColor: a.color}} onPointerDown={e => drag(i, 'end', e)}/>
+        <span className={`annot-move ${on ? 'on' : ''}`} role="button" tabIndex={0} aria-label={`Move annotation ${i + 1}`} title="Drag to move" style={{left: `${(a.x + a.x2) / 2}%`, top: `${(a.y + y2) / 2}%`}} onPointerDown={e => drag(i, 'move', e)}>✥</span>
+      </React.Fragment>;
+    })}
   </div>;
 }

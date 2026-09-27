@@ -335,3 +335,9 @@ button:hover>.sample-fade_fast span+span{animation-duration:.9s}
 .style-toggles{display:flex;gap:4px;margin:6px 0}.icon-toggle{width:34px;height:30px;border:1px solid #444956;border-radius:6px;background:#262930;color:#c9cfdb;display:grid;place-items:center}
 .icon-toggle.on{background:#5b49d6;border-color:#7b69ea;color:#fff}
 .caption-preview{container-type:normal;line-height:1.35;word-wrap:break-word}
+/* Annotation handles on the picture */
+.annot-canvas{position:absolute;inset:0;z-index:6;pointer-events:none}
+.annot-handle,.annot-move{position:absolute;pointer-events:auto;touch-action:none;transform:translate(-50%,-50%)}
+.annot-handle{width:14px;height:14px;border-radius:50%;background:#fff;border:3px solid;box-shadow:0 1px 4px #0009;cursor:grab}
+.annot-move{width:22px;height:22px;border-radius:6px;background:#15171cd9;color:#fff;border:1px solid #ffffff88;display:grid;place-items:center;font-size:13px;cursor:move}
+.annot-handle:hover,.annot-move:hover,.annot-handle.on,.annot-move.on{outline:2px solid #a699f0;outline-offset:2px}

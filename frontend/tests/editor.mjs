@@ -247,6 +247,17 @@ try{
  await user.click(within(screen.getByRole('group',{name:'Add annotation'})).getByRole('button',{name:/Circle/}));
  await user.click(within(screen.getByRole('group',{name:'Add annotation'})).getByRole('button',{name:/Callout/}));await saved();
  check('annotations save and preview on the picture',lk().some(l=>l.annotations?.length===2&&l.annotations[0].type==='circle'&&l.annotations[1].type==='callout')&&!!document.querySelector('.scenefx-preview ellipse')&&!!document.querySelector('.fx-callout'));
+ const ac=document.querySelector('.annot-canvas');ac.getBoundingClientRect=()=>({left:0,top:0,width:200,height:100,right:200,bottom:100});
+ const startH=screen.getByRole('button',{name:'Annotation 1 corner'});
+ fireEvent.pointerDown(startH,{clientX:0,clientY:0});fireEvent.pointerMove(window,{clientX:20,clientY:10});fireEvent.pointerUp(window);await saved();
+ const moved=lk().filter(l=>l.annotations).at(-1).annotations[0];
+ check('dragging a corner handle resizes the circle on the picture',moved.x===48&&moved.y===40&&moved.x2===62);
+ fireEvent.pointerDown(screen.getByRole('button',{name:'Move annotation 1'}),{clientX:0,clientY:0});fireEvent.pointerMove(window,{clientX:-40,clientY:0});fireEvent.pointerUp(window);await saved();
+ const shifted=lk().filter(l=>l.annotations).at(-1).annotations[0];
+ check('dragging the centre handle moves the whole shape',shifted.x===28&&shifted.x2===42&&shifted.y===40);
+ check('the panel sliders follow the dragged position',screen.getAllByRole('slider',{name:'Start left–right'})[0].value==='28');
+ await user.click(within(screen.getByRole('group',{name:'Add annotation'})).getByRole('button',{name:/Arrow/}));await saved();
+ check('curved arrows preview as a curve with an arrowhead',[...document.querySelectorAll('.scenefx-preview path')].some(p=>/ Q /.test(p.getAttribute('d')))&&!!document.querySelector('.scenefx-preview polygon'));
  // Batch B/C controls
  await user.click(screen.getByRole('switch',{name:'Colour wheels'}));
  const liftDisc=screen.getByRole('slider',{name:'Lift colour wheel'});liftDisc.focus();fireEvent.keyDown(liftDisc,{key:'ArrowLeft'});fireEvent.keyDown(liftDisc,{key:'ArrowLeft'});await saved();
