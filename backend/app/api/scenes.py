@@ -155,11 +155,20 @@ def add_shot(scene_id: str, body: schemas.ShotIn, db: Session = Depends(get_db))
     if asset.type not in ("image", "video") or asset.project_id != scene.project_id:
         raise HTTPException(400, "Only images and videos from this project can be added to the picture track.")
     order = body.order_index if body.order_index else len(scene.shots)
+    fit = body.fit
+    if "fit" not in body.model_fields_set and asset.width and asset.height:
+        # Landscape media in a vertical project (or the reverse) keeps the whole picture over a
+        # blurred copy instead of being cropped to a thin strip — the CapCut default look.
+        project = db.get(Project, scene.project_id)
+        media_landscape, project_landscape = asset.width > asset.height * 1.1, project.width > project.height * 1.1
+        media_portrait, project_portrait = asset.height > asset.width * 1.1, project.height > project.width * 1.1
+        if (media_landscape and project_portrait) or (media_portrait and project_landscape):
+            fit = "contain_blur"
     shot = Shot(
         scene_id=scene_id,
         asset_id=body.asset_id,
         order_index=order,
-        fit=body.fit,
+        fit=fit,
         motion_json=body.motion,
         source_in_ms=body.source_in_ms,
         source_out_ms=body.source_out_ms,
@@ -192,6 +201,16 @@ def update_shot(shot_id: str, body: dict, db: Session = Depends(get_db)):
     for field in ("fit", "source_in_ms", "source_out_ms", "duration_ms", "is_selected", "order_index"):
         if field in body:
             setattr(shot, field, body[field])
+    if "audio" in body:
+        a = body["audio"]
+        if not isinstance(a, dict) or set(a) - {"volume", "mute", "duck"}:
+            raise HTTPException(400, "Clip sound settings are volume, mute and duck.")
+        v = a.get("volume", 100)
+        if isinstance(v, bool) or not isinstance(v, (int, float)) or not 0 <= v <= 200:
+            raise HTTPException(400, "Clip volume must be between 0 and 200%.")
+        if not isinstance(a.get("mute", False), bool) or not isinstance(a.get("duck", True), bool):
+            raise HTTPException(400, "Clip mute and duck must be true or false.")
+        shot.audio_json = {"volume": round(float(v), 1), "mute": a.get("mute", False), "duck": a.get("duck", True)}
     if "motion" in body:
         from app.render.filters import EASINGS
         motion = body["motion"]
@@ -535,6 +554,72 @@ def paste_audio(scene_id: str, body: dict, db: Session = Depends(get_db)):
     for t in scene.voice_takes:
         t.accepted = False
     db.add(_copy_row(take, scene_id=scene.id, accepted=True))
+    scene.revision += 1
+    db.commit(); db.refresh(scene)
+    return scene
+
+
+
+@router.post("/{scene_id}/auto-captions", response_model=schemas.SceneOut)
+def auto_captions(scene_id: str, body: dict | None = None, db: Session = Depends(get_db)):
+    """Captions from the speech in this scene: the narration if there is one, otherwise the
+    video clips' own sound (cut exactly as they play). Language is detected automatically
+    unless given. The words and their times become the captions (editable)."""
+    import tempfile
+    from pathlib import Path as _P
+    from app.config import FFMPEG_BIN, MEDIA_DIR, DEFAULT_LEAD_MS
+    from app.providers import transcribe as tr
+    from app.render.media import clip_audio, selected_shots, shot_durations, media_duration_ms
+    body = body or {}
+    scene = db.get(Scene, scene_id)
+    if not scene:
+        raise HTTPException(404, "Scene not found")
+    provider = body.get("provider", "auto")
+    language = (body.get("language") or "").strip() or None
+    if provider not in ("auto", "elevenlabs", "openai") or (language and len(language) > 8):
+        raise HTTPException(400, "Provider must be auto, elevenlabs or openai; language a short code like en or ar.")
+    take = next((t for t in scene.voice_takes if t.accepted), None)
+    work = _P(tempfile.mkdtemp(prefix="sf-stt-"))
+    offset = 0
+    try:
+        if take and take.audio_asset and body.get("source", "auto") != "clips":
+            src = _P(MEDIA_DIR) / take.audio_asset.storage_key
+            edit = take.edit_json or {}
+            wav = work / "speech.wav"
+            args = [FFMPEG_BIN, "-y", "-v", "error"]
+            if edit.get("in_ms"):
+                args += ["-ss", f"{int(edit['in_ms'])/1000:.3f}"]
+            args += ["-i", str(src)]
+            if edit.get("out_ms"):
+                args += ["-t", f"{(int(edit['out_ms'])-int(edit.get('in_ms') or 0))/1000:.3f}"]
+            import subprocess
+            subprocess.run(args + ["-ac", "1", "-ar", "16000", str(wav)], check=True, capture_output=True, timeout=300)
+            offset = DEFAULT_LEAD_MS if scene.lead_ms is None else scene.lead_ms
+            source = "narration"
+        else:
+            shots = selected_shots(scene)
+            total = media_duration_ms(scene)
+            if not shots or not total:
+                raise HTTPException(400, "This scene has no narration or video with sound to transcribe.")
+            wav = clip_audio(scene, shots, shot_durations(scene, shots, total), MEDIA_DIR, work, FFMPEG_BIN, has_narration=False, original=True)
+            if not wav:
+                raise HTTPException(400, "The videos in this scene have no sound to transcribe.")
+            source = "clips"
+        try:
+            result = tr.transcribe(db, str(wav), provider, language)
+        except tr.TranscribeError as e:
+            raise HTTPException(400, str(e))
+    finally:
+        import shutil
+        shutil.rmtree(work, ignore_errors=True)
+    if not result["words"]:
+        raise HTTPException(400, "No speech was recognised in this scene.")
+    words = [[w, s + offset, e + offset] for w, s, e in result["words"]]
+    scene.subtitle_text = " ".join(w for w, _, _ in words)
+    font = dict(scene.font_json or {})
+    font["transcript"] = {"language": result["language"], "provider": result["provider"], "source": source, "words": words}
+    font["captions_enabled"] = True
+    scene.font_json = font
     scene.revision += 1
     db.commit(); db.refresh(scene)
     return scene

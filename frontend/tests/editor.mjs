@@ -47,6 +47,8 @@ globalThis.fetch=async(path,init={})=>{
  else if(path.endsWith('/voices'))result={voices:['af_heart','default']};
  else if(path.endsWith('/image-history'))result=[];
  else if(path.startsWith('/api/assets/luts'))result=[];
+ else if(/\/api\/projects\/[^/]+\/insert-countdown$/.test(path)){const sc={...clone(project.scenes[0]),id:'cd-'+next++,title:'Film leader',shots:[],voice_takes:[]};project.scenes.unshift(sc);result=sc;}
+ else if(/\/api\/scenes\/[^/]+\/auto-captions$/.test(path)){const sc=project.scenes.find(x=>x.id===path.split('/')[3]);sc.subtitle_text='hello from speech';sc.font_json={...sc.font_json,captions_enabled:true,transcript:{language:'en',source:'narration',words:[['hello',0,300],['from',300,600],['speech',600,900]]}};result=sc;}
  else if(/\/api\/scenes\/[^/]+\/duplicate$/.test(path)){const src=project.scenes.find(x=>x.id===path.split('/')[3]);const dup=clone(src);dup.id='dup-'+next++;dup.title=src.title+' (copy)';dup.shots=dup.shots.map(sh=>({...sh,id:'dsh-'+next++}));project.scenes.splice(project.scenes.indexOf(src)+1,0,dup);result=dup;}
  else if(/\/api\/scenes\/[^/]+\/paste-audio$/.test(path)){const tgt=project.scenes.find(x=>x.id===path.split('/')[3]);const src=project.scenes.flatMap(x=>x.voice_takes).find(v=>v.id===body.take_id);tgt.voice_takes.forEach(v=>v.accepted=false);tgt.voice_takes.push({...clone(src),id:'pt-'+next++,accepted:true});result=tgt;}
  else if(/\/api\/projects\/[^/]+\/beat-sync$/.test(path))result={bpm:120,beats:[0.5,1,1.5],scenes_changed:2,scenes_kept:1};
@@ -214,6 +216,11 @@ try{
  check('background box saves',requests.some(r=>r.body?.font?.background==='box'));
  check('the caption preview is drawn on the picture',!!document.querySelector('.preview-canvas .caption-preview'));
  await user.click(screen.getByRole('button',{name:'Apply Classic caption style'}));await saved();
+ await user.click(screen.getByRole('button',{name:/Captions from speech/}));
+ await user.selectOptions(screen.getByRole('combobox',{name:'Speech language'}),'ar');
+ await user.click(screen.getByRole('button',{name:'Generate captions'}));
+ await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/auto-captions'))));
+ check('Captions from speech sends the chosen language and reports the detected one',requests.some(r=>r.path.endsWith('/auto-captions')&&r.body.language==='ar')&&!!(await screen.findByText(/language: en/)));
  await user.selectOptions(screen.getByRole('combobox',{name:'Caption animation'}),'letters-pop');await saved();
  check('caption animation saves from the Text tab',requests.some(r=>r.body?.font?.caption_animation==='letters-pop'));
  await user.click(screen.getByRole('button',{name:/Add animated title/}));await saved();
@@ -224,9 +231,8 @@ try{
  await user.click(screen.getByRole('tab',{name:'Audio',exact:true}));
  await user.click(screen.getByRole('checkbox',{name:'Level loudness for YouTube'}));
  await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.path===`/api/projects/${project.id}`&&r.body?.finishing?.loudnorm===true)));
- await user.click(screen.getByRole('checkbox',{name:'Countdown leader'}));
- await waitFor(()=>assert.ok(requests.some(r=>r.body?.finishing?.leader===true&&r.body.finishing.loudnorm===true)));
- check('YouTube loudness and countdown leader save on the project',true);
+ await waitFor(()=>assert.ok(requests.some(r=>r.body?.finishing?.loudnorm===true)));
+ check('YouTube loudness saves on the project (the whole-video countdown switch is gone)',!screen.queryByRole('checkbox',{name:'Countdown leader'}));
  check('restore old photo is offered for image scenes',(await (async()=>{await user.click(screen.getByRole('tab',{name:'Media',exact:true}));const b=screen.queryByRole('button',{name:/Restore old photo/});await user.click(screen.getByRole('tab',{name:'Audio',exact:true}));return !!b;})()));
  // Effects pack controls
  await user.click(screen.getByRole('tab',{name:'Effects',exact:true}));
@@ -247,6 +253,12 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getByRole('switch',{name:'Spotlight'}));await saved();
  check('turning an effect off removes it',lk().some(l=>'spotlight' in l&&l.spotlight===null)&&!document.querySelector('.scenefx-preview .fx-layer:not(.fx-leak)'));
  check('VHS look is offered',!!screen.getByRole('button',{name:'VHS',exact:true}));
+ check('no Insert countdown button on the timeline side any more',!screen.queryByRole('button',{name:/Insert countdown/}));
+ await user.click(screen.getByRole('switch',{name:'Countdown intro'}));
+ await user.click(within(screen.getByRole('radiogroup',{name:'Countdown style'})).getByRole('radio',{name:'Modern'}));await saved();
+ check('Countdown intro is an effect you switch on for a scene',lk().some(l=>l.countdown?.style==='modern'&&l.countdown.seconds===5));
+ await user.click(screen.getByRole('switch',{name:'Countdown intro'}));await saved();
+ check('switching Countdown intro off removes it',lk().at(-1).countdown===null);
  await user.click(within(screen.getByRole('group',{name:'Add annotation'})).getByRole('button',{name:/Circle/}));
  await user.click(within(screen.getByRole('group',{name:'Add annotation'})).getByRole('button',{name:/Callout/}));await saved();
  check('annotations save and preview on the picture',lk().some(l=>l.annotations?.length===2&&l.annotations[0].type==='circle'&&l.annotations[1].type==='callout')&&!!document.querySelector('.scenefx-preview ellipse')&&!!document.querySelector('.fx-callout'));
@@ -487,8 +499,11 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await waitFor(()=>assert.ok(requests.some(r=>r.path===`/api/scenes/${target.id}/paste-audio`)));
  check('copy audio from one scene and paste it into another',requests.some(r=>r.path===`/api/scenes/${target.id}/paste-audio`&&r.body.take_id===withAudio.voice_takes.find(v=>v.accepted).id));
  // restore the mock project for the checks that follow
- project.scenes=project.scenes.filter(x=>!x.id.startsWith('dup-'));
+ project.scenes=project.scenes.filter(x=>!x.id.startsWith('dup-')&&!x.id.startsWith('cd-'));
  for(const x of project.scenes){x.voice_takes=x.voice_takes.filter(v=>!v.id.startsWith('pt-'));x.voice_takes.forEach(v=>v.accepted=v.id===acceptedBefore[x.id]);}
+ fireEvent.keyDown(document.body,{key:'n',ctrlKey:true});
+ const newName=await screen.findByRole('textbox',{name:'New project name'});
+ check('Ctrl+N (File → New project) returns to the project page ready to type a name',document.activeElement===newName);
  cleanup();
  render(React.createElement(App));
  await user.click(await screen.findByRole('button',{name:/Renamed project Open project/}));

@@ -125,6 +125,14 @@ class Scene(Base):
         foreign_keys="VoiceTake.scene_id",
     )
 
+    @property
+    def natural_duration_ms(self) -> int | None:
+        """How long the scene's own media lasts (videos after trim/speed; see render.media)."""
+        from app.render.media import media_duration_ms
+        try:
+            return media_duration_ms(self)
+        except Exception:
+            return None
 
 class Asset(Base):
     """A content-addressed media blob (uploaded, generated, or rendered)."""
@@ -167,6 +175,8 @@ class Shot(Base):
     duration_ms: Mapped[int | None] = mapped_column(Integer, nullable=True)  # None = proportional share
     # Video timing: {"speed": 0.25-4, "ramp": none|slow_middle|fast_middle, "freeze_at_ms", "freeze_ms"}
     speed_json: Mapped[dict] = mapped_column(JSON, default=dict)
+    # Sound of a video clip: {volume: 0-200 (%), mute: bool, duck: bool (lower under narration)}
+    audio_json: Mapped[dict] = mapped_column(JSON, default=dict)
 
     fit: Mapped[str] = mapped_column(String(16), default="cover")
     crop_json: Mapped[dict | None] = mapped_column(JSON, nullable=True)

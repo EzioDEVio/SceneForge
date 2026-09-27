@@ -152,21 +152,14 @@ def render_scene_visual(
         return _render_layout(scene, project, shots, layout, total_duration_ms, ctx, work_dir, progress_cb)
 
     n = len(shots)
-    explicit_total = sum(s.duration_ms or 0 for s in shots)
-    remaining = max(total_duration_ms - explicit_total, 0)
-    n_implicit = sum(1 for s in shots if not s.duration_ms)
-    per_implicit = remaining // n_implicit if n_implicit else 0
+    from app.render.media import shot_durations
+    plan_ms = shot_durations(scene, shots, total_duration_ms)   # videos keep their own length
 
     shot_paths: list[str] = []
     for idx, shot in enumerate(shots):
         if ctx.cancel_check():
             raise FFmpegError("cancelled")
-        shot_ms = shot.duration_ms or per_implicit
-        if idx == n - 1:
-            # absorb integer-division remainder into the last shot so the
-            # sum always matches total_duration_ms exactly
-            already = sum((s.duration_ms or per_implicit) for s in shots[:-1])
-            shot_ms = max(total_duration_ms - already, 1)
+        shot_ms = plan_ms[idx]
         shot_out = str(work_dir / f"shot_{idx}.mp4")
 
         def shot_progress(pct: int, _idx=idx) -> None:
@@ -372,6 +365,24 @@ def _exact_word_times(scene: Scene, lead_ms: int) -> list[tuple[int, int]] | Non
     return [(s + lead_ms, e + lead_ms) for s, e in times] if times else None
 
 
+def _caption_word_times(scene: Scene, lead_ms: int, narration_path) -> list[tuple[int, int]] | None:
+    """Exact per-word caption timing: from the voice engine (ElevenLabs narration) or from an
+    automatic-captions transcript (any narration or video sound), when the captions still match."""
+    font = scene.font_json or {}
+    if not (font.get("karaoke") or font.get("split") == "phrases"):
+        return None
+    if narration_path:
+        exact = _exact_word_times(scene, lead_ms)
+        if exact:
+            return exact
+    tr = font.get("transcript") or {}
+    if tr.get("words"):
+        from app.render.word_timing import exact_word_times
+        spoken = [(w, int(s), int(e)) for w, s, e in tr["words"]]
+        return exact_word_times(scene.subtitle_text.split(), spoken)
+    return None
+
+
 def _speech_segments(scene: Scene, narration_path: str, lead_ms: int, total_ms: int) -> list[tuple[int, int]] | None:
     """Spoken spans of the accepted take (after its trim), in scene time."""
     from app.render.word_timing import voiced_segments
@@ -391,6 +402,7 @@ def mux_audio_and_captions(
     lead_ms: int,
     work_dir: Path,
     ctx: RenderContext,
+    clip_audio_path: str | None = None,
 ) -> str:
     out_w, out_h = _canvas(project)
     captioned_path = visual_path
@@ -402,7 +414,7 @@ def mux_audio_and_captions(
             speech_start_ms=lead_ms if narration_path else 0,
             speech_ms=_narration_duration_ms(scene)[0] if narration_path else None,
             speech_segments=_speech_segments(scene, narration_path, lead_ms, total_duration_ms) if narration_path and scene.font_json.get("karaoke") else None,
-            word_times=_exact_word_times(scene, lead_ms) if narration_path and scene.font_json.get("karaoke") else None,
+            word_times=_caption_word_times(scene, lead_ms, narration_path),
         )
         fonts_dir = escape_path_for_filter(str(BUNDLED_FONT_PATH.parent))
         ass_escaped = escape_path_for_filter(ass_path)
@@ -444,7 +456,21 @@ def mux_audio_and_captions(
     clip_ms = effective_ms(take.measured_duration_ms, edit) if take and take.measured_duration_ms else total_duration_ms
     pre = narration_filter(edit, clip_ms or total_duration_ms)
     pre = f"{pre}," if pre else ""
-    if typing_path:
+    if clip_audio_path:
+        # Video clips' own sound, mixed with narration and typing sound when present.
+        inputs, chains, mix, k = ['-i', captioned_path], [], [], 1
+        if narration_path:
+            inputs += ['-i', narration_path]
+            chains.append(f'[{k}:a]{pre}adelay={lead_ms}|{lead_ms},apad,atrim=duration={total_s:.3f}[voice]'); mix.append('[voice]'); k += 1
+        inputs += ['-i', clip_audio_path]
+        chains.append(f'[{k}:a]apad,atrim=duration={total_s:.3f}[clip]'); mix.append('[clip]'); k += 1
+        if typing_path:
+            inputs += ['-i', typing_path]
+            chains.append(f'[{k}:a]apad,atrim=duration={total_s:.3f}[keys]'); mix.append('[keys]'); k += 1
+        graph = ';'.join(chains) + (f";{''.join(mix)}amix=inputs={len(mix)}:duration=longest:normalize=0," if len(mix) > 1 else f";{mix[0]}anull,") + 'alimiter=limit=0.95:latency=1[aout]'
+        args = [*inputs, '-filter_complex', graph, '-map', '0:v', '-map', '[aout]', '-t', f'{total_s:.3f}',
+                '-c:v', 'copy', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', final_path]
+    elif typing_path:
         if narration_path:
             inputs = ['-i', captioned_path, '-i', narration_path, '-i', typing_path]
             graph = (f'[1:a]{pre}adelay={lead_ms}|{lead_ms},apad,atrim=duration={total_s:.3f}[voice];'
@@ -506,7 +532,9 @@ def render_part(
         elif narration_ms is not None:
             total_ms = lead_ms + narration_ms + trail_ms
         else:
-            total_ms = scene.requested_duration_ms or FALLBACK_SCENE_DURATION_MS
+            # No narration and no fixed length: the scene lasts as long as its videos.
+            from app.render.media import media_duration_ms
+            total_ms = media_duration_ms(scene) or scene.requested_duration_ms or FALLBACK_SCENE_DURATION_MS
             lead_ms = 0
 
         if progress_cb:
@@ -517,8 +545,16 @@ def render_part(
             visual_path = _apply_overlays(scene, project, visual_path, total_ms, work_dir, ctx)
         if progress_cb:
             progress_cb("captions_audio", 50)
+        from app.render.media import clip_audio, selected_shots, shot_durations
+        clip_shots = selected_shots(scene)
+        if (scene.look_json or {}).get("layout") and clip_shots:
+            clip_shots, clip_ms = clip_shots[:1], [total_ms]          # split screen: first panel's sound
+        else:
+            clip_ms = shot_durations(scene, clip_shots, total_ms)
+        from app.config import FFMPEG_BIN as _FF, MEDIA_DIR as _MEDIA
+        clip_path = clip_audio(scene, clip_shots, clip_ms, _MEDIA, work_dir, _FF, narration_path is not None) if clip_shots else None
         final_path = mux_audio_and_captions(
-            scene, project, visual_path, total_ms, narration_path, lead_ms, work_dir, ctx
+            scene, project, visual_path, total_ms, narration_path, lead_ms, work_dir, ctx, clip_audio_path=clip_path
         )
         film = (scene.look_json or {}).get("film")
         if film and int(film.get("sound", 0)) > 0:
@@ -526,6 +562,19 @@ def render_part(
             from app.render.filters import clean_film, film_fps_for
             f = clean_film(film)
             final_path = add_projector_sound(final_path, f["sound"], film_fps_for(f, project.fps), work_dir, ctx.cancel_check)
+        cd = (scene.look_json or {}).get("countdown")
+        if cd:
+            # Countdown intro effect: the leader plays first, then the scene.
+            from app.render import countdowns
+            leader = countdowns.render(cd, *_canvas(project), project.fps)
+            joined = str(work_dir / "with_countdown.mp4")
+            run_ffmpeg(["-i", str(leader), "-i", final_path, "-filter_complex",
+                        "[0:v]setsar=1[v0];[1:v]setsar=1[v1];[0:a]aresample=48000,aformat=channel_layouts=stereo[a0];"
+                        "[1:a]aresample=48000,aformat=channel_layouts=stereo[a1];[v0][a0][v1][a1]concat=n=2:v=1:a=1[v][a]",
+                        "-map", "[v]", "-map", "[a]", "-c:v", "libx264", "-preset", X264_PRESET, "-crf", str(X264_CRF),
+                        "-pix_fmt", "yuv420p", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", joined], cancel_check=ctx.cancel_check)
+            final_path = joined
+            total_ms += int(cd.get("seconds", 5)) * 1000
         if progress_cb:
             progress_cb("finalize", 90)
 

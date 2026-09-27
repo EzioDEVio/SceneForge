@@ -95,7 +95,7 @@ async function boot(){
  ipcMain.handle('sf:diagnostics',guard(async()=>{await collectDiagnostics();return true;}));
  const rebuildMenu=()=>Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate()));
  const menuTemplate=()=>([
-  {label:'File',submenu:[{label:'Open workspace folder',click:()=>shell.openPath(dataDir)},{label:'Open logs',click:()=>shell.openPath(path.join(dataDir,'logs'))},{type:'separator'},{role:'quit'}]},
+  {label:'File',submenu:[{label:'New project…',accelerator:'CmdOrCtrl+N',click:()=>openPanel({panel:'projects',mode:'new'})},{label:'Open project…',accelerator:'CmdOrCtrl+O',click:()=>openPanel({panel:'projects',mode:'open'})},{type:'separator'},{label:'Open workspace folder',click:()=>shell.openPath(dataDir)},{label:'Open logs',click:()=>shell.openPath(path.join(dataDir,'logs'))},{type:'separator'},{role:'quit'}]},
   {label:'AI Engines',submenu:[
    {label:'AI engines & providers…',accelerator:'CmdOrCtrl+Shift+A',click:()=>openPanel({panel:'ai'})},
    {label:'Getting started with AI',click:()=>openPanel({panel:'ai',section:'start'})},

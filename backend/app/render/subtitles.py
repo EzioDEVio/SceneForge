@@ -179,7 +179,10 @@ def write_ass_file(
     italic = -1 if font_json.get("italic") else 0
     underline = -1 if font_json.get("underline") else 0
     spacing = float(font_json.get("spacing", 0) or 0)
-    margin_v = max(0, int(round(canvas_h * (0.055 + float(font_json.get("offset_y", 0) or 0) / 100))))
+    # Vertical video (TikTok, Reels, Shorts): the platform's own buttons and caption cover the
+    # bottom ~20 %, so captions sit higher by default; landscape keeps the usual 5.5 %.
+    base = 0.2 if canvas_h > canvas_w * 1.2 else 0.055
+    margin_v = max(0, int(round(canvas_h * (base + float(font_json.get("offset_y", 0) or 0) / 100))))
     side = int(round(canvas_w * (100 - float(font_json.get("max_width", 90) or 90)) / 200))
     case = font_json.get("case", "none")
     if case == "upper":

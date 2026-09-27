@@ -44,6 +44,8 @@ def on_startup():
 app.include_router(projects.router)
 app.include_router(scenes.router)
 app.include_router(assets.router)
+from app.api import effect_scenes  # noqa: E402
+app.include_router(effect_scenes.router)
 app.include_router(voice.router)
 app.include_router(render.router)
 app.include_router(providers.router)

@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {Vibrate, Focus, EyeOff, Sun, Blend, Plus, Trash2, Palette, LayoutGrid, Route as RouteIcon, Box as BoxIcon, MousePointerClick, Undo2, PenLine} from 'lucide-react';
+import {Vibrate, Focus, EyeOff, Sun, Blend, Plus, Trash2, Palette, LayoutGrid, Route as RouteIcon, Box as BoxIcon, MousePointerClick, Undo2, PenLine, Timer} from 'lucide-react';
 import type {Look, Scene} from './api';
 
 export type Shake = {amount: number; speed: number; impact: boolean};
@@ -116,10 +116,10 @@ function StopLabelInput({index, value, onCommit}: {index: number; value: string;
 }
 
 /** Scene effects: camera shake, spotlight, blur/pixelate regions, light leaks, split toning. */
-export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEditing, onRouteEditing, onAddMedia, liveAnnotations}: {scene: Scene; disabled: boolean; onDraft: (look: Look) => void;
-  liveRoute?: RouteFx | null; routeEditing?: boolean; onRouteEditing?: (on: boolean) => void; onAddMedia?: () => void; liveAnnotations?: Annotation[]}) {
+export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEditing, onRouteEditing, onAddMedia, liveAnnotations, vertical}: {scene: Scene; disabled: boolean; onDraft: (look: Look) => void;
+  liveRoute?: RouteFx | null; routeEditing?: boolean; onRouteEditing?: (on: boolean) => void; onAddMedia?: () => void; liveAnnotations?: Annotation[]; vertical?: boolean}) {
   const look = (scene.look_json || {}) as any;
-  const pick = (l: any) => ({annotations: l.annotations || [], shake: l.shake || null, spotlight: l.spotlight || null, redact: l.redact || [], leak: l.leak || null, tone: l.tone || null, wheels: l.wheels || null, layout: l.layout || null, parallax: l.parallax || null});
+  const pick = (l: any) => ({countdown: l.countdown || null, annotations: l.annotations || [], shake: l.shake || null, spotlight: l.spotlight || null, redact: l.redact || [], leak: l.leak || null, tone: l.tone || null, wheels: l.wheels || null, layout: l.layout || null, parallax: l.parallax || null});
   const [st, setSt] = useState(pick(look));
   useEffect(() => {setSt(pick((scene.look_json || {}) as any));}, [scene.id]);
   const route: RouteFx | null = liveRoute === undefined ? (look.route || null) : liveRoute;
@@ -138,6 +138,19 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
         <Row label="Balance" value={tone.balance} min={-100} max={100} onChange={balance => put('tone', {...tone, balance})} disabled={disabled}/>
       </>}
     </Section>
+    <section className="look-section" aria-label="Countdown intro">
+      <div className="look-heading"><h3><Timer size={15}/> Countdown intro</h3>
+        <button role="switch" aria-checked={!!(st as any).countdown} aria-label="Countdown intro" className={`fx-switch ${(st as any).countdown ? 'on' : ''}`} disabled={disabled}
+          onClick={() => put('countdown', (st as any).countdown ? null : {style: 'film', seconds: 5, beep: 'each', tone: 'bw', color: '#8F7CF0'})}><span/></button></div>
+      <p className="hint">A cinema countdown plays before this scene (the scene gets longer by its length). Off unless you switch it on.</p>
+      {(st as any).countdown && (() => {const cd = (st as any).countdown; const setCd = (p: any) => put('countdown', {...cd, ...p}); return <>
+        <Pills label="Countdown style" value={cd.style} options={[['film', 'Film leader'], ['modern', 'Modern'], ['minimal', 'Minimal']]} onChange={style => setCd({style})} disabled={disabled}/>
+        <label className="control-label">Length<select aria-label="Countdown length" value={cd.seconds} disabled={disabled} onChange={e => setCd({seconds: Number(e.target.value)})}>{[3, 4, 5, 6, 7, 8, 9, 10].map(n => <option key={n} value={n}>{n} seconds</option>)}</select></label>
+        <label className="control-label">Beeps<select aria-label="Countdown beeps" value={cd.beep} disabled={disabled} onChange={e => setCd({beep: e.target.value})}><option value="each">Every number</option><option value="two-pop">Classic 2-pop</option><option value="none">Silent</option></select></label>
+        {cd.style === 'film' && <Pills label="Countdown tone" value={cd.tone} options={[['bw', 'Black & white'], ['sepia', 'Sepia']]} onChange={tone => setCd({tone})} disabled={disabled}/>}
+        {cd.style === 'modern' && <div className="adjust-row changed"><label>Ring colour</label><input type="color" aria-label="Countdown ring colour" value={cd.color} disabled={disabled} onChange={e => setCd({color: e.target.value.toUpperCase()})}/><span/><span/></div>}
+      </>;})()}
+    </section>
     <section className="look-section" aria-label="Annotations">
       <div className="look-heading"><h3><PenLine size={15}/> Annotations</h3><span className="hint">{annots.length}/10</span></div>
       <p className="hint">Arrows, circles, underlines, boxes and callouts that draw themselves on screen to point things out. Shown on the preview; render to see them draw.</p>
@@ -178,7 +191,7 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
         <p className="hint">Applies to photos in this scene (not video clips). The subject box shows on the preview.</p>
       </>}
     </Section>
-    <Section title="Split screen" Icon={LayoutGrid} on={!!layout} onToggle={on => put('layout', on ? {...LAYOUT} : null)} disabled={disabled || videoOrImages < 2} hint={videoOrImages < 2 ? `Split screen shows several pictures at once, so this scene needs at least two. It has ${videoOrImages}.` : "Show the scene's pictures at the same time, e.g. then-and-now. They fill the panels in order and the preview shows the layout."}>
+    <Section title="Split screen" Icon={LayoutGrid} on={!!layout} onToggle={on => put('layout', on ? {...LAYOUT, type: vertical ? 'split2v' : 'split2'} : null)} disabled={disabled || videoOrImages < 2} hint={videoOrImages < 2 ? `Split screen shows several pictures at once, so this scene needs at least two. It has ${videoOrImages}.` : "Show the scene's pictures at the same time, e.g. then-and-now. They fill the panels in order and the preview shows the layout."}>
       {layout && <>
         <Pills label="Layout" value={layout.type} options={[['split2', 'Side by side'], ['split2v', 'Top & bottom'], ['split3', 'Three'], ['grid4', '2 × 2 grid']]} onChange={type => put('layout', {...layout, type})} disabled={disabled}/>
         <Row label="Gap" value={layout.gap} min={0} max={40} unit="px" onChange={gap => put('layout', {...layout, gap})} disabled={disabled}/>

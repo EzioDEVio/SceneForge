@@ -63,7 +63,7 @@ export function FinishingPanel({project, disabled, onChanged}: {project: Project
       <p className="hint">Changes fixed-length scenes so each cut lands on a beat. Scenes that follow their narration keep their length.</p>
     </>}
     <label className="switch-label finishing-toggle"><input type="checkbox" aria-label="Level loudness for YouTube" checked={!!fin.loudnorm} disabled={disabled} onChange={e => save({...fin, loudnorm: e.target.checked}, true)}/><Gauge size={14}/> Level loudness for YouTube (-14 LUFS)</label>
-    <label className="switch-label finishing-toggle"><input type="checkbox" aria-label="Countdown leader" checked={!!fin.leader} disabled={disabled} onChange={e => save({...fin, leader: e.target.checked}, true)}/><Clapperboard size={14}/> Film countdown leader at the start (5 s, with the “2-pop” beep)</label>
+    
     {error && <p className="form-error" role="alert">{error}</p>}
   </section>;
 }

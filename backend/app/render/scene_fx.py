@@ -279,3 +279,14 @@ from app.render.routes import clean_route  # noqa: E402
 from app.render.annotations import clean_annotations  # noqa: E402
 
 CLEANERS.update(layout=_wrap(clean_layout), route=_wrap(clean_route), parallax=_wrap(clean_parallax), annotations=_wrap(clean_annotations))
+
+
+def _clean_countdown(raw):
+    from app.render.countdowns import clean, CountdownError
+    try:
+        return clean(raw)
+    except CountdownError as e:
+        raise SceneFxError(str(e))
+
+
+CLEANERS['countdown'] = _clean_countdown

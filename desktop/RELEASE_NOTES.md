@@ -1,4 +1,24 @@
-# SceneForge Studio 0.5.2 (in progress)
+# SceneForge Studio 0.5.3
+
+## Fixed (important)
+- **Video clips now keep their own sound.** Videos with sound used to export silent; only narration and music were heard.
+- **Scenes last as long as their videos.** A scene without narration used to fall back to 4 seconds, and a scene longer than its video looped the video to fill the gap. Now a scene lasts exactly as long as its videos (after trimming and speed changes), and several videos in one scene each keep their own length.
+- **No unexpected countdown.** The whole-video "Countdown leader" switch is removed; the countdown is now an effect you add to a scene (below).
+- **File → New project / Open project** (Ctrl+N / Ctrl+O), in the desktop menu and the editor menu. They wait for saves instead of being greyed out.
+- Changing only a clip's speed or sound now always re-renders the scene (it could reuse an old render).
+
+## New
+- **Clip sound** (Motion tab, for videos): volume, mute, and "Lower it under narration" so a voice-over stays clear.
+- **Captions from speech** (Text tab): automatic captions from the narration or from the sound of your videos, in any language (detected automatically), with exact word timing for phrase captions and word highlight. Uses your ElevenLabs (Scribe v2) or OpenAI (Whisper) key; the text stays editable.
+- **Countdown intro** (Effects tab): a cinema countdown before a scene: Film leader (grain, scratches, projector sound; black & white or sepia), Modern (glowing ring) or Minimal; 3–10 s; beeps on every number, the classic 2-pop, or silent. Off unless you switch it on.
+
+## 9:16 (TikTok, Reels, Shorts)
+- **Landscape clips and photos keep the whole picture over a blurred background** by default in vertical projects, instead of being cropped. Choose in Motion → Fill the frame: Fill (crop), Fit + blurred background, or Fit + bars.
+- **Captions sit above the platform's buttons and caption** (about 20 % up) by default.
+- **Safe zones** toggle on the preview shows the areas TikTok, Reels and Shorts cover.
+- Split screen defaults to top & bottom in vertical projects.
+
+# SceneForge Studio 0.5.2
 
 - **No more flicker** when changing effects: background saves no longer grey out the timeline or the scene settings.
 - **Duplicate and copy/paste on the timeline:** right-click a picture clip → Duplicate scene, Copy scene, Paste after (or Ctrl+D / Ctrl+C / Ctrl+V). The copy keeps every picture, effect, caption, title, overlay and audio take, so you can give it different effects. Right-click a narration clip → Copy audio, then Paste audio here on another scene.

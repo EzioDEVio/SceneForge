@@ -65,6 +65,7 @@ class ShotIn(BaseModel):
 class ShotOut(BaseModel):
     crop_json: dict | None = None
     speed_json: dict = {}
+    audio_json: dict = {}
     id: str
     asset_id: str
     order_index: int
@@ -147,6 +148,7 @@ class SceneOut(BaseModel):
     rendered_plan_hash: str | None
     rendered_asset_id: str | None
     measured_duration_ms: int | None
+    natural_duration_ms: int | None = None      # length of the scene's videos when it has no narration
     shots: list[ShotOut] = []
     voice_takes: list[VoiceTakeOut] = []
     is_stale: bool = False

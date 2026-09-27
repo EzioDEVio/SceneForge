@@ -100,12 +100,11 @@ lvl=export()
 out=subprocess.run(['ffmpeg','-hide_banner','-i',str(lvl),'-af','ebur128','-f','null','-'],capture_output=True,text=True).stderr
 I=float(re.findall(r'I:\s+(-?[\d.]+) LUFS',out)[-1])
 check(f'loudness levelled for YouTube (measured {I:.1f} LUFS, target -14)',abs(I+14)<2.0)
+# The whole-video countdown leader is retired (it is now Effects → Countdown intro on a scene);
+# an old project that still has leader=true must no longer get a countdown.
 client.patch(f'/api/projects/{pid}',json={'finishing':{'leader':True}})
 led=export()
-check('countdown leader adds 5 s at the start',abs(dur(led)-d0-5)<0.15)
-fr=np.frombuffer(subprocess.check_output(['ffmpeg','-v','error','-ss','0.5','-i',str(led),'-frames:v','1','-vf','scale=320:180','-f','rawvideo','-pix_fmt','gray','-']),np.uint8)
-la=audio(led);beep=rms(la,3.0,3.04)
-check('leader shows the countdown and has the 2-pop beep at 3 s',80<fr.mean()<200 and beep>0.05 and rms(la,1.0,2.9)<0.01)
+check('the retired whole-video leader no longer adds a countdown',abs(dur(led)-d0)<0.15)
 # projector sound on an Old film scene
 client.patch(f'/api/projects/{pid}',json={'finishing':{}})
 client.patch(f'/api/scenes/{s2}',json={'look':{'film':{'scratches':0,'dust':0,'flicker':0,'weave':0,'sound':80,'fps':18,'tone':'color'}}})
