@@ -361,3 +361,14 @@ button:hover>.sample-fade_fast span+span{animation-duration:.9s}
 .clip-sound{margin:10px 0;padding:10px 12px;border:1px solid #3a3f4b;border-radius:8px;background:#262a32}.clip-sound h4{margin:0 0 6px;font-size:12px;color:#e8eaf0}
 .auto-captions{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin:4px 0}.auto-captions-panel{flex-basis:100%;display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;padding:10px;border:1px solid #4d4480;border-radius:8px;background:#2b2840}
 .auto-captions-panel .hint,.auto-captions-panel .info-status{grid-column:1/-1;margin:0}.auto-captions-panel .btn{grid-column:1/-1}
+.fit-choice{margin:0 0 12px}.fit-choice>span{display:block;font-size:12px;font-weight:600;color:#e8eaf0;margin-bottom:5px}.fit-choice .segmented button{font-size:11px}
+.canvas-blur-bg{transform:scale(1.08)}
+/* 9:16 platform safe zones (TikTok / Reels / Shorts interface) */
+.safe-toggle{display:inline-flex;align-items:center;gap:4px;font-size:11px;color:#c9cfdb;margin-right:10px}
+.safe-zones{position:absolute;inset:0;z-index:8;pointer-events:none}
+.safe-zones span{position:absolute;display:flex;align-items:center;justify-content:center;text-align:center;font-size:clamp(7px,1.6cqw,11px);color:#fff;background:repeating-linear-gradient(135deg,#ff4d6d55 0 6px,#ff4d6d22 6px 12px);border:1px dashed #ff8fa3}
+.sz-top{left:0;right:0;top:0;height:9%}
+.sz-bottom{left:0;right:0;bottom:0;height:20%}
+.sz-right{right:0;top:38%;bottom:20%;width:14%;writing-mode:vertical-rl}
+.fit-choice .segmented button.selected{background:#5b49d6;border-color:#7b69ea;color:#fff}
+.canvas-fg{background:transparent}

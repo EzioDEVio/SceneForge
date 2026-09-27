@@ -116,8 +116,8 @@ function StopLabelInput({index, value, onCommit}: {index: number; value: string;
 }
 
 /** Scene effects: camera shake, spotlight, blur/pixelate regions, light leaks, split toning. */
-export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEditing, onRouteEditing, onAddMedia, liveAnnotations}: {scene: Scene; disabled: boolean; onDraft: (look: Look) => void;
-  liveRoute?: RouteFx | null; routeEditing?: boolean; onRouteEditing?: (on: boolean) => void; onAddMedia?: () => void; liveAnnotations?: Annotation[]}) {
+export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEditing, onRouteEditing, onAddMedia, liveAnnotations, vertical}: {scene: Scene; disabled: boolean; onDraft: (look: Look) => void;
+  liveRoute?: RouteFx | null; routeEditing?: boolean; onRouteEditing?: (on: boolean) => void; onAddMedia?: () => void; liveAnnotations?: Annotation[]; vertical?: boolean}) {
   const look = (scene.look_json || {}) as any;
   const pick = (l: any) => ({countdown: l.countdown || null, annotations: l.annotations || [], shake: l.shake || null, spotlight: l.spotlight || null, redact: l.redact || [], leak: l.leak || null, tone: l.tone || null, wheels: l.wheels || null, layout: l.layout || null, parallax: l.parallax || null});
   const [st, setSt] = useState(pick(look));
@@ -191,7 +191,7 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
         <p className="hint">Applies to photos in this scene (not video clips). The subject box shows on the preview.</p>
       </>}
     </Section>
-    <Section title="Split screen" Icon={LayoutGrid} on={!!layout} onToggle={on => put('layout', on ? {...LAYOUT} : null)} disabled={disabled || videoOrImages < 2} hint={videoOrImages < 2 ? `Split screen shows several pictures at once, so this scene needs at least two. It has ${videoOrImages}.` : "Show the scene's pictures at the same time, e.g. then-and-now. They fill the panels in order and the preview shows the layout."}>
+    <Section title="Split screen" Icon={LayoutGrid} on={!!layout} onToggle={on => put('layout', on ? {...LAYOUT, type: vertical ? 'split2v' : 'split2'} : null)} disabled={disabled || videoOrImages < 2} hint={videoOrImages < 2 ? `Split screen shows several pictures at once, so this scene needs at least two. It has ${videoOrImages}.` : "Show the scene's pictures at the same time, e.g. then-and-now. They fill the panels in order and the preview shows the layout."}>
       {layout && <>
         <Pills label="Layout" value={layout.type} options={[['split2', 'Side by side'], ['split2v', 'Top & bottom'], ['split3', 'Three'], ['grid4', '2 × 2 grid']]} onChange={type => put('layout', {...layout, type})} disabled={disabled}/>
         <Row label="Gap" value={layout.gap} min={0} max={40} unit="px" onChange={gap => put('layout', {...layout, gap})} disabled={disabled}/>

@@ -50,12 +50,13 @@ export function CaptionPreview({font, text, projectW, projectH}: {font: F; text:
   const hiIdx = font.karaoke ? Math.min(1, shown.length - 1) : -1;
   const hi = font.highlight_color || '#FFD84D';
   const pos = font.position || 'bottom';
-  const cqw = Number(font.size || 44) * 0.74 / projectW * 100;    // libass size ≈ 0.74 of a browser em
+  const cqw = Number(font.size || 44) * 0.74 / projectW * 100;
+  const base = projectH > projectW * 1.2 ? 20 : 5.5;     // vertical: clear of TikTok/Reels/Shorts buttons    // libass size ≈ 0.74 of a browser em
   const style: React.CSSProperties = {
     ...captionCss(font, 0.9), fontSize: `${cqw}cqw`,
     left: `${(100 - Number(font.max_width || 90)) / 2}%`, right: `${(100 - Number(font.max_width || 90)) / 2}%`,
     textAlign: (font.halign || 'center') as any,
-    ...(pos === 'top' ? {top: `${5.5 + Number(font.offset_y || 0)}%`} : pos === 'middle' ? {top: '50%', transform: 'translateY(-50%)'} : {bottom: `${5.5 + Number(font.offset_y || 0)}%`}),
+    ...(pos === 'top' ? {top: `${base + Number(font.offset_y || 0)}%`} : pos === 'middle' ? {top: '50%', transform: 'translateY(-50%)'} : {bottom: `${base + Number(font.offset_y || 0)}%`}),
   };
   return <div className="caption-preview" aria-hidden="true" style={{position: 'absolute', zIndex: 5, pointerEvents: 'none', ...style, background: 'transparent', padding: 0}} dir="auto">
     <span style={{...captionCss(font, 0.9), fontSize: 'inherit', display: 'inline', boxDecorationBreak: 'clone', WebkitBoxDecorationBreak: 'clone', lineHeight: 1.35}}>

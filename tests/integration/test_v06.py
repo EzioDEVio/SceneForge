@@ -95,4 +95,21 @@ c.patch(f"/api/scenes/{sc0['id']}",json={'font':{'split':'phrases','phrase_words
 with SessionLocal() as db:
  wt=_caption_word_times(db.get(_S,sc0['id']),0,None)
 check('phrase captions use the transcript word times exactly',wt==[(200,700),(800,1100),(1200,1400),(1500,2400)])
+
+# --- 9:16 polish -----------------------------------------------------------------------------
+land=t/'land.mp4';subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i','testsrc2=s=640x360:d=1:r=30','-c:v','libx264',str(land)],check=True)
+la=c.post('/api/assets/upload',params={'project_id':vid},files={'file':('land.mp4',open(land,'rb'),'video/mp4')}).json()
+tgt=c.get(f'/api/projects/{vid}').json()['scenes'][2]['id']
+auto=c.post(f'/api/scenes/{tgt}/shots',json={'asset_id':la['id']}).json()
+check('a landscape clip added to a 9:16 project keeps the whole picture over a blurred background',auto['fit']=='contain_blur')
+explicit=c.post(f'/api/scenes/{tgt}/shots',json={'asset_id':la['id'],'fit':'cover'}).json()
+check('an explicitly chosen fit is respected',explicit['fit']=='cover')
+check('a portrait clip in a 9:16 project still fills the frame',c.get(f'/api/projects/{vid}').json()['scenes'][0]['shots'][0]['fit']=='cover')
+from app.render.subtitles import write_ass_file
+def mv(w,h):
+ path=write_ass_file('m','hello',2000,{},w,h,out_path=str(t/'m.ass'))
+ return int([x for x in pathlib.Path(path).read_text(encoding='utf-8-sig').splitlines() if x.startswith('Style:')][0].split(',')[21])
+check('vertical captions sit above the TikTok/Reels/Shorts buttons (about 20 % up); landscape keeps 5.5 %',mv(1080,1920)==384 and mv(1920,1080)==59)
+from app.render.filters import build_contain_chain
+check('the blurred background is strong enough at 1080×1920',"gblur=sigma=48" in build_contain_chain(1080,1920,True))
 print(f'{n} v0.6 checks passed')

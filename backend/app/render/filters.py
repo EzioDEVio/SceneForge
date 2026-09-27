@@ -140,7 +140,8 @@ def build_contain_chain(out_w: int, out_h: int, blurred_bg: bool) -> str:
     return (
         f"split=2[bg][fg];"
         f"[bg]scale={out_w}:{out_h}:force_original_aspect_ratio=increase,"
-        f"crop={out_w}:{out_h},gblur=sigma=20[bgblur];"
+        f"crop={out_w}:{out_h},gblur=sigma={max(20, round(max(out_w, out_h) / 40))},"
+        f"eq=brightness=-0.07:saturation=0.9[bgblur];"   # strong, slightly darker blur so the picture stands out
         f"[fg]scale={out_w}:{out_h}:force_original_aspect_ratio=decrease[fgs];"
         f"[bgblur][fgs]overlay=(W-w)/2:(H-h)/2"
     )

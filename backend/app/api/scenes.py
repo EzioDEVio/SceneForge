@@ -155,11 +155,20 @@ def add_shot(scene_id: str, body: schemas.ShotIn, db: Session = Depends(get_db))
     if asset.type not in ("image", "video") or asset.project_id != scene.project_id:
         raise HTTPException(400, "Only images and videos from this project can be added to the picture track.")
     order = body.order_index if body.order_index else len(scene.shots)
+    fit = body.fit
+    if "fit" not in body.model_fields_set and asset.width and asset.height:
+        # Landscape media in a vertical project (or the reverse) keeps the whole picture over a
+        # blurred copy instead of being cropped to a thin strip — the CapCut default look.
+        project = db.get(Project, scene.project_id)
+        media_landscape, project_landscape = asset.width > asset.height * 1.1, project.width > project.height * 1.1
+        media_portrait, project_portrait = asset.height > asset.width * 1.1, project.height > project.width * 1.1
+        if (media_landscape and project_portrait) or (media_portrait and project_landscape):
+            fit = "contain_blur"
     shot = Shot(
         scene_id=scene_id,
         asset_id=body.asset_id,
         order_index=order,
-        fit=body.fit,
+        fit=fit,
         motion_json=body.motion,
         source_in_ms=body.source_in_ms,
         source_out_ms=body.source_out_ms,
