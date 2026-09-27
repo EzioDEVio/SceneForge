@@ -7,7 +7,7 @@ Any step that fails or is slower than its limit fails the build.
 
   python desktop/tests/e2e_backend.py --exe <sceneforge-backend[.exe]> --ffmpeg-dir <dir> --resources <repo or app-resources>
 """
-import argparse, json, os, secrets, subprocess, sys, tempfile, time, urllib.request, uuid
+import argparse, json, os, re, secrets, subprocess, sys, tempfile, time, urllib.request, uuid
 
 ap = argparse.ArgumentParser()
 ap.add_argument("--exe", required=True); ap.add_argument("--ffmpeg-dir", required=True); ap.add_argument("--resources", required=True)
@@ -109,6 +109,29 @@ try:
             time.sleep(1)
         raise RuntimeError("render did not finish")
     step("render 3 s scene (overlay + old film + grade + narration + Arabic map route + annotations)", 240, wait)
+
+    # A video with its own sound in a scene without narration: length follows the video and its
+    # sound is kept (regression guard for 0.5.3: clips used to render silent and 4 s long).
+    clipf = os.path.join(work, "clip.mp4")
+    subprocess.run([ff, "-v", "error", "-y", "-f", "lavfi", "-i", "testsrc2=s=640x360:d=3:r=30", "-f", "lavfi", "-i", "sine=f=500:d=3",
+                    "-c:v", "libx264", "-c:a", "aac", "-shortest", clipf], check=True)
+    vasset = step("import a video with sound", 20, lambda: request("POST", f"/api/assets/upload?project_id={pid}", files=("clip.mp4", open(clipf, "rb").read(), "video/mp4")))
+    vscene = request("GET", f"/api/projects/{pid}")["scenes"][1]["id"]
+    step("add the video to a scene without narration", 5, lambda: request("POST", f"/api/scenes/{vscene}/shots", {"asset_id": vasset["id"]}))
+    vjob = step("start video scene render", 5, lambda: request("POST", f"/api/scenes/{vscene}/render"))
+    job = vjob
+
+    def wait_video():
+        wait()
+        rendered = [x for x in request("GET", f"/api/projects/{pid}")["scenes"] if x["id"] == vscene][0]["rendered_asset_id"]
+        data = request("GET", f"/api/assets/{rendered}/stream")
+        out = os.path.join(work, "vscene.mp4"); open(out, "wb").write(data)
+        dur = float(subprocess.run([env["SCENEFORGE_FFPROBE"], "-v", "error", "-show_entries", "format=duration", "-of", "csv=p=0", out], capture_output=True, text=True).stdout)
+        vol = subprocess.run([ff, "-i", out, "-af", "volumedetect", "-f", "null", "-"], capture_output=True, text=True).stderr
+        peak = float(re.search(r"max_volume: (-?[\d.]+) dB", vol).group(1))
+        if abs(dur - 3) > 0.25 or peak < -40:
+            raise RuntimeError(f"video scene is {dur:.2f} s with peak {peak} dB (expected 3 s with sound)")
+    step("video scene keeps its length and its own sound", 120, wait_video)
 finally:
     try:
         proc.stdin.close(); proc.wait(timeout=20)
