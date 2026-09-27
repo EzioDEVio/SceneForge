@@ -1,3 +1,34 @@
+# SceneForge Studio 0.5.0 — Captions Pro
+
+Captions now have CapCut-level styling. Everything is in **Text → Caption styles**, with a live preview on the picture.
+
+## Caption styles (one click)
+Classic, YouTube box, **Viral bold**, Karaoke, Neon, Cinematic, Documentary, Underline, **Arabic modern**, Pulse.
+
+## Font
+- **Seven new bundled fonts:** Poppins, Bebas Neue, Anton, Pacifico, and Arabic **Amiri**, **Tajawal**, **Lalezar**, each paired with a matching font for the other script.
+- **Bold, italic, underline**; letter case (as typed, UPPERCASE, Title Case, lowercase); letter spacing; size up to 120.
+- Added fonts are size-matched so the same size setting looks the same size.
+
+## Colours, outline, shadow, box
+- Text colour; outline colour and width; shadow with colour and opacity.
+- **Background box** with colour, opacity and padding.
+
+## Position
+- Top / middle / bottom, left / centre / right, move up or down, maximum width.
+
+## Phrase captions (CapCut style)
+- Show a few words at a time (1–8 per phrase), each phrase appearing as its words are spoken (exact timing with ElevenLabs, measured from the audio for other voices).
+
+## Word highlight
+- New styles: **Box** (a marker behind the spoken word), **Colour** (only the current word) and **Underline**, besides Colour fill, Pop and Glow. Works inside phrases.
+
+## Animation
+- Entrance (all the ✦ animations), **exit** (fade out, pop out) and a looping **pulse**. In phrase mode each phrase gets its own entrance, exit and pulse.
+
+## Also
+- The old flat caption controls are replaced by the organised Caption styles panel. Existing projects keep their settings.
+
 # SceneForge Studio 0.4.1
 
 - **Caption animations** (Text tab → *Caption animation ✦*): the captions themselves can now use the new animations: letters pop/fade/flip/blur-in, words pop/fade/flip, shine, bounce, zoom, blur, neon, wobble and glitch, with an adjustable length. Arabic captions animate word by word. (Typewriter and Word-by-word highlight still animate captions their own way; turn them off to use a caption animation.)

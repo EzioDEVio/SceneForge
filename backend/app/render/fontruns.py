@@ -14,8 +14,14 @@ from __future__ import annotations
 
 import unicodedata
 
-ARABIC_FAMILIES = ("Noto Naskh Arabic", "Noto Sans Arabic")
+ARABIC_FAMILIES = ("Noto Naskh Arabic", "Noto Sans Arabic", "Amiri", "Tajawal", "Lalezar")
 LATIN_DEFAULT = "Noto Sans"
+# Arabic families that carry their own Latin letters (keep one design for both scripts).
+_OWN_LATIN = {"Amiri", "Tajawal", "Lalezar"}
+# Latin display families paired with a matching Arabic design.
+_ARABIC_PARTNER = {"Poppins": "Tajawal", "Bebas Neue": "Lalezar", "Anton": "Lalezar", "Pacifico": "Amiri"}
+ALL_FAMILIES = ("Noto Naskh Arabic", "Noto Sans Arabic", "Noto Sans", "Amiri", "Tajawal", "Lalezar",
+                "Poppins", "Bebas Neue", "Anton", "Pacifico")
 # Latin families whose design matches a serif Arabic companion better.
 _SERIF_LATIN = {"Times New Roman", "Georgia"}
 
@@ -29,7 +35,9 @@ def font_pair(family: str | None) -> tuple[str, str]:
     """Return (arabic_family, latin_family) for a user-selected family."""
     family = (family or ARABIC_FAMILIES[0]).strip()
     if family in ARABIC_FAMILIES:
-        return family, LATIN_DEFAULT
+        return family, (family if family in _OWN_LATIN else LATIN_DEFAULT)
+    if family in _ARABIC_PARTNER:
+        return _ARABIC_PARTNER[family], family
     arabic = "Noto Naskh Arabic" if family in _SERIF_LATIN else "Noto Sans Arabic"
     return arabic, family
 
@@ -96,3 +104,47 @@ def tag_runs(text: str, family: str | None, escape) -> tuple[str, str]:
             current = wanted
         parts.append(escape(chunk))
     return first, "".join(parts)
+
+
+# libass sizes text by a font's full ascent+descent, which varies a lot between designs
+# (Amiri and Lalezar reserve tall space and look small). The added families are scaled so
+# their capital letters match Noto Sans at the same size setting; Noto families are
+# unchanged, so existing projects keep their look.
+_SCALE_FILES = {"Amiri": "Amiri-Regular.ttf", "Tajawal": "Tajawal-Regular.ttf", "Lalezar": "Lalezar-Regular.ttf",
+                "Poppins": "Poppins-Regular.ttf", "Bebas Neue": "BebasNeue-Regular.ttf", "Anton": "Anton-Regular.ttf",
+                "Pacifico": "Pacifico-Regular.ttf"}
+_scale_cache: dict[str, float] = {}
+
+
+def _line_ratio(path) -> float:
+    """Visible capital height as a share of the height libass sizes by (ascent+descent).
+    Matching this across fonts makes the same size setting look the same size."""
+    from PIL import ImageFont
+    f = ImageFont.truetype(str(path), 200)
+    a, d = f.getmetrics()
+    top, bottom = f.getbbox("H")[1], f.getbbox("H")[3]
+    return (a + d) / max(1, bottom - top)
+
+
+def family_scale(family: str | None) -> float:
+    """Size multiplier for a family so libass matches the browser preview (1.0 for Noto)."""
+    if family not in _SCALE_FILES:
+        return 1.0
+    if family not in _scale_cache:
+        try:
+            from pathlib import Path
+            from app.config import RESOURCE_DIR
+            fonts = Path(RESOURCE_DIR) / "assets" / "fonts"
+            _scale_cache[family] = round(_line_ratio(fonts / _SCALE_FILES[family]) / _line_ratio(fonts / "NotoSans-Regular.ttf"), 3)
+        except Exception:
+            _scale_cache[family] = 1.0
+    return _scale_cache[family]
+
+
+def text_scale(family: str | None, text: str) -> float:
+    """Scale for the font that draws most of this text (Arabic partner or Latin family)."""
+    arabic, latin = font_pair(family)
+    runs = script_runs(text or "")
+    ar = sum(len(c) for s, c in runs if s == "ar")
+    la = sum(len(c) for s, c in runs if s != "ar")
+    return family_scale(arabic if ar > la else latin)
