@@ -478,7 +478,6 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(within(cdlg).getByRole('button',{name:'Insert countdown'}));
  await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/insert-countdown'))));
  check('Insert countdown sends the chosen style, tone and beeps',requests.some(r=>r.path.endsWith('/insert-countdown')&&r.body.style==='film'&&r.body.tone==='sepia'&&r.body.beep==='two-pop'));
- project.scenes=project.scenes.filter(x=>!x.id.startsWith('cd-'));
  // Duplicate / copy / paste
  const clipsBefore=project.scenes.length;
  const firstClip=document.querySelector('.picture-clip');
@@ -497,7 +496,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await waitFor(()=>assert.ok(requests.some(r=>r.path===`/api/scenes/${target.id}/paste-audio`)));
  check('copy audio from one scene and paste it into another',requests.some(r=>r.path===`/api/scenes/${target.id}/paste-audio`&&r.body.take_id===withAudio.voice_takes.find(v=>v.accepted).id));
  // restore the mock project for the checks that follow
- project.scenes=project.scenes.filter(x=>!x.id.startsWith('dup-'));
+ project.scenes=project.scenes.filter(x=>!x.id.startsWith('dup-')&&!x.id.startsWith('cd-'));
  for(const x of project.scenes){x.voice_takes=x.voice_takes.filter(v=>!v.id.startsWith('pt-'));x.voice_takes.forEach(v=>v.accepted=v.id===acceptedBefore[x.id]);}
  cleanup();
  render(React.createElement(App));
