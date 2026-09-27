@@ -1,3 +1,9 @@
+# SceneForge Studio 0.5.2 (in progress)
+
+- **No more flicker** when changing effects: background saves no longer grey out the timeline or the scene settings.
+- **Duplicate and copy/paste on the timeline:** right-click a picture clip → Duplicate scene, Copy scene, Paste after (or Ctrl+D / Ctrl+C / Ctrl+V). The copy keeps every picture, effect, caption, title, overlay and audio take, so you can give it different effects. Right-click a narration clip → Copy audio, then Paste audio here on another scene.
+- **Preview zoom:** zoom buttons next to the cut tool and in the preview header (up to 400 %), Ctrl + mouse wheel zooms at the cursor, and middle-drag or Space + drag pans.
+
 # SceneForge Studio 0.5.1
 
 - **Move and resize annotations directly on the picture.** In the Effects tab, every annotation shows handles on the preview: drag a point to change where it starts or ends (or its corners, for circles and boxes), and drag the ✥ handle to move the whole shape. The sliders update as you drag.

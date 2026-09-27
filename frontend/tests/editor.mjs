@@ -462,6 +462,13 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await screen.findByRole('button',{name:'Use this image'});
  check('image studio sends chosen provider and composition',requests.some(r=>r.path.endsWith('/generate-image')&&r.body.provider_id==='provider-gemini'&&r.body.size==='1536x1024'));
  await user.click(screen.getByRole('button',{name:'Close',exact:true}));
+ await user.click(screen.getByRole('button',{name:'Zoom preview in'}));
+ const pc=()=>[...document.querySelectorAll('.preview-canvas')].find(el=>el.offsetParent!==null||el.closest('.scene-editor:not([hidden])'));
+ await waitFor(()=>assert.ok(/scale\(1\.25\)/.test(pc()?.style.transform||'')));
+ check('timeline zoom tool magnifies the preview',/scale\(1\.25\)/.test(pc().style.transform));
+ await user.click(screen.getByRole('button',{name:'Fit preview to window'}));
+ await waitFor(()=>assert.ok(!pc().style.transform));
+ check('Fit returns the preview to normal size',!pc().style.transform);
  // Duplicate / copy / paste
  const clipsBefore=project.scenes.length;
  const firstClip=document.querySelector('.picture-clip');

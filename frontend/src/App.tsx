@@ -526,6 +526,23 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
   const [previewMode, setPreviewMode] = useState<"source" | "render">(scene.rendered_asset_id ? "render" : "source");
   const [selectedShotId, setSelectedShotId] = useState(scene.shots[0]?.id || "");
   const [zoom, setZoom] = useState(100);
+  // Inspection zoom (magnify and pan the preview to check details); 1 = fit.
+  const [mag, setMag] = useState(1);
+  const [pan, setPan] = useState({x: 0, y: 0});
+  const spaceDown = useRef(false);
+  const setMagAt = (next: number, cx = 0.5, cy = 0.5) => {
+    const m = Math.max(1, Math.min(4, +next.toFixed(2)));
+    setPan(p => m === 1 ? {x: 0, y: 0} : {x: p.x + (cx - 0.5) * (1 / mag - 1 / m) * 100, y: p.y + (cy - 0.5) * (1 / mag - 1 / m) * 100});
+    setMag(m);
+  };
+  useEffect(() => {
+    if (!active) return;
+    const onZoom = (e: Event) => {const d = (e as CustomEvent).detail; if (d === 'fit') {setMag(1); setPan({x: 0, y: 0});} else setMagAt(mag * (d > 0 ? 1.25 : 0.8));};
+    const kd = (e: KeyboardEvent) => {if (e.code === 'Space') spaceDown.current = true;};
+    const ku = (e: KeyboardEvent) => {if (e.code === 'Space') spaceDown.current = false;};
+    window.addEventListener('sceneforge-preview-zoom', onZoom); window.addEventListener('keydown', kd); window.addEventListener('keyup', ku);
+    return () => {window.removeEventListener('sceneforge-preview-zoom', onZoom); window.removeEventListener('keydown', kd); window.removeEventListener('keyup', ku);};
+  }, [active, mag]);
   const fileRef = useRef<HTMLInputElement>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const editorRef = useRef<HTMLElement>(null);
@@ -707,8 +724,14 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
             </div>
             <span className="aspect-badge">{project.aspect}</span>
           </div>
-          <div className="canvas-viewport">
-            <div className="preview-canvas" style={{aspectRatio: project.aspect.replace(":", "/"), width: `min(${zoom}%, calc((var(--stage-height) - 40px) * ${canvasRatio * zoom / 100}))`}}><WhiteBalanceFilter id={wbFilterId} adjust={liveAdjust}/>{previewMode !== "render" && shot && <PreviewFinish adjust={liveAdjust}/>}{previewMode !== "render" && shot && hoverFx && hoverFx !== scene.effect_preset && <div className="hover-preview-chip" role="status">Previewing <b>{selectedEffect.label}</b> · click to apply</div>}{previewMode !== "render" && shot && liveFilm && <FilmPreview film={liveFilm}/>}{previewMode !== "render" && shot && <SceneFxPreview look={{...(scene.look_json || {}), ...((pending.current.look as any) || {})}} shots={scene.shots} filter={mediaFilter} aspect={project.width / project.height}/>}{previewMode !== "render" && shot && tab === "Effects" && !routeEditing && liveAnnots.length > 0 && <AnnotationCanvas annots={liveAnnots} onChange={a => draft({look: {annotations: a}})}/>}{previewMode !== "render" && shot && routeEditing && liveRoute && <RouteCanvas route={liveRoute} onChange={r => draft({look: {route: r}})}/>}{previewMode !== "render" && shot && overlays.length > 0 && <OverlayCanvas overlays={overlays} frameAspect={project.width / project.height} selected={ovSelected} onSelect={i => {setOvSelected(i); setTab("Overlays");}} onChange={(i, patch, commit) => {const next = ovRef.current.map((x, k) => k === i ? {...x, ...patch} : x); ovRef.current = next; changeOverlays(next, !!commit);}} onCommit={() => draft({overlays: ovRef.current})}/>}
+          <div className={`canvas-viewport ${mag > 1 ? 'magnified' : ''}`}
+            onWheel={e => {if (!e.ctrlKey) return; e.preventDefault(); const r = e.currentTarget.getBoundingClientRect(); setMagAt(mag * (e.deltaY < 0 ? 1.15 : 0.87), (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);}}
+            onPointerDown={e => {if (mag <= 1 || !(e.button === 1 || (e.button === 0 && spaceDown.current))) return; e.preventDefault();
+              const sx = e.clientX, sy = e.clientY, p0 = pan, r = e.currentTarget.getBoundingClientRect();
+              const move = (ev: PointerEvent) => setPan({x: p0.x + (ev.clientX - sx) / r.width * 100 / mag, y: p0.y + (ev.clientY - sy) / r.height * 100 / mag});
+              const up = () => {window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);};
+              window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);}}>
+            <div className="preview-canvas" style={{transform: mag > 1 ? `scale(${mag}) translate(${pan.x}%, ${pan.y}%)` : undefined, transformOrigin: "center", aspectRatio: project.aspect.replace(":", "/"), width: `min(${zoom}%, calc((var(--stage-height) - 40px) * ${canvasRatio * zoom / 100}))`}}><WhiteBalanceFilter id={wbFilterId} adjust={liveAdjust}/>{previewMode !== "render" && shot && <PreviewFinish adjust={liveAdjust}/>}{previewMode !== "render" && shot && hoverFx && hoverFx !== scene.effect_preset && <div className="hover-preview-chip" role="status">Previewing <b>{selectedEffect.label}</b> · click to apply</div>}{previewMode !== "render" && shot && liveFilm && <FilmPreview film={liveFilm}/>}{previewMode !== "render" && shot && <SceneFxPreview look={{...(scene.look_json || {}), ...((pending.current.look as any) || {})}} shots={scene.shots} filter={mediaFilter} aspect={project.width / project.height}/>}{previewMode !== "render" && shot && tab === "Effects" && !routeEditing && liveAnnots.length > 0 && <AnnotationCanvas annots={liveAnnots} onChange={a => draft({look: {annotations: a}})}/>}{previewMode !== "render" && shot && routeEditing && liveRoute && <RouteCanvas route={liveRoute} onChange={r => draft({look: {route: r}})}/>}{previewMode !== "render" && shot && overlays.length > 0 && <OverlayCanvas overlays={overlays} frameAspect={project.width / project.height} selected={ovSelected} onSelect={i => {setOvSelected(i); setTab("Overlays");}} onChange={(i, patch, commit) => {const next = ovRef.current.map((x, k) => k === i ? {...x, ...patch} : x); ovRef.current = next; changeOverlays(next, !!commit);}} onCommit={() => draft({overlays: ovRef.current})}/>}
               {previewMode === "render" && rendered ? <video ref={videoRef} className="canvas-media" controls preload="metadata" src={api.assetStreamUrl(rendered)}/> :
                 shot ? shot.asset?.type === "image" ? (shot.crop_json?<svg className="canvas-media" role="img" aria-label={`Cropped source for ${scene.title}`} viewBox={`${shot.crop_json.x*(shot.asset.width||1)} ${shot.crop_json.y*(shot.asset.height||1)} ${shot.crop_json.width*(shot.asset.width||1)} ${shot.crop_json.height*(shot.asset.height||1)}`} preserveAspectRatio={shot.fit==='cover'?'xMidYMid slice':'xMidYMid meet'} style={{filter:mediaFilter}}><image href={gradedSrc||api.assetStreamUrl(shot.asset_id)} width={shot.asset.width||1} height={shot.asset.height||1}/></svg>:<img className="canvas-media" src={gradedSrc||api.assetStreamUrl(shot.asset_id)} alt={`Source media for ${scene.title}`} style={{objectFit: shot.fit === "cover" ? "cover" : "contain", filter:mediaFilter}}/>) :
                   <video ref={videoRef} className="canvas-media" controls preload="metadata" poster={gradedSrc||undefined} src={api.assetStreamUrl(shot.asset_id)} style={{objectFit:shot.fit === "cover" ? "cover" : "contain",filter:mediaFilter}}/> :
@@ -719,7 +742,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
           </div>
           <footer className="preview-footer">
             <span>{previewMode === "source" ? "Editing preview • Effects approximate; render for motion, captions & sound" : scene.is_stale ? "Previous render • Changes need a new render" : "Rendered scene"}</span>
-            <label className="zoom-control">View <select aria-label="Canvas view size" value={zoom} onChange={e => setZoom(Number(e.target.value))}><option value={100}>Fit</option><option value={75}>75%</option><option value={50}>50%</option></select></label>
+            <span className="inspect-zoom" role="group" aria-label="Preview zoom"><button className="icon-reset" aria-label="Zoom out of the preview" disabled={mag <= 1} onClick={() => setMagAt(mag * 0.8)}>−</button><button className="text-btn" aria-label="Fit preview" title="Fit (Ctrl + mouse wheel zooms, middle-drag or Space + drag pans)" onClick={() => {setMag(1); setPan({x: 0, y: 0});}}>{Math.round(mag * 100)}%</button><button className="icon-reset" aria-label="Zoom into the preview" disabled={mag >= 4} onClick={() => setMagAt(mag * 1.25)}>+</button></span><label className="zoom-control">View <select aria-label="Canvas view size" value={zoom} onChange={e => setZoom(Number(e.target.value))}><option value={100}>Fit</option><option value={75}>75%</option><option value={50}>50%</option></select></label>
           </footer>
         </div>
         <div className="render-bar">

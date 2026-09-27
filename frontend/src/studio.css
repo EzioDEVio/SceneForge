@@ -344,3 +344,6 @@ button:hover>.sample-fade_fast span+span{animation-duration:.9s}
 .clip-menu{position:fixed;z-index:2000;min-width:230px;background:#23262e;border:1px solid #454b58;border-radius:8px;box-shadow:0 10px 30px #000a;padding:4px;display:flex;flex-direction:column}
 .clip-menu button{display:flex;justify-content:space-between;gap:16px;background:none;border:0;color:#e2e5ec;font-size:12px;padding:7px 10px;border-radius:5px;text-align:left}
 .clip-menu button:hover:not(:disabled){background:#3a3351}.clip-menu button:disabled{color:#6e7482}.clip-menu kbd{font:10px monospace;color:#9aa0ad}
+.canvas-viewport{overflow:hidden}.canvas-viewport.magnified{cursor:zoom-in}
+.inspect-zoom{display:inline-flex;align-items:center;gap:2px;margin-right:10px}.inspect-zoom .text-btn{min-width:44px;justify-content:center}
+.tl-zoom{display:inline-flex;gap:2px;margin-left:4px;padding-left:6px;border-left:1px solid #49505d}
