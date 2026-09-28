@@ -158,7 +158,7 @@ def countdown_leader(width: int, height: int, fps: int) -> Path:
         _run(["-f", "rawvideo", "-pix_fmt", "gray", "-s", f"{width}x{height}", "-r", str(fps), "-i", "-",
               "-f", "lavfi", "-i", f"aevalsrc={beep}|{beep}:s=48000:d={LEADER_SECONDS}",
               "-vf", "noise=alls=14:allf=t,vignette=angle=0.55,format=yuv420p,setsar=1",
-              "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-c:a", "aac", "-b:a", "192k",
+              "-c:v", "libx264", "-preset", "veryfast", "-crf", "18", "-pix_fmt", "yuv420p", "-profile:v", "high", "-movflags", "+faststart", "-c:a", "aac", "-b:a", "192k",
               "-shortest", str(tmp)], raw)
         os.replace(tmp, out)
         return out
@@ -210,9 +210,9 @@ def finish_export(export_path: str, project, cancel_check=None) -> str:
                   f"[{idx}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo[la]",
                   f"[0:v]setsar=1,fps={project.fps},format=yuv420p[mv]",
                   f"[lv][la][mv][{label}]concat=n=2:v=1:a=1[vout][aout]"]
-        maps = ["-map", "[vout]", "-map", "[aout]", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p"]
+        maps = ["-map", "[vout]", "-map", "[aout]", "-c:v", "libx264", "-preset", "veryfast", "-crf", "20", "-pix_fmt", "yuv420p", "-profile:v", "high", "-movflags", "+faststart"]
     else:
-        maps = ["-map", "0:v", "-map", f"[{label}]", "-c:v", "copy"]
+        maps = ["-map", "0:v", "-map", f"[{label}]", "-c:v", "copy", "-movflags", "+faststart"]
     run_ffmpeg([*inputs, "-filter_complex", ";".join(graph), *maps, "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
                 "-movflags", "+faststart", out], cancel_check=cancel_check)
     return out

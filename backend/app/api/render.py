@@ -3,7 +3,7 @@ from __future__ import annotations
 import asyncio
 import json
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Body, Depends, HTTPException
 from sse_starlette.sse import EventSourceResponse
 from sqlalchemy.orm import Session
 
@@ -33,7 +33,12 @@ def render_part_endpoint(scene_id: str, db: Session = Depends(get_db)):
 
 
 @router.post("/api/projects/{project_id}/export", response_model=schemas.JobCreateResponse)
-def export_project_endpoint(project_id: str, skip_empty: bool = False, db: Session = Depends(get_db)):
+def export_project_endpoint(project_id: str, skip_empty: bool = False, body: dict | None = Body(None), db: Session = Depends(get_db)):
+    from app.render import delivery
+    try:
+        settings = delivery.clean((body or {}).get("settings"))
+    except delivery.DeliveryError as e:
+        raise HTTPException(400, str(e))
     project = db.get(Project, project_id)
     if not project:
         raise HTTPException(404, "Project not found")
@@ -49,8 +54,31 @@ def export_project_endpoint(project_id: str, skip_empty: bool = False, db: Sessi
     db.add(job)
     db.commit()
     db.refresh(job)
-    job_worker.start_export_job(job.id, project_id, selected_ids)
+    job_worker.start_export_job(job.id, project_id, selected_ids, settings)
     return {"job_id": job.id}
+
+
+@router.get("/api/projects/{project_id}/captions")
+def project_captions(project_id: str, format: str = "srt", db: Session = Depends(get_db)):
+    """Caption file (SRT or VTT) for the whole video, for uploading to YouTube and others."""
+    from fastapi.responses import PlainTextResponse
+    from app.render import delivery
+    project = db.get(Project, project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+    if format not in ("srt", "vtt"):
+        raise HTTPException(400, "Caption format must be srt or vtt.")
+    timed, cursor, prev = [], 0, None
+    for s in [s for s in project.scenes if s.shots]:
+        length = s.measured_duration_ms or s.natural_duration_ms or s.requested_duration_ms or 4000
+        t = s.transition_in_json or {}
+        overlap = min(int(t.get("duration_ms") or 0), prev // 2, length // 2) if prev and t.get("type", "cut") != "cut" else 0
+        start = cursor - overlap
+        timed.append((s, start, length)); cursor, prev = start + length, length
+    text = delivery.captions_file(delivery.caption_cues(timed), format)
+    name = "".join(ch for ch in (project.title or "captions") if ch.isalnum() or ch in " -_").strip() or "captions"
+    return PlainTextResponse(text, media_type="text/vtt" if format == "vtt" else "application/x-subrip",
+                             headers={"Content-Disposition": f'attachment; filename="{name}.{format}"'})
 
 
 @router.get("/api/jobs/{job_id}", response_model=schemas.JobOut)

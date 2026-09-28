@@ -623,3 +623,48 @@ def auto_captions(scene_id: str, body: dict | None = None, db: Session = Depends
     scene.revision += 1
     db.commit(); db.refresh(scene)
     return scene
+
+
+_POSITIONAL_LOOK = ("route", "annotations", "layout", "parallax", "redact")   # tied to one picture's layout
+
+
+@router.post("/{scene_id}/apply-to")
+def apply_to_scenes(scene_id: str, body: dict, db: Session = Depends(get_db)):
+    """Copy this scene's settings to other scenes (multi-select on the timeline):
+    effects = look preset + look settings (except position-specific ones),
+    captions = caption style (not the caption text or transcript), titles = text overlays,
+    transition = incoming transition."""
+    from copy import deepcopy
+    src = db.get(Scene, scene_id)
+    if not src:
+        raise HTTPException(404, "Scene not found")
+    targets = (body or {}).get("targets") or []
+    parts = set((body or {}).get("parts") or [])
+    if not isinstance(targets, list) or not targets or not parts or parts - {"effects", "captions", "titles", "transition"}:
+        raise HTTPException(400, "Choose target scenes and what to copy: effects, captions, titles, transition.")
+    changed = 0
+    for tid in targets:
+        t = db.get(Scene, tid)
+        if not t or t.id == src.id:
+            continue
+        if t.project_id != src.project_id:
+            raise HTTPException(400, "Scenes must be in the same project.")
+        if "effects" in parts:
+            t.effect_preset = src.effect_preset
+            look = {k: deepcopy(v) for k, v in (src.look_json or {}).items() if k not in _POSITIONAL_LOOK}
+            keep = {k: v for k, v in (t.look_json or {}).items() if k in _POSITIONAL_LOOK}
+            t.look_json = {**look, **keep}
+        if "captions" in parts or "titles" in parts:
+            font = dict(t.font_json or {})
+            if "captions" in parts:
+                style = {k: deepcopy(v) for k, v in (src.font_json or {}).items() if k not in ("layers", "transcript")}
+                font = {**style, **({"layers": font["layers"]} if "layers" in font else {}), **({"transcript": font["transcript"]} if "transcript" in font else {})}
+            if "titles" in parts:
+                font["layers"] = deepcopy((src.font_json or {}).get("layers", []))
+            t.font_json = font
+        if "transition" in parts:
+            t.transition_in_json = deepcopy(src.transition_in_json)
+        t.revision += 1
+        changed += 1
+    db.commit()
+    return {"changed": changed}

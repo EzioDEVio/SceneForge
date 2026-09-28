@@ -617,7 +617,8 @@ XFADE_NAMES = {
     "zoom_in": "zoomin", "smooth_left": "smoothleft", "smooth_right": "smoothright",
     "radial": "radial", "pixelize": "pixelize", "blur": "hblur", "diagonal": "diagtl",
     "squeeze": "squeezeh", "fade_grays": "fadegrays", "wind": "hlwind", "slice": "hlslice",
-    "open": "horzopen", "close": "horzclose", "fade_fast": "fadefast", "film_burn": f"custom:expr='{FILM_BURN_EXPR}'",
+    "open": "horzopen", "close": "horzclose", "fade_fast": "fadefast",
+    "slide_up": "slideup", "slide_down": "slidedown", "smooth_up": "smoothup", "smooth_down": "smoothdown", "wipe_up": "wipeup", "wipe_down": "wipedown", "cover_left": "coverleft", "cover_right": "coverright", "reveal_left": "revealleft", "reveal_right": "revealright", "vert_open": "vertopen", "vert_close": "vertclose", "diagonal_tr": "diagtr", "rect_crop": "rectcrop", "distance": "distance", "slice_vertical": "vuslice", "wind_up": "vuwind", "squeeze_v": "squeezev", "film_burn": f"custom:expr='{FILM_BURN_EXPR}'",
 }
 
 
@@ -651,8 +652,8 @@ def _render_export_core(
             graph.append(''.join(pads) + f'concat=n={len(paths)}:v=1:a=1[vout][aout]')
             out_path = str(Path(RENDERS_DIR) / f"export_{project.id}_{uuid.uuid4().hex[:8]}.mp4")
             run_ffmpeg([*inputs, '-filter_complex', ';'.join(graph), '-map', '[vout]', '-map', '[aout]',
-                        '-c:v', 'libx264', '-preset', X264_PRESET, '-crf', X264_CRF, '-pix_fmt', 'yuv420p',
-                        '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', out_path], cancel_check=ctx.cancel_check)
+                        '-c:v', 'libx264', '-preset', X264_PRESET, '-crf', X264_CRF, '-pix_fmt', 'yuv420p', '-profile:v', 'high',
+                        '-movflags', '+faststart', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2', out_path], cancel_check=ctx.cancel_check)
             if progress_cb: progress_cb('export', 100)
             return out_path
 
@@ -712,7 +713,10 @@ def _render_export_core(
             "-filter_complex", graph,
             "-map", f"[{v_label}]", "-map", f"[{a_label}]",
             "-c:v", "libx264", "-preset", X264_PRESET, "-crf", X264_CRF,
-            "-c:a", "aac", "-b:a", "192k",
+            # Widely playable delivery format: some transitions compute in full colour, which made
+            # libx264 pick High 4:4:4 (Windows Photos / Media Player cannot open it).
+            "-pix_fmt", "yuv420p", "-profile:v", "high", "-movflags", "+faststart",
+            "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
             out_path,
         ]
         run_ffmpeg(args, cancel_check=ctx.cancel_check)

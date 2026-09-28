@@ -20,6 +20,14 @@ export const CAPTION_PRESETS: {name: string; sample: string; values: F}[] = [
   {name: 'Documentary', sample: 'Story', values: {family: 'Amiri', size: 46, bold: false, italic: true, case: 'none', color: '#FFFFFF', outline_width: 0, shadow: 3, shadow_opacity: 75, background: 'none', split: 'phrases', phrase_words: 5, karaoke: false, caption_animation: 'fade', caption_animation_ms: 400, exit_animation: 'fade'}},
   {name: 'Underline', sample: 'Under', values: {family: 'Poppins', size: 58, bold: true, case: 'none', color: '#FFFFFF', outline_color: '#000000', outline_width: 3, background: 'none', split: 'phrases', phrase_words: 4, karaoke: true, karaoke_style: 'underline', highlight_color: '#FF6B6B', caption_animation: 'none'}},
   {name: 'Arabic modern', sample: 'عربي', values: {family: 'Tajawal', size: 66, bold: true, case: 'none', color: '#FFFFFF', outline_color: '#000000', outline_width: 3, background: 'none', split: 'phrases', phrase_words: 3, karaoke: true, karaoke_style: 'box', highlight_color: '#FFB020', caption_animation: 'words-pop', caption_animation_ms: 300}},
+  {name: 'Bold outline', sample: 'BOLD', values: {family: 'Poppins', size: 64, bold: true, case: 'upper', color: '#FFFFFF', outline_color: '#000000', outline_width: 7, background: 'none', shadow: 2, shadow_opacity: 60, split: 'phrases', phrase_words: 3, karaoke: false, caption_animation: 'words-pop', caption_animation_ms: 250}},
+  {name: 'Yellow box', sample: 'Yellow', values: {family: 'Poppins', size: 56, bold: true, case: 'none', color: '#111111', background: 'box', box_color: '#FFD84D', box_opacity: 100, box_padding: 12, outline_width: 0, split: 'phrases', phrase_words: 4, karaoke: false, caption_animation: 'bounce', caption_animation_ms: 300}},
+  {name: 'Red highlight', sample: 'Red', values: {family: 'Anton', size: 72, case: 'upper', color: '#FFFFFF', outline_color: '#000000', outline_width: 5, background: 'none', split: 'phrases', phrase_words: 2, karaoke: true, karaoke_style: 'box', highlight_color: '#FF3B3B', caption_animation: 'words-pop', caption_animation_ms: 250}},
+  {name: 'Green karaoke', sample: 'Green', values: {family: 'Bebas Neue', size: 78, case: 'upper', color: '#FFFFFF', outline_color: '#000000', outline_width: 5, background: 'none', split: 'phrases', phrase_words: 3, karaoke: true, karaoke_style: 'color', highlight_color: '#39FF6A', caption_animation: 'none'}},
+  {name: 'Blue glow', sample: 'Glow', values: {family: 'Poppins', size: 58, bold: true, case: 'none', color: '#FFFFFF', outline_width: 0, background: 'none', split: 'phrases', phrase_words: 3, karaoke: true, karaoke_style: 'glow', highlight_color: '#4DB8FF', caption_animation: 'fade', caption_animation_ms: 200}},
+  {name: 'Handwritten', sample: 'Hello', values: {family: 'Pacifico', size: 60, bold: false, case: 'none', color: '#FFFFFF', outline_color: '#1A1A1A', outline_width: 3, background: 'none', shadow: 2, split: 'phrases', phrase_words: 4, karaoke: false, caption_animation: 'fade', caption_animation_ms: 300}},
+  {name: 'News lower third', sample: 'News', values: {family: 'Noto Sans', size: 40, bold: true, case: 'none', color: '#FFFFFF', background: 'box', box_color: '#C8102E', box_opacity: 95, box_padding: 10, outline_width: 0, position: 'bottom', halign: 'left', split: 'full', karaoke: false, caption_animation: 'fade', caption_animation_ms: 300}},
+  {name: 'Elegant serif', sample: 'Elegant', values: {family: 'Amiri', size: 50, bold: false, italic: false, case: 'none', color: '#F5EFE0', outline_width: 0, shadow: 2, shadow_opacity: 80, spacing: 2, background: 'none', split: 'phrases', phrase_words: 5, karaoke: false, caption_animation: 'letters-fade', caption_animation_ms: 700}},
   {name: 'Pulse', sample: 'Pulse', values: {family: 'Bebas Neue', size: 80, case: 'upper', color: '#FFE14D', outline_color: '#000000', outline_width: 4, background: 'none', split: 'phrases', phrase_words: 2, karaoke: false, caption_animation: 'bounce', caption_animation_ms: 350, loop: 'pulse', exit_animation: 'pop', exit_ms: 200}},
 ];
 
@@ -165,10 +173,10 @@ const LANGS: [string, string][] = [['', 'Detect automatically'], ['ar', 'Arabic'
 
 /** CapCut-style automatic captions: transcribe the speech in the scene (narration, or the
  *  videos' own sound) with the language detected, then style them with Captions Pro. */
-export function AutoCaptions({scene, onDone}: {scene: Scene; onDone: (s: Scene) => void}) {
-  const [open, setOpen] = React.useState(false);
+export function AutoCaptions({scene, onDone, onStyle}: {scene: Scene; onDone: (s: Scene) => void; onStyle?: (values: F) => void}) {
   const [lang, setLang] = React.useState('');
   const [provider, setProvider] = React.useState('auto');
+  const [style, setStyle] = React.useState('Viral bold');
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState('');
   const tr = (scene.font_json as any)?.transcript;
@@ -176,19 +184,23 @@ export function AutoCaptions({scene, onDone}: {scene: Scene; onDone: (s: Scene) 
   const hasVideo = scene.shots.some(s => s.asset?.type === 'video');
   async function go() {
     setBusy(true); setMsg('Listening to the speech…');
-    try {const sc = await api.autoCaptions(scene.id, {provider, language: lang}); const t = (sc.font_json as any)?.transcript;
-      setMsg(`Done: ${t?.words?.length || 0} words${t?.language ? ` · language: ${t.language}` : ''}. Edit the text if needed, then style it below.`); onDone(sc);}
-    catch (e: any) {setMsg(e.message || String(e));} finally {setBusy(false);}
+    try {
+      const sc = await api.autoCaptions(scene.id, {provider, language: lang}); const t = (sc.font_json as any)?.transcript;
+      const preset = CAPTION_PRESETS.find(p => p.name === style);
+      if (preset && onStyle) onStyle({...preset.values, captions_enabled: true, typewriter: false});
+      setMsg(`Done: ${t?.words?.length || 0} words${t?.language ? ` · language: ${t.language}` : ''}${preset ? ` · style: ${preset.name}` : ''}. Edit the text below if a word is wrong.`); onDone(sc);
+    } catch (e: any) {setMsg(e.message || String(e));} finally {setBusy(false);}
   }
-  return <div className="auto-captions">
-    <button className="text-btn" disabled={!hasNarr && !hasVideo} title={!hasNarr && !hasVideo ? 'Add narration or a video with sound first' : ''} onClick={() => setOpen(o => !o)}>✦ Captions from speech</button>
-    {tr?.language && !open && <span className="info-badge ok">{tr.language} · {tr.source === 'clips' ? 'from video sound' : 'from narration'}</span>}
-    {open && <div className="auto-captions-panel">
-      <p className="hint">Turns the speech in this scene into captions with exact word timing: {hasNarr ? 'the narration' : 'the videos’ own sound'}. Works with any language.</p>
-      <label className="control-label">Language<select aria-label="Speech language" value={lang} onChange={e => setLang(e.target.value)}>{LANGS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-      <label className="control-label">Service<select aria-label="Transcription service" value={provider} onChange={e => setProvider(e.target.value)}><option value="auto">Automatic (your saved key)</option><option value="elevenlabs">ElevenLabs Scribe</option><option value="openai">OpenAI Whisper</option></select></label>
-      <button className="btn btn-primary" disabled={busy} onClick={() => void go()}>{busy ? 'Transcribing…' : 'Generate captions'}</button>
-      {msg && <p className="info-status" aria-live="polite">{msg}</p>}
-    </div>}
-  </div>;
+  const disabled = !hasNarr && !hasVideo;
+  return <section className="auto-captions-card" aria-label="Auto captions">
+    <header><span className="acc-icon"><Sparkles size={16}/></span><div><strong>Auto captions</strong><span>{disabled ? 'Add narration or a video with sound to this scene first.' : `Turns ${hasNarr ? 'the narration' : 'the speech in your video'} into timed captions, in any language.`}</span></div>
+      {tr?.language && <span className="info-badge ok">{tr.language} · {tr.source === 'clips' ? 'video sound' : 'narration'}</span>}</header>
+    <div className="acc-grid">
+      <label className="control-label">Language<select aria-label="Speech language" value={lang} disabled={disabled} onChange={e => setLang(e.target.value)}>{LANGS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+      <label className="control-label">Caption style<select aria-label="Auto caption style" value={style} disabled={disabled} onChange={e => setStyle(e.target.value)}><option value="">Keep current style</option>{CAPTION_PRESETS.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}</select></label>
+      <label className="control-label">Service<select aria-label="Transcription service" value={provider} disabled={disabled} onChange={e => setProvider(e.target.value)}><option value="auto">Automatic (your saved key)</option><option value="elevenlabs">ElevenLabs Scribe</option><option value="openai">OpenAI Whisper</option></select></label>
+      <button className="btn btn-primary acc-go" disabled={busy || disabled} onClick={() => void go()}><Sparkles size={14}/> {busy ? 'Transcribing…' : 'Generate captions'}</button>
+    </div>
+    {msg && <p className="info-status" aria-live="polite">{msg}</p>}
+  </section>;
 }

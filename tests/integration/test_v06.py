@@ -112,4 +112,77 @@ def mv(w,h):
 check('vertical captions sit above the TikTok/Reels/Shorts buttons (about 20 % up); landscape keeps 5.5 %',mv(1080,1920)==384 and mv(1920,1080)==59)
 from app.render.filters import build_contain_chain
 check('the blurred background is strong enough at 1080×1920',"gblur=sigma=48" in build_contain_chain(1080,1920,True))
+
+# --- exports open everywhere (Windows Photos / Media Player) -----------------------------------
+def probe_v(path):
+ out=subprocess.check_output(['ffprobe','-v','error','-select_streams','v:0','-show_entries','stream=profile,pix_fmt','-of','default=nw=1',str(path)],text=True)
+ return dict(l.split('=',1) for l in out.strip().splitlines())
+vs=c.get(f'/api/projects/{vid}').json()['scenes']
+c.patch(f"/api/scenes/{vs[1]['id']}",json={'transition_in':{'type':'film_burn','duration_ms':500}})
+check('the transition was applied for this check',c.get(f'/api/projects/{vid}').json()['scenes'][1]['transition_in_json']['type']=='film_burn')
+for label,path in (('with a film burn transition',export_of(vid)),):
+ info=probe_v(path);raw=open(path,'rb').read()
+ check(f'export {label} is 4:2:0, not High 4:4:4, with fast start',info['pix_fmt']=='yuv420p' and '4:4:4' not in info['profile'] and raw.find(b'moov')<raw.find(b'mdat'))
+c.patch(f"/api/scenes/{vs[1]['id']}",json={'transition_in':{'type':'cut','duration_ms':0}})
+info=probe_v(out:=export_of(vid));raw=open(out,'rb').read()
+check('export with plain cuts is 4:2:0 with fast start',info['pix_fmt']=='yuv420p' and raw.find(b'moov')<raw.find(b'mdat'))
+
+# --- new transitions render in a real export --------------------------------------------------
+from app.render.renderer import XFADE_NAMES
+new=['slide_up','slide_down','smooth_up','smooth_down','wipe_up','wipe_down','cover_left','cover_right','reveal_left','reveal_right','vert_open','vert_close','diagonal_tr','rect_crop','distance','slice_vertical','wind_up','squeeze_v']
+check('18 new transitions are mapped to FFmpeg',all(k in XFADE_NAMES for k in new))
+bad=[]
+for k in new:
+ xf=XFADE_NAMES[k]
+ r=subprocess.run(['ffmpeg','-v','error','-f','lavfi','-i','color=red:s=160x90:d=1:r=30','-f','lavfi','-i','color=blue:s=160x90:d=1:r=30','-filter_complex',f'[0][1]xfade=transition={xf}:duration=0.5:offset=0.4','-f','null','-'],capture_output=True,text=True)
+ if r.returncode: bad.append(k)
+check(f'every new transition renders with the bundled FFmpeg {bad or ""}',not bad)
+c.patch(f"/api/scenes/{vs[1]['id']}",json={'transition_in':{'type':'cover_left','duration_ms':500}})
+out=export_of(vid)
+dur_ct=float(subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','csv=p=0',str(out)]))
+# scenes: 3 s countdown + 3 s clip, 3 s clip, 3 s + 2×1 s clips; minus 0.5 s transition overlap
+check(f'an export with a new transition (Cover left) has the right length ({dur_ct:.2f} s = 13.5 s)',abs(dur_ct-13.5)<0.3)
+
+# --- multi-select: copy settings to several scenes --------------------------------------------
+vs=c.get(f'/api/projects/{vid}').json()['scenes']
+src,t1,t2=vs[0]['id'],vs[1]['id'],vs[2]['id']
+c.patch(f'/api/scenes/{t1}',json={'subtitle_text':'target one text','look':{'annotations':[{'type':'box'}]}})
+c.patch(f'/api/scenes/{src}',json={'effect_preset':'glow','look':{'film':{'scratches':40},'annotations':[{'type':'circle'},{'type':'arrow'}]},
+ 'font':{'family':'Anton','case':'upper','split':'phrases','layers':[{'id':'t','text':'TITLE','x':50,'y':20,'size':60,'color':'#FFFFFF','start_ms':0,'end_ms':0,'animation':'letters-pop'}]},
+ 'transition_in':{'type':'dissolve','duration_ms':400}})
+check('apply-to validates its request',c.post(f'/api/scenes/{src}/apply-to',json={'targets':[t1],'parts':['everything']}).status_code==400)
+r=c.post(f'/api/scenes/{src}/apply-to',json={'targets':[t1,t2],'parts':['effects','captions','titles','transition']}).json()
+after={x['id']:x for x in c.get(f'/api/projects/{vid}').json()['scenes']}
+a1=after[t1]
+check('effects and look copy to the selected scenes, position-specific effects stay their own',r['changed']==2 and a1['effect_preset']=='glow' and a1['look_json']['film']['scratches']==40 and len(a1['look_json']['annotations'])==1 and a1['look_json']['annotations'][0]['type']=='box')
+check('caption style copies but each scene keeps its own caption text',a1['font_json']['family']=='Anton' and a1['font_json']['case']=='upper' and a1['subtitle_text']=='target one text')
+check('text overlays and transition copy too',a1['font_json']['layers'][0]['text']=='TITLE' and a1['transition_in_json']['type']=='dissolve' and after[t2]['font_json']['layers'][0]['animation']=='letters-pop')
+
+# --- export settings (delivery) and caption files ----------------------------------------------
+def export_with(settings):
+ j=c.post(f'/api/projects/{vid}/export',json={'settings':settings}).json()
+ assert 'job_id' in j,j
+ while (st:=c.get(f"/api/jobs/{j['job_id']}").json())['status'] not in ('succeeded','failed'):time.sleep(0.5)
+ assert st['status']=='succeeded',st.get('error','')[-600:]
+ a=[x for x in c.get(f'/api/assets?project_id={vid}').json() if x['id']==st['artifact_asset_id']] if False else None
+ out=t/f"dl_{time.time()}";data=c.get(f"/api/assets/{st['artifact_asset_id']}/stream");out.write_bytes(data.content);return out,data.headers.get('content-type','')
+def vinfo(path):
+ o=subprocess.check_output(['ffprobe','-v','error','-select_streams','v:0','-show_entries','stream=codec_name,codec_tag_string,width,height,r_frame_rate,pix_fmt','-of','default=nw=1',str(path)],text=True)
+ return dict(l.split('=',1) for l in o.strip().splitlines())
+check('export settings are validated',c.post(f'/api/projects/{vid}/export',json={'settings':{'resolution':'8k'}}).status_code==400)
+o,ct=export_with({'resolution':'720p','fps':24,'format':'mp4_h264','quality':'draft'});i=vinfo(o)
+check('720p keeps the 9:16 shape (720×1280) at 24 fps, H.264 4:2:0',i['width']=='720' and i['height']=='1280' and i['r_frame_rate']=='24/1' and i['pix_fmt']=='yuv420p' and 'mp4' in ct)
+o,_=export_with({'resolution':'720p','format':'mp4_h265','quality':'draft'});i=vinfo(o)
+check('H.265 is tagged hvc1 so Apple and Windows players accept it',i['codec_name']=='hevc' and i['codec_tag_string']=='hvc1')
+o,ct=export_with({'resolution':'720p','format':'webm','quality':'draft'});i=vinfo(o)
+check('WebM uses VP9',i['codec_name']=='vp9' and 'webm' in ct)
+o,_=export_with({'resolution':'720p','format':'mov_prores','quality':'draft'});i=vinfo(o)
+check('MOV uses ProRes for further editing',i['codec_name']=='prores')
+o,ct=export_with({'format':'gif','quality':'draft'})
+check('animated GIF export',open(o,'rb').read(6) in (b'GIF89a',b'GIF87a') and 'gif' in ct)
+o,ct=export_with({'format':'mp3','quality':'standard'})
+check('audio-only MP3 export',subprocess.check_output(['ffprobe','-v','error','-select_streams','a:0','-show_entries','stream=codec_name','-of','csv=p=0',str(o)],text=True).strip()=='mp3' and 'audio' in ct)
+srt=c.get(f'/api/projects/{vid}/captions?format=srt')
+vtt=c.get(f'/api/projects/{vid}/captions?format=vtt')
+check('caption files for the whole video (SRT and VTT)',srt.status_code==200 and '-->' in srt.text and srt.text.startswith('1\n') and vtt.text.startswith('WEBVTT') and 'attachment' in srt.headers.get('content-disposition',''))
 print(f'{n} v0.6 checks passed')

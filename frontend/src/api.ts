@@ -185,6 +185,8 @@ export const api = {
     req<Scene>(`/api/projects/${projectId}/insert-countdown`, {method: 'POST', body: JSON.stringify(body)}),
   autoCaptions: (sceneId: string, body: {provider?: string; language?: string; source?: string}) =>
     req<Scene>(`/api/scenes/${sceneId}/auto-captions`, {method: 'POST', body: JSON.stringify(body)}),
+  applyToScenes: (sourceId: string, targets: string[], parts: string[]) =>
+    req<{changed: number}>(`/api/scenes/${sourceId}/apply-to`, {method: 'POST', body: JSON.stringify({targets, parts})}),
   duplicateScene: (sceneId: string) => req<Scene>(`/api/scenes/${sceneId}/duplicate`, {method: 'POST'}),
   pasteAudio: (sceneId: string, takeId: string) => req<Scene>(`/api/scenes/${sceneId}/paste-audio`, {method: 'POST', body: JSON.stringify({take_id: takeId})}),
   reorderScenes: (projectId: string, sceneIds: string[]) =>
@@ -235,8 +237,9 @@ export const api = {
   selectTake: (takeId: string) => req<VoiceTake>(`/api/voice-takes/${takeId}/select`, { method: "POST" }),
 
   renderPart: (sceneId: string) => req<{ job_id: string }>(`/api/scenes/${sceneId}/render`, { method: "POST" }),
-  exportProject: (projectId: string, skipEmpty = false) =>
-    req<{ job_id: string }>(`/api/projects/${projectId}/export?skip_empty=${skipEmpty}`, { method: "POST" }),
+  exportProject: (projectId: string, skipEmpty = false, settings?: Record<string, unknown>) =>
+    req<{ job_id: string }>(`/api/projects/${projectId}/export?skip_empty=${skipEmpty}`, { method: "POST", body: JSON.stringify({settings: settings || {}}) }),
+  captionsUrl: (projectId: string, format: 'srt' | 'vtt') => `/api/projects/${projectId}/captions?format=${format}`,
   getJob: (jobId: string) => req<Job>(`/api/jobs/${jobId}`),
   cancelJob: (jobId: string) => req(`/api/jobs/${jobId}/cancel`, { method: "POST" }),
 

@@ -49,6 +49,7 @@ globalThis.fetch=async(path,init={})=>{
  else if(path.startsWith('/api/assets/luts'))result=[];
  else if(/\/api\/projects\/[^/]+\/insert-countdown$/.test(path)){const sc={...clone(project.scenes[0]),id:'cd-'+next++,title:'Film leader',shots:[],voice_takes:[]};project.scenes.unshift(sc);result=sc;}
  else if(/\/api\/scenes\/[^/]+\/auto-captions$/.test(path)){const sc=project.scenes.find(x=>x.id===path.split('/')[3]);sc.subtitle_text='hello from speech';sc.font_json={...sc.font_json,captions_enabled:true,transcript:{language:'en',source:'narration',words:[['hello',0,300],['from',300,600],['speech',600,900]]}};result=sc;}
+ else if(/\/api\/scenes\/[^/]+\/apply-to$/.test(path))result={changed:body.targets.length};
  else if(/\/api\/scenes\/[^/]+\/duplicate$/.test(path)){const src=project.scenes.find(x=>x.id===path.split('/')[3]);const dup=clone(src);dup.id='dup-'+next++;dup.title=src.title+' (copy)';dup.shots=dup.shots.map(sh=>({...sh,id:'dsh-'+next++}));project.scenes.splice(project.scenes.indexOf(src)+1,0,dup);result=dup;}
  else if(/\/api\/scenes\/[^/]+\/paste-audio$/.test(path)){const tgt=project.scenes.find(x=>x.id===path.split('/')[3]);const src=project.scenes.flatMap(x=>x.voice_takes).find(v=>v.id===body.take_id);tgt.voice_takes.forEach(v=>v.accepted=false);tgt.voice_takes.push({...clone(src),id:'pt-'+next++,accepted:true});result=tgt;}
  else if(/\/api\/projects\/[^/]+\/beat-sync$/.test(path))result={bpm:120,beats:[0.5,1,1.5],scenes_changed:2,scenes_kept:1};
@@ -216,11 +217,15 @@ try{
  check('background box saves',requests.some(r=>r.body?.font?.background==='box'));
  check('the caption preview is drawn on the picture',!!document.querySelector('.preview-canvas .caption-preview'));
  await user.click(screen.getByRole('button',{name:'Apply Classic caption style'}));await saved();
- await user.click(screen.getByRole('button',{name:/Captions from speech/}));
- await user.selectOptions(screen.getByRole('combobox',{name:'Speech language'}),'ar');
- await user.click(screen.getByRole('button',{name:'Generate captions'}));
+ const acc=screen.getByRole('region',{name:'Auto captions'});
+ await user.selectOptions(within(acc).getByRole('combobox',{name:'Speech language'}),'ar');
+ await user.selectOptions(within(acc).getByRole('combobox',{name:'Auto caption style'}),'Red highlight');
+ await user.click(within(acc).getByRole('button',{name:/Generate captions/}));
  await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/auto-captions'))));
- check('Captions from speech sends the chosen language and reports the detected one',requests.some(r=>r.path.endsWith('/auto-captions')&&r.body.language==='ar')&&!!(await screen.findByText(/language: en/)));
+ check('Auto captions card sends the chosen language and reports the detected one',requests.some(r=>r.path.endsWith('/auto-captions')&&r.body.language==='ar')&&!!(await within(acc).findByText(/language: en/)));
+ await saved();
+ check('Auto captions applies the chosen caption style after transcribing',requests.some(r=>r.body?.font?.family==='Anton'&&r.body.font.karaoke_style==='box'&&r.body.font.highlight_color==='#FF3B3B'));
+ await user.click(screen.getByRole('button',{name:'Apply Classic caption style'}));await saved();
  await user.selectOptions(screen.getByRole('combobox',{name:'Caption animation'}),'letters-pop');await saved();
  check('caption animation saves from the Text tab',requests.some(r=>r.body?.font?.caption_animation==='letters-pop'));
  await user.click(screen.getByRole('button',{name:/Add animated title/}));await saved();
@@ -481,6 +486,31 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getByRole('button',{name:'Fit preview to window'}));
  await waitFor(()=>assert.ok(!pc().style.transform));
  check('Fit returns the preview to normal size',!pc().style.transform);
+ await user.click(screen.getByRole('button',{name:'Select scene 2: Part-1'}));
+ await user.click(screen.getAllByRole('button',{name:'Transitions'})[0]);
+ const coverTile=[...document.querySelectorAll('.transition-presets button')].find(b=>b.textContent.includes('Cover left'));
+ await user.hover(coverTile);
+ check('42 transitions are offered; none previews on the first playing scene (it cannot take a transition)',[...document.querySelectorAll('.transition-presets button')].length>=42&&coverTile.disabled&&!document.querySelector('.tx-on-canvas'));
+ await user.unhover(coverTile);
+ check('moving away ends the transition preview',!document.querySelector('.tx-on-canvas'));
+ const pcs=[...document.querySelectorAll('.picture-clip')];
+ fireEvent.click(pcs[1],{ctrlKey:true});fireEvent.click(pcs[2],{ctrlKey:true});
+ const bb=await screen.findByRole('region',{name:'Selected parts'});
+ check('Ctrl+click selects several parts with a tick and shows the batch bar',document.querySelectorAll('.picture-clip.multi').length>=2&&/parts selected/.test(bb.textContent));
+ await user.click(within(bb).getByRole('button',{name:/Apply to/}));
+ await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/apply-to'))));
+ check('Apply copies the chosen settings to the other selected parts',requests.some(r=>r.path.endsWith('/apply-to')&&r.body.parts.includes('effects')&&r.body.parts.includes('captions')&&r.body.targets.length>=1));
+ await user.click(within(bb).getByRole('button',{name:'Clear selection'}));
+ check('clearing the selection hides the batch bar',!screen.queryByRole('region',{name:'Selected parts'}));
+ await user.click(screen.getByRole('button',{name:/^Export video$/}));
+ const exd=await screen.findByRole('dialog',{name:'Export video'});
+ await user.click(within(exd).getByRole('radio',{name:/Small file/}));
+ await user.click(within(exd).getByRole('button',{name:/Advanced settings/}));
+ await user.selectOptions(within(exd).getByRole('combobox',{name:'Export frame rate'}),'60');
+ check('export dialog shows a size estimate and caption file links',/About/.test(exd.textContent)&&!!within(exd).getByRole('link',{name:'SRT'}));
+ await user.click(within(exd).getByRole('button',{name:/^Export$/}));
+ await waitFor(()=>assert.ok(requests.some(r=>r.path.includes('/export')&&r.body?.settings?.format==='mp4_h265')));
+ check('Export sends the chosen preset and advanced settings',requests.some(r=>r.path.includes('/export')&&r.body.settings.format==='mp4_h265'&&r.body.settings.resolution==='720p'&&r.body.settings.fps===60));
  // Duplicate / copy / paste
  const clipsBefore=project.scenes.length;
  const firstClip=document.querySelector('.picture-clip');

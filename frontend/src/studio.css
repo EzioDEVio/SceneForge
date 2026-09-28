@@ -273,8 +273,8 @@ body.resizing-inspector iframe,body.resizing-inspector video{pointer-events:none
 .transition-sample span{position:absolute;inset:0;display:grid;place-items:center}
 .transition-sample span:first-child{clip-path:inset(0 50% 0 0)}
 .transition-sample span+span{clip-path:inset(0 0 0 50%)}
-button:hover>.transition-sample span,button:focus-visible>.transition-sample span{clip-path:none}
-button:hover>.transition-sample span+span,button:focus-visible>.transition-sample span+span{animation:tx-fade 1.6s ease-in-out infinite}
+button:hover>.transition-sample span,button:focus-visible>.transition-sample span,.tx-live.transition-sample span{clip-path:none}
+button:hover>.transition-sample span+span,button:focus-visible>.transition-sample span+span,.tx-live.transition-sample span+span{animation:tx-fade 1.6s ease-in-out infinite}
 @keyframes tx-fade{0%,20%{opacity:0}60%,100%{opacity:1}}
 @keyframes tx-slide-l{0%,15%{transform:translateX(100%)}60%,100%{transform:none}}
 @keyframes tx-slide-r{0%,15%{transform:translateX(-100%)}60%,100%{transform:none}}
@@ -296,28 +296,28 @@ button:hover>.transition-sample span+span,button:focus-visible>.transition-sampl
 @keyframes tx-wind{0%,15%{transform:translateX(100%);filter:blur(3px)}60%,100%{transform:none;filter:none}}
 @keyframes tx-slice{0%,15%{clip-path:inset(0 0 100% 0)}30%{clip-path:inset(0 0 66% 0)}45%{clip-path:inset(0 0 33% 0)}60%,100%{clip-path:inset(0 0 0 0)}}
 @keyframes tx-radial{0%,15%{clip-path:polygon(50% 50%,50% 0,50% 0,50% 0,50% 0,50% 0)}30%{clip-path:polygon(50% 50%,50% 0,100% 0,100% 50%,100% 50%,100% 50%)}45%{clip-path:polygon(50% 50%,50% 0,100% 0,100% 100%,0 100%,0 100%)}60%,100%{clip-path:polygon(50% 50%,50% 0,100% 0,100% 100%,0 100%,0 0)}}
-button:hover>.sample-cut span+span,button:focus-visible>.sample-cut span+span{animation:none;opacity:1}
-button:hover>.sample-slide span+span,button:hover>.sample-smooth_left span+span{animation-name:tx-slide-l}
-button:hover>.sample-slide_right span+span,button:hover>.sample-smooth_right span+span{animation-name:tx-slide-r}
-button:hover>.sample-wipe_left span+span{animation-name:tx-wipe-l}
-button:hover>.sample-wipe_right span+span{animation-name:tx-wipe-r}
-button:hover>.sample-diagonal span+span{animation-name:tx-diag}
-button:hover>.sample-circle_open span+span{animation-name:tx-circle-open}
-button:hover>.sample-circle_close span+span{animation-name:tx-circle-open;animation-direction:reverse}
-button:hover>.sample-open span+span{animation-name:tx-open}
-button:hover>.sample-close span+span{animation-name:tx-open;animation-direction:reverse}
-button:hover>.sample-zoom_in span+span{animation-name:tx-zoom}
-button:hover>.sample-squeeze span+span{animation-name:tx-squeeze}
-button:hover>.sample-blur span+span{animation-name:tx-blur}
-button:hover>.sample-pixelize span+span{animation-name:tx-pixel}
-button:hover>.sample-fade_through_black span+span{animation-name:tx-black}
-button:hover>.sample-fade_white span+span{animation-name:tx-white}
-button:hover>.sample-fade_grays span+span{animation-name:tx-grey}
-button:hover>.sample-film_burn span+span{animation-name:tx-burn}
-button:hover>.sample-wind span+span{animation-name:tx-wind}
-button:hover>.sample-slice span+span{animation-name:tx-slice}
-button:hover>.sample-radial span+span{animation-name:tx-radial}
-button:hover>.sample-fade_fast span+span{animation-duration:.9s}
+button:hover>.sample-cut span+span,.tx-live.sample-cut span+span,button:focus-visible>.sample-cut span+span{animation:none;opacity:1}
+button:hover>.sample-slide span+span,.tx-live.sample-slide span+span,button:hover>.sample-smooth_left span+span,.tx-live.sample-smooth_left span+span{animation-name:tx-slide-l}
+button:hover>.sample-slide_right span+span,.tx-live.sample-slide_right span+span,button:hover>.sample-smooth_right span+span,.tx-live.sample-smooth_right span+span{animation-name:tx-slide-r}
+button:hover>.sample-wipe_left span+span,.tx-live.sample-wipe_left span+span{animation-name:tx-wipe-l}
+button:hover>.sample-wipe_right span+span,.tx-live.sample-wipe_right span+span{animation-name:tx-wipe-r}
+button:hover>.sample-diagonal span+span,.tx-live.sample-diagonal span+span{animation-name:tx-diag}
+button:hover>.sample-circle_open span+span,.tx-live.sample-circle_open span+span{animation-name:tx-circle-open}
+button:hover>.sample-circle_close span+span,.tx-live.sample-circle_close span+span{animation-name:tx-circle-open;animation-direction:reverse}
+button:hover>.sample-open span+span,.tx-live.sample-open span+span{animation-name:tx-open}
+button:hover>.sample-close span+span,.tx-live.sample-close span+span{animation-name:tx-open;animation-direction:reverse}
+button:hover>.sample-zoom_in span+span,.tx-live.sample-zoom_in span+span{animation-name:tx-zoom}
+button:hover>.sample-squeeze span+span,.tx-live.sample-squeeze span+span{animation-name:tx-squeeze}
+button:hover>.sample-blur span+span,.tx-live.sample-blur span+span{animation-name:tx-blur}
+button:hover>.sample-pixelize span+span,.tx-live.sample-pixelize span+span{animation-name:tx-pixel}
+button:hover>.sample-fade_through_black span+span,.tx-live.sample-fade_through_black span+span{animation-name:tx-black}
+button:hover>.sample-fade_white span+span,.tx-live.sample-fade_white span+span{animation-name:tx-white}
+button:hover>.sample-fade_grays span+span,.tx-live.sample-fade_grays span+span{animation-name:tx-grey}
+button:hover>.sample-film_burn span+span,.tx-live.sample-film_burn span+span{animation-name:tx-burn}
+button:hover>.sample-wind span+span,.tx-live.sample-wind span+span{animation-name:tx-wind}
+button:hover>.sample-slice span+span,.tx-live.sample-slice span+span{animation-name:tx-slice}
+button:hover>.sample-radial span+span,.tx-live.sample-radial span+span{animation-name:tx-radial}
+button:hover>.sample-fade_fast span+span,.tx-live.sample-fade_fast span+span{animation-duration:.9s}
 @media (prefers-reduced-motion:reduce){button:hover>.transition-sample span+span{animation:none!important;opacity:1}}
 .route-label-row{display:grid;grid-template-columns:22px minmax(0,1fr);gap:8px;align-items:center;margin:5px 0}.route-label-row input{width:100%}
 .annot-add{display:flex;flex-wrap:wrap;gap:6px;margin:8px 0}.annot-add .btn{font-size:11px;padding:5px 9px}
@@ -372,3 +372,70 @@ button:hover>.sample-fade_fast span+span{animation-duration:.9s}
 .sz-right{right:0;top:38%;bottom:20%;width:14%;writing-mode:vertical-rl}
 .fit-choice .segmented button.selected{background:#5b49d6;border-color:#7b69ea;color:#fff}
 .canvas-fg{background:transparent}
+/* Progress card (renders and exports) */
+.progress-card{margin:8px 0;padding:10px 12px;border-radius:12px;background:linear-gradient(160deg,#2c2a45,#23262e);border:1px solid #4d4480;box-shadow:0 6px 18px #0006}
+.progress-card.floating{position:fixed;right:18px;bottom:18px;width:340px;z-index:1500;animation:pc-in .25s ease-out}
+@keyframes pc-in{from{transform:translateY(12px);opacity:0}to{transform:none;opacity:1}}
+.pc-head{display:flex;align-items:center;gap:10px}.pc-icon{display:grid;place-items:center;width:30px;height:30px;border-radius:9px;background:#5b49d6;color:#fff;flex:none}
+.pc-titles{display:flex;flex-direction:column;min-width:0;flex:1}.pc-titles strong{font-size:12.5px;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.pc-titles span{font-size:11px;color:#b8b2e6}
+.pc-pct{font:700 15px 'Noto Sans',sans-serif;color:#fff;font-variant-numeric:tabular-nums}.pc-cancel{width:24px;height:24px;color:#cfc9f5}
+.pc-track{position:relative;height:8px;margin:9px 0 6px;border-radius:999px;background:#1a1b24;overflow:hidden;box-shadow:inset 0 1px 2px #0008}
+.pc-fill{position:relative;height:100%;border-radius:999px;background:linear-gradient(90deg,#6b4fe0,#9d7bff 60%,#5fd3ff);transition:width .45s ease;overflow:hidden}
+.pc-shimmer{position:absolute;inset:0;background:linear-gradient(100deg,transparent 20%,#ffffff55 45%,transparent 70%);transform:translateX(-100%);animation:pc-shine 1.4s linear infinite}
+@keyframes pc-shine{to{transform:translateX(100%)}}
+.pc-meta{display:flex;justify-content:space-between;font-size:10.5px;color:#9aa0ad;font-variant-numeric:tabular-nums}
+@media (prefers-reduced-motion:reduce){.pc-shimmer{animation:none}.pc-fill{transition:none}}
+
+@keyframes tx-slide-u{0%,15%{transform:translateY(100%)}60%,100%{transform:none}}
+@keyframes tx-slide-d{0%,15%{transform:translateY(-100%)}60%,100%{transform:none}}
+@keyframes tx-wipe-u{0%,15%{clip-path:inset(100% 0 0 0)}60%,100%{clip-path:inset(0)}}
+@keyframes tx-wipe-d{0%,15%{clip-path:inset(0 0 100% 0)}60%,100%{clip-path:inset(0)}}
+@keyframes tx-vopen{0%,15%{clip-path:inset(50% 0 50% 0)}60%,100%{clip-path:inset(0)}}
+@keyframes tx-rect{0%,15%{clip-path:inset(50% 50% 50% 50%)}60%,100%{clip-path:inset(0)}}
+@keyframes tx-diag-tr{0%,15%{clip-path:polygon(100% 0,100% 0,100% 0)}60%,100%{clip-path:polygon(100% 0,-120% 0,100% 220%)}}
+@keyframes tx-distance{0%,15%{opacity:0;transform:scale(1.25);filter:blur(3px)}60%,100%{opacity:1;transform:none;filter:none}}
+@keyframes tx-reveal-l{0%,15%{clip-path:inset(0 100% 0 0)}60%,100%{clip-path:inset(0)}}
+button:hover>.sample-slide_up span+span,.tx-live.sample-slide_up span+span{animation-name:tx-slide-u}
+button:hover>.sample-smooth_up span+span,.tx-live.sample-smooth_up span+span{animation-name:tx-slide-u}
+button:hover>.sample-cover_right span+span,.tx-live.sample-cover_right span+span{animation-name:tx-slide-r}
+button:hover>.sample-slide_down span+span,.tx-live.sample-slide_down span+span{animation-name:tx-slide-d}
+button:hover>.sample-smooth_down span+span,.tx-live.sample-smooth_down span+span{animation-name:tx-slide-d}
+button:hover>.sample-wipe_up span+span,.tx-live.sample-wipe_up span+span{animation-name:tx-wipe-u}
+button:hover>.sample-wind_up span+span,.tx-live.sample-wind_up span+span{animation-name:tx-wipe-u}
+button:hover>.sample-slice_vertical span+span,.tx-live.sample-slice_vertical span+span{animation-name:tx-wipe-u}
+button:hover>.sample-wipe_down span+span,.tx-live.sample-wipe_down span+span{animation-name:tx-wipe-d}
+button:hover>.sample-cover_left span+span,.tx-live.sample-cover_left span+span{animation-name:tx-slide-l}
+button:hover>.sample-reveal_left span+span,.tx-live.sample-reveal_left span+span{animation-name:tx-wipe-l}
+button:hover>.sample-reveal_right span+span,.tx-live.sample-reveal_right span+span{animation-name:tx-reveal-l}
+button:hover>.sample-vert_open span+span,.tx-live.sample-vert_open span+span{animation-name:tx-vopen}
+button:hover>.sample-vert_close span+span,.tx-live.sample-vert_close span+span{animation-name:tx-vopen;animation-direction:reverse}
+button:hover>.sample-diagonal_tr span+span,.tx-live.sample-diagonal_tr span+span{animation-name:tx-diag-tr}
+button:hover>.sample-rect_crop span+span,.tx-live.sample-rect_crop span+span{animation-name:tx-rect}
+button:hover>.sample-distance span+span,.tx-live.sample-distance span+span{animation-name:tx-distance}
+button:hover>.sample-squeeze_v span+span,.tx-live.sample-squeeze_v span+span{animation-name:tx-vopen}
+.tx-on-canvas{position:absolute!important;inset:0;height:auto!important;z-index:9;pointer-events:none;background:#000}
+.tx-on-canvas span{font-size:28px}.tx-on-canvas img{width:100%;height:100%;object-fit:cover;display:block}
+.tx-on-canvas-label{position:absolute;left:50%;top:10px;transform:translateX(-50%);z-index:3;font-style:normal;background:#15171ccc;color:#e8e4ff;border:1px solid #7b69ea;border-radius:999px;padding:4px 12px;font-size:11px;white-space:nowrap}
+/* Multi-select */
+.picture-clip.multi{outline:2px solid #5fd3ff;outline-offset:-2px}
+.picture-clip.multi::after{content:"✓";position:absolute;top:3px;right:4px;width:16px;height:16px;border-radius:50%;background:#5fd3ff;color:#101218;font:700 11px/16px sans-serif;text-align:center}
+.picture-clip{position:relative}
+.batch-bar{position:fixed;left:50%;transform:translateX(-50%);bottom:18px;z-index:1400;display:flex;align-items:center;flex-wrap:wrap;gap:8px 10px;max-width:min(1100px,94vw);padding:10px 14px;border-radius:14px;background:linear-gradient(160deg,#243449,#23262e);border:1px solid #3f8bb3;box-shadow:0 10px 30px #0009}
+.bb-count{display:flex;align-items:center;gap:6px;font-weight:700;color:#fff;font-size:12.5px}.bb-from{font-size:12px;color:#b9c7d8}
+.bb-parts{display:flex;gap:6px;flex-wrap:wrap}.bb-chip{display:inline-flex;align-items:center;gap:4px;padding:4px 10px;border-radius:999px;border:1px solid #4a5568;font-size:11.5px;color:#cfd6e2;cursor:pointer}
+.bb-chip input{display:none}.bb-chip.on{background:#1f4b63;border-color:#5fd3ff;color:#fff}.bb-msg{font-size:11.5px;color:#9fe3c4}
+.auto-captions-card{margin:0 0 12px;padding:12px 14px;border-radius:12px;background:linear-gradient(135deg,#3a2f6e,#23262e 75%);border:1px solid #6a58d8;box-shadow:0 4px 14px #0005}
+.auto-captions-card header{display:flex;align-items:center;gap:10px}.auto-captions-card header>div{flex:1;display:flex;flex-direction:column}
+.auto-captions-card header strong{color:#fff;font-size:13.5px}.auto-captions-card header span{font-size:11.5px;color:#c8c2f0}
+.acc-icon{display:grid;place-items:center;width:32px;height:32px;border-radius:9px;background:linear-gradient(135deg,#8f7cf0,#5fd3ff);color:#fff;flex:none}
+.acc-grid{display:grid;grid-template-columns:1fr 1fr;gap:6px 10px;margin-top:10px}.acc-grid .acc-go{grid-column:1/-1;justify-content:center}
+.auto-captions-card .info-status{margin:8px 0 0}
+/* Export dialog */
+.export-presets{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+.export-preset{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:10px;border-radius:10px;border:1px solid #444956;background:#262a32;color:#e8eaf0;text-align:left;min-height:84px}
+.export-preset svg{color:#a699f0}.export-preset strong{font-size:12.5px}.export-preset small{font-size:10.5px;color:#9aa0ad}.export-preset em{font-size:10px;color:#ffb366;font-style:normal}
+.export-preset.selected{border-color:#8f7cf0;box-shadow:0 0 0 2px #8f7cf055;background:#2e2a45}
+.export-advanced{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;padding:10px;border:1px solid #3a3f4b;border-radius:8px}
+.export-summary{display:flex;justify-content:space-between;align-items:center;padding:9px 12px;border-radius:8px;background:#1f2229;font-size:12px;color:#c9cfdb}.export-summary span{display:inline-flex;align-items:center;gap:6px}
+.export-captions{display:flex;align-items:center;flex-wrap:wrap;gap:8px;font-size:12px;color:#c9cfdb}.export-actions{justify-content:flex-end}
+@media(max-width:760px){.export-presets{grid-template-columns:repeat(2,1fr)}}

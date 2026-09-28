@@ -153,7 +153,7 @@ def _run_part_job(job_id: str, project_id: str, scene_id: str) -> None:
             _contexts.pop(job_id, None)
 
 
-def _run_export_job(job_id: str, project_id: str, selected_ids: list[str] | None = None) -> None:
+def _run_export_job(job_id: str, project_id: str, selected_ids: list[str] | None = None, settings: dict | None = None) -> None:
     ctx = RenderContext()
     with _lock:
         _contexts[job_id] = ctx
@@ -211,16 +211,29 @@ def _run_export_job(job_id: str, project_id: str, selected_ids: list[str] | None
 
         _emit(job_id, {"stage": "compositing export", "progress": 70})
         out_path = render_export(project, scenes, scene_paths, transitions, ctx,
-                                  progress_cb=lambda s, p: _emit(job_id, {"stage": s, "progress": 70 + int(p * 0.25)}))
+                                  progress_cb=lambda s, p: _emit(job_id, {"stage": s, "progress": 70 + int(p * 0.2)}))
+        # Delivery: resolution, frame rate, format and quality chosen in the export dialog.
+        from app.render import delivery as _delivery
+        from app.config import FFMPEG_BIN as _FF
+        _settings = _delivery.clean(settings)
+        _emit(job_id, {"stage": "delivery", "progress": 92})
+        master = out_path
+        out_path = _delivery.deliver(master, _settings, project.width, project.height, project.fps, RENDERS_DIR, _FF, cancel_check=lambda: ctx.cancel_requested)
+        if out_path != master:
+            try:
+                _os.remove(master)
+            except OSError:
+                pass
+        _ext, _mime = _delivery.extension(_settings)
 
         with session_scope() as db:
             from app.render.ffmpeg_utils import probe as _probe
             from app.render.renderer import _content_hash_file
             info = _probe(out_path)
             asset = Asset(
-                project_id=project_id, type=AssetType.VIDEO,
+                project_id=project_id, type=(AssetType.AUDIO if _mime.startswith("audio") else AssetType.VIDEO),
                 content_hash=_content_hash_file(out_path), storage_key=_os.path.relpath(out_path, RENDERS_DIR),
-                mime="video/mp4", original_filename=_safe_download_name(project.title or "export") + "-export.mp4", duration_ms=info.duration_ms,
+                mime=_mime, original_filename=_safe_download_name(project.title or "export") + f"-export.{_ext}", duration_ms=info.duration_ms,
                 width=info.width, height=info.height, origin=AssetOrigin.RENDER_OUTPUT,
             )
             db.add(asset)
@@ -241,6 +254,6 @@ def start_part_job(job_id: str, project_id: str, scene_id: str) -> None:
     t.start()
 
 
-def start_export_job(job_id: str, project_id: str, selected_ids: list[str] | None = None) -> None:
-    t = threading.Thread(target=_run_export_job, args=(job_id, project_id, selected_ids), daemon=True)
+def start_export_job(job_id: str, project_id: str, selected_ids: list[str] | None = None, settings: dict | None = None) -> None:
+    t = threading.Thread(target=_run_export_job, args=(job_id, project_id, selected_ids, settings), daemon=True)
     t.start()

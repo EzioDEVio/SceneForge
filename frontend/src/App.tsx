@@ -1,3 +1,6 @@
+Warning: truncated output (original token count: 28678)
+Total output lines: 1116
+
 import {askConfirm} from "./dialogs";
 import {registerCloseSave,saveBeforeClose} from "./closeGuard";
 import {hasActiveWrites, BUILD_ID} from "./api";
@@ -13,6 +16,9 @@ import {OverlayCanvas, OverlayPanel} from "./Overlays";
 import {InspectorResizer} from "./InspectorResizer";
 import {AIEnginesPanel, AboutPanel} from "./InfoPanels";
 import {CaptionStylePanel, CaptionPreview, AutoCaptions} from "./CaptionsPro";
+import {ProgressCard} from "./ProgressCard";
+import {BatchBar} from "./BatchBar";
+import {ExportDialog} from "./ExportDialog";
 import {SceneEffectsPanel, SceneFxPreview, RouteCanvas, AnnotationCanvas} from "./EffectsPanels";
 import {SpeedControls, ClipSoundControls} from "./SpeedControls";
 import type {Overlay} from "./api";
@@ -506,8 +512,8 @@ function durationLabel(scene: Scene) {
 
 // Each scene stays mounted while navigating, preserving its draft and render subscription.
 // All writes for a scene run sequentially, so an older response cannot overwrite a newer edit.
-function PartRow({scene, project, index, total, active, refresh, onMove, onDelete, onOpenSettings, onSaveState}: {
-  scene: Scene; project: Project; index: number; total: number; active: boolean;
+function PartRow({scene, project, index, total, active, refresh, onMove, onDelete, onOpenSettings, onSaveState, txPreview}: {
+  scene: Scene; project: Project; index: number; total: number; active: boolean; txPreview?: {key: string; from: string | null; to: string | null} | null;
   refresh: () => Promise<void>; onMove: (dir: -1 | 1) => void; onDelete: () => void;
   onOpenSettings: () => void; onSaveState: (id: string, state: string) => void;
 }) {
@@ -644,143 +650,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
     if (!active) return;
     const onPaste = (e: ClipboardEvent) => {
       const t = e.target as HTMLElement | null;
-      if (t && (t.closest('input, textarea, select, [contenteditable="true"]'))) return;
-      const files = Array.from(e.clipboardData?.files || []);
-      if (!files.length) return;
-      e.preventDefault();
-      void (async () => {
-        let added = 0;
-        for (const raw of files) {
-          const ext = raw.type.split('/')[1]?.replace('jpeg', 'jpg').replace('quicktime', 'mov') || 'png';
-          const file = raw.name && raw.name !== 'image.png' ? raw : new File([raw], `pasted-${new Date().toISOString().replace(/[:.]/g, '-')}.${ext}`, {type: raw.type});
-          if (raw.type.startsWith('image/') || raw.type.startsWith('video/')) {await upload(file); added++;}
-          else if (raw.type.startsWith('audio/')) {await run(async () => {await api.uploadVoiceTake(scene.id, file);}); added++;}
-        }
-        if (!added) setError('Only images, videos and audio can be pasted into a scene.');
-      })();
-    };
-    window.addEventListener('paste', onPaste);
-    return () => window.removeEventListener('paste', onPaste);
-  }, [active, scene.id]);
-  async function upload(file: File) {
-    await run(async () => {
-      const asset = await api.uploadAsset(project.id, file);
-      const added = await api.addShot(scene.id, asset.id);
-      setSelectedShotId(added.id); setPreviewMode("source");
-    });
-  }
-  async function render() {
-    setError(null);
-    if (!(await flush())) return;
-    if (!scene.voice_takes.some(t => t.accepted) && !(scene.font_json.typewriter_sound && scene.font_json.typewriter && scene.font_json.captions_enabled && captions.trim()) && !await askConfirm("No narration take is selected. Render this scene without narration?")) return;
-    try { setJobId((await api.renderPart(scene.id)).job_id); }
-    catch (e: any) { setError(e.message); }
-  }
-  const activeMotion = shot?.motion_json?.type || "static";
-  const [hoverFx, setHoverFx] = useState<string | null>(null);   // look being previewed on hover
-  useEffect(() => setHoverFx(null), [scene.id]);
-  const selectedEffect = EFFECTS.find(f => f.key === (hoverFx || scene.effect_preset)) || EFFECTS[0];
-  const strength = scene.effect_intensity / 100;
-  const previewFilter = selectedEffect.swatch.replace(/([a-z-]+)\(([-.\d]+)([^)]*)\)/g,(_,fn,n,unit)=>{
-    const base=["contrast","brightness","saturate"].includes(fn)?1:0;
-    return `${fn}(${base+(Number(n)-base)*strength}${unit})`;
-  });
-  const liveAdjust = ((pending.current.look as any)?.adjust ?? scene.look_json?.adjust) || undefined;
-  const pendingLook = (pending.current.look as any) || {};
-  const liveRoute = ('route' in pendingLook ? pendingLook.route : (scene.look_json as any)?.route) || null;
-  const liveAnnots = (('annotations' in pendingLook ? pendingLook.annotations : (scene.look_json as any)?.annotations) || []) as any[];
-  const wbFilterId = `sf-wb-${scene.id}`;
-  // With a LUT, the preview shows a server-graded frame (exact colour: LUT +
-  // colour sliders), so only the look preset stays as a CSS approximation.
-  const gradedSrc = (scene.look_json?.lut || (scene.look_json as any)?.tone?.amount || (scene.look_json as any)?.wheels) && shot ? api.gradedFrameUrl(scene.id, gradeKey(scene.look_json), 1280, shot.id) : null;
-  const liveFilm = (pending.current.look as any)?.film !== undefined ? (pending.current.look as any).film : scene.look_json?.film;
-  // "none" (the Original look) is not combinable with other CSS filter
-  // functions: joined into a list it makes the whole value invalid, and the
-  // browser then drops every filter. Keep only real filter functions.
-  const presetFilter = previewFilter === "none" ? "" : previewFilter;
-  const mediaFilter = [presetFilter, gradedSrc ? "" : adjustPreviewFilter(liveAdjust, wbFilterId), filmToneFilter(liveFilm)].filter(Boolean).join(' ') || undefined;
-  const canvasRatio = project.aspect.split(':').map(Number).reduce((a,b)=>a/b);
-  async function uploadSound(file: File) {
-    await run(async () => {
-      const asset = await api.uploadAsset(project.id, file);
-      await api.updateScene(scene.id, {font:{typewriter_sound_asset_id:asset.id,typewriter_sound:true,typewriter:true}});
-    });
-  }
-  return (
-    <section ref={editorRef} className="scene-editor" hidden={!active} aria-label={`Edit ${scene.title}`}>
-      <div className="editor-main">
-        <header className="scene-heading">
-          <div><span className="eyebrow">SCENE {String(index + 1).padStart(2, "0")} / {String(total).padStart(2, "0")}</span><h2>{scene.title}</h2></div>
-          <div className="scene-actions">
-            <button className="icon-btn" title="Move scene up" aria-label="Move scene up" disabled={index === 0 || saving} onClick={() => onMove(-1)}><ArrowUp size={16}/></button>
-            <button className="icon-btn" title="Move scene down" aria-label="Move scene down" disabled={index === total-1 || saving} onClick={() => onMove(1)}><ArrowDown size={16}/></button>
-            <button className="icon-btn danger" title="Delete scene" aria-label="Delete scene" disabled={saving || Object.keys(pending.current).length > 0 || isGenerating} onClick={onDelete}><Trash2 size={16}/></button>
-          </div>
-        </header>
-        <div className="preview-card">
-          <div className="preview-toolbar"><div className="button-row"><button className="btn" onClick={()=>{setPreviewMode("source");editorRef.current?.querySelector<HTMLTextAreaElement>('[aria-label="Narration script"]')?.focus();}}>Edit narration</button><button className="btn" onClick={()=>{setTab("Text");setPreviewMode("source");}}>Edit captions & titles</button></div>
-            <div className="segmented" aria-label="Preview mode">
-              <button aria-pressed={previewMode === "source"} onClick={() => setPreviewMode("source")}>Preview</button>
-              <button aria-pressed={previewMode === "render"} disabled={!rendered} onClick={() => setPreviewMode("render")}>Rendered scene</button>
-            </div>
-            <span className="aspect-badge">{project.aspect}</span>
-          </div>
-          <div className={`canvas-viewport ${mag > 1 ? 'magnified' : ''}`}
-            onWheel={e => {if (!e.ctrlKey) return; e.preventDefault(); const r = e.currentTarget.getBoundingClientRect(); setMagAt(mag * (e.deltaY < 0 ? 1.15 : 0.87), (e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height);}}
-            onPointerDown={e => {if (mag <= 1 || !(e.button === 1 || (e.button === 0 && spaceDown.current))) return; e.preventDefault();
-              const sx = e.clientX, sy = e.clientY, p0 = pan, r = e.currentTarget.getBoundingClientRect();
-              const move = (ev: PointerEvent) => setPan({x: p0.x + (ev.clientX - sx) / r.width * 100 / mag, y: p0.y + (ev.clientY - sy) / r.height * 100 / mag});
-              const up = () => {window.removeEventListener('pointermove', move); window.removeEventListener('pointerup', up);};
-              window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);}}>
-            <div className="preview-canvas" style={{transform: mag > 1 ? `scale(${mag}) translate(${pan.x}%, ${pan.y}%)` : undefined, transformOrigin: "center", aspectRatio: project.aspect.replace(":", "/"), width: `min(${zoom}%, calc((var(--stage-height) - 40px) * ${canvasRatio * zoom / 100}))`}}><WhiteBalanceFilter id={wbFilterId} adjust={liveAdjust}/>{previewMode !== "render" && shot && <PreviewFinish adjust={liveAdjust}/>}{previewMode !== "render" && shot && hoverFx && hoverFx !== scene.effect_preset && <div className="hover-preview-chip" role="status">Previewing <b>{selectedEffect.label}</b> · click to apply</div>}{previewMode !== "render" && shot && liveFilm && <FilmPreview film={liveFilm}/>}{previewMode !== "render" && shot && <SceneFxPreview look={{...(scene.look_json || {}), ...((pending.current.look as any) || {})}} shots={scene.shots} filter={mediaFilter} aspect={project.width / project.height}/>}{previewMode !== "render" && shot && tab === "Effects" && !routeEditing && liveAnnots.length > 0 && <AnnotationCanvas annots={liveAnnots} onChange={a => draft({look: {annotations: a}})}/>}{previewMode !== "render" && shot && routeEditing && liveRoute && <RouteCanvas route={liveRoute} onChange={r => draft({look: {route: r}})}/>}{previewMode !== "render" && shot && overlays.length > 0 && <OverlayCanvas overlays={overlays} frameAspect={project.width / project.height} selected={ovSelected} onSelect={i => {setOvSelected(i); setTab("Overlays");}} onChange={(i, patch, commit) => {const next = ovRef.current.map((x, k) => k === i ? {...x, ...patch} : x); ovRef.current = next; changeOverlays(next, !!commit);}} onCommit={() => draft({overlays: ovRef.current})}/>}
-              {previewMode === "render" && rendered ? <video ref={videoRef} className="canvas-media" controls preload="metadata" src={api.assetStreamUrl(rendered)}/> :
-                shot ? shot.asset?.type === "image" ? (shot.crop_json?<svg className="canvas-media" role="img" aria-label={`Cropped source for ${scene.title}`} viewBox={`${shot.crop_json.x*(shot.asset.width||1)} ${shot.crop_json.y*(shot.asset.height||1)} ${shot.crop_json.width*(shot.asset.width||1)} ${shot.crop_json.height*(shot.asset.height||1)}`} preserveAspectRatio={shot.fit==='cover'?'xMidYMid slice':'xMidYMid meet'} style={{filter:mediaFilter}}><image href={gradedSrc||api.assetStreamUrl(shot.asset_id)} width={shot.asset.width||1} height={shot.asset.height||1}/></svg>:<>{shot.fit === "contain_blur" && <img className="canvas-media canvas-blur-bg" aria-hidden="true" alt="" src={gradedSrc||api.assetStreamUrl(shot.asset_id)} style={{objectFit: "cover", filter: `${mediaFilter === "none" ? "" : mediaFilter} blur(14px) brightness(0.9)`}}/>}<img className="canvas-media" src={gradedSrc||api.assetStreamUrl(shot.asset_id)} alt={`Source media for ${scene.title}`} style={{objectFit: shot.fit === "cover" ? "cover" : "contain", filter:mediaFilter}}/></>) :
-                  <>{shot.fit === "contain_blur" && <img className="canvas-media canvas-blur-bg" aria-hidden="true" alt="" src={gradedSrc||api.assetThumbUrl(shot.asset_id, 480)} style={{objectFit: "cover", filter: `${mediaFilter === "none" ? "" : mediaFilter} blur(14px) brightness(0.9)`}}/>}<video ref={videoRef} className="canvas-media canvas-fg" controls preload="metadata" poster={gradedSrc||undefined} src={api.assetStreamUrl(shot.asset_id)} style={{objectFit:shot.fit === "cover" ? "cover" : "contain",filter:mediaFilter}}/></> :
-                  <div className="canvas-empty"><div className="empty-icon"><ImageIcon size={30}/></div><h3>Start with a visual</h3><p>Add an image or video to bring this scene to life.</p><button className="btn btn-primary" onClick={() => fileRef.current?.click()}><Plus size={15}/> Add media</button><button className="text-btn" onClick={() => setChatOpen(true)}><Sparkles size={14}/> Or generate an image</button></div>}
-              {previewMode==="source"&&shot?.asset?.type==="image"&&scene.effect_preset==="glitch"&&strength>0&&<img aria-hidden="true" className="canvas-media glitch-slice glitch-full" src={api.assetStreamUrl(shot.asset_id)} alt="" style={{objectFit:shot.fit==="cover"?"cover":"contain",opacity:strength}}/>}
-              {safeZones&&project.height>project.width*1.2&&<div className="safe-zones" aria-hidden="true"><span className="sz-top">Top bar</span><span className="sz-bottom">Caption & username · keep text above</span><span className="sz-right">Buttons</span></div>}{previewMode==="source"&&shot&&<CaptionPreview font={scene.font_json as any} text={captions} projectW={project.width} projectH={project.height}/>}{previewMode==="source"&&shot&&(scene.font_json.layers||[]).map(l=><div className="canvas-text-layer" key={l.id} dir="auto" style={{left:`${l.x}%`,top:`${l.y}%`,fontSize:`${l.size/project.width*100}cqw`,color:l.color,fontFamily:previewFontFamily(l.family||scene.font_json.family),fontWeight:l.bold?700:400,textAlign:(l.align||"center") as any,transform:`translate(${l.align==="left"?0:l.align==="right"?-100:-50}%,-50%)`,WebkitTextStroke:`${(l.outline_width||0)/project.width*100}cqw black`,textShadow:l.shadow?`${l.shadow/project.width*100}cqw ${l.shadow/project.width*100}cqw black`:"none"}}>{l.text}</div>)}
-            </div>
-          </div>
-          <footer className="preview-footer">
-            <span>{previewMode === "source" ? "Editing preview • Effects approximate; render for motion, captions & sound" : scene.is_stale ? "Previous render • Changes need a new render" : "Rendered scene"}</span>
-            {project.height>project.width*1.2&&<label className="safe-toggle" title="Shade the areas TikTok, Reels and Shorts cover with their buttons and caption"><input type="checkbox" aria-label="Show safe zones" checked={safeZones} onChange={e=>setSafeZones(e.target.checked)}/> Safe zones</label>}<span className="inspect-zoom" role="group" aria-label="Preview zoom"><button className="icon-reset" aria-label="Zoom out of the preview" disabled={mag <= 1} onClick={() => setMagAt(mag * 0.8)}>−</button><button className="text-btn" aria-label="Fit preview" title="Fit (Ctrl + mouse wheel zooms, middle-drag or Space + drag pans)" onClick={() => {setMag(1); setPan({x: 0, y: 0});}}>{Math.round(mag * 100)}%</button><button className="icon-reset" aria-label="Zoom into the preview" disabled={mag >= 4} onClick={() => setMagAt(mag * 1.25)}>+</button></span><label className="zoom-control">View <select aria-label="Canvas view size" value={zoom} onChange={e => setZoom(Number(e.target.value))}><option value={100}>Fit</option><option value={75}>75%</option><option value={50}>50%</option></select></label>
-          </footer>
-        </div>
-        <div className="render-bar">
-          <span className={`render-status ${scene.is_stale && rendered ? "needs-render" : ""}`}><span className="status-dot"/>{isGenerating ? `${job?.stage || "Rendering"} · ${Math.round(job?.progress || 0)}%` : !shot ? "Add media to render" : scene.is_stale && rendered ? "Changes since last render" : rendered ? "Scene ready" : "Ready for first render"}</span>
-          <div className="button-row">
-            {rendered && <a className="icon-btn" title="Download scene" aria-label="Download scene" href={api.assetDownloadUrl(rendered)} download><Download size={17}/></a>}
-            {isGenerating ? <button className="btn" onClick={() => run(() => api.cancelJob(jobId!))}>Cancel render</button> : <button className="btn btn-primary" onClick={render} disabled={!shot}><Play size={15}/> Render scene</button>}
-          </div>
-        </div>
-        {isGenerating && <progress aria-label="Scene rendering progress" max={100} value={job?.progress || 0}/>}
-        {(error || job?.status === "failed") && <div role="alert" className="error-box"><details><summary>Render/save failed — show details</summary><pre>{error || job?.error}</pre></details><button className="text-btn" onClick={()=>{setError(null);setJobId(null);}}>Dismiss</button>{error && <button className="text-btn" onClick={async () => { setError(null); await flush(); }}>Retry text save / dismiss</button>}</div>}
-        <section className={`script-card ${scriptOpen ? "expanded" : ""}`} aria-label="Narration script">
-          <div className="section-heading script-heading">
-            <h3><FileText size={16}/> Narration script</h3>
-            <span className="script-chip">{wordCount} words · ≈ {speakSeconds.toFixed(0)} s spoken</span>
-            {acceptedTake ? <span className={`script-chip ${acceptedTake.stale ? "warn" : "ok"}`}>{acceptedTake.stale ? "Script changed · generate a new voice" : `Voice ${(((acceptedTake.effective_duration_ms ?? acceptedTake.measured_duration_ms) || 0) / 1000).toFixed(1)} s`}</span> : wordCount > 0 && <span className="script-chip">No voice yet</span>}
-            <button className="text-btn script-expand" aria-expanded={scriptOpen} onClick={() => setScriptOpen(!scriptOpen)}>{scriptOpen ? "Collapse" : "Expand"}</button>
-          </div>
-          <textarea aria-label="Narration script" dir="auto" className="script-box" value={text} onChange={e => {setText(e.target.value); draft({original_text: e.target.value, spoken_text: e.target.value});}} onBlur={() => void flush()} placeholder="Tell your story. Paste or write the narration for this scene…"/>
-          <div className="script-footer"><span>Saves automatically. After editing, generate a new voice so the audio matches.</span><button className="btn primary script-voice" onClick={async () => {if (await flush()) setTab("Audio");}}><Volume2 size={14}/> {acceptedTake ? "Voice & narration" : "Generate voice"} <ChevronRight size={14}/></button></div>
-        </section>
-      </div>
-      <aside className="inspector" aria-label="Scene inspector">
-        <InspectorResizer/>
-        <div className="inspector-heading"><span className="eyebrow">SCENE SETTINGS</span><span className="subtle">{durationLabel(scene)}</span></div>
-        <div className="inspector-tabs" role="tablist" aria-label="Scene tools">
-          {INSPECTOR_TABS.map(({name, Icon}) => <button key={name} role="tab" id={`${scene.id}-${name}-tab`} aria-controls={`${scene.id}-panel`} aria-selected={tab === name} onClick={() => setTab(name)} onKeyDown={e => {
-            const offset = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
-            if (offset) {e.preventDefault(); const next = INSPECTOR_TABS[(INSPECTOR_TABS.findIndex(t => t.name === name) + offset + INSPECTOR_TABS.length) % INSPECTOR_TABS.length].name; setTab(next); document.getElementById(`${scene.id}-${next}-tab`)?.focus();}
-          }} tabIndex={tab === name ? 0 : -1}><Icon size={18}/><span>{name}</span></button>)}
-        </div>
-        <div className="inspector-body" role="tabpanel" id={`${scene.id}-panel`} aria-labelledby={`${scene.id}-${tab}-tab`}>
-          {tab === "Media" && <>
-            <div className="section-heading"><h3>Scene media</h3><span className="count-badge">{scene.shots.length}</span></div>
-            <p className="hint">Images and clips play in the order shown.</p>
-            <div className="media-grid">{scene.shots.map((s,i) => <div className={`media-item ${s.id === shot?.id ? "selected" : ""}`} key={s.id}>
-              <button className="media-select" aria-label={`Select media ${i+1}`} aria-pressed={s.id === shot?.id} onClick={() => {setSelectedShotId(s.id); setPreviewMode("source");}}><Thumb assetId={s.asset_id} type={s.asset?.type}/><span>{String(i+1).padStart(2,"0")}</span></button>
+  …4678 tokens truncated…ria-pressed={s.id === shot?.id} onClick={() => {setSelectedShotId(s.id); setPreviewMode("source");}}><Thumb assetId={s.asset_id} type={s.asset?.type}/><span>{String(i+1).padStart(2,"0")}</span></button>
               <button className="remove-media" aria-label={`Remove media ${i+1}`} disabled={false} onClick={() => run(() => api.deleteShot(s.id))}><X size={12}/></button>
             </div>)}</div>
             <button className="btn upload-btn" disabled={false} onClick={() => fileRef.current?.click()}><Upload size={16}/> Upload image or video</button>
@@ -794,7 +664,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
   await flush();await run(async()=>{const saved:any=await api.updateScene(scene.id,{look});
   // An old backend ignores "look" without an error; say so instead of silently doing nothing.
   if(look.lut&&saved?.look_json?.lut?.asset_id!==look.lut.asset_id)throw new Error("The LUT was not saved because this SceneForge backend is out of date. Close every SceneForge and start.bat window, run setup.bat in the newest folder, then start it again.");});}}/><SceneEffectsPanel scene={scene} disabled={false} onDraft={look=>draft({look})} liveRoute={liveRoute} routeEditing={routeEditing} onRouteEditing={setRouteEditing} liveAnnotations={liveAnnots} vertical={project.height>project.width*1.2} onAddMedia={() => fileRef.current?.click()}/></>}
-          {tab === "Text" && <><div className="text-quick"><button className="btn btn-primary" disabled={draftLayers.length >= 12} onClick={() => {const next = [...draftLayers, {id: 'ttl' + Math.random().toString(36).slice(2, 8), text: 'Animated title', x: 50, y: 22, size: 72, color: '#FFE14D', bold: true, start_ms: 0, end_ms: 0, family: 'Noto Sans', align: 'center', outline_width: 4, shadow: 0, animation: 'letters-pop', animation_ms: 900, exit_ms: 400, spacing: 0}]; setDraftLayers(next); draft({font: {layers: next}}); setTimeout(() => document.querySelector('.text-layers article:last-of-type input, .text-layers article:last-of-type textarea')?.scrollIntoView?.({block: 'center'}), 80);}}>✦ Add animated title</button><span className="hint">Titles and labels with letter-by-letter animations. Edit them under Text overlays below.</span></div><h3>On-screen captions</h3><p className="hint">Caption text is independent of narration.</p><textarea aria-label="On-screen captions" dir="auto" className="caption-box" value={captions} onChange={e => {setCaptions(e.target.value); draft({subtitle_text:e.target.value});}} onBlur={() => void flush()} placeholder="Write the text to appear on your video…"/><button className="text-btn" onClick={() => {setCaptions(text); draft({subtitle_text:text});}}><Copy size={13}/> Copy narration to captions</button><AutoCaptions scene={scene} onDone={sc => {setCaptions(sc.subtitle_text); void refresh();}}/><fieldset><CaptionStylePanel scene={scene} onChange={f => {if(f.typewriter&&!captions.trim()&&text.trim()){setCaptions(text);draft({subtitle_text:text});}void update({font:f});}}/><TextLayers key={`tl-${draftLayers.length}`} scene={{...scene,font_json:{...scene.font_json,layers:draftLayers}}} onChange={layers=>{setDraftLayers(layers);draft({font:{layers}});}}/></fieldset><button className="btn btn-primary" disabled={!shot||isGenerating} onClick={render}>Render text preview</button><p className="hint">Caption typewriter applies to On-screen captions. For a title, choose typewriter under its Text overlay Animation. Render text preview to see the result.</p><section className="typewriter-controls"><h3>Typewriter timing & sound</h3>
+          {tab === "Text" && <><AutoCaptions scene={scene} onDone={sc => {setCaptions(sc.subtitle_text); void refresh();}} onStyle={f => void update({font: f})}/><div className="text-quick"><button className="btn btn-primary" disabled={draftLayers.length >= 12} onClick={() => {const next = [...draftLayers, {id: 'ttl' + Math.random().toString(36).slice(2, 8), text: 'Animated title', x: 50, y: 22, size: 72, color: '#FFE14D', bold: true, start_ms: 0, end_ms: 0, family: 'Noto Sans', align: 'center', outline_width: 4, shadow: 0, animation: 'letters-pop', animation_ms: 900, exit_ms: 400, spacing: 0}]; setDraftLayers(next); draft({font: {layers: next}}); setTimeout(() => document.querySelector('.text-layers article:last-of-type input, .text-layers article:last-of-type textarea')?.scrollIntoView?.({block: 'center'}), 80);}}>✦ Add animated title</button><span className="hint">Titles and labels with letter-by-letter animations. Edit them under Text overlays below.</span></div><h3>On-screen captions</h3><p className="hint">Caption text is independent of narration.</p><textarea aria-label="On-screen captions" dir="auto" className="caption-box" value={captions} onChange={e => {setCaptions(e.target.value); draft({subtitle_text:e.target.value});}} onBlur={() => void flush()} placeholder="Write the text to appear on your video…"/><button className="text-btn" onClick={() => {setCaptions(text); draft({subtitle_text:text});}}><Copy size={13}/> Copy narration to captions</button><fieldset><CaptionStylePanel scene={scene} onChange={f => {if(f.typewriter&&!captions.trim()&&text.trim()){setCaptions(text);draft({subtitle_text:text});}void update({font:f});}}/><TextLayers key={`tl-${draftLayers.length}`} scene={{...scene,font_json:{...scene.font_json,layers:draftLayers}}} onChange={layers=>{setDraftLayers(layers);draft({font:{layers}});}}/></fieldset><button className="btn btn-primary" disabled={!shot||isGenerating} onClick={render}>Render text preview</button><p className="hint">Caption typewriter applies to On-screen captions. For a title, choose typewriter under its Text overlay Animation. Render text preview to see the result.</p><section className="typewriter-controls"><h3>Typewriter timing & sound</h3>
             <p className="hint">Enable Captions and Typewriter reveal above. Sound follows each reveal, not the original recording’s rhythm.</p>
             <label className="check-label"><input type="checkbox" checked={!!scene.font_json.typewriter_sound} disabled={false} onChange={e=>update({font:{typewriter_sound:e.target.checked}})}/> Synchronized keystrokes</label>
             <div className="button-row">{[{label:"Slow",ms:220},{label:"Natural",ms:160},{label:"Fast",ms:80}].map(p=><button className="btn" disabled={false} key={p.label} onClick={()=>update({font:{typewriter_duration_ms:Math.min(120000,Math.max(100,(Array.from(captions).length-1)*p.ms))}})}>{p.label}</button>)}</div><button className="text-btn" disabled={false} onClick={()=>update({timing_mode:"fixed",requested_duration_ms:Math.max(scene.requested_duration_ms||4000,(scene.font_json.typewriter_delay_ms||0)+(scene.font_json.typewriter_duration_ms||Math.max(200,(Array.from(captions).length-1)*160))+1000)})}>Extend scene to fit typing + 1s hold</button>
@@ -930,6 +800,9 @@ export default function App() {
   const dirty = Object.values(states).some(s => s !== "Saved");
   const statesRef = useRef(states); statesRef.current = states;
   const [clip, setClip] = useState<{kind:'scene'|'audio';id:string;label:string}|null>(null);
+  const [hoverTx, setHoverTx] = useState<string|null>(null);   // transition previewed on the picture
+  const [multi, setMulti] = useState<string[]>([]);            // several parts selected on the timeline
+  const [exportOpen, setExportOpen] = useState(false);
   const [projectMode, setProjectMode] = useState<'new'|'open'>('open');
   /** Back to the project list (to start a new project or open another), after saves finish. */
   async function goToProjects(mode:'new'|'open'){
@@ -978,7 +851,7 @@ export default function App() {
   useEffect(() => {
     if(exportJob && ["succeeded","failed","cancelled"].includes(exportJob.status)) void refresh().catch(e => setError(e.message));
   },[exportJob?.status]);
-  async function renderFullVideo(){
+  async function renderFullVideo(settings?: Record<string, unknown>){
     if(!project||busy||exporting)return;
     // Background saves no longer lock the timeline; wait for them before exporting.
     for(let i=0;i<40&&Object.values(statesRef.current).some(v=>v!=="Saved");i++)await new Promise(r=>setTimeout(r,250));
@@ -987,7 +860,7 @@ export default function App() {
       if(!project.scenes.some(s=>s.shots.length))return;
       if(empty.length&&!await askConfirm(`Skip ${empty.length} empty scene(s) and render all scenes with media?`))return;
       setExportPanel(true);setExportExpanded(false);setExportScenes(structuredClone(project.scenes));
-      setExportJobId((await api.exportProject(project.id,empty.length>0)).job_id);
+      setExportJobId((await api.exportProject(project.id,empty.length>0,settings||{quality:'draft'})).job_id);
     });
   }
   async function refresh() {
@@ -1067,9 +940,12 @@ export default function App() {
       <button className="brand brand-button" title="Back to projects" disabled={dirty||busy||exporting} onClick={()=>action(async()=>{setProjects(await api.listProjects()); projectRef.current=null; setProject(null);})}><span className="brand-mark"><Film size={19}/></span><span>SceneForge</span></button>
       <span className="toolbar-divider"/>
       <div className="project-identity"><input aria-label="Project name" value={titleDraft} onChange={e=>{setTitleDraft(e.target.value); setStates(prev=>({...prev,title:"Unsaved changes"}));}} onBlur={()=>void saveTitle()}/><span role="status" className={`save-status ${failed ? "save-error" : ""}`}>{busy ? "Saving…" : status}</span></div>
-      <div className="toolbar-end"><select aria-label="Project aspect ratio" value={project.aspect} disabled={busy||exporting} onChange={e=>action(async()=>{await api.updateProject(project.id,{aspect:e.target.value}); await refresh();})}>{ASPECTS.map(a=><option key={a}>{a}</option>)}</select><button className="icon-btn" title="Provider settings" aria-label="Provider settings" onClick={()=>setSettingsOpen(true)}><Settings size={18}/></button><button className="btn btn-primary" disabled={exporting||dirty||busy||!project.scenes.length} onClick={()=>void renderFullVideo()}><Upload size={15}/>{exporting ? `Exporting ${Math.round(exportJob?.progress||0)}%` : "Export video"}</button></div>
+      <div className="toolbar-end"><select aria-label="Project aspect ratio" value={project.aspect} disabled={busy||exporting} onChange={e=>action(async()=>{await api.updateProject(project.id,{aspect:e.target.value}); await refresh();})}>{ASPECTS.map(a=><option key={a}>{a}</option>)}</select><button className="icon-btn" title="Provider settings" aria-label="Provider settings" onClick={()=>setSettingsOpen(true)}><Settings size={18}/></button><button className="btn btn-primary" disabled={exporting||dirty||busy||!project.scenes.length} onClick={()=>setExportOpen(true)}><Upload size={15}/>{exporting ? `Exporting ${Math.round(exportJob?.progress||0)}%` : "Export video"}</button></div>
     </header>
     {titleCard&&<TitleDesigner width={project.width} height={project.height} busy={busy} onClose={()=>setTitleCard(false)} onCreate={d=>void addTitleCard(d)}/>}
+    {project&&multi.length>1&&selected&&<BatchBar source={selected} scenes={project.scenes.filter(x=>multi.includes(x.id))} onClear={()=>setMulti([])} onDone={()=>void refresh()}/>}
+    {exportOpen&&project&&<ExportDialog project={project} onClose={()=>setExportOpen(false)} onExport={settings=>{setExportOpen(false);void renderFullVideo(settings);}}/>}
+    {exporting&&exportJob&&<ProgressCard floating title="Exporting video" stage={exportJob.stage} progress={exportJob.progress||0} status={exportJob.status} onCancel={()=>void api.cancelJob(exportJob.id).catch(()=>{})}/>}
     {(error||exportJob?.status==="failed")&&<div role="alert" className="error-box"><details><summary>Operation failed — show details</summary><pre>{error||exportJob?.error}</pre></details><button className="text-btn" onClick={()=>{setError(null);if(exportJob?.status==='failed')setExportJobId(null);}}>Dismiss</button></div>}
     <div className="editor-menubar">
       {['File','Edit','View'].map(name=><div className="editor-menu" key={name}><button aria-expanded={menu===name} onClick={()=>setMenu(menu===name?'':name)}>{name}</button>{menu===name&&<div className="editor-menu-items">
@@ -1089,16 +965,16 @@ export default function App() {
       {libraryTab==='Media Pool'&&<>{importStatus&&<p className="hint" aria-live="polite">{importStatus}</p>}<MediaPool projectId={project.id} version={mediaVersion} disabled={busy||exporting} onImport={()=>importRef.current?.click()} onFolder={()=>folderRef.current?.click()} onAdd={addPoolAssets} onUse={usePoolAsset} canUse={!!selected}/></>}
 
       {libraryTab==='Scenes'&&<><p className="sidebar-hint">PROJECT BIN · Select a part to edit</p><div className="scene-list">{project.scenes.map((s,i)=><button key={s.id} className={`scene-nav ${selected?.id===s.id?"selected":""}`} aria-label={`Select scene ${i+1}: ${s.title}`} aria-current={selected?.id===s.id?"true":undefined} onClick={()=>setSelectedId(s.id)}><div className="scene-thumb">{s.shots[0]?<Thumb assetId={s.shots[0].asset_id} type={s.shots[0].asset?.type}/>:<Film size={22}/>}<span>{String(i+1).padStart(2,"0")}</span></div><div className="scene-nav-meta"><strong>{s.title}</strong><span>{durationLabel(s)} · {s.shots.length} media</span></div></button>)}</div><button className="btn add-scene" disabled={busy||exporting} onClick={()=>setTitleCard(true)}><Type size={16}/> Add title card</button><button className="btn add-scene" disabled={busy} onClick={addPart}><Plus size={16}/> Add scene</button></>}
-      {libraryTab==='Transitions'&&<><p className="sidebar-hint">INCOMING TO · {selected?.title||'Select a part'}</p><div className="library-presets transition-presets">{TRANSITIONS.map(([key,label])=><button key={key} aria-pressed={selected?.transition_in_json.type===key} disabled={!selected?.shots.length||selected.id===project.scenes.find(s=>s.shots.length)?.id||busy||exporting} onClick={()=>selected&&record('transition',()=>api.updateScene(selected.id,{transition_in:selected.transition_in_json}),()=>api.updateScene(selected.id,{transition_in:{type:key,duration_ms:key==='cut'?0:(selected.transition_in_json.duration_ms||500)}}))}><div aria-hidden="true" className={`transition-sample sample-${key}`}><span>A</span><span>B</span></div><span>{label}</span></button>)}</div><p className="hint">Select the incoming part, then a transition. Adjust its duration above the tracks.</p></>}
+      {libraryTab==='Transitions'&&<><p className="sidebar-hint">INCOMING TO · {selected?.title||'Select a part'}</p><div className="library-presets transition-presets">{TRANSITIONS.map(([key,label])=><button key={key} onMouseEnter={()=>setHoverTx(key)} onMouseLeave={()=>setHoverTx(null)} onFocus={()=>setHoverTx(key)} onBlur={()=>setHoverTx(null)} aria-pressed={selected?.transition_in_json.type===key} disabled={!selected?.shots.length||selected.id===project.scenes.find(s=>s.shots.length)?.id||busy||exporting} onClick={()=>selected&&record('transition',()=>api.updateScene(selected.id,{transition_in:selected.transition_in_json}),()=>api.updateScene(selected.id,{transition_in:{type:key,duration_ms:key==='cut'?0:(selected.transition_in_json.duration_ms||500)}}))}><div aria-hidden="true" className={`transition-sample sample-${key}`}><span>A</span><span>B</span></div><span>{label}</span></button>)}</div><p className="hint">Select the incoming part, then a transition. Adjust its duration above the tracks.</p></>}
       </div><div className="sidebar-bottom"><span className="status-dot"/> Local workspace<span>Scene editor</span></div></>}
       </nav>
       <main className="editing-area">
-        {project.scenes.map((scene,i)=><PartRow key={`${scene.id}-${editorEpoch}`} scene={scene} project={project} index={i} total={project.scenes.length} active={selected?.id===scene.id} refresh={refresh} onMove={dir=>moveScene(scene.id,dir)} onDelete={()=>deleteScene(scene.id)} onOpenSettings={()=>setSettingsOpen(true)} onSaveState={(id,state)=>setStates(prev=>({...prev,[id]:state}))}/>)}
+        {project.scenes.map((scene,i)=><PartRow key={`${scene.id}-${editorEpoch}`} scene={scene} project={project} index={i} total={project.scenes.length} active={selected?.id===scene.id} txPreview={hoverTx&&selected&&project.scenes.indexOf(selected)>0?{key:hoverTx,from:project.scenes[project.scenes.indexOf(selected)-1]?.shots[0]?.asset_id||null,to:selected.shots[0]?.asset_id||null}:null} refresh={refresh} onMove={dir=>moveScene(scene.id,dir)} onDelete={()=>deleteScene(scene.id)} onOpenSettings={()=>setSettingsOpen(true)} onSaveState={(id,state)=>setStates(prev=>({...prev,[id]:state}))}/>)}
         {!project.scenes.length&&<div className="empty-project"><Film size={40}/><h2>Your story starts here</h2><button className="btn btn-primary" disabled={busy} onClick={addPart}><Plus size={16}/> Add your first scene</button></div>}
         <div id="sequence-viewer"/>
       </main>
     </div>
-    <ProjectTimeline notice={importStatus} onDropFiles={(id,files)=>void dropFilesOnTimeline(id,files)} onDropAssets={(id,assets)=>void dropAssetsOnTimeline(id,assets)} onDuration={resizeDuration} onRender={()=>void renderFullVideo()} exportScenes={exportScenes} exportAsset={exportJob?.status==="succeeded"?exportJob.artifact_asset_id:null} project={project} selectedId={selected?.id||""} disabled={busy||exporting} onSelect={setSelectedId} onAdd={addPart} clipboard={clip} onClipboard={c=>{setClip(c);setImportStatus(c.kind==='scene'?`Copied scene “${c.label}”. Select a scene and press Ctrl+V (or right-click → Paste) to paste it after that scene.`:`Copied ${c.label}. Select another scene's narration and press Ctrl+V to paste.`);}} onDuplicate={id=>void duplicateScene(id)} onPaste={id=>void pasteClip(id)} onReorder={ids=>record('scene order',()=>api.reorderScenes(project.id,project.scenes.map(s=>s.id)),()=>api.reorderScenes(project.id,ids))} onUpdate={(id,patch)=>record('transition',()=>api.updateScene(id,{transition_in:project.scenes.find(s=>s.id===id)!.transition_in_json}),()=>api.updateScene(id,patch))} onDelete={()=>selected&&void deleteScene(selected.id)} onAudio={()=>audioImportRef.current?.click()} onRemoveAudio={()=>selected&&void action(async()=>{await removeSceneAudio(selected);await refresh();})} onRemoveSceneAudio={id=>{const s=project.scenes.find(x=>x.id===id);if(s)void action(async()=>{await removeSceneAudio(s);await refresh();setImportStatus(`Audio removed from ${s.title}. Its picture is unchanged.`);});}} onUndo={undoTimeline} onRedo={redoTimeline} canUndo={!!history.length} canRedo={!!future.length} onSplit={(at,baked)=>selected&&void action(async()=>{const right=await api.splitScene(selected.id,at,baked);setEditorEpoch(v=>v+1);setHistory([]);setFuture([]);await refresh();setSelectedId(right.id);})}/>
+    <ProjectTimeline notice={importStatus} onDropFiles={(id,files)=>void dropFilesOnTimeline(id,files)} onDropAssets={(id,assets)=>void dropAssetsOnTimeline(id,assets)} onDuration={resizeDuration} onRender={()=>void renderFullVideo()} exportScenes={exportScenes} exportAsset={exportJob?.status==="succeeded"?exportJob.artifact_asset_id:null} project={project} selectedId={selected?.id||""} disabled={busy||exporting} onSelect={setSelectedId} onAdd={addPart} multi={multi} onMulti={(id,mode)=>{if(!project)return;setMulti(m=>{if(mode==='clear')return [];const base=m.length?m:(selected?[selected.id]:[]);if(mode==='toggle')return base.includes(id)?base.filter(x=>x!==id):[...base,id];const ids=project.scenes.map(x=>x.id),a=ids.indexOf(selected?.id||id),b=ids.indexOf(id);return ids.slice(Math.min(a,b),Math.max(a,b)+1);});}} clipboard={clip} onClipboard={c=>{setClip(c);setImportStatus(c.kind==='scene'?`Copied scene “${c.label}”. Select a scene and press Ctrl+V (or right-click → Paste) to paste it after that scene.`:`Copied ${c.label}. Select another scene's narration and press Ctrl+V to paste.`);}} onDuplicate={id=>void duplicateScene(id)} onPaste={id=>void pasteClip(id)} onReorder={ids=>record('scene order',()=>api.reorderScenes(project.id,project.scenes.map(s=>s.id)),()=>api.reorderScenes(project.id,ids))} onUpdate={(id,patch)=>record('transition',()=>api.updateScene(id,{transition_in:project.scenes.find(s=>s.id===id)!.transition_in_json}),()=>api.updateScene(id,patch))} onDelete={()=>selected&&void deleteScene(selected.id)} onAudio={()=>audioImportRef.current?.click()} onRemoveAudio={()=>selected&&void action(async()=>{await removeSceneAudio(selected);await refresh();})} onRemoveSceneAudio={id=>{const s=project.scenes.find(x=>x.id===id);if(s)void action(async()=>{await removeSceneAudio(s);await refresh();setImportStatus(`Audio removed from ${s.title}. Its picture is unchanged.`);});}} onUndo={undoTimeline} onRedo={redoTimeline} canUndo={!!history.length} canRedo={!!future.length} onSplit={(at,baked)=>selected&&void action(async()=>{const right=await api.splitScene(selected.id,at,baked);setEditorEpoch(v=>v+1);setHistory([]);setFuture([]);await refresh();setSelectedId(right.id);})}/>
     {settingsOpen&&<SettingsPanel onClose={()=>setSettingsOpen(false)}/>}
 
     {infoPanel?.panel==='ai'&&<AIEnginesPanel section={infoPanel.section} onClose={()=>setInfoPanel(null)} onOpenSettings={()=>{setInfoPanel(null);setSettingsOpen(true);}}/>}
