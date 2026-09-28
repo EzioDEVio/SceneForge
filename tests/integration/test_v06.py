@@ -1,4 +1,4 @@
-"""SceneForge 0.6 features: cinema countdown scenes (more added as 0.6 grows)."""
+"""SceneForge 0.6 integration checks, including real FFmpeg exports."""
 import os,pathlib,subprocess,sys,tempfile
 import numpy as np
 root=pathlib.Path(__file__).resolve().parents[2]
@@ -64,10 +64,27 @@ def tone(a,b):
 check('each part plays its own sound at the right time (440, 660, 880 Hz)',abs(tone(0.5,2.5)-440)<15 and abs(tone(3.5,5.5)-660)<15 and abs(tone(6.5,8.5)-880)<15)
 sh=vs[1]['shots'][0]['id']
 check('clip sound settings are validated',c.patch(f'/api/scenes/shots/{sh}',json={'audio':{'volume':500}}).status_code==400)
+check('clip fade durations are validated',c.patch(f'/api/scenes/shots/{sh}',json={'audio':{'fade_in_ms':10001}}).status_code==400)
 c.patch(f'/api/scenes/shots/{sh}',json={'audio':{'mute':True}})
 out2=export_of(vid);pcm=np.frombuffer(subprocess.check_output(['ffmpeg','-v','error','-i',str(out2),'-ac','1','-ar','8000','-f','s16le','-']),np.int16).astype(float)
 rms=lambda a,b:float(np.sqrt((pcm[int(a*8000):int(b*8000)]**2).mean()))
 check('muting one clip silences only that part',rms(3.5,5.5)<30 and rms(0.5,2.5)>300 and rms(6.5,8.5)>300)
+
+# A cut on a video scene cuts the picture and its embedded source audio at the same source offset.
+split_scene=vs[0];split_shot=split_scene['shots'][0]
+c.patch(f"/api/scenes/{split_scene['id']}",json={'timing_mode':'fixed','requested_duration_ms':3000})
+c.patch(f"/api/scenes/shots/{split_shot['id']}",json={'audio':{'volume':70,'mute':False,'duck':True,'fade_in_ms':350,'fade_out_ms':600}})
+snapshot=c.get(f"/api/scenes/{split_scene['id']}").json()
+right=c.post(f"/api/scenes/{split_scene['id']}/split",json={'at_ms':1000})
+assert right.status_code==200,right.text
+right_scene=c.get(f"/api/scenes/{right.json()['id']}").json()
+check('splitting a source video carries its audio settings and cuts audio at the same source offset',right_scene['shots'][0]['audio_json']=={'volume':70,'mute':False,'duck':True,'fade_in_ms':350,'fade_out_ms':600} and right_scene['shots'][0]['source_in_ms']==1000 and right_scene['shots'][0]['duration_ms']==2000)
+restored=c.post(f"/api/scenes/{split_scene['id']}/restore",json=snapshot)
+check('undo split restores original scene and shot IDs with clip sound settings',restored.status_code==200 and restored.json()['id']==split_scene['id'] and restored.json()['shots'][0]['id']==split_shot['id'] and restored.json()['shots'][0]['audio_json']=={'volume':70,'mute':False,'duck':True,'fade_in_ms':350,'fade_out_ms':600})
+c.delete(f"/api/scenes/{right.json()['id']}")
+order=[s['id'] for s in c.get(f'/api/projects/{vid}').json()['scenes']]
+c.put(f'/api/projects/{vid}/scene-order',json={'scene_ids':order})
+check('undo split removes the right-hand part',right.json()['id'] not in order)
 # --- countdown intro effect ------------------------------------------------------------------
 check('countdown intro settings are validated',c.patch(f"/api/scenes/{vs[0]['id']}",json={'look':{'countdown':{'seconds':30}}}).status_code==400)
 c.patch(f"/api/scenes/{vs[0]['id']}",json={'look':{'countdown':{'style':'minimal','seconds':3,'beep':'two-pop'}}})
@@ -78,16 +95,14 @@ check(f'countdown intro plays before the scene and adds its length ({d3:.2f} s)'
 # --- automatic captions from speech ----------------------------------------------------------
 from app.providers import transcribe as tr
 sc0=c.get(f'/api/projects/{vid}').json()['scenes'][1]
-r=c.post(f"/api/scenes/{sc0['id']}/auto-captions",json={})
-check('without an ElevenLabs/OpenAI key, auto captions explain what is needed',r.status_code==400 and 'key' in r.json()['detail'])
 seen={}
 def fake(db,path,provider='auto',language=None):
- seen['dur']=float(subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','csv=p=0',path]));seen['lang']=language
- return {'language':'ar','text':'مرحبا بكم في الأندلس','words':[['مرحبا',200,700],['بكم',800,1100],['في',1200,1400],['الأندلس',1500,2400]],'provider':'elevenlabs'}
+ seen['dur']=float(subprocess.check_output(['ffprobe','-v','error','-show_entries','format=duration','-of','csv=p=0',path]));seen['lang']=language;seen['provider']=provider
+ return {'language':'ar','text':'مرحبا بكم في الأندلس','words':[['مرحبا',200,700],['بكم',800,1100],['في',1200,1400],['الأندلس',1500,2400]],'provider':'local'}
 tr.transcribe=fake
 r=c.post(f"/api/scenes/{sc0['id']}/auto-captions",json={'language':'ar'})
 j=r.json()
-check('auto captions transcribe the video clip sound and save text + word timing',r.status_code==200 and j['subtitle_text']=='مرحبا بكم في الأندلس' and j['font_json']['transcript']['source']=='clips' and j['font_json']['captions_enabled'] and abs(seen['dur']-3)<0.3 and seen['lang']=='ar')
+check('free local auto captions are the default and save text, language + word timing',r.status_code==200 and j['subtitle_text']=='مرحبا بكم في الأندلس' and j['font_json']['transcript']['source']=='clips' and j['font_json']['transcript']['provider']=='local' and j['font_json']['captions_enabled'] and abs(seen['dur']-3)<0.3 and seen['lang']=='ar' and seen['provider']=='auto')
 from app.db.database import SessionLocal
 from app.db.models import Scene as _S
 from app.render.renderer import _caption_word_times

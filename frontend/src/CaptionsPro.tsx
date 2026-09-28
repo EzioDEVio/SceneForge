@@ -3,6 +3,7 @@ import {Bold, Italic, Underline, Type, Palette, Square, Move, Rows3, Highlighter
 import {api, type Scene} from './api';
 import {previewFontFamily} from './fonts';
 import {ANIMATION_LABELS} from './TitleDesigner';
+import {FeatureHelp} from './FeatureHelp';
 
 type F = Record<string, any>;
 const FAMILIES = ['Noto Sans', 'Poppins', 'Bebas Neue', 'Anton', 'Pacifico', 'Noto Naskh Arabic', 'Noto Sans Arabic', 'Amiri', 'Tajawal', 'Lalezar',
@@ -28,6 +29,12 @@ export const CAPTION_PRESETS: {name: string; sample: string; values: F}[] = [
   {name: 'Handwritten', sample: 'Hello', values: {family: 'Pacifico', size: 60, bold: false, case: 'none', color: '#FFFFFF', outline_color: '#1A1A1A', outline_width: 3, background: 'none', shadow: 2, split: 'phrases', phrase_words: 4, karaoke: false, caption_animation: 'fade', caption_animation_ms: 300}},
   {name: 'News lower third', sample: 'News', values: {family: 'Noto Sans', size: 40, bold: true, case: 'none', color: '#FFFFFF', background: 'box', box_color: '#C8102E', box_opacity: 95, box_padding: 10, outline_width: 0, position: 'bottom', halign: 'left', split: 'full', karaoke: false, caption_animation: 'fade', caption_animation_ms: 300}},
   {name: 'Elegant serif', sample: 'Elegant', values: {family: 'Amiri', size: 50, bold: false, italic: false, case: 'none', color: '#F5EFE0', outline_width: 0, shadow: 2, shadow_opacity: 80, spacing: 2, background: 'none', split: 'phrases', phrase_words: 5, karaoke: false, caption_animation: 'letters-fade', caption_animation_ms: 700}},
+  {name: 'Creator punch', sample: 'PUNCH!', values: {family: 'Anton', size: 86, bold: true, case: 'upper', color: '#FFFFFF', outline_color: '#151515', outline_width: 8, shadow: 2, background: 'none', split: 'phrases', phrase_words: 2, karaoke: true, karaoke_style: 'pop', highlight_color: '#FFB000', caption_animation: 'bounce', caption_animation_ms: 240}},
+  {name: 'Soft subtitle', sample: 'Soft subtitle', values: {family: 'Poppins', size: 42, bold: false, case: 'none', color: '#FFFFFF', outline_color: '#000000', outline_width: 2, shadow: 2, background: 'box', box_color: '#111827', box_opacity: 72, box_padding: 9, split: 'phrases', phrase_words: 5, karaoke: false, caption_animation: 'fade', caption_animation_ms: 350}},
+  {name: 'Glass panel', sample: 'Glass panel', values: {family: 'Poppins', size: 44, bold: true, case: 'none', color: '#FFFFFF', outline_width: 0, shadow: 1, background: 'box', box_color: '#24364B', box_opacity: 78, box_padding: 14, split: 'phrases', phrase_words: 4, karaoke: true, karaoke_style: 'color', highlight_color: '#7CE7FF', caption_animation: 'fade', caption_animation_ms: 300}},
+  {name: 'Pastel pop', sample: 'Pastel pop', values: {family: 'Poppins', size: 58, bold: true, case: 'none', color: '#FFE9F4', outline_color: '#49243B', outline_width: 3, shadow: 2, background: 'none', split: 'phrases', phrase_words: 3, karaoke: true, karaoke_style: 'pop', highlight_color: '#FF8CC6', caption_animation: 'words-pop', caption_animation_ms: 260}},
+  {name: 'Cyber cyan', sample: 'CYBER', values: {family: 'Bebas Neue', size: 72, bold: true, case: 'upper', color: '#B8FBFF', outline_color: '#07252D', outline_width: 3, shadow: 3, background: 'none', split: 'phrases', phrase_words: 3, karaoke: true, karaoke_style: 'glow', highlight_color: '#00E5FF', caption_animation: 'glitch', caption_animation_ms: 300}},
+  {name: 'Clean white', sample: 'Clean white', values: {family: 'Noto Sans', size: 46, bold: true, case: 'none', color: '#FFFFFF', outline_color: '#101114', outline_width: 3, shadow: 1, background: 'none', split: 'phrases', phrase_words: 5, karaoke: false, caption_animation: 'fade', caption_animation_ms: 250}},
   {name: 'Pulse', sample: 'Pulse', values: {family: 'Bebas Neue', size: 80, case: 'upper', color: '#FFE14D', outline_color: '#000000', outline_width: 4, background: 'none', split: 'phrases', phrase_words: 2, karaoke: false, caption_animation: 'bounce', caption_animation_ms: 350, loop: 'pulse', exit_animation: 'pop', exit_ms: 200}},
 ];
 
@@ -88,8 +95,20 @@ function Num({label, value, min, max, step = 1, onChange, unit = ''}: {label: st
     <input type="range" aria-label={label} min={min} max={max} step={step} value={value} onChange={e => onChange(Number(e.target.value))}/>
     <input type="number" aria-label={`${label} value`} min={min} max={max} step={step} value={value} onChange={e => onChange(Math.max(min, Math.min(max, Number(e.target.value) || 0)))}/><span className="unit">{unit}</span></div>;
 }
-const Group = ({title, Icon, children}: {title: string; Icon: typeof Type; children: React.ReactNode}) =>
-  <fieldset className="adjust-group caption-group"><legend><Icon size={12}/> {title}</legend>{children}</fieldset>;
+const GROUP_GUIDE:Record<string,[string,string]>={
+  'Caption styles':['Apply a ready-made visual treatment to captions.','Choose a style tile; caption wording remains unchanged.'],
+  Font:['Set caption typeface, size and weight.','Choose a font and adjust size; use bundled Noto fonts for consistent Arabic rendering.'],
+  'Colours & outline':['Set caption color, outline and contrast.','Choose a text color and outline that remains readable over your footage.'],
+  'Background box':['Add a background plate behind captions.','Choose a fill and adjust its opacity, roundness and padding.'],
+  Position:['Place captions within the frame.','Choose a preset position or adjust the on-screen offsets.'],
+  Display:['Control how much caption text is shown at once.','Choose line wrapping and phrase settings for the style you want.'],
+  'Word highlight':['Highlight spoken words as they are read.','Choose a highlight color/style; exact timing uses transcript or voice alignment when available.'],
+  Animation:['Animate captions as they enter or reveal.','Choose an animation and duration, then render a scene to review timing.'],
+};
+const Group = ({title, Icon, children}: {title: string; Icon: typeof Type; children: React.ReactNode}) => {
+  const [description,steps]=GROUP_GUIDE[title]||['Adjust this caption setting.','Change the control and review the caption preview.'];
+  return <fieldset className="adjust-group caption-group"><legend><Icon size={12}/> {title} <FeatureHelp compact title={title} description={description} steps={steps}/></legend>{children}</fieldset>;
+};
 
 /** Captions Pro: every caption setting in one organised panel. */
 export function CaptionStylePanel({scene, onChange}: {scene: Scene; onChange: (f: F) => void}) {
@@ -173,10 +192,11 @@ const LANGS: [string, string][] = [['', 'Detect automatically'], ['ar', 'Arabic'
 
 /** CapCut-style automatic captions: transcribe the speech in the scene (narration, or the
  *  videos' own sound) with the language detected, then style them with Captions Pro. */
-export function AutoCaptions({scene, onDone, onStyle}: {scene: Scene; onDone: (s: Scene) => void; onStyle?: (values: F) => void}) {
+export function AutoCaptions({scene, onDone, onStyle}: {scene: Scene; onDone: (s: Scene) => void; onStyle?: (values: F) => void | Promise<void>}) {
   const [lang, setLang] = React.useState('');
-  const [provider, setProvider] = React.useState('auto');
+  const [provider, setProvider] = React.useState('local');
   const [style, setStyle] = React.useState('Viral bold');
+  const [wordsPerClip,setWordsPerClip]=React.useState(3);
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState('');
   const tr = (scene.font_json as any)?.transcript;
@@ -185,10 +205,11 @@ export function AutoCaptions({scene, onDone, onStyle}: {scene: Scene; onDone: (s
   async function go() {
     setBusy(true); setMsg('Listening to the speech…');
     try {
-      const sc = await api.autoCaptions(scene.id, {provider, language: lang}); const t = (sc.font_json as any)?.transcript;
       const preset = CAPTION_PRESETS.find(p => p.name === style);
-      if (preset && onStyle) onStyle({...preset.values, captions_enabled: true, typewriter: false});
-      setMsg(`Done: ${t?.words?.length || 0} words${t?.language ? ` · language: ${t.language}` : ''}${preset ? ` · style: ${preset.name}` : ''}. Edit the text below if a word is wrong.`); onDone(sc);
+      const sc = await api.autoCaptions(scene.id, {provider, language: lang, phrase_words:wordsPerClip}); const t = (sc.font_json as any)?.transcript;
+      if (preset && onStyle) await onStyle({...preset.values, captions_enabled: true, typewriter: false});
+      const portions=(sc.font_json as any)?.caption_segments?.length||0;
+      setMsg(`Done: ${t?.words?.length || 0} words · ${portions} editable caption clips${t?.language ? ` · language: ${t.language}` : ''}${preset ? ` · style: ${preset.name}` : ''}. Edit each clip below or click it on T1.`); onDone(sc);
     } catch (e: any) {setMsg(e.message || String(e));} finally {setBusy(false);}
   }
   const disabled = !hasNarr && !hasVideo;
@@ -197,10 +218,12 @@ export function AutoCaptions({scene, onDone, onStyle}: {scene: Scene; onDone: (s
       {tr?.language && <span className="info-badge ok">{tr.language} · {tr.source === 'clips' ? 'video sound' : 'narration'}</span>}</header>
     <div className="acc-grid">
       <label className="control-label">Language<select aria-label="Speech language" value={lang} disabled={disabled} onChange={e => setLang(e.target.value)}>{LANGS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
-      <label className="control-label">Caption style<select aria-label="Auto caption style" value={style} disabled={disabled} onChange={e => setStyle(e.target.value)}><option value="">Keep current style</option>{CAPTION_PRESETS.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}</select></label>
-      <label className="control-label">Service<select aria-label="Transcription service" value={provider} disabled={disabled} onChange={e => setProvider(e.target.value)}><option value="auto">Automatic (your saved key)</option><option value="elevenlabs">ElevenLabs Scribe</option><option value="openai">OpenAI Whisper</option></select></label>
+      <label className="control-label">Caption style<select aria-label="Auto caption style" value={style} disabled={disabled} onChange={e => {setStyle(e.target.value);const p=CAPTION_PRESETS.find(x=>x.name===e.target.value);if(p)setWordsPerClip(Number(p.values.phrase_words||3));}}><option value="">Keep current style</option>{CAPTION_PRESETS.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}</select></label>
+      <label className="control-label">Service<select aria-label="Transcription service" value={provider} disabled={disabled} onChange={e => setProvider(e.target.value)}><option value="local">Local Whisper · free</option><option value="elevenlabs">ElevenLabs Scribe · cloud</option><option value="openai">OpenAI Whisper · cloud</option></select></label>
+      <label className="control-label">Words per caption clip<select aria-label="Words per caption clip" value={wordsPerClip} disabled={disabled} onChange={e=>setWordsPerClip(Math.max(1,Math.min(8,Number(e.target.value)||3)))}>{Array.from({length:8},(_,i)=>i+1).map(n=><option key={n} value={n}>{n} {n===1?'word':'words'}</option>)}</select></label>
       <button className="btn btn-primary acc-go" disabled={busy || disabled} onClick={() => void go()}><Sparkles size={14}/> {busy ? 'Transcribing…' : 'Generate captions'}</button>
     </div>
+    {provider === 'local' && <p className="hint">Runs on this PC with no API key. The multilingual Whisper model downloads once on first use; after that, captions work offline.</p>}
     {msg && <p className="info-status" aria-live="polite">{msg}</p>}
   </section>;
 }

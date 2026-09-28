@@ -56,13 +56,15 @@ def _exit_loop_tags(font_json: dict, span_ms: int) -> str:
 
 
 def _phrase_events(text, font_json, duration_ms, family, primary, outline, outline_w, size,
-                   speech_start_ms, speech_ms, speech_segments, word_times, ts, runs, tag_runs, escape_text):
+                   speech_start_ms, speech_ms, speech_segments, word_times, ts, runs, tag_runs, escape_text,
+                   forced_end_ms=None):
     """CapCut-style phrase captions: a few words at a time, each phrase shown while its words
     are spoken (exact voice timing, measured speech, or an even spread), with the phrase's
     entrance, word highlight, exit and loop applied per phrase."""
     from app.render.word_timing import word_starts
     words = text.split()
     n = max(1, min(8, int(font_json.get("phrase_words", 3) or 3)))
+    direction_mark = {"rtl": "\u200f", "ltr": "\u200e"}.get(font_json.get("caption_direction"), "")
     weights = [len(w) + 2 for w in words]
     if word_times and len(word_times) == len(words):
         starts = [s for s, _ in word_times]
@@ -84,8 +86,12 @@ def _phrase_events(text, font_json, duration_ms, family, primary, outline, outli
     events = []
     for c in range(0, len(words), n):
         chunk = words[c:c + n]
+        # Keep the phrase's text untouched for word timing, while giving libass
+        # an explicit paragraph direction for mixed Arabic/Latin captions.
+        if c == 0 and chunk and direction_mark:
+            chunk[0] = direction_mark + chunk[0]
         c_start = starts[c]
-        c_end = starts[c + n] if c + n < len(words) else min(duration_ms, last_end + 500)
+        c_end = starts[c + n] if c + n < len(words) else min(duration_ms, int(forced_end_ms) if forced_end_ms is not None else last_end + 500)
         c_end = max(c_end, c_start + 200)
         span = c_end - c_start
         enter = _entrance_tags(anim, min(a, max(100, span // 2)))
@@ -223,8 +229,33 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         first, tagged = tag_runs(value, chosen_family, escape_text)
         return "{\\fn%s}%s" % (first, tagged) if tagged else ""
 
+    direction_mark = {"rtl": "\u200f", "ltr": "\u200e"}.get(font_json.get("caption_direction"), "")
+    def caption_runs(value, chosen_family):
+        return runs(direction_mark + value if value and direction_mark else value, chosen_family)
+
     split = font_json.get("split", "full")
-    if split == "phrases" and text.strip() and not typewriter:
+    caption_segments = font_json.get("caption_segments") or []
+    if caption_segments and text.strip() and not typewriter:
+        events = []
+        transcript_words = ((font_json.get('transcript') or {}).get('words') or [])
+        for segment in caption_segments:
+            segment_text = str(segment.get('text') or '').strip()
+            if not segment_text: continue
+            start = max(0, min(duration_ms, int(segment.get('start_ms') or 0)))
+            end = max(start + 100, min(duration_ms, int(segment.get('end_ms') or duration_ms)))
+            if end <= start: continue
+            if case == 'upper': segment_text = segment_text.upper()
+            elif case == 'lower': segment_text = segment_text.lower()
+            elif case == 'title': segment_text = ' '.join(w[:1].upper() + w[1:] for w in segment_text.split(' '))
+            tokens = segment_text.split()
+            timed = [row for row in transcript_words if isinstance(row, (list, tuple)) and len(row) >= 3 and start <= int(row[1]) < end]
+            if [str(row[0]) for row in timed] != tokens: timed = []
+            word_times_segment = [(int(row[1]), int(row[2])) for row in timed] or None
+            segment_font = {**font_json, 'split': 'phrases', 'phrase_words': max(1, min(8, len(tokens)))}
+            events.extend(_phrase_events(segment_text, segment_font, duration_ms, family, primary, outline, outline_w, size,
+                                         start, end-start, [(start, end)], word_times_segment, ts, runs, tag_runs, escape_text,
+                                         forced_end_ms=end))
+    elif split == "phrases" and text.strip() and not typewriter:
         events = _phrase_events(text, font_json, duration_ms, family, primary, outline, outline_w, size,
                                 speech_start_ms, speech_ms, speech_segments, word_times, ts, runs, tag_runs, escape_text)
     elif font_json.get("karaoke") and text.strip() and not typewriter:
@@ -259,7 +290,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         if style in ("pop", "glow", "box", "color", "underline"):
             # One event per word: spoken words in the highlight colour, the
             # current word popped (bigger) or glowing, the rest in the caption colour.
-            tagged_words = [tag_runs(w + (" " if i < len(words) - 1 else ""), family, escape_text) for i, w in enumerate(words)]
+            tagged_words = [tag_runs((direction_mark if i == 0 else "") + w + (" " if i < len(words) - 1 else ""), family, escape_text) for i, w in enumerate(words)]
             def line(current: int, spoken: int) -> str:
                 out = []
                 for j, (first, tagged) in enumerate(tagged_words):
@@ -294,20 +325,20 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         else:
             parts = [f"{{\\1c{hi}\\2c{primary}\\k{max(0, round(starts[0] / 10))}}}"]
             for i, word in enumerate(words):
-                first, tagged = tag_runs(word + (" " if i < len(words) - 1 else ""), family, escape_text)
+                first, tagged = tag_runs((direction_mark if i == 0 else "") + word + (" " if i < len(words) - 1 else ""), family, escape_text)
                 parts.append(f"{{\\k{max(1, round((ends[i] - starts[i]) / 10))}\\fn{first}}}{tagged}")
             events = [f"Dialogue: 0,{ts(0)},{ts(duration_ms)},Default,,0,0,0,,{''.join(parts)}\n"]
     elif not typewriter or not text.strip():
-        events = [f"Dialogue: 0,{ts(0)},{ts(duration_ms)},Default,,0,0,0,,{runs(text, family)}\n"]
+        events = [f"Dialogue: 0,{ts(0)},{ts(duration_ms)},Default,,0,0,0,,{caption_runs(text, family)}\n"]
     else:
         schedule = reveal_schedule(text, duration_ms, font_json)
         events = []
         for i, event in enumerate(schedule):
             end = schedule[i + 1]['time_ms'] if i + 1 < len(schedule) else duration_ms
-            substr = runs(event['text'], family)
+            substr = caption_runs(event['text'], family)
             events.append(f"Dialogue: 0,{ts(event['time_ms'])},{ts(end)},Default,,0,0,0,,{substr}\n")
 
-    def unit_animated(text: str, family: str, animation: str, anim_ms: int, base: str, hi: str) -> str:
+    def unit_animated(text: str, family: str, animation: str, anim_ms: int, base: str, hi: str, base_direction: str = "") -> str:
         """Per-letter (or per-word) animation with inline ASS tags. libass keeps doing the
         layout, bidi and shaping; only timing tags are added between units. Arabic letters must
         stay joined (tags between them break shaping), so Arabic text animates by word."""
@@ -319,6 +350,8 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         kind = animation.split('-', 1)[-1] if animation != 'shine' else 'shine'
         out = []
         for i, u in enumerate(units):
+            if i == 0 and base_direction:
+                u = base_direction + u
             o = int((anim_ms - d) * i / (n - 1)) if n > 1 else 0
             if kind == 'fade':
                 tags = r'\alpha&HFF&\t(%d,%d,\alpha&H00&)' % (o, o + d)
@@ -358,11 +391,11 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         }
         head = f"Dialogue: 0,{ts(0)},{ts(duration_ms)},Default,,0,0,0,,"
         if cap_anim.startswith(('letters-', 'words-')) or cap_anim == 'shine':
-            events[0] = head + unit_animated(text, family, cap_anim, a, cap_color, cap_hi) + "\n"
+            events[0] = head + unit_animated(text, family, cap_anim, a, cap_color, cap_hi, direction_mark) + "\n"
         elif cap_anim in line_tags:
-            events[0] = head + '{' + line_tags[cap_anim] + '}' + runs(text, family) + "\n"
+            events[0] = head + '{' + line_tags[cap_anim] + '}' + caption_runs(text, family) + "\n"
             if cap_anim == 'neon':
-                events.insert(0, head.replace('Dialogue: 0,', 'Dialogue: 0,', 1) + '{' + line_tags['neon'] + r'\1a&HFF&\3c%s\bord6\blur10\shad0' % cap_hi + '}' + runs(text, family) + "\n")
+                events.insert(0, head.replace('Dialogue: 0,', 'Dialogue: 0,', 1) + '{' + line_tags['neon'] + r'\1a&HFF&\3c%s\bord6\blur10\shad0' % cap_hi + '}' + caption_runs(text, family) + "\n")
 
     for index, layer in enumerate(font_json.get('layers', [])):
         start = min(duration_ms, int(layer.get('start_ms', 0)))
@@ -400,22 +433,28 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         family=layer.get('family','Noto Naskh Arabic')
         if family not in LAYER_FAMILIES: family='Noto Naskh Arabic'
         layer_size = int(round(int(layer.get('size', 64)) * text_scale(family, layer.get('text', ''))))
+        if layer.get('kind') == 'text_box':
+            side_margin = round(canvas_w * (100 - float(layer.get('box_width', 80))) / 200)
+        else:
+            side_margin = 0
+        event_prefix = f"Dialogue: {index+1},{ts(start)},{ts(end)},Default,,{side_margin},{side_margin},0,,"
         overrides = r'{\an%d%s\fs%d\c%s\b%d\bord%.1f\shad%.1f\fsp%.1f%s}' % (align,position_tag,layer_size,color,int(layer.get('bold',False)),layer.get('outline_width',0),layer.get('shadow',0),float(layer.get('spacing',0) or 0),extra)
         if animation == 'typewriter':
             schedule = reveal_schedule(layer['text'],span,{'typewriter_delay_ms':0,'typewriter_duration_ms':anim_ms})
             for j,event in enumerate(schedule):
                 stop = schedule[j+1]['time_ms'] if j+1<len(schedule) else span
                 event_overrides=overrides if j==len(schedule)-1 else overrides.replace(r'\fad(0,%d)' % exit_ms,'')
-                events.append(f"Dialogue: {index+1},{ts(start+event['time_ms'])},{ts(start+stop)},Default,,0,0,0,,{event_overrides}{runs(event['text'], family)}\n")
+                event_prefix_time = f"Dialogue: {index+1},{ts(start+event['time_ms'])},{ts(start+stop)},Default,,{side_margin},{side_margin},0,,"
+                events.append(f"{event_prefix_time}{event_overrides}{runs(event['text'], family)}\n")
         elif animation.startswith(('letters-','words-')) or animation == 'shine':
-            events.append(f"Dialogue: {index+1},{ts(start)},{ts(end)},Default,,0,0,0,,{overrides}{unit_animated(layer['text'], family, animation, anim_ms, color, hi_color)}\n")
+            events.append(f"{event_prefix}{overrides}{unit_animated(layer['text'], family, animation, anim_ms, color, hi_color)}\n")
         elif animation == 'neon':
             # glow: a blurred outline in the highlight colour underneath, sharp text on top, both flickering on
             halo = overrides.replace('}', r'\1a&HFF&\3c%s\bord%d\blur10\shad0}' % (hi_color, max(4, int(layer.get('size',64)) // 10)), 1)
-            events.append(f"Dialogue: {index+1},{ts(start)},{ts(end)},Default,,0,0,0,,{halo}{runs(layer['text'], family)}\n")
-            events.append(f"Dialogue: {index+1},{ts(start)},{ts(end)},Default,,0,0,0,,{overrides}{runs(layer['text'], family)}\n")
+            events.append(f"{event_prefix}{halo}{runs(layer['text'], family)}\n")
+            events.append(f"{event_prefix}{overrides}{runs(layer['text'], family)}\n")
         else:
-            events.append(f"Dialogue: {index+1},{ts(start)},{ts(end)},Default,,0,0,0,,{overrides}{runs(layer['text'], family)}\n")
+            events.append(f"{event_prefix}{overrides}{runs(layer['text'], family)}\n")
 
     path = out_path or str(TMP_DIR / f"{scene_id}_captions.ass")
     with open(path, "w", encoding="utf-8-sig") as fh:

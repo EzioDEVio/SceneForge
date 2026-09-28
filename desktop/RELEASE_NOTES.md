@@ -1,3 +1,55 @@
+# SceneForge Studio 0.6.0-wip.10 (unreleased)
+
+This is a reviewed source snapshot, not a published GitHub release. See [the source comparison and review](../docs/REVIEW_0.6.0_WIP.md).
+
+## Compatibility and timeline fixes
+- Restored undo/redo coverage for scene add/delete, media insertion, title cards, narration attach/remove, scene reorder, clip sound, and scene splits (up to 100 recent timeline operations).
+- Scene splits preserve per-shot source audio settings and speed settings; undo restores original scene and clip IDs.
+- Added a dedicated source-video-audio lane with separate blocks for each video clip. Selecting a block opens that clip’s **Clip Audio** inspector (separate from Motion), including volume, mute, narration ducking, and fades.
+- Restored the original AI Engines top-level menu and Help menu while retaining Scenes, Media Pool, Transitions, and toolbar provider settings. Removed the redundant AI Engines entry from the Scenes library tabs.
+- Whole-scene timeline blocks can be dragged to reorder; source sound follows video splits.
+
+## New and improved
+- **Additional caption looks:** Creator punch, Soft subtitle, Glass panel, Pastel pop, Cyber cyan and Clean white.
+- Transition tiles now show more distinct cover, slide, zoom, wipe, blur and radial motion cues while previewing.
+- Dropping media into empty timeline space inserts it at that point in the sequence; the left/right scene-edge insertion behavior remains available.
+- **18 additional transitions** with live previews on your clips (42 choices total).
+- **Select several parts** and apply chosen effects, caption styles, titles, or transitions together while preserving each part's caption text and position-specific effects.
+- **Free local captions:** Faster-Whisper is the default and needs no API key. Its multilingual model downloads once on first use; subsequent transcription runs on-device. ElevenLabs and OpenAI remain optional cloud choices.
+- **Fourteen additional caption styles** (24 total).
+- **Export presets and controls:** platform presets, estimated size, resolution up to 4K, frame rate, quality, H.264/H.265 MP4, WebM, ProRes MOV, GIF, MP3 and WAV; export SRT/VTT caption files.
+- **Progress cards** show the current stage, percentage, elapsed time and estimate, with cancellation for renders and exports.
+- The multi-select toolbar can be minimized and closes automatically after a successful action.
+- Advanced export controls open by default in a redesigned dark editing-style panel; the narration script box has updated styling.
+- The timeline shows video source sound on its own A2 lane; clicking a block opens the existing clip sound controls. Drop media near a scene's left/right edge to insert a new part before/after it.
+
+## Fixed
+- Exports use broadly supported H.264 4:2:0 and fast-start MP4 settings, including projects with transitions, to improve playback in Windows Photos and Media Player.
+- The fast timeline export uses draft quality; the Export dialog retains its selected delivery quality.
+- A 9:16 project preserves the full duration and sound of source video clips. Clip sound can be muted or adjusted individually.
+
+## Additional updates in wip.8 (previous WIP)
+- Added **Text**, **Text Box**, and **Text+** creation tools. Text is a short title; Text Box adds a width-controlled, wrapping block; Text+ uses SceneForge's styled/animated title controls. These are not a full DaVinci Resolve Fusion replacement.
+- Text titles and on-screen captions appear as labeled, timed clips on the T1 timeline. Selecting a clip switches to Text and focuses the matching editable caption/title field.
+- Added click-to-open “What it does / How to use it” help popovers across Media, Motion, Effects, Overlays, Text, Audio and Clip Audio, plus feature sections such as stickers, effects, framing and narration.
+- Timeline marker help now explains that markers are named bookmarks for returning to a point in the project.
+- Frontend/backend build IDs and desktop package version were `0.6.0-wip.8`.
+- The post-export Share dialog from wip.7 remains included.
+
+## Additional updates in wip.9 (previous WIP)
+- Auto captions now create individually timed caption clips on T1, grouped by a user-selected 1–8 words per clip. Click a clip to open and focus its text editor; change wording and start/end times, split a phrase into two clips, or remove a clip. Caption styles still apply across the caption set.
+- Fixed clipped feature-help popovers by placing them in a viewport-level layer, repositioning them near the trigger, constraining long content to a scrollable viewport, and supporting Escape to close.
+- Bumped frontend/backend build IDs and desktop package to `0.6.0-wip.9`; the post-export Share dialog remains included.
+
+## Additional updates in wip.10
+- Moved the T1 text/caption lane above the V1 picture lane so timed captions sit directly above their video on the timeline.
+- Added caption search, previous/next navigation, active-segment highlighting, and collapse/expand for long transcripts.
+- Added Auto, Right to left, and Left to right caption direction. The setting follows edited captions into ASS rendering, including mixed Arabic/Latin phrases.
+- Updated the frontend/backend build identifiers and desktop package version to `0.6.0-wip.10`.
+
+## Installation notes
+- The Windows desktop installer bundles the editor, its private backend runtime and FFmpeg. It does not bundle the Whisper model, optional Chatterbox/Kokoro narration servers, or Stable Diffusion image models. Whisper downloads its model once on first use; the others require separate setup if needed.
+
 # SceneForge Studio 0.5.3
 
 ## Fixed (important)
@@ -395,3 +447,20 @@ For SD, select your existing folder containing `webui-user.bat`, with `--api` in
 
 ## Release status
 This is an unsigned Windows x64 release candidate. The core editor, private Python runtime, FFmpeg and fonts are bundled. AI engines and model downloads are not bundled. Existing Chatterbox installations remain supported. macOS/Linux installers, signing and automatic engine installation are not included. Real SD inference on the user's GPU remains a manual acceptance check; CI checks launching and stopping a fixture service, not model quality.
+
+## Regression repairs in wip.5
+- Source clip sound controls now have a dedicated Clip Audio inspector tab and no longer appear inside Motion. A2 timeline blocks open that tab.
+- Crop and focal maps use backend-generated image thumbnails/poster frames, with a readable fallback if preview generation fails. Crop/focal controls save on slider release or keyboard edits as well as through Apply buttons.
+- Clip volume commits the exact selected value instead of relying on stale slider state.
+
+## Additional updates in wip.6
+- Source clip sound now includes render-applied fade-in and fade-out sliders alongside volume, mute, and narration ducking. Fade settings follow a clip through scene splits.
+- Auto captions now switch to a single-column layout in a narrow inspector and return to two columns when there is room.
+
+## Additional updates in wip.7 (previous WIP)
+- Export completion offers a local-first share dialog with download, desktop file-location reveal, platform links and step-by-step posting guidance for YouTube, TikTok, Instagram and Facebook. SceneForge does not upload automatically; the dialog explains platform authorization and account limits.
+- Timeline ruler scrubbing can snap to scene boundaries and named markers. Markers persist per project in the local browser profile.
+- Single, narration-free video scenes can be trimmed from either edge on the timeline; source video audio follows the same in/out points. The existing scene delete operation removes a scene and closes the sequence gap.
+- Overlays now include a searchable, categorized 48-item emoji/sticker picker. A chosen symbol is rasterized as a standard image overlay asset so it follows existing placement, transform, animation and render behavior.
+- Added three distinct color filter presets: Teal & Amber, Pastel, and Bleach Bypass.
+- Updated frontend/backend build IDs and desktop package to `0.6.0-wip.7`. This is still an unreleased source snapshot; no platform upload APIs or full multitrack lock/mute/solo controls are included.

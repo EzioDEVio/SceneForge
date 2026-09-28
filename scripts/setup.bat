@@ -56,7 +56,7 @@ pause
 exit /b 1
 
 :no_node
-echo [ERROR] Node.js was not found on PATH. Install Node 18+ LTS from
+echo [ERROR] Node.js was not found on PATH. Install Node 20+ LTS from
 echo         https://nodejs.org/ and re-run this script.
 pause
 exit /b 1

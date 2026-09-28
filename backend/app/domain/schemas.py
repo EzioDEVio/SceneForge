@@ -83,9 +83,13 @@ class ShotOut(BaseModel):
 
 class VoiceTakeOut(BaseModel):
     id: str
+    spoken_text_hash: str = ""
     source: str
     provider: str | None
+    model: str | None = None
     voice: str | None
+    settings_json: dict | None = None
+    audio_asset_id: str | None = None
     measured_duration_ms: int | None
     accepted: bool
     stale: bool
@@ -254,6 +258,8 @@ class GenerateImageRequest(BaseModel):
 
 
 class TextLayer(BaseModel):
+    kind: str = Field(default="text_plus", pattern=r"^(text|text_box|text_plus)$")
+    box_width: float = Field(default=80, ge=20, le=100)
     family: str = Field(default="Noto Naskh Arabic", pattern=r"^(Noto Naskh Arabic|Noto Sans Arabic|Noto Sans|Amiri|Tajawal|Lalezar|Poppins|Bebas Neue|Anton|Pacifico)$")
     align: str = Field(default="center", pattern=r"^(left|center|right)$")
     outline_width: float = Field(default=0, ge=0, le=10)

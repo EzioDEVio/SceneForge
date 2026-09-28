@@ -184,6 +184,11 @@ _EFFECT_FILTERS: dict[str, str] = {
     EffectPreset.NEWSPRINT: ("hue=s=0,eq=contrast=1.55:brightness=0.02,noise=alls=16:allf=u,"
                              "colorchannelmixer=.95:0:0:0:0:.92:0:0:0:0:.82:0,unsharp=3:3:0.6"),
     EffectPreset.OLD_FILM: "curves=preset=vintage,eq=saturation=0.75:contrast=1.05,noise=alls=22:allf=t+u,vignette=PI/3.5",
+    # Added as distinct colour treatments, separate from the image-look and
+    # film-damage controls above.
+    EffectPreset.TEAL_AMBER: "colorbalance=rs=-0.08:gs=-0.02:bs=0.12:rh=0.10:gh=0.035:bh=-0.09,eq=contrast=1.08:saturation=1.12",
+    EffectPreset.PASTEL: "eq=contrast=0.90:brightness=0.06:saturation=0.78,colorbalance=rs=0.025:gs=0.018:bs=-0.015",
+    EffectPreset.BLEACH_BYPASS: "hue=s=0.48,eq=contrast=1.32:brightness=-0.015,colorbalance=bs=0.035:rh=0.025",
 }
 
 

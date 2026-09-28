@@ -1,6 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
-import {Plus, Trash2, Copy, ArrowUp, ArrowDown, Upload, PictureInPicture2} from 'lucide-react';
+import {Plus, Trash2, Copy, ArrowUp, ArrowDown, Upload, PictureInPicture2, Search, Sticker} from 'lucide-react';
 import {api, Asset, Overlay, Scene} from './api';
+import {FeatureHelp} from './FeatureHelp';
 
 export const OVERLAY_DEFAULTS: Omit<Overlay, 'id' | 'asset_id'> = {
   x: 72, y: 30, width: 34, rotation: 0, opacity: 100, radius: 6, border: 6, border_color: '#FFFFFF', shadow: 60, feather: 0, chroma: null, chroma_similarity: 30, x2: null, y2: null,
@@ -9,6 +10,9 @@ export const OVERLAY_DEFAULTS: Omit<Overlay, 'id' | 'asset_id'> = {
 const ANIMS: [Overlay['anim_in'], string][] = [['none', 'None'], ['fade', 'Fade'], ['slide_left', 'Slide'], ['slide_up', 'Rise'], ['zoom', 'Zoom pop']];
 const newId = () => 'ov' + Math.random().toString(36).slice(2, 9);
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
+const STICKERS = [
+  ['😀','Grinning face','reaction happy smile'],['😂','Laughing','reaction funny tears'],['🥳','Party','celebration confetti'],['😍','Heart eyes','reaction love'],['😮','Wow','reaction surprised'],['🤔','Thinking','reaction question'],['😎','Cool','reaction sunglasses'],['😭','Crying','reaction sad'],['👏','Clap','hands applause'],['👍','Thumbs up','hands approve'],['👎','Thumbs down','hands dislike'],['❤️','Heart','love symbol'],['🔥','Fire','trending hot'],['✨','Sparkles','magic shine'],['⭐','Star','rating favorite'],['💯','100','perfect score'],['✅','Check','done correct'],['❌','Cross','wrong no'],['⚠️','Warning','alert caution'],['❓','Question','help ask'],['💡','Idea','light bulb tip'],['🎉','Confetti','party celebration'],['🎬','Movie','film video'],['🎵','Music','sound audio'],['📍','Pin','location map'],['🚀','Rocket','launch fast'],['💬','Speech bubble','comment message'],['👀','Eyes','look watch'],['🙏','Thanks','please hands'],['💪','Strong','muscle power'],['🌟','Glow star','star shine'],['☀️','Sun','weather bright'],['🌈','Rainbow','color pride'],['🧠','Brain','think smart'],['💰','Money','cash finance'],['🎯','Target','goal focus'],['🏆','Trophy','winner award'],['☕','Coffee','drink break'],['🍿','Popcorn','movie snack'],['🐱','Cat','animal pet'],['🐶','Dog','animal pet'],['🦋','Butterfly','nature'],['🌸','Blossom','flower spring'],['💖','Sparkling heart','love heart'],['🚨','Siren','alert urgent'],['🛑','Stop','halt'],['▶️','Play','video start'],['⏸️','Pause','video stop'],
+].map(([emoji,name,tags])=>({emoji,name,tags}));
 
 function useProjectMedia(projectId: string) {
   const [media, setMedia] = useState<Asset[]>([]);
@@ -78,6 +82,8 @@ export function OverlayPanel({scene, overlays, selected, onSelect, onChange, dis
 }) {
   const [media, setMedia] = useProjectMedia(scene.project_id);
   const [error, setError] = useState('');
+  const [stickerQuery,setStickerQuery]=useState('');
+  const [stickerBusy,setStickerBusy]=useState('');
   const file = useRef<HTMLInputElement>(null);
   const o = overlays[selected];
   const set = (patch: Partial<Overlay>) => onChange(overlays.map((x, i) => i === selected ? {...x, ...patch} : x));
@@ -92,6 +98,22 @@ export function OverlayPanel({scene, overlays, selected, onSelect, onChange, dis
     try {const a = await api.uploadAsset(scene.project_id, f); if (a.type !== 'image' && a.type !== 'video') {setError('Choose an image or a video.'); return;} setMedia(m => [...m, a]); add(a.id);}
     catch (e: any) {setError(e.message || 'Upload failed.');}
     finally {if (file.current) file.current.value = '';}
+  }
+  async function addSticker(sticker:{emoji:string;name:string}) {
+    if(overlays.length>=8){setError('A scene can have at most 8 overlays. Remove one before adding another.');return;}
+    setStickerBusy(sticker.name);setError('');
+    try {
+      const canvas=document.createElement('canvas');canvas.width=512;canvas.height=512;
+      const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Sticker rendering is unavailable in this browser.');
+      ctx.clearRect(0,0,512,512);ctx.textAlign='center';ctx.textBaseline='middle';
+      ctx.font='380px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+      ctx.shadowColor='rgba(0,0,0,.28)';ctx.shadowBlur=10;ctx.fillText(sticker.emoji,256,264,448);
+      const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Could not create the sticker image.')),'image/png'));
+      const safe=sticker.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+      const asset=await api.uploadAsset(scene.project_id,new File([blob],`sticker-${safe}.png`,{type:'image/png'}));
+      setMedia(m=>[...m,asset]);add(asset.id);
+    }catch(e:any){setError(e?.message||'Could not add this sticker.');}
+    finally{setStickerBusy('');}
   }
   const num = (key: keyof Overlay, label: string, min: number, max: number, step = 1, unit = '') =>
     <div className="adjust-row changed"><label htmlFor={`ov-${key}`}>{label}</label>
@@ -111,6 +133,14 @@ export function OverlayPanel({scene, overlays, selected, onSelect, onChange, dis
       <input ref={file} type="file" accept="image/*,video/*" hidden aria-label="Upload overlay media" onChange={e => void upload(e.target.files?.[0])}/>
     </div>
     {error && <p className="form-error" role="alert">{error}</p>}
+    <section className="sticker-library" aria-label="Stickers and emoji">
+      <div className="section-heading"><h3><Sticker size={15}/> Stickers & emoji</h3><span>{STICKERS.length}</span><FeatureHelp compact title="Stickers and emoji" description="Add a reusable graphic or emoji as a normal image overlay on the scene." steps="Search or browse the sticker grid, click an item, then select it in the overlay list or preview to resize, position, animate, or delete it."/></div>
+      <p className="hint">Choose a transparent sticker. It is saved as a PNG overlay, so it renders consistently with your project.</p>
+      <label className="search-control"><Search size={14}/><input aria-label="Search stickers and emoji" placeholder="Search stickers…" value={stickerQuery} onChange={e=>setStickerQuery(e.target.value)}/></label>
+      <div className="sticker-grid" role="group" aria-label="Sticker choices">{STICKERS.filter(s=>`${s.name} ${s.tags} ${s.emoji}`.toLowerCase().includes(stickerQuery.toLowerCase())).map(s=><button key={s.name} className="sticker-choice" title={s.name} aria-label={`Add ${s.name} sticker`} disabled={disabled||!!stickerBusy||overlays.length>=8} onClick={()=>void addSticker(s)}><span aria-hidden="true">{stickerBusy===s.name?'…':s.emoji}</span><small>{s.name}</small></button>)}</div>
+      {!STICKERS.some(s=>`${s.name} ${s.tags} ${s.emoji}`.toLowerCase().includes(stickerQuery.toLowerCase()))&&<p className="hint">No stickers match that search.</p>}
+      {overlays.length>=8&&<p className="hint">This scene has reached the 8 overlay limit.</p>}
+    </section>
     {overlays.length > 0 && <ul className="overlay-list" aria-label="Overlays (top of list is drawn on top)">
       {[...overlays.keys()].reverse().map(i => <li key={overlays[i].id} className={i === selected ? 'selected' : ''}>
         <button className="overlay-pick" aria-pressed={i === selected} onClick={() => onSelect(i)}><img src={api.assetThumbUrl(overlays[i].asset_id, 160)} alt=""/> Overlay {i + 1}</button>

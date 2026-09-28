@@ -101,6 +101,21 @@ def update_scene(scene_id: str, body: schemas.SceneUpdate, db: Session = Depends
                 if any(l['end_ms'] and l['end_ms'] <= l['start_ms'] for l in body.font['layers']): raise ValueError()
             except (ValidationError, ValueError, TypeError):
                 raise HTTPException(400, 'Text layers need valid positions, colors, sizes and end times after start times (maximum 12 layers).')
+        if 'caption_segments' in body.font:
+            try:
+                segments = body.font['caption_segments']
+                if not isinstance(segments, list) or len(segments) > 2000: raise ValueError()
+                clean = []
+                for segment in segments:
+                    if not isinstance(segment, dict): raise ValueError()
+                    sid, text = segment.get('id'), segment.get('text')
+                    start, end = segment.get('start_ms'), segment.get('end_ms')
+                    if not isinstance(sid, str) or len(sid) > 80 or not isinstance(text, str) or len(text) > 2000: raise ValueError()
+                    if isinstance(start, bool) or not isinstance(start, int) or isinstance(end, bool) or not isinstance(end, int) or start < 0 or end <= start or end > 3_600_000: raise ValueError()
+                    clean.append({'id': sid, 'text': text, 'start_ms': start, 'end_ms': end})
+                body.font['caption_segments'] = clean
+            except (ValueError, TypeError):
+                raise HTTPException(400, 'Caption segments need text and valid start/end times (maximum 2,000 segments).')
         scene.font_json = {**scene.font_json, **body.font}
     if body.lead_ms is not None:
         scene.lead_ms = body.lead_ms
@@ -140,6 +155,74 @@ def delete_scene(scene_id: str, db: Session = Depends(get_db)):
         s.order_index = idx
     db.commit()
     return {"ok": True}
+
+
+@router.post("/{scene_id}/restore", response_model=schemas.SceneOut)
+def restore_scene(scene_id: str, body: dict, db: Session = Depends(get_db)):
+    """Restore a scene snapshot for timeline undo while preserving media IDs."""
+    from app.db.models import Asset, RenderJob, Shot, VoiceTake
+
+    project_id = body.get("project_id")
+    project = db.get(Project, project_id) if isinstance(project_id, str) else None
+    if not project:
+        raise HTTPException(404, "Project not found")
+    if body.get("id") != scene_id:
+        raise HTTPException(400, "Scene snapshot ID does not match the restore path")
+    shots, takes = body.get("shots") or [], body.get("voice_takes") or []
+    if not isinstance(shots, list) or not isinstance(takes, list):
+        raise HTTPException(400, "Scene clips and narration takes must be lists")
+    if any(not isinstance(row, dict) or not isinstance(row.get("id"), str) for row in shots):
+        raise HTTPException(400, "Every restored clip needs its original ID")
+    if any(not isinstance(row, dict) or not isinstance(row.get("id"), str) for row in takes):
+        raise HTTPException(400, "Every restored narration take needs its original ID")
+    for row in shots:
+        asset = db.get(Asset, row.get("asset_id"))
+        if not asset or asset.project_id != project.id:
+            raise HTTPException(400, "Scene media must belong to this project")
+    for row in takes:
+        asset_id = row.get("audio_asset_id")
+        asset = db.get(Asset, asset_id) if asset_id else None
+        if asset_id and (not asset or asset.project_id != project.id or asset.type != "audio"):
+            raise HTTPException(400, "Narration audio must belong to this project")
+    rendered_id = body.get("rendered_asset_id")
+    rendered = db.get(Asset, rendered_id) if rendered_id else None
+    if rendered_id and (not rendered or rendered.project_id != project.id):
+        raise HTTPException(400, "Rendered media must belong to this project")
+
+    current = db.get(Scene, scene_id)
+    if current and current.project_id != project.id:
+        raise HTTPException(400, "Scene belongs to another project")
+    order = max(0, int(body.get("order_index", 0)))
+    if current:
+        previous_order = current.order_index
+        order = min(order, previous_order)
+        for job in db.query(RenderJob).filter(RenderJob.scene_id == scene_id).all():
+            job.scene_id = None
+        db.delete(current)
+        db.flush()
+        if order < previous_order:
+            siblings = db.query(Scene).filter(Scene.project_id == project.id, Scene.order_index >= order, Scene.order_index < previous_order).all()
+            for sibling in siblings: sibling.order_index += 1
+        elif order > previous_order:
+            siblings = db.query(Scene).filter(Scene.project_id == project.id, Scene.order_index > previous_order, Scene.order_index <= order).all()
+            for sibling in siblings: sibling.order_index -= 1
+    else:
+        for sibling in db.query(Scene).filter(Scene.project_id == project.id, Scene.order_index >= order).all():
+            sibling.order_index += 1
+
+    scene_fields = ("title", "original_text", "spoken_text", "subtitle_text", "source_refs_json", "timing_mode",
+        "requested_duration_ms", "lead_ms", "trail_ms", "effect_preset", "effect_intensity", "transition_in_json",
+        "font_json", "look_json", "overlays_json", "revision", "rendered_plan_hash", "rendered_asset_id", "measured_duration_ms")
+    scene = Scene(id=scene_id, project_id=project.id, order_index=order, **{k: body[k] for k in scene_fields if k in body})
+    db.add(scene); db.flush()
+    shot_fields = ("order_index", "asset_id", "is_selected", "source_in_ms", "source_out_ms", "duration_ms", "speed_json", "audio_json", "fit", "crop_json", "motion_json")
+    for row in shots:
+        db.add(Shot(id=row["id"], scene_id=scene_id, **{k: row[k] for k in shot_fields if k in row}))
+    take_fields = ("spoken_text_hash", "source", "provider", "model", "voice", "settings_json", "audio_asset_id", "measured_duration_ms", "edit_json", "accepted", "stale")
+    for row in takes:
+        db.add(VoiceTake(id=row["id"], scene_id=scene_id, **{k: row[k] for k in take_fields if k in row}))
+    db.commit(); db.refresh(scene)
+    return _out(scene)
 
 
 @router.post("/{scene_id}/shots", response_model=schemas.ShotOut)
@@ -203,14 +286,20 @@ def update_shot(shot_id: str, body: dict, db: Session = Depends(get_db)):
             setattr(shot, field, body[field])
     if "audio" in body:
         a = body["audio"]
-        if not isinstance(a, dict) or set(a) - {"volume", "mute", "duck"}:
-            raise HTTPException(400, "Clip sound settings are volume, mute and duck.")
+        if not isinstance(a, dict) or set(a) - {"volume", "mute", "duck", "fade_in_ms", "fade_out_ms"}:
+            raise HTTPException(400, "Clip sound settings are volume, mute, ducking, and fade durations.")
         v = a.get("volume", 100)
         if isinstance(v, bool) or not isinstance(v, (int, float)) or not 0 <= v <= 200:
             raise HTTPException(400, "Clip volume must be between 0 and 200%.")
         if not isinstance(a.get("mute", False), bool) or not isinstance(a.get("duck", True), bool):
             raise HTTPException(400, "Clip mute and duck must be true or false.")
-        shot.audio_json = {"volume": round(float(v), 1), "mute": a.get("mute", False), "duck": a.get("duck", True)}
+        fades = {}
+        for key in ("fade_in_ms", "fade_out_ms"):
+            value = a.get(key, 0)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 10000:
+                raise HTTPException(400, "Clip fade durations must be between 0 and 10000 ms.")
+            fades[key] = int(round(value))
+        shot.audio_json = {"volume": round(float(v), 1), "mute": a.get("mute", False), "duck": a.get("duck", True), **fades}
     if "motion" in body:
         from app.render.filters import EASINGS
         motion = body["motion"]
@@ -278,7 +367,7 @@ def split_scene(scene_id: str, body: dict, db: Session = Depends(get_db)):
     right = Scene(project_id=scene.project_id, order_index=scene.order_index+1, title=scene.title+' · B', timing_mode='fixed', requested_duration_ms=total-at,
                   effect_preset=scene.effect_preset, effect_intensity=scene.effect_intensity, font_json=deepcopy(scene.font_json), look_json=deepcopy(scene.look_json or {}), overlays_json=deepcopy(scene.overlays_json or []), transition_in_json={'type':'cut','duration_ms':0})
     db.add(right);db.flush()
-    db.add(Shot(scene_id=right.id,asset_id=shot.asset_id,order_index=0,fit=shot.fit,motion_json=deepcopy(shot.motion_json),crop_json=deepcopy(shot.crop_json),source_in_ms=(shot.source_in_ms or 0)+(at if shot.asset.type=='video' else 0),duration_ms=total-at))
+    db.add(Shot(scene_id=right.id,asset_id=shot.asset_id,order_index=0,fit=shot.fit,motion_json=deepcopy(shot.motion_json),crop_json=deepcopy(shot.crop_json),audio_json=deepcopy(shot.audio_json or {}),speed_json=deepcopy(shot.speed_json or {}),source_in_ms=(shot.source_in_ms or 0)+(at if shot.asset.type=='video' else 0),duration_ms=total-at))
     scene.timing_mode='fixed';scene.requested_duration_ms=at;shot.duration_ms=at;scene.revision+=1
     db.commit();db.refresh(right)
     return _out(right)
@@ -576,8 +665,8 @@ def auto_captions(scene_id: str, body: dict | None = None, db: Session = Depends
         raise HTTPException(404, "Scene not found")
     provider = body.get("provider", "auto")
     language = (body.get("language") or "").strip() or None
-    if provider not in ("auto", "elevenlabs", "openai") or (language and len(language) > 8):
-        raise HTTPException(400, "Provider must be auto, elevenlabs or openai; language a short code like en or ar.")
+    if provider not in ("auto", "local", "elevenlabs", "openai") or (language and len(language) > 8):
+        raise HTTPException(400, "Provider must be local, elevenlabs or openai; language a short code like en or ar.")
     take = next((t for t in scene.voice_takes if t.accepted), None)
     work = _P(tempfile.mkdtemp(prefix="sf-stt-"))
     offset = 0
@@ -615,9 +704,18 @@ def auto_captions(scene_id: str, body: dict | None = None, db: Session = Depends
     if not result["words"]:
         raise HTTPException(400, "No speech was recognised in this scene.")
     words = [[w, s + offset, e + offset] for w, s, e in result["words"]]
+    try: phrase_words = max(1, min(8, int(body.get('phrase_words', 3))))
+    except (TypeError, ValueError, OverflowError): phrase_words = 3
+    import uuid
+    caption_segments = []
+    for index in range(0, len(words), phrase_words):
+        chunk = words[index:index + phrase_words]
+        caption_segments.append({'id': str(uuid.uuid4()), 'text': ' '.join(row[0] for row in chunk),
+                                 'start_ms': max(0, int(chunk[0][1])), 'end_ms': max(int(chunk[0][1]) + 100, int(chunk[-1][2]))})
     scene.subtitle_text = " ".join(w for w, _, _ in words)
     font = dict(scene.font_json or {})
     font["transcript"] = {"language": result["language"], "provider": result["provider"], "source": source, "words": words}
+    font['caption_segments'] = caption_segments
     font["captions_enabled"] = True
     scene.font_json = font
     scene.revision += 1
@@ -657,8 +755,8 @@ def apply_to_scenes(scene_id: str, body: dict, db: Session = Depends(get_db)):
         if "captions" in parts or "titles" in parts:
             font = dict(t.font_json or {})
             if "captions" in parts:
-                style = {k: deepcopy(v) for k, v in (src.font_json or {}).items() if k not in ("layers", "transcript")}
-                font = {**style, **({"layers": font["layers"]} if "layers" in font else {}), **({"transcript": font["transcript"]} if "transcript" in font else {})}
+                style = {k: deepcopy(v) for k, v in (src.font_json or {}).items() if k not in ("layers", "transcript", "caption_segments")}
+                font = {**style, **({"layers": font["layers"]} if "layers" in font else {}), **({"transcript": font["transcript"]} if "transcript" in font else {}), **({"caption_segments": font["caption_segments"]} if "caption_segments" in font else {})}
             if "titles" in parts:
                 font["layers"] = deepcopy((src.font_json or {}).get("layers", []))
             t.font_json = font

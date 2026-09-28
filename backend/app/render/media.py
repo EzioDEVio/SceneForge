@@ -109,7 +109,12 @@ def clip_audio(scene, shots, durations, media_root, work_dir: Path, ffmpeg_bin: 
                 tempo.append("atempo=0.5"); s /= 0.5
             if abs(s - 1) > 1e-3:
                 tempo.append(f"atempo={s:.4f}")
-            af = ",".join([*tempo, f"volume={vol:.3f}", "aresample=48000", "aformat=channel_layouts=stereo", f"apad", f"atrim=0:{ms/1000:.3f}"])
+            fade_in = min(ms, max(0, int(a.get("fade_in_ms", 0) or 0))) / 1000
+            fade_out = min(ms, max(0, int(a.get("fade_out_ms", 0) or 0))) / 1000
+            filters = [*tempo, f"volume={vol:.3f}", "aresample=48000", "aformat=channel_layouts=stereo", "apad", f"atrim=0:{ms/1000:.3f}"]
+            if fade_in > 0: filters.append(f"afade=t=in:st=0:d={fade_in:.3f}")
+            if fade_out > 0: filters.append(f"afade=t=out:st={max(0, ms/1000-fade_out):.3f}:d={fade_out:.3f}")
+            af = ",".join(filters)
             cmd = [ffmpeg_bin, "-y", "-v", "error", "-ss", f"{(shot.source_in_ms or 0)/1000:.3f}", "-i", str(src),
                    "-t", f"{ms/1000*speed:.3f}", "-vn", "-af", af, "-ar", "48000", "-ac", "2", str(seg)]
             audible = True

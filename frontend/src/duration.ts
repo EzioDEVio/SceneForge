@@ -6,6 +6,11 @@ export function sceneDuration(scene:Scene) {
   const cd=((scene.look_json as any)?.countdown?.seconds||0)*1000;
   return baseDuration(scene)+cd;
 }
+/** Snap ruler scrubs to the closest scene edge or marker inside a pixel-sized tolerance. */
+export function snapTimelineTime(ms:number,points:number[],tolerance:number) {
+  const nearest=points.reduce<number|null>((best,p)=>best===null||Math.abs(p-ms)<Math.abs(best-ms)?p:best,null);
+  return nearest!==null&&Math.abs(nearest-ms)<=Math.max(0,tolerance)?nearest:ms;
+}
 function baseDuration(scene:Scene) {
   if(scene.timing_mode==='fixed'&&scene.requested_duration_ms)return scene.requested_duration_ms;
   const take=scene.voice_takes.find(t=>t.accepted);

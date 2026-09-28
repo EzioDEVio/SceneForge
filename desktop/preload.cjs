@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('sceneforgeDesktop', {
   setBeta: on => ipcRenderer.invoke('sf:set-beta', !!on),
   chooseSdFolder: () => ipcRenderer.invoke('sf:choose-sd-folder'),
   openExternal: url => ipcRenderer.invoke('sf:open-external', String(url)),
+  revealExport: assetId => ipcRenderer.invoke('sf:reveal-export', String(assetId)),
   openLogs: () => ipcRenderer.invoke('sf:open-logs'),
   collectDiagnostics: () => ipcRenderer.invoke('sf:diagnostics'),
 });

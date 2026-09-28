@@ -1,6 +1,7 @@
 import React, {useEffect, useState} from 'react';
 import {Vibrate, Focus, EyeOff, Sun, Blend, Plus, Trash2, Palette, LayoutGrid, Route as RouteIcon, Box as BoxIcon, MousePointerClick, Undo2, PenLine, Timer} from 'lucide-react';
 import type {Look, Scene} from './api';
+import {FeatureHelp} from './FeatureHelp';
 
 export type Shake = {amount: number; speed: number; impact: boolean};
 export type Spot = {x: number; y: number; w: number; h: number; shape: 'rect' | 'ellipse'; dim: number; feather: number; start_ms: number; end_ms: number | null};
@@ -80,7 +81,7 @@ function Pills<T extends string>({label, value, options, onChange, disabled}: {l
 }
 function Section({title, Icon, on, onToggle, hint, children, disabled}: {title: string; Icon: typeof Sun; on: boolean; onToggle: (on: boolean) => void; hint: string; children: React.ReactNode; disabled: boolean}) {
   return <section className="look-section" aria-label={title}>
-    <div className="look-heading"><h3><Icon size={15}/> {title}</h3>
+    <div className="look-heading"><h3><Icon size={15}/> {title}</h3><FeatureHelp compact title={title} description={hint} steps="Turn this feature on, adjust its controls, then preview or render the scene. Changes are saved with this scene."/>
       <label className="switch-label"><input type="checkbox" role="switch" aria-label={title} checked={on} disabled={disabled} onChange={e => onToggle(e.target.checked)}/> {on ? 'On' : 'Off'}</label></div>
     <p className="hint">{hint}</p>
     {on && children}

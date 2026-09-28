@@ -89,6 +89,19 @@ async def upload_asset(project_id: str, file: UploadFile, db: Session = Depends(
 RANGE_RE = re.compile(r"bytes=(\d*)-(\d*)")
 
 
+@router.get("/{asset_id}/location")
+def asset_location(asset_id: str, db: Session = Depends(get_db)):
+    """Return a local render's path for the guarded desktop reveal-in-folder action."""
+    asset = db.get(Asset, asset_id)
+    if not asset or asset.origin != AssetOrigin.RENDER_OUTPUT:
+        raise HTTPException(404, "Exported file not found")
+    render_root = Path(RENDERS_DIR).resolve()
+    path = (render_root / asset.storage_key).resolve()
+    if not path.is_relative_to(render_root) or not path.is_file():
+        raise HTTPException(404, "Exported file is missing on disk")
+    return {"path": str(path), "name": asset.original_filename}
+
+
 @router.get("/{asset_id}/stream")
 def stream_asset(asset_id: str, request: Request, db: Session = Depends(get_db), download: int = 0):
     asset = db.get(Asset, asset_id)

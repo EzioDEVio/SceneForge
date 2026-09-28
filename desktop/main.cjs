@@ -84,13 +84,20 @@ async function boot(){
  const fromApp=e=>{try{return new URL(e.senderFrame.url).origin===origin;}catch{return false;}};
  const guard=fn=>async(e,...a)=>{if(!fromApp(e))throw Error('Not allowed');return fn(...a);};
  const openPanel=(panel)=>window.webContents.executeJavaScript(`window.dispatchEvent(new CustomEvent('sceneforge-open-panel',{detail:${JSON.stringify(panel)}}))`);
- for(const ch of ['sf:info','sf:check-updates','sf:set-beta','sf:choose-sd-folder','sf:open-external','sf:open-logs','sf:diagnostics'])ipcMain.removeHandler(ch);
+ for(const ch of ['sf:info','sf:check-updates','sf:set-beta','sf:choose-sd-folder','sf:open-external','sf:open-logs','sf:diagnostics','sf:reveal-export'])ipcMain.removeHandler(ch);
  ipcMain.handle('sf:info',guard(async()=>({version:app.getVersion(),electron:process.versions.electron,chrome:process.versions.chrome,platform:process.platform,arch:process.arch,
   packaged:app.isPackaged,beta:updater.beta(),workspace:dataDir})));
  ipcMain.handle('sf:check-updates',guard(async()=>app.isPackaged?updater.check(false):{status:'error',kind:'dev',message:'Updates are only available in the installed app.'}));
  ipcMain.handle('sf:set-beta',guard(async on=>{const r=updater.setBeta(on);rebuildMenu();if(on)updater.check(false);return r;}));
  ipcMain.handle('sf:choose-sd-folder',guard(async()=>{const r=await dialog.showOpenDialog(window,{title:'Choose the folder containing webui-user.bat',properties:['openDirectory']});return r.canceled?null:r.filePaths[0];}));
  ipcMain.handle('sf:open-external',guard(async url=>{if(!/^https:\/\//.test(url))throw Error('Only https links can be opened');await shell.openExternal(url);return true;}));
+ ipcMain.handle('sf:reveal-export',guard(async assetId=>{
+  if(!/^[a-f0-9-]{36}$/i.test(assetId))throw Error('Invalid export reference');
+  const item=await api(`/api/assets/${encodeURIComponent(assetId)}/location`);
+  const root=path.resolve(dataDir,'renders')+path.sep, target=path.resolve(item.path);
+  if(!target.startsWith(root)||!fs.existsSync(target))throw Error('Export is outside the SceneForge render folder');
+  shell.showItemInFolder(target);return true;
+ }));
  ipcMain.handle('sf:open-logs',guard(async()=>{fs.mkdirSync(path.join(dataDir,'logs'),{recursive:true});return shell.openPath(path.join(dataDir,'logs'));}));
  ipcMain.handle('sf:diagnostics',guard(async()=>{await collectDiagnostics();return true;}));
  const rebuildMenu=()=>Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate()));

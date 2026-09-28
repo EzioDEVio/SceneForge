@@ -27,7 +27,7 @@ let failNextPatch=false;
 let requests=[];
 let next=10;
 let profiles=[];
-let healthBuild="v0.5-captions-9";let oldBackend=false;
+let healthBuild="v0.6.0-wip.10";let oldBackend=false;
 let failLocal=true;
 let closeReady=true;
 const clone=x=>structuredClone(x);
@@ -39,6 +39,7 @@ globalThis.fetch=async(path,init={})=>{
  else if(path==='/api/close-status')result={ready:closeReady};
  else if(path==='/api/projects'&&method==='GET') result=[project];
  else if(path===`/api/projects/${project.id}`&&method==='GET') result=project;
+ else if(/^\/api\/scenes\/[^/]+$/.test(path)&&method==='GET')result=project.scenes.find(s=>s.id===path.split('/').at(-1));
  else if(path===`/api/projects/${project.id}`&&method==='PATCH'){Object.assign(project,body); result=project;}
  else if(path===`/api/projects/${project.id}`&&method==='DELETE')result={ok:true};
  else if(path==='/api/providers'&&method==='GET') result=profiles;
@@ -48,25 +49,25 @@ globalThis.fetch=async(path,init={})=>{
  else if(path.endsWith('/image-history'))result=[];
  else if(path.startsWith('/api/assets/luts'))result=[];
  else if(/\/api\/projects\/[^/]+\/insert-countdown$/.test(path)){const sc={...clone(project.scenes[0]),id:'cd-'+next++,title:'Film leader',shots:[],voice_takes:[]};project.scenes.unshift(sc);result=sc;}
- else if(/\/api\/scenes\/[^/]+\/auto-captions$/.test(path)){const sc=project.scenes.find(x=>x.id===path.split('/')[3]);sc.subtitle_text='hello from speech';sc.font_json={...sc.font_json,captions_enabled:true,transcript:{language:'en',source:'narration',words:[['hello',0,300],['from',300,600],['speech',600,900]]}};result=sc;}
+ else if(/\/api\/scenes\/[^/]+\/auto-captions$/.test(path)){const sc=project.scenes.find(x=>x.id===path.split('/')[3]);sc.subtitle_text='hello from speech';sc.font_json={...sc.font_json,captions_enabled:true,transcript:{language:'en',source:'narration',words:[['hello',0,300],['from',300,600],['speech',600,900]]},caption_segments:[{id:'cap-1',text:'hello from',start_ms:0,end_ms:600},{id:'cap-2',text:'speech',start_ms:600,end_ms:900}]};result=sc;}
  else if(/\/api\/scenes\/[^/]+\/apply-to$/.test(path))result={changed:body.targets.length};
  else if(/\/api\/scenes\/[^/]+\/duplicate$/.test(path)){const src=project.scenes.find(x=>x.id===path.split('/')[3]);const dup=clone(src);dup.id='dup-'+next++;dup.title=src.title+' (copy)';dup.shots=dup.shots.map(sh=>({...sh,id:'dsh-'+next++}));project.scenes.splice(project.scenes.indexOf(src)+1,0,dup);result=dup;}
  else if(/\/api\/scenes\/[^/]+\/paste-audio$/.test(path)){const tgt=project.scenes.find(x=>x.id===path.split('/')[3]);const src=project.scenes.flatMap(x=>x.voice_takes).find(v=>v.id===body.take_id);tgt.voice_takes.forEach(v=>v.accepted=false);tgt.voice_takes.push({...clone(src),id:'pt-'+next++,accepted:true});result=tgt;}
  else if(/\/api\/projects\/[^/]+\/beat-sync$/.test(path))result={bpm:120,beats:[0.5,1,1.5],scenes_changed:2,scenes_kept:1};
  else if(/\/api\/assets\/[^/]+\/restore$/.test(path))result={id:'restored-'+next++,type:'image',original_filename:'photo (restored).png',width:1600,height:1200};
  else if(path.startsWith('/api/assets?'))result=[{id:'pool-img',type:'image',original_filename:'map.png',width:800,height:600},{id:'pool-vid',type:'video',original_filename:'clip.mp4',width:1280,height:720}];
- else if(/^\/api\/assets\/[^/?]+$/.test(path)&&method==='GET')result={id:path.split('/')[3],type:'image',original_filename:'map.png',width:800,height:600};
+ else if(/^\/api\/assets\/[^/?]+$/.test(path)&&method==='GET')result={id:path.split('/')[3],type:path.split('/')[3]==='pool-vid'?'video':'image',original_filename:path.split('/')[3]==='pool-vid'?'clip.mp4':'map.png',width:800,height:600};
  else if(path.startsWith('/api/assets/lut?')&&method==='POST'){const f=body.get('file');if(/broken/.test(f.name))return {ok:false,status:400,statusText:'Bad',json:async()=>({detail:'This LUT could not be read: Expected 35937 entries, found 3.'})};result={id:'lut-'+next++,type:'lut',original_filename:f.name,width:33};}
  else if(path.startsWith('/api/assets/upload')&&method==='POST'){const f=body.get('file');result={id:'up-'+next++,type:/\.(mp4|mov)$/i.test(f.name)?'video':'image',original_filename:f.name,width:640,height:360,duration_ms:null};}
  else if(/\/api\/scenes\/[^/]+\/voice-takes\/upload$/.test(path)){const sc=project.scenes.find(s=>s.id===path.split('/')[3]);const take={id:'take-'+next++,accepted:true,voice:'Uploaded audio',source:'upload',measured_duration_ms:5200,stale:false,edit_json:{},effective_duration_ms:5200,audio_asset:{id:'aud-'+next++,type:'audio',original_filename:body.get('file').name}};sc.voice_takes.forEach(t=>t.accepted=false);sc.voice_takes.push(take);result=take;}
- else if(/\/api\/voice-takes\/[^/]+\/select$/.test(path))result={ok:true};
+ else if(path.endsWith('/voice-takes/from-asset')&&method==='POST'){const sc=project.scenes.find(s=>s.id===path.split('/')[3]);const take={id:'take-'+next++,accepted:true,voice:'Uploaded audio',source:'upload',measured_duration_ms:3000,stale:false,edit_json:{},effective_duration_ms:3000,audio_asset:{id:body.asset_id,type:'audio',original_filename:'music.mp3'}};sc.voice_takes.forEach(t=>t.accepted=false);sc.voice_takes.push(take);result=take;}
+ else if(/\/api\/scenes\/[^/]+\/voice-takes\/clear-selection$/.test(path)){const sc=project.scenes.find(s=>s.id===path.split('/')[3]);sc.voice_takes.forEach(t=>t.accepted=false);result={ok:true};}
+ else if(/\/api\/voice-takes\/[^/]+\/select$/.test(path)){const id=path.split('/')[3];const sc=project.scenes.find(s=>s.voice_takes.some(t=>t.id===id));sc.voice_takes.forEach(t=>t.accepted=t.id===id);result={ok:true};}
  else if(/\/api\/voice-takes\/[^/]+\/edit$/.test(path)){const id=path.split('/')[3];const take=project.scenes.flatMap(x=>x.voice_takes).find(v=>v.id===id);take.edit_json={...take.edit_json,...body};take.effective_duration_ms=(take.edit_json.out_ms??take.measured_duration_ms)-(take.edit_json.in_ms||0);result=take;}
  else if(/\/api\/assets\/[^/]+\/waveform/.test(path))result={duration_ms:5200,peaks:Array.from({length:600},(_,i)=>Math.abs(Math.sin(i/9))),peak:1};
- else if(/\/api\/scenes\/[^/]+\/voice-takes\/clear-selection$/.test(path)){const sc=project.scenes.find(x=>x.id===path.split('/')[3]);sc.voice_takes.forEach(v=>v.accepted=false);result={ok:true};}
- else if(path.endsWith('/voice-takes/from-asset')){result={id:'take-'+next++,accepted:true,voice:'Uploaded audio',source:'upload',measured_duration_ms:3000,stale:false};}
- else if(/\/api\/scenes\/[^/]+\/shots$/.test(path)&&method==='POST'){const sc=project.scenes.find(s=>s.id===path.split('/')[3]);const shot={id:'shot-'+next++,asset_id:body.asset_id,asset:{id:body.asset_id,type:'image',width:640,height:360},order_index:sc.shots.length,fit:'cover',motion_json:{type:'static'},crop_json:null,source_in_ms:0};sc.shots.push(shot);result=shot;}
+  else if(/\/api\/scenes\/[^/]+\/shots$/.test(path)&&method==='POST'){const sc=project.scenes.find(s=>s.id===path.split('/')[3]);const mediaType=body.asset_id==='pool-vid'?'video':'image';const shot={id:'shot-'+next++,asset_id:body.asset_id,asset:{id:body.asset_id,type:mediaType,width:mediaType==='video'?1280:640,height:mediaType==='video'?720:360},order_index:sc.shots.length,fit:'cover',motion_json:{type:'static'},crop_json:null,source_in_ms:0};shot.asset.original_filename=body.asset_id==='pool-vid'?'clip.mp4':'map.png';sc.shots.push(shot);result=shot;}
  else if(path.endsWith('/generate-image'))result={id:'generated-image'};
- else if(path.endsWith('/scene-order')) {project.scenes=body.scene_ids.map(id=>project.scenes.find(s=>s.id===id));result={ok:true};}
+ else if(path.endsWith('/scene-order')) {project.scenes=body.scene_ids.map((id,index)=>{const scene=project.scenes.find(s=>s.id===id);scene.order_index=index;return scene;});result={ok:true};}
  else if(path===`/api/projects/${project.id}/scenes`&&method==='POST') {
   const s=clone(fixture.scenes[1]);s.id='new-'+next++;s.title='New scene';project.scenes.push(s);result=s;
  }
@@ -77,7 +78,8 @@ globalThis.fetch=async(path,init={})=>{
   const s=project.scenes.find(s=>s.id===path.split('/').at(-1));
   const {font,look,...fields}=body;Object.assign(s,fields);if(look&&!oldBackend){s.look_json={...(s.look_json||{})};for(const [k,v] of Object.entries(look)){if(v===null)delete s.look_json[k];else s.look_json[k]=v;}}if(body.transition_in)s.transition_in_json=body.transition_in;if(font)Object.assign(s.font_json,font);s.is_stale=true;result=s;
  }
- else if(path.startsWith('/api/scenes/')&&method==='DELETE'){project.scenes=project.scenes.filter(s=>s.id!==path.split('/').at(-1));result={ok:true};}
+ else if(path.startsWith('/api/scenes/')&&path.endsWith('/restore')&&method==='POST'){const id=path.split('/').at(-2),at=project.scenes.findIndex(s=>s.id===id);if(at>=0)project.scenes[at]=clone(body);else project.scenes.splice(Math.max(0,Math.min(body.order_index??project.scenes.length,project.scenes.length)),0,clone(body));result=body;}
+ else if(path.startsWith('/api/scenes/')&&method==='DELETE'){project.scenes=project.scenes.filter(s=>s.id!==path.split('/').at(-1));project.scenes.forEach((s,i)=>s.order_index=i);result={ok:true};}
  else throw Error(`Unhandled test API: ${method} ${path}`);
  return {ok:true,status:200,json:async()=>clone(result)};
 };
@@ -103,7 +105,30 @@ try{
  check('movie preview waits for a completed export',screen.getByRole('button',{name:'Preview last export'}).disabled);
  await user.click(screen.getByRole('button',{name:'Fit timeline'}));
  check('fit timeline sets an allowed zoom',Number(screen.getByRole('slider',{name:'Timeline zoom'}).value)>=12);
+ check('timeline snapping can be switched on and off',screen.getByRole('button',{name:'Toggle timeline snapping'}).getAttribute('aria-pressed')==='true');
+ window.prompt=()=> 'Chapter marker';await user.click(screen.getByRole('button',{name:'Add timeline marker'}));
+ await waitFor(()=>assert.ok(screen.getByRole('button',{name:'Seek to marker Chapter marker'})));
+ check('named timeline markers appear on the ruler and can be removed',!!screen.getByRole('button',{name:'Remove marker Chapter marker'}));
+ await user.click(screen.getByRole('button',{name:'Remove marker Chapter marker'}));
+ check('timeline marker removal clears the ruler marker',!screen.queryByRole('button',{name:'Seek to marker Chapter marker'}));
+ await user.click(screen.getByRole('button',{name:'How to use Timeline markers'}));
+ check('timeline markers explain their bookmark and return-to-time use',!!screen.getByRole('dialog',{name:'Timeline markers help'}));
+ check('feature help opens in a viewport-level popover that cannot be clipped by the inspector',screen.getByRole('dialog',{name:'Timeline markers help'}).parentElement===document.body&&screen.getByRole('dialog',{name:'Timeline markers help'}).style.position==='fixed');
+ await user.click(screen.getByRole('button',{name:'Close Timeline markers help'}));
+ for(const tabName of ['Media','Motion','Effects','Overlays','Text','Audio','Clip Audio']){const tab=screen.queryByRole('tab',{name:tabName,exact:true});if(!tab)continue;await user.click(tab);await user.click(screen.getByRole('button',{name:`How to use ${tabName}`}));check(`${tabName} tab has click-to-open feature guidance`,!!screen.getByRole('dialog',{name:`${tabName} help`}));await user.click(screen.getByRole('button',{name:`Close ${tabName} help`}));}
+ await user.click(screen.getByRole('tab',{name:'Media',exact:true}));
  check('left library has no duplicate Effects tab',!screen.queryByRole('button',{name:'Effects',exact:true})&&!!screen.getByRole('tab',{name:'Effects',exact:true}));
+ check('original library tabs remain and AI Engines is not duplicated in the Scenes pane',!!screen.getByRole('button',{name:'Scenes',exact:true})&&!!screen.getByRole('button',{name:'Media Pool',exact:true})&&!!screen.getByRole('button',{name:'Transitions',exact:true})&&!within(document.querySelector('.library-tabs')).queryByRole('button',{name:'AI Engines'})&&!!document.querySelector('.library-tabs button[aria-pressed]'));
+ check('original top-level AI Engines and Help menus are restored',!!within(document.querySelector('.editor-menubar')).getByRole('button',{name:'AI Engines',exact:true})&&!!within(document.querySelector('.editor-menubar')).getByRole('button',{name:'Help',exact:true}));
+ await user.click(within(document.querySelector('.editor-menubar')).getByRole('button',{name:'AI Engines',exact:true}));
+ check('top-level AI Engines menu opens the provider guide',!!screen.getByRole('dialog',{name:'AI engines & providers'}));
+ await user.click(screen.getByRole('button',{name:'Close'}));
+ await user.click(screen.getByRole('button',{name:'Help',exact:true}));
+ check('Help menu restores the About panel',!!screen.getByRole('button',{name:'About SceneForge'}));
+ await user.click(screen.getByRole('button',{name:'About SceneForge'}));
+ check('Help opens the existing About panel',!!screen.getByRole('dialog',{name:/About SceneForge/}));
+ await user.click(screen.getByRole('button',{name:'Close'}));
+ await user.click(screen.getByRole('button',{name:'Scenes',exact:true}));
  check('transport has one play toggle and icon scene navigation',!screen.queryByRole('button',{name:'Pause full video'})&&!screen.queryByRole('button',{name:'Prev',exact:true})&&!screen.queryByRole('button',{name:'Next',exact:true})&&!!screen.getByRole('button',{name:'Previous scene'})&&!!screen.getByRole('button',{name:'Next scene'}));
  check('render full video sits with timeline tools, not playback',!within(screen.getByRole('group',{name:'Playback'})).queryByRole('button',{name:/Render full video/})&&!!screen.getByRole('button',{name:/Render full video/}));
  const tc=()=>screen.getByLabelText('Timeline timecode').textContent;
@@ -137,6 +162,11 @@ try{
  await user.type(visibleEditor().getByRole('textbox',{name:'On-screen captions'}),'مرحبا — Altair 8800');
  await user.click(screen.getByRole('tab',{name:'Media',exact:true}));
  await saved();
+ check('caption text is represented as a text block on the timeline',!!screen.getByRole('button',{name:'Edit caption: مرحبا — Altair 8800'}));
+ await user.click(screen.getByRole('button',{name:'Edit caption: مرحبا — Altair 8800'}));
+ await new Promise(resolve=>setTimeout(resolve,220));
+ check('clicking the caption timeline block focuses caption editing',visibleEditor().getByRole('textbox',{name:'On-screen captions'})===document.activeElement);
+ await user.click(screen.getByRole('tab',{name:'Media',exact:true}));
  await user.selectOptions(screen.getByRole('combobox',{name:'Frame fit'}),'contain');await saved();
  check('fit setting reaches the main image',visibleEditor().getByRole('img',{name:/Source media/}).style.objectFit==='contain');
  await waitFor(()=>assert.ok(!screen.getByRole('combobox',{name:'Frame fit'}).disabled));
@@ -222,14 +252,35 @@ try{
  await user.selectOptions(within(acc).getByRole('combobox',{name:'Auto caption style'}),'Red highlight');
  await user.click(within(acc).getByRole('button',{name:/Generate captions/}));
  await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/auto-captions'))));
- check('Auto captions card sends the chosen language and reports the detected one',requests.some(r=>r.path.endsWith('/auto-captions')&&r.body.language==='ar')&&!!(await within(acc).findByText(/language: en/)));
+ check('Auto captions card sends the chosen language and phrase length, then reports detection',requests.some(r=>r.path.endsWith('/auto-captions')&&r.body.language==='ar'&&r.body.phrase_words===2)&&!!(await within(acc).findByText(/language: en/)));
+ await waitFor(()=>assert.ok(screen.getByRole('button',{name:'Edit caption segment: hello from'})));
+ check('speech captions become individually timed clips on T1',!!screen.getByRole('button',{name:'Edit caption segment: hello from'})&&!!screen.getByRole('button',{name:'Edit caption segment: speech'}));
+ const trackOrder=[...document.querySelectorAll('.sequence-content > .titles-track, .sequence-content > .picture-track')].map(el=>el.classList.contains('titles-track')?'text':'picture');
+ check('caption and title lane is above the picture lane',trackOrder[0]==='text'&&trackOrder[1]==='picture'&&!!(document.querySelector('.track-headers .track-text-label')?.compareDocumentPosition(document.querySelector('.track-headers .track-video-label'))&4));
+ await user.click(screen.getByRole('button',{name:'Edit caption segment: hello from'}));
+ await new Promise(resolve=>setTimeout(resolve,180));
+ check('clicking a caption clip opens Text and focuses its individual text box',document.activeElement?.getAttribute?.('aria-label')==='Caption segment 1 text');
+ await user.clear(screen.getByRole('textbox',{name:'Caption segment 1 text'}));await user.type(screen.getByRole('textbox',{name:'Caption segment 1 text'}),'hello from today');await saved();
+ check('editing a caption segment preserves its timing and saves its wording',requests.some(r=>r.body?.font?.caption_segments?.some(s=>s.id==='cap-1'&&s.text==='hello from today'&&s.start_ms===0&&s.end_ms===600)));
+ await user.click(screen.getByRole('button',{name:'Split caption 1'}));await saved();
+ check('caption segments can be split into shorter editable clips',requests.some(r=>r.body?.font?.caption_segments?.length===3));
+ await user.selectOptions(screen.getByRole('combobox',{name:'Caption text direction'}),'rtl');await saved();
+ check('right-to-left caption direction saves to the scene',requests.some(r=>r.body?.font?.caption_direction==='rtl'));
+ await user.type(screen.getByRole('searchbox',{name:'Search captions'}),'speech');
+ check('caption search narrows the clip list',!!screen.queryByRole('textbox',{name:'Caption segment 3 text'})&&document.querySelectorAll('.caption-segment-card').length===1);
+ await user.click(screen.getByRole('button',{name:'Next caption'}));await new Promise(resolve=>setTimeout(resolve,100));
+ check('caption navigation focuses the matching editable caption',document.activeElement?.getAttribute?.('aria-label')==='Caption segment 3 text');
+ await user.clear(screen.getByRole('searchbox',{name:'Search captions'}));
+ await user.click(screen.getByRole('button',{name:'Collapse all captions'}));
+ check('long caption lists can be collapsed and expanded',!!screen.getByRole('button',{name:'Expand all captions'})&&!screen.queryByRole('textbox',{name:'Caption segment 1 text'}));
+ await user.click(screen.getByRole('button',{name:'Expand all captions'}));
  await saved();
  check('Auto captions applies the chosen caption style after transcribing',requests.some(r=>r.body?.font?.family==='Anton'&&r.body.font.karaoke_style==='box'&&r.body.font.highlight_color==='#FF3B3B'));
  await user.click(screen.getByRole('button',{name:'Apply Classic caption style'}));await saved();
  await user.selectOptions(screen.getByRole('combobox',{name:'Caption animation'}),'letters-pop');await saved();
  check('caption animation saves from the Text tab',requests.some(r=>r.body?.font?.caption_animation==='letters-pop'));
- await user.click(screen.getByRole('button',{name:/Add animated title/}));await saved();
- check('Add animated title creates a letter-pop title overlay',requests.some(r=>(r.body?.font?.layers||[]).some(l=>l.animation==='letters-pop'&&l.text==='Animated title')));
+ await user.click(screen.getAllByRole('button',{name:'Add Text+',exact:true})[0]);await saved();
+ check('Text+ creates an advanced letter-pop title overlay',requests.some(r=>(r.body?.font?.layers||[]).some(l=>l.animation==='letters-pop'&&l.text==='Text+ title')));
  await user.click(screen.getByRole('checkbox',{name:'Word-by-word highlight'}));await saved();
  check('word-by-word highlight saves and turns captions on',requests.some(r=>r.body?.font?.karaoke===true&&r.body.font.captions_enabled===true));
  check('highlight colour picker appears',!!screen.getByLabelText('Highlight colour'));
@@ -318,6 +369,10 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  // Picture-in-picture overlays
  await user.click(screen.getByRole('tab',{name:'Overlays',exact:true}));
  await waitFor(()=>assert.ok(within(screen.getByRole('combobox',{name:'Add overlay from media'})).getAllByRole('option').length===3));
+ check('searchable sticker and emoji library is available in Overlays',screen.getByRole('group',{name:'Sticker choices'}).querySelectorAll('button').length>=40);
+ await user.type(screen.getByRole('textbox',{name:'Search stickers and emoji'}),'heart');
+ check('sticker search filters the curated emoji choices',screen.getByRole('button',{name:'Add Heart sticker'})&&screen.getByRole('button',{name:'Add Heart eyes sticker'}));
+ await user.clear(screen.getByRole('textbox',{name:'Search stickers and emoji'}));
  await user.selectOptions(screen.getByRole('combobox',{name:'Add overlay from media'}),'pool-img');await saved();
  const ovSave=()=>requests.filter(r=>r.method==='PATCH'&&r.body?.overlays).at(-1)?.body.overlays;
  check('adding an overlay saves it with default placement',ovSave()?.length===1&&ovSave()[0].asset_id==='pool-img'&&ovSave()[0].width===34&&ovSave()[0].anim_in==='fade');
@@ -344,10 +399,11 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  fireEvent.dragOver(narration,dt([]));
  check('dragging a file over a scene highlights its audio lane',narration.className.includes('drop-target'));
  const firstScene=project.scenes[0].id;
+ await user.click(screen.getByRole('button',{name:'Select scene 1: Part-1'}));
  fireEvent.drop(narration,dt([new File(['RIFF'],'voiceover.wav',{type:'audio/wav'}),new File(['x'],'notes.txt')]));
  await waitFor(()=>assert.ok(requests.some(r=>r.path===`/api/scenes/${firstScene}/voice-takes/upload`)));
  await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.path===`/api/scenes/${firstScene}`&&r.body?.timing_mode==='audio_driven')));
- check('dropping audio on a scene uploads it as that scene’s sound and matches the clip to it',requests.some(r=>/\/api\/voice-takes\/take-\d+\/select$/.test(r.path)));
+ check('dropping audio on a scene uploads it as that scene’s sound and matches the clip to it',project.scenes.find(s=>s.id===firstScene)?.voice_takes.some(t=>t.accepted));
  await waitFor(()=>assert.match(screen.getByText(/voiceover\.wav added/).textContent,/Skipped unsupported: notes\.txt/));
  check('drop results are reported, including skipped files',true);
  const picture=screen.getAllByRole('button',{name:/Storyboard scene 1/})[0];
@@ -355,6 +411,16 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  fireEvent.drop(picture,dt([new File(['img'],'extra.png',{type:'image/png'})]));
  await waitFor(()=>assert.equal(project.scenes[0].shots.length,before+1));
  check('dropping an image on a picture clip adds it to that scene',requests.some(r=>r.path.startsWith('/api/assets/upload')));
+ const videoPool={id:'pool-vid',type:'video',original_filename:'clip.mp4'};
+ fireEvent.drop(picture,{dataTransfer:{types:['application/x-sceneforge-assets'],getData:()=>JSON.stringify([videoPool])}});
+ await waitFor(()=>assert.ok(project.scenes.find(s=>s.id===firstScene).shots.some(shot=>shot.asset?.type==='video')));
+ const sourceAudio=screen.getByRole('button',{name:'clip.mp4 audio controls'});
+ await user.click(sourceAudio);
+ await waitFor(()=>assert.equal(screen.getByRole('tab',{name:'Clip Audio',exact:true}).getAttribute('aria-selected'),'true'));
+ check('A2 source-audio clip opens separate Clip Audio controls',!!screen.getByRole('region',{name:'Clip sound'})&&!!screen.getByRole('checkbox',{name:'Mute clip sound'})&&!screen.getByRole('tab',{name:'Motion',exact:true}).getAttribute('aria-selected').includes('true'));
+ fireEvent.change(screen.getByRole('slider',{name:'Clip volume'}),{target:{value:'65'}});fireEvent.pointerUp(screen.getByRole('slider',{name:'Clip volume'}),{pointerId:1});
+ await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.path.includes('/shots/')&&r.body?.audio?.volume===65)));check('clip-audio volume slider saves the released value',true);
+ fireEvent.change(screen.getByRole('slider',{name:'Clip audio fade in'}),{target:{value:'500'}});fireEvent.pointerUp(screen.getByRole('slider',{name:'Clip audio fade in'}),{pointerId:1});await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.path.includes('/shots/')&&r.body?.audio?.fade_in_ms===500)));check('clip audio fade-in saves and is exposed independently',true);
  const pool={id:'pool-audio',type:'audio',original_filename:'music.mp3'};
  fireEvent.drop(narration,{dataTransfer:{types:['application/x-sceneforge-assets'],getData:()=>JSON.stringify([pool])}});
  await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/voice-takes/from-asset')&&r.body.asset_id==='pool-audio')));
@@ -397,12 +463,23 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getByRole('checkbox',{name:'Synchronized keystrokes'}));await saved();
  check('typewriter sound settings save independently',project.scenes.find(s=>s.id===firstId).font_json.typewriter_sound===true);
  await user.click(screen.getByRole('button',{name:'Copy narration to captions'}));await saved();
+ await user.selectOptions(screen.getByRole('combobox',{name:'Caption text direction'}),'ltr');await saved();
+ check('manual caption editor exposes and saves explicit text direction',project.scenes.find(s=>s.id===firstId).font_json.caption_direction==='ltr');
  await user.click(screen.getByRole('button',{name:'Slow',exact:true}));await saved();
  check('slow typing preset saves a longer reveal',project.scenes.find(s=>s.id===firstId).font_json.typewriter_duration_ms>3000);
  await user.click(screen.getByRole('button',{name:'Extend scene to fit typing + 1s hold'}));await saved();
  check('extend scene preserves requested typing duration',project.scenes.find(s=>s.id===firstId).requested_duration_ms>project.scenes.find(s=>s.id===firstId).font_json.typewriter_duration_ms);
- await user.click(screen.getByRole('button',{name:'Add text overlay'}));await saved();
+ await user.click(screen.getAllByRole('button',{name:'Add Text',exact:true})[0]);await saved();
  check('text overlay appears in editor canvas',visibleEditor().getByText('Your title',{selector:'.canvas-text-layer'}));
+ check('each title appears as a named editable block on the T1 timeline',!!screen.getByRole('button',{name:'Edit text: Your title'}));
+ await user.click(screen.getByRole('button',{name:'Edit text: Your title'}));
+ await new Promise(resolve=>setTimeout(resolve,220));
+ check('clicking a text timeline block opens the Text tab',visibleEditor().getByRole('tab',{name:'Text',selected:true}).getAttribute('aria-selected')==='true');
+ check('clicking a text timeline block focuses the matching title text',document.activeElement?.tagName==='TEXTAREA'&&document.activeElement.value==='Your title');
+ await user.click(visibleEditor().getAllByRole('button',{name:'Add Text Box',exact:true})[0]);await saved();
+ check('Text Box layers expose a wrapping width control',screen.getAllByRole('slider',{name:/text box width/}).length>0);
+ await user.click(visibleEditor().getAllByRole('button',{name:'Add Text+',exact:true})[0]);await saved();
+ check('Text+ layers are distinct advanced title clips',[...document.querySelectorAll('.text-edit-clip')].some(block=>block.textContent?.includes('Text+ title')));
  const layerText=visibleEditor().getByRole('textbox',{name:'Layer 1 text'});
  await user.clear(layerText);await user.type(layerText,'A chapter title');await user.tab();await saved();
  check('overlay text persists independently of captions',project.scenes.find(s=>s.id===firstId).font_json.layers[0].text==='A chapter title');
@@ -424,8 +501,15 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getByRole('button',{name:'Expand scene list'}));
  await user.click(screen.getByRole('button',{name:'Add scene',exact:true}));await waitFor(()=>assert.equal(project.scenes.length,4));
  check('added scene is selected',screen.getByRole('region',{name:'Edit New scene'}));
+ await user.keyboard('{Control>}z{/Control}');
+ await waitFor(()=>assert.equal(project.scenes.some(s=>s.title==='New scene'),false));
+ check('undo removes an added scene',true);
+ await user.keyboard('{Control>}{Shift>}z{/Shift}{/Control}');
+ await waitFor(()=>assert.equal(project.scenes.some(s=>s.title==='New scene'),true));
+ check('redo restores an added scene',true);
+ await waitFor(()=>assert.ok(screen.getByRole('button',{name:/Select scene \d+: Part-1/})));
  check('empty scene blocks rendering',screen.getByRole('button',{name:'Render scene'}).disabled);
- await user.click(screen.getByRole('button',{name:'Select scene 2: Part-1'}));
+ await user.click(screen.getByRole('button',{name:new RegExp('Select scene \\d+: Part-1')}));
  failNextPatch=true;
  await user.clear(visibleEditor().getByRole('textbox',{name:'Narration script'}));
  await user.type(visibleEditor().getByRole('textbox',{name:'Narration script'}),'Recoverable draft');
@@ -486,7 +570,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getByRole('button',{name:'Fit preview to window'}));
  await waitFor(()=>assert.ok(!pc().style.transform));
  check('Fit returns the preview to normal size',!pc().style.transform);
- await user.click(screen.getByRole('button',{name:'Select scene 2: Part-1'}));
+ await user.click(screen.getByRole('button',{name:/Select scene \d+: Part-1/}));
  await user.click(screen.getAllByRole('button',{name:'Transitions'})[0]);
  const coverTile=[...document.querySelectorAll('.transition-presets button')].find(b=>b.textContent.includes('Cover left'));
  await user.hover(coverTile);
@@ -494,7 +578,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.unhover(coverTile);
  check('moving away ends the transition preview',!document.querySelector('.tx-on-canvas'));
  const pcs=[...document.querySelectorAll('.picture-clip')];
- fireEvent.click(pcs[1],{ctrlKey:true});fireEvent.click(pcs[2],{ctrlKey:true});
+ fireEvent.click(pcs[0],{ctrlKey:true});fireEvent.click(pcs[1],{ctrlKey:true});
  const bb=await screen.findByRole('region',{name:'Selected parts'});
  check('Ctrl+click selects several parts with a tick and shows the batch bar',document.querySelectorAll('.picture-clip.multi').length>=2&&/parts selected/.test(bb.textContent));
  await user.click(within(bb).getByRole('button',{name:/Apply to/}));
@@ -505,7 +589,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getByRole('button',{name:/^Export video$/}));
  const exd=await screen.findByRole('dialog',{name:'Export video'});
  await user.click(within(exd).getByRole('radio',{name:/Small file/}));
- await user.click(within(exd).getByRole('button',{name:/Advanced settings/}));
+ check('advanced export settings are visible as soon as the dialog opens',!!within(exd).getByRole('combobox',{name:'Export frame rate'}));
  await user.selectOptions(within(exd).getByRole('combobox',{name:'Export frame rate'}),'60');
  check('export dialog shows a size estimate and caption file links',/About/.test(exd.textContent)&&!!within(exd).getByRole('link',{name:'SRT'}));
  await user.click(within(exd).getByRole('button',{name:/^Export$/}));
@@ -537,7 +621,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  cleanup();
  render(React.createElement(App));
  await user.click(await screen.findByRole('button',{name:/Renamed project Open project/}));
- await user.click(screen.getByRole('button',{name:'Select scene 2: Part-1'}));
+ await user.click(screen.getByRole('button',{name:/Select scene \d+: Part-1/}));
  check('reopening restores persisted text',visibleEditor().getByRole('textbox',{name:'Narration script'}).value==='Recoverable draft before exit keep draft');
  await user.click(screen.getByRole('button',{name:'SceneForge'}));
  await user.click(await screen.findByRole('button',{name:'Delete project Renamed project'}));

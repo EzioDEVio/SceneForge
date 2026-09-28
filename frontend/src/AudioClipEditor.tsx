@@ -2,6 +2,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import {Play, Square, Trash2, RotateCcw, AudioLines} from 'lucide-react';
 import {api, AudioEdit, Scene, VoiceTake, Waveform} from './api';
 import {sceneDuration} from './duration';
+import {FeatureHelp} from './FeatureHelp';
 
 /** Take the audio off a scene without touching its picture. A scene that
  *  followed the audio keeps its current length (switches to fixed timing),
@@ -122,7 +123,7 @@ export function AudioClipEditor({scene, take, disabled, onChanged, onRemove}: Pr
   if (!asset) return null;
   const pct = (ms: number) => `${source ? (ms / source) * 100 : 0}%`;
   return <section className="audio-clip-editor" aria-label="Scene audio clip">
-    <div className="look-heading"><h3><AudioLines size={15}/> Scene audio</h3><span className="hint" aria-live="polite">{status}</span></div>
+    <div className="look-heading"><h3><AudioLines size={15}/> Scene audio</h3><FeatureHelp compact title="Scene audio clip" description="Edit the selected narration or recording without changing the original audio file in the Media Pool." steps="Adjust the in/out handles, volume, fades, and voice effect. Changes are saved on this scene's selected take."/><span className="hint" aria-live="polite">{status}</span></div>
     <p className="audio-clip-name" title={asset.original_filename}>{asset.original_filename || take.voice || 'Narration'} · {secs(clipMs)} s used of {secs(source)} s</p>
     <div className="audio-wave" ref={strip}>
       {wave ? <WavePath peaks={wave.peaks} height={56} className="audio-wave-svg"/> : <div className="audio-wave-empty">Reading waveform…</div>}

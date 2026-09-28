@@ -26,19 +26,23 @@ Get the installer for your system from the **[latest release](https://github.com
 
 ![Effects panel](docs/screenshots/effects-panel.png)
 
-**Scenes and timeline** — scene-by-scene timeline with picture, narration and text lanes; drag-and-drop images, videos, audio and whole folders; 25 transitions including film burn, wind and clock wipe; keyboard shortcuts; undo/redo; split scenes; resizable settings panel.
+**Scenes and timeline** — scene-by-scene timeline with picture, narration, source-video-audio and text lanes; drag-and-drop images, videos, audio and whole folders; 42 transitions including film burn, wind and clock wipe, with live previews; keyboard shortcuts; undo/redo; split scenes; multi-select and batch apply; ruler snapping and named markers; linked source video/audio edge trimming for eligible single-video scenes.
 
 **Pictures and motion** — Ken Burns zoom and pan with smooth easing; **3D photo (parallax)**, which gives still photos depth; **picture-in-picture overlays** you drag and resize on the preview, with borders, rounded corners, shadows, animations, glide paths and green screen; **split screen** (side by side, top & bottom, three panels, 2×2); **animated map routes** you draw by clicking on the preview; video clip speed, slow-motion ramps and freeze frames; **restore old photo** (dust, grain, contrast and sharpness for archive scans).
 
-**Looks** — 18 looks including VHS and full-frame glitch; **Old film** (scratches, dust, hair, flicker, gate weave, 16/18 fps projector motion, black & white or sepia, projector sound); colour sliders, **colour wheels**, split toning and **.cube LUT import** (3D, 1D and DaVinci Resolve shaper LUTs); camera shake with impact zoom; spotlight; blur or pixelate areas to hide faces and names; light leaks.
+**Looks and filters** — 18 looks including VHS and full-frame glitch; **Old film** (scratches, dust, hair, flicker, gate weave, 16/18 fps projector motion, black & white or sepia, projector sound); colour sliders, **colour wheels**, split toning and **.cube LUT import** (3D, 1D and DaVinci Resolve shaper LUTs); camera shake with impact zoom; spotlight; blur or pixelate areas to hide faces and names; light leaks; Teal & Amber, Pastel and Bleach Bypass color filters.
 
-**Text** — captions with correct Arabic right-to-left layout; **word-by-word captions** that follow the voice (exact timing with ElevenLabs, measured from the audio for other voices) in fill, pop or glow styles; animated title layers; typewriter reveal with sound.
+**Text** — captions with correct Arabic right-to-left layout; automatic captions from narration or video sound (free local Whisper, with optional cloud services); **24 caption styles** and word-by-word timing; animated title layers; typewriter reveal with sound.
 
 ![Word-by-word captions](docs/screenshots/word-by-word-captions.png)
 
 **Sound** — narration from AI voices or your own recordings; trim, volume, fades and waveform editing; voice effects (clean up, 1940s radio, telephone); background music that loops and **ducks under narration** automatically; **sync scene cuts to the beat**; loudness levelling for YouTube (-14 LUFS); film countdown leader.
 
-**Export** — one MP4 with everything rendered by FFmpeg, bundled with the app.
+**Export** — platform presets for YouTube, TikTok/Reels/Shorts and Instagram; advanced resolution up to 4K, frame rate, quality and format controls; MP4, H.265, WebM, ProRes, GIF, MP3 and WAV; SRT/VTT caption files. Video sound is preserved and can be adjusted per clip.
+
+**Share and overlays** — after export, a local-first Share dialog offers download, file-location access in the desktop app, and upload steps for YouTube, TikTok, Instagram and Facebook. Direct account uploads are not included. Overlays also include a searchable, categorized emoji/sticker picker; selected symbols use the standard image-overlay editor and render pipeline.
+
+The features above include the **0.6.0 work in progress** from source. The latest published installer may not include them yet; check the release notes for the version you download.
 
 ## AI providers
 
@@ -47,15 +51,18 @@ AI is optional. You can build a complete video from your own photos, clips and r
 | Purpose | Cloud (your own account/key) | Local (free, on your computer) |
 |---|---|---|
 | Images | OpenAI, Google Gemini, Cloudflare Workers AI, Hugging Face | Stable Diffusion via AUTOMATIC1111 (point SceneForge at its folder: *AI Engines* menu) |
-| Voice | ElevenLabs (with exact word timing), Together AI | Chatterbox (multilingual incl. Arabic), Kokoro |
+| Voice | ElevenLabs (with exact word timing), Together AI | Chatterbox and Kokoro (separate services); espeak is an optional basic fallback with its own install |
+| Captions | OpenAI Whisper or ElevenLabs Scribe | Faster-Whisper (model download required once) |
+
+**What installs:** Source setup needs Python, Node.js and FFmpeg. The Windows desktop installer bundles the app, private backend runtime and FFmpeg so end users do not need those tools installed separately. Optional Chatterbox/Kokoro narration servers and Stable Diffusion image generation are separate installs today; their large models are not bundled. The Whisper model downloads automatically the first time captions run. Rendering and exports use local FFmpeg; cloud features only run when you choose a provider and supply its key.
 
 Keys are stored in your operating system's credential store (Windows Credential Manager, macOS Keychain, Linux Secret Service), never in the project files.
 
-**Coming next:** an AI providers workspace with a built-in model manager and free offline engines (Piper voices, Whisper captions, a compact Stable Diffusion engine), so no separate installs or Docker are needed. See the [roadmap](#roadmap).
+**Automatic captions:** Local Faster-Whisper transcription is included in the backend dependencies. Its multilingual model downloads once when first used (internet required for that first download), then runs on the user's CPU without an API key or network connection. ElevenLabs and OpenAI remain optional cloud services.
 
 ## Build from source
 
-Requirements: Python 3.11+, Node.js 20+, and FFmpeg (only for running from source; the installers bundle it).
+Requirements: Python 3.11+, Node.js 20+, and FFmpeg (only for running from source; the desktop installer bundles its backend runtime and FFmpeg). Local captioning downloads a Whisper model on first use. The optional Chatterbox/Kokoro speech servers and Stable Diffusion image-generation server remain separate installs; the desktop installer does not bundle these large models or services.
 
 **Windows**
 ```bat
@@ -107,7 +114,7 @@ npm --prefix desktop run dist:win             # or dist:mac / dist:linux
 - [x] Film looks, LUTs, colour grading, overlays, map routes, split screen, 3D photos
 - [x] Word-by-word captions, music ducking, beat sync, loudness
 - [x] Desktop installers for Windows, Linux and macOS with automatic updates
-- [ ] AI providers workspace and model manager with free offline engines (Piper, Whisper, Stable Diffusion)
+- [ ] AI providers workspace and model manager for optional local speech and image models
 - [ ] Colorize black & white photos; automatic subject detection for 3D photos (local AI models)
 - [ ] Signed installers (free open-source signing programmes are being considered)
 

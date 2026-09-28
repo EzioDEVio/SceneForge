@@ -29,7 +29,7 @@ python desktop/tests/smoke_backend.py --exe desktop/build/backend/sceneforge-bac
 npm --prefix desktop run dist:win
 ```
 
-The installer appears in `desktop/release`. `fetch_ffmpeg.py` verifies a fixed SHA-256 before extracting the pinned Windows pack, and retains upstream notices. No runtime dependencies are downloaded by the installer itself.
+The installer appears in `desktop/release`. `fetch_ffmpeg.py` verifies a fixed SHA-256 before extracting the pinned Windows pack, and retains upstream notices. Local captions use Faster-Whisper; the multilingual model is downloaded once on first transcription and then runs on-device. This means internet access is needed once for that model. The installer does not bundle optional Chatterbox/Kokoro narration servers or Stable Diffusion image models; these must be installed separately if used. Cloud transcription and generation require the user's own provider account and key.
 
 ## CI and verification
 `.github/workflows/desktop-windows.yml` runs on `desktop-alpha/**` branch pushes. It builds on Windows, runs editor and launcher tests, exercises the frozen backend (authentication, static UI, persistent project creation, real Arabic title rendering and shutdown), builds the installer, silently installs it in a temporary directory, launches the installed desktop executable, and checks uninstall. Only a successful run uploads the installer artifact.

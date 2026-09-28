@@ -3,16 +3,21 @@
   ElevenLabs Speech to Text (Scribe v2): POST /v1/speech-to-text, word timestamps, language_code
   OpenAI Whisper (whisper-1): /v1/audio/transcriptions, verbose_json with word timestamps
 
-Uses the keys already saved in SceneForge (provider profiles named "elevenlabs" / "openai").
+Local Faster-Whisper is the default and needs no API key. Cloud providers remain optional.
 Returns {"language": "en", "text": "...", "words": [[word, start_ms, end_ms], ...], "provider": ...}.
 """
 from __future__ import annotations
 
 import requests
+import os
+from pathlib import Path
+from threading import Lock
 
 from app.security.secrets import reveal
 
 TIMEOUT = (10, 300)
+_LOCAL_LOCK = Lock()
+_LOCAL_MODEL = None
 
 
 class TranscribeError(ValueError):
@@ -29,7 +34,38 @@ def _key(db, name: str) -> str | None:
 
 
 def available(db) -> list[str]:
-    return [n for n in ("elevenlabs", "openai") if _key(db, n)]
+    return ["local", *[n for n in ("elevenlabs", "openai") if _key(db, n)]]
+
+
+def _local(path: str, language: str | None) -> dict:
+    """Run CPU int8 Whisper. The small multilingual model is fetched once and cached."""
+    global _LOCAL_MODEL
+    try:
+        from faster_whisper import WhisperModel
+    except ImportError as e:
+        raise TranscribeError("Local captions are unavailable because Faster-Whisper is not installed. Reinstall or update SceneForge.") from e
+    if _LOCAL_MODEL is None:
+        with _LOCAL_LOCK:
+            if _LOCAL_MODEL is None:
+                model_dir = Path(os.environ.get("SCENEFORGE_MODEL_DIR", Path.home() / ".sceneforge" / "models" / "whisper"))
+                model_dir.mkdir(parents=True, exist_ok=True)
+                try:
+                    _LOCAL_MODEL = WhisperModel("base", device="cpu", compute_type="int8", download_root=str(model_dir))
+                except Exception as e:
+                    raise TranscribeError(f"Could not download or start the local Whisper model: {e}") from e
+    try:
+        segments, info = _LOCAL_MODEL.transcribe(path, language=language or None, word_timestamps=True, vad_filter=True)
+        words = []
+        text = []
+        for segment in segments:
+            text.append(segment.text.strip())
+            for word in segment.words or []:
+                value = word.word.strip()
+                if value:
+                    words.append([value, int(round(word.start * 1000)), int(round(word.end * 1000))])
+        return {"language": info.language or language or "", "text": " ".join(text).strip(), "words": words, "provider": "local"}
+    except Exception as e:
+        raise TranscribeError(f"Local Whisper transcription failed: {e}") from e
 
 
 def _elevenlabs(key: str, path: str, language: str | None) -> dict:
@@ -63,12 +99,13 @@ def _openai(key: str, path: str, language: str | None) -> dict:
 
 
 def transcribe(db, path: str, provider: str = "auto", language: str | None = None) -> dict:
-    names = available(db)
-    if not names:
-        raise TranscribeError("Automatic captions need an ElevenLabs or OpenAI key. Add one in AI Engines → Cloud providers.")
     if provider == "auto":
-        provider = names[0]
-    if provider not in names:
+        provider = "local"
+    if provider == "local":
+        return _local(path, language)
+    if provider not in ("elevenlabs", "openai"):
+        raise TranscribeError("Choose Local Whisper, ElevenLabs, or OpenAI.")
+    if provider not in available(db):
         raise TranscribeError(f"No {provider} key is saved. Add it in AI Engines → Cloud providers.")
     key = _key(db, provider)
     return (_elevenlabs if provider == "elevenlabs" else _openai)(key, path, language or None)

@@ -22,7 +22,7 @@ export function ExportDialog({project, onClose, onExport}: {project: Project; on
   const vertical = project.height > project.width * 1.2;
   const [preset, setPreset] = useState(vertical ? 'short' : 'yt');
   const [s, setS] = useState<S>((PRESETS.find(p => p.key === (vertical ? 'short' : 'yt')) || PRESETS[0]).s);
-  const [adv, setAdv] = useState(false);
+  const [adv, setAdv] = useState(true);
   useEffect(() => {const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose(); window.addEventListener('keydown', esc); return () => window.removeEventListener('keydown', esc);}, [onClose]);
   const seconds = useMemo(() => project.scenes.filter(x => x.shots.length).reduce((a, x) => a + sceneDuration(x), 0) / 1000, [project]);
   const short = SHORT[s.resolution] || Math.min(project.width, project.height);

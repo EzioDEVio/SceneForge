@@ -1,4 +1,5 @@
-export interface TextLayer { family?:string;outline_width?:number;shadow?:number;align?:string;exit_ms?:number; animation?:string;animation_ms?:number;spacing?:number;highlight?:string;id:string;text:string;x:number;y:number;size:number;color:string;start_ms:number;end_ms:number;bold:boolean;}
+export interface TextLayer { kind?:'text'|'text_box'|'text_plus';box_width?:number; family?:string;outline_width?:number;shadow?:number;align?:string;exit_ms?:number; animation?:string;animation_ms?:number;spacing?:number;highlight?:string;id:string;text:string;x:number;y:number;size:number;color:string;start_ms:number;end_ms:number;bold:boolean;}
+export type CaptionSegment={id:string;text:string;start_ms:number;end_ms:number};
 // Thin fetch wrapper + types matching backend/app/domain/schemas.py.
 // Uses relative /api paths so it works both under the Vite dev proxy and
 // the production build served from the same FastAPI origin.
@@ -21,18 +22,24 @@ export type Shot = {
   order_index: number;
   fit: string;
   motion_json: { type: string; start?: any; end?: any };
+  speed_json?: {speed?:number};
   source_in_ms: number;
   source_out_ms: number | null;
   duration_ms: number | null;
   is_selected: boolean;
+  audio_json?: {volume?: number; mute?: boolean; duck?: boolean; fade_in_ms?: number; fade_out_ms?: number};
   asset?: Asset;
 };
 
 export type VoiceTake = {
   id: string;
+  spoken_text_hash?: string;
   source: string;
   provider: string | null;
+  model?: string | null;
   voice: string | null;
+  settings_json?: Record<string, unknown> | null;
+  audio_asset_id?: string | null;
   measured_duration_ms: number | null;
   natural_duration_ms?: number | null;
   accepted: boolean;
@@ -54,6 +61,8 @@ export type FontSettings = {
   position: string;
   captions_enabled: boolean;
   layers?: TextLayer[];
+  caption_segments?: CaptionSegment[];
+  caption_direction?: 'auto'|'ltr'|'rtl';
   typewriter?: boolean;
   typewriter_sound?: boolean;
   typewriter_sound_asset_id?: string | null;
@@ -63,7 +72,7 @@ export type FontSettings = {
 };
 
 /** Must match BUILD_ID in backend/app/main.py. */
-export const BUILD_ID = "v0.5-captions-9";
+export const BUILD_ID = "v0.6.0-wip.10";
 
 export type Adjust = Partial<Record<'exposure'|'contrast'|'highlights'|'shadows'|'temperature'|'tint'|'saturation'|'vibrance'|'sharpen'|'vignette'|'grain', number>>;
 export type Look = {
@@ -177,13 +186,14 @@ export const api = {
   deleteProject: (id:string) => req<{ok:boolean}>(`/api/projects/${id}`, {method:"DELETE"}),
   listProjects: () => req<Project[]>("/api/projects"),
   getProject: (id: string) => req<Project>(`/api/projects/${id}`),
+  getScene: (id:string)=>req<Scene>(`/api/scenes/${id}`),
   updateProject: (id: string, body: Partial<{ title: string; aspect: string; finishing: Finishing }>) =>
     req<Project>(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   addScene: (projectId: string) =>
     req<Scene>(`/api/projects/${projectId}/scenes`, { method: "POST", body: JSON.stringify({}) }),
   insertCountdown: (projectId: string, body: {style: string; seconds: number; beep: string; tone: string; color?: string; after_scene_id?: string | null}) =>
     req<Scene>(`/api/projects/${projectId}/insert-countdown`, {method: 'POST', body: JSON.stringify(body)}),
-  autoCaptions: (sceneId: string, body: {provider?: string; language?: string; source?: string}) =>
+  autoCaptions: (sceneId: string, body: {provider?: string; language?: string; source?: string; phrase_words?: number}) =>
     req<Scene>(`/api/scenes/${sceneId}/auto-captions`, {method: 'POST', body: JSON.stringify(body)}),
   applyToScenes: (sourceId: string, targets: string[], parts: string[]) =>
     req<{changed: number}>(`/api/scenes/${sourceId}/apply-to`, {method: 'POST', body: JSON.stringify({targets, parts})}),
@@ -211,6 +221,7 @@ export const api = {
   hideAsset:(id:string)=>req(`/api/assets/${id}/hide-from-pool`,{method:'POST'}),
   useAudioAsset:(sceneId:string,assetId:string)=>req(`/api/scenes/${sceneId}/voice-takes/from-asset`,{method:'POST',body:JSON.stringify({asset_id:assetId})}),
   splitScene: (id:string,at:number,baked=false)=>req<Scene>(`/api/scenes/${id}/split`,{method:"POST",body:JSON.stringify({at_ms:at,baked})}),
+  restoreScene: (id:string,snapshot:Scene)=>req<Scene>(`/api/scenes/${id}/restore`,{method:"POST",body:JSON.stringify(snapshot)}),
   updateShot: (shotId: string, body: Record<string, any>) =>
     req<Shot>(`/api/scenes/shots/${shotId}`, { method: "PATCH", body: JSON.stringify(body) }),
   deleteShot: (shotId: string) => req(`/api/scenes/shots/${shotId}`, { method: "DELETE" }),

@@ -1,6 +1,7 @@
 import React, {useEffect, useRef, useState} from 'react';
 import {Music, Upload, Clapperboard, Gauge} from 'lucide-react';
 import {api, Asset, Finishing, Project} from './api';
+import {FeatureHelp} from './FeatureHelp';
 
 const MUSIC_DEFAULTS = {volume: 35, duck: 70, fade_in_ms: 1500, fade_out_ms: 3000};
 
@@ -41,7 +42,7 @@ export function FinishingPanel({project, disabled, onChanged}: {project: Project
     <input aria-label={`Music ${label}`} type="range" min={0} max={100} step={5} value={m[key]} disabled={disabled} onChange={e => save({...fin, music: {...m, [key]: Number(e.target.value)}})}/></label>;
 
   return <section className="look-section finishing-panel" aria-label="Music and finishing">
-    <div className="look-heading"><h3><Music size={15}/> Music & finishing</h3><span className="hint" aria-live="polite">{status}</span></div>
+    <div className="look-heading"><h3><Music size={15}/> Music & finishing</h3><FeatureHelp compact title="Music and finishing" description="Add a project soundtrack and apply final loudness and audio treatments." steps="Import or choose music, adjust its level and narration ducking, set fades, and render the full project to hear the finished mix."/><span className="hint" aria-live="polite">{status}</span></div>
     <p className="hint">For the whole video. Applied when you export.</p>
     <div className="lut-row">
       <select aria-label="Background music" value={m?.asset_id || ''} disabled={disabled} onChange={e => save({...fin, music: e.target.value ? {...MUSIC_DEFAULTS, ...(m || {}), asset_id: e.target.value} : null}, true)}>
