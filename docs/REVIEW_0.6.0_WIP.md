@@ -54,4 +54,4 @@ Adds a post-export sharing workflow, snapping and named markers, constrained vid
 - Moved the T1 captions/titles lane above V1 and added transcript search, segment navigation, collapse/expand, and Auto/RTL/LTR caption direction.
 - Frontend production build passed; frontend checks passed (191 component, 19 unit, 6 share-dialog checks), as did 14 desktop tests, Python compile checks, and the RTL/LTR caption-render smoke test. Full counts and commands are in `handoff.md`.
 - The full backend integration suite could not start locally because FastAPI is absent. The push-triggered GitHub checks workflow installs the required dependencies; its result is reported after the run completes.
-- Branch-dispatched installers are test artifacts. This work does not tag or publish a stable GitHub release.
+- Builds from `chatgpt/0.6.0-wip.10` are test artifacts using `--publish never`. This work does not tag or publish a stable GitHub release.

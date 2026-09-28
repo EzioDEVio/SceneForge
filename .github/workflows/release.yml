@@ -10,6 +10,7 @@
 name: Release
 on:
   push:
+    branches: ['chatgpt/0.6.0-wip.10']
     tags: ['v*']
   workflow_dispatch:
 permissions:

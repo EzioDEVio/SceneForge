@@ -27,7 +27,7 @@ Reviewed inputs in this workspace include the 0.5.3 source ZIP, the original 0.6
 - The GitHub `release/v0.5.3` branch remains unchanged and is the published base.
 - The locally tested 0.6.0 WIP source (which includes Claude-authored changes) is carried forward as a clearly named snapshot branch. Its original unpublished per-commit Git authorship is not reconstructed; the snapshot commit documents that limitation.
 - The reviewed ChatGPT-assisted changes are a distinct commit on `chatgpt/0.6.0-wip.10`, based on that 0.6.0 snapshot. Both branches live in the existing repository; no second repository is created.
-- No stable release tag is created by this work. The release workflow is run manually so installer builds upload as temporary Actions artifacts.
+- No stable release tag is created by this work. The Release workflow runs for pushes to `chatgpt/0.6.0-wip.10` and uploads branch builds as temporary Actions artifacts using `--publish never`; tagged releases retain their existing behavior.
 
 ### Preserved 0.5.3 features
 
