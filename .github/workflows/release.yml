@@ -12,6 +12,12 @@ on:
   push:
     branches: ['chatgpt/0.6.0-wip.10']
     tags: ['v*']
+    paths-ignore:
+      - '.github/workflows/checks.yml'
+      - '.github/workflows/release.yml'
+      - 'tests/**'
+      - 'docs/**'
+      - 'handoff.md'
   workflow_dispatch:
 permissions:
   contents: write

@@ -39,4 +39,7 @@ jobs:
             python tests/integration/test_batch_b.py
             python tests/integration/test_text_motion.py
             python tests/integration/test_v06.py
+            python tests/integration/test_caption_segments.py
+            python tests/integration/test_effect_presets_addon.py
+            python tests/integration/test_share_location.py
           '

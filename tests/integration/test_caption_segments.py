@@ -1,6 +1,9 @@
 """Focused rendering smoke test for individually timed auto-caption clips."""
 from pathlib import Path
 from tempfile import TemporaryDirectory
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "backend"))
 
 from app.render.subtitles import write_ass_file
 

@@ -1,5 +1,7 @@
 """Small render smoke test for the extra SceneForge color-filter presets."""
-import subprocess
+import pathlib, subprocess, sys
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[2] / "backend"))
+
 from app.domain.constants import EffectPreset
 from app.render.filters import build_effect_chain
 
