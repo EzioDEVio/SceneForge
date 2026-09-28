@@ -125,11 +125,12 @@ Re-run in this workspace on 2026-09-28:
 - `PYTHONPATH=backend python tests/integration/test_caption_segments.py` — **passed**: independently timed caption events and explicit RTL/LTR direction marks.
 - `python -m compileall -q backend/app tests/integration/test_caption_segments.py tests/integration/test_effect_presets_addon.py tests/integration/test_share_location.py` — **passed**.
 - `git diff --check` — **passed**.
-- The full backend integration suite could not run locally because FastAPI is not installed in this workspace. The push-triggered GitHub checks workflow installs `backend/requirements.txt` and runs the integration suite.
-- Windows/Linux/macOS installer build and packaged-app checks are recorded after the Actions run. Do not treat them as passed until each result is green.
+- GitHub Checks run **36486468767** on commit `8c1532b6a3a6b3e65c2abc2fcc712ad2398e23c7` — **passed**. It ran the frontend build/tests and the full backend integration/render suite, including native credential migration plus the caption, effect-preset, and share-location checks.
+- GitHub Release workflow run **36485090171** on app-source commit `4cb3a6715c52085095d3fe17313c500f3793ab29` — **passed** for all three configured targets: Windows x64 NSIS installer, Linux AppImage and `.deb`, and macOS Apple Silicon `.dmg` and `.zip`. Packaged backend/editor render checks passed. The macOS target is Apple Silicon only; Intel macOS is not built.
+- The three installer artifacts are attached to that Actions run and expire **2026-12-27**. They are temporary branch-build artifacts, not a published stable release.
 - wip.9 verification (historical): 185 component checks, 19 unit checks, 6 Share dialog checks, caption render smoke, and Python compile passed; these are not wip.10 test results.
 
-The following still need hands-on or real-service verification: browser visual behavior, real cloud caption API credentials, first-run Faster-Whisper model download/inference, and Windows Photos/Media Player playback. CI installer results are recorded after the branch build; this is not a substitute for your own editor workflow test.
+The following still need hands-on or real-service verification: browser visual behavior, real cloud caption API credentials, first-run Faster-Whisper model download/inference, Windows Photos/Media Player playback, and clean-machine installation on each OS. CI confirms the installer packages launch and pass packaged-app render checks, but does not replace those user acceptance checks.
 
 `docs/REVIEW_0.6.0_WIP.md` records the latest review and remaining work. Any Actions-built installers from a branch dispatch are test artifacts, not a published stable release.
 
