@@ -37,7 +37,7 @@ except video.VideoGenerationError as exc:
     assert "only for 8-second" in str(exc)
 else:
     raise AssertionError("Veo 1080p accepted an unsupported duration")
-bad = {**base, "provider": "runway", "model": "runway-gen4.5", "aspect_ratio": "custom"}
+bad = {**base, "provider": "runway", "model": "runway-gen4.5", "resolution": "720p", "aspect_ratio": "custom"}
 try:
     video.validate_request(bad)
 except video.VideoGenerationError as exc:
