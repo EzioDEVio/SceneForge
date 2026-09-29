@@ -73,14 +73,15 @@ Model files and separate ComfyUI requirements are not included in the Windows, m
 - `npm test` in `desktop/` — passed: 14 tests.
 - `python -m compileall -q backend/app tests/integration/test_video_generation.py` — passed.
 - `git diff --check` — passed.
-- `tests/integration/test_video_generation.py` is included in `.github/workflows/checks.yml`, but could not run locally. This workspace's Python has no backend dependencies such as Requests/FastAPI/SQLAlchemy, and package downloads were unavailable. CI installs `backend/requirements.txt`.
-- No real ComfyUI model, Google Veo call or Runway call was made; all UI generation flow tests mock the API. No installer was built or manually launched during this feature work.
+- The GitHub Actions Release matrix on feature commit `17de02742088315c00cbd7cd6f9b7e2d4a76c872` passed for Windows, Linux and Apple Silicon macOS. The jobs built installer artifacts and passed packaged-backend render checks; Windows also passed silent install and app startup, and Linux/macOS passed their packaged editor end-to-end checks. macOS remains marked experimental in the workflow.
+- The feature-specific `tests/integration/test_video_generation.py` is included in `.github/workflows/checks.yml`. It could not run locally because this workspace's Python lacks backend dependencies such as Requests/FastAPI/SQLAlchemy; a source-branch CI run is being triggered against this feature tree. CI installs `backend/requirements.txt`.
+- No real ComfyUI model, Google Veo call or Runway call was made; provider generation is still untested against live services. The packaged installer checks exercise startup and editing/rendering, not paid or local model generation.
 - Provider progress is generally unavailable, so SceneForge shows an indeterminate active-job bar. Cancelling a queued ComfyUI task removes that task; a ComfyUI generation already running may need to be stopped in ComfyUI. Canceling an accepted Google request does not promise to stop the remote task.
 
 ## Remaining acceptance work
 
-- Run CI and fix any environment-specific backend failures.
+- Review the source-branch backend integration run and fix any environment-specific failures.
 - On a supported machine, import each built-in ComfyUI API workflow and test prompt/dimensions/seed, audio output, cancel behavior, and local generated-file transfer.
 - Test Google and Runway with user-owned valid credentials and provider billing; verify returned file download, actual dimensions/duration/audio, published price and failure/cancellation errors.
 - Add generated video to both an empty and populated project, apply captions/effects/overlays/audio, render/export, and open outputs in target-platform players.
-- Build the Windows, Linux and macOS branch artifacts and do clean-install acceptance. A pushed branch build is a temporary Actions artifact, not a published release.
+- Manually install and test the Windows, Linux and macOS branch artifacts on user machines. A pushed branch build is a temporary Actions artifact, not a published release.
