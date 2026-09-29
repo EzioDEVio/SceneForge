@@ -19,14 +19,14 @@ const models=[
   {id:'veo-3.1-lite',provider:'google_veo',provider_label:'Google Gemini API',name:'Veo 3.1 Lite',model:'veo-3.1-lite-generate-preview',kind:'cloud',price_per_second:{'720p':0.05,'1080p':0.08},resolutions:['720p','1080p'],ratios:['16:9','9:16'],duration_min:4,duration_max:8,durations:[4,6,8],native_audio:true,requirements:'Cloud test model',workflow_url:'https://ai.google.dev',cost_note:'Google list price per second.'},
 ];
 let profiles=[{id:'local-profile',capability:'video',name:'local_comfy',configured:true,base_url:'http://127.0.0.1:8188',model:'ComfyUI'}];
-let generationRequest=null,added=null,captionsFor=null,closed=0;
+let generationRequest=null,added=null,captionsFor=null,closed=0,statusChecks=0;
 const asset={id:'generated-1',type:'video',original_filename:'generated.mp4',width:720,height:1280,duration_ms:5000,origin:'generated'};
 const asset2={...asset,id:'generated-2',original_filename:'generated take 2.mp4'};
 globalThis.fetch=async(path,init={})=>{
   const method=init.method||'GET';
   let result;
   if(path==='/api/video-generation/catalog')result={models,prices_checked:'2026-09-28'};
-  else if(path==='/api/video-generation/local/status')result={ready:true,message:'ComfyUI is connected.'};
+  else if(path==='/api/video-generation/local/status'){statusChecks++;result={ready:true,message:'ComfyUI is connected.'};}
   else if(path==='/api/video-generation/local/system')result={detected:true,gpu_name:'Test GPU',vram_gb:8,recommended_model_ids:['wan2.2-ti2v-5b','wan2.1-t2v-1.3b'],message:'Test hardware guidance'};
   else if(path==='/api/providers')result=profiles;
   else if(path==='/api/video-generation/projects/project-1/generate'){generationRequest=JSON.parse(init.body);result={job_id:'job-1'};}
@@ -45,8 +45,19 @@ try{
   const view=render(React.createElement(VideoGenerationPanel,props));
   await screen.findByRole('dialog',{name:'Generate video from text'});
   await screen.findByText('ComfyUI is connected.');
+  assert.ok(screen.getByText(/Workflow → Browse Workflow Templates/),'local setup names the ComfyUI template location');
+  assert.ok(screen.getByText(/File → Export Workflow \(API\)/),'local setup names the API export command');
+  const checksBefore=statusChecks;
+  await user.click(screen.getByRole('button',{name:/Check again/}));
+  await waitFor(()=>assert.ok(statusChecks>checksBefore,'Check again performs a fresh ComfyUI status request'));
   await user.click(screen.getByRole('button',{name:/Open ComfyUI install guide/}));
   assert.equal(externalUrl,'https://docs.comfy.org/get_started/introduction','desktop setup links use the approved external-link bridge');
+  await user.selectOptions(screen.getByLabelText('Video model'),'custom-comfy-workflow');
+  await screen.findByText('No API workflow imported for Custom ComfyUI workflow');
+  const blockedGenerate=screen.getByRole('button',{name:'Generate video'});
+  assert.equal(blockedGenerate.disabled,true,'generation stays disabled without an API workflow');
+  await screen.findByText('Import the API workflow for Custom ComfyUI workflow above to enable Generate.');
+  await user.selectOptions(screen.getByLabelText('Video model'),'wan2.1-t2v-1.3b');
   await user.type(screen.getByLabelText('Prompt'), 'A moonlit desert with a slow camera push');
   await user.selectOptions(screen.getByLabelText('Number of results'),'2');
   await user.selectOptions(screen.getByLabelText('Aspect ratio'),'custom');
