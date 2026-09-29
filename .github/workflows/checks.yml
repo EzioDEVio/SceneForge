@@ -42,4 +42,5 @@ jobs:
             python tests/integration/test_caption_segments.py
             python tests/integration/test_effect_presets_addon.py
             python tests/integration/test_share_location.py
+            python tests/integration/test_video_generation.py
           '

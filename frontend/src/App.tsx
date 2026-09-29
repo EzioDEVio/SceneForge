@@ -17,6 +17,7 @@ import {ProgressCard} from "./ProgressCard";
 import {BatchBar} from "./BatchBar";
 import {ExportDialog} from "./ExportDialog";
 import {ShareDialog} from "./ShareDialog";
+import VideoGenerationPanel from "./VideoGenerationPanel";
 import {FeatureHelp} from "./FeatureHelp";
 import {SceneEffectsPanel, SceneFxPreview, RouteCanvas, AnnotationCanvas} from "./EffectsPanels";
 import {SpeedControls, ClipSoundControls} from "./SpeedControls";
@@ -31,7 +32,7 @@ import {
   ArrowLeft, ArrowRight, ArrowUp, ArrowDown,
   Download, Play, Loader2, Trash2, X, Plus, Upload, Sparkles, Volume2,
   FileText, ImageIcon, Clock, Palette, Type, Wand2, Film, Settings, Key, Check,
-  ChevronRight, Layers, Copy, PanelLeftClose, PanelLeftOpen, Search, CheckCircle2, Timer,
+  ChevronRight, Layers, Copy, PanelLeftClose, PanelLeftOpen, Search, CheckCircle2, Timer, Clapperboard,
 } from "lucide-react";
 import { api, subscribeJob, Project, Scene, Shot, Job, VoiceTake, ProviderProfile, Asset, VoiceOption } from "./api";
 
@@ -302,6 +303,9 @@ const PROVIDER_NOTES:Record<string,string> = {
   together:"Together AI image models, including a limited free FLUX Schnell model. Usage and quota follow your account.",
   local_sd:"Runs on your computer. Install AUTOMATIC1111 and an image checkpoint, then start it with --api. No API key or Docker required. GPU memory limits apply; model downloads are separate. Use current to keep the loaded model.",
   elevenlabs:"Hosted multilingual voice generation. Usage and quota follow your ElevenLabs account.",
+  local_comfy:"Runs open-weight video models on your computer through ComfyUI. Model files and trusted API workflows are downloaded/imported separately; no API key or per-video provider fee. GPU, RAM and disk requirements vary by model.",
+  google_veo:"Paid cloud video generation through Google Gemini API. Add a Google AI Studio key. SceneForge displays an estimate before submission; Google controls final billing.",
+  runway:"Paid cloud video generation through Runway API. Add a Runway developer key and credits. SceneForge displays an estimate before submission; Runway controls final billing.",
 };
 const PROVIDER_OPTIONS = [
   {name:"cloudflare", label:"Cloudflare · Free allowance", capability:"image", model:"@cf/black-forest-labs/flux-1-schnell", url:""},
@@ -311,8 +315,11 @@ const PROVIDER_OPTIONS = [
   {name:"openai", label:"OpenAI · Images", capability:"image", model:"gpt-image-1", url:""},
   {name:"gemini", label:"Google Gemini · Images", capability:"image", model:"gemini-3.1-flash-image", url:""},
   {name:"elevenlabs", label:"ElevenLabs · Voice", capability:"speech", model:"eleven_multilingual_v2", url:"https://api.elevenlabs.io/v1"},
+  {name:"local_comfy", label:"Local · ComfyUI video", capability:"video", model:"ComfyUI local video engine", url:"http://127.0.0.1:8188"},
+  {name:"google_veo", label:"Google Veo · Video", capability:"video", model:"veo-3.1-generate-preview", url:""},
+  {name:"runway", label:"Runway · Video", capability:"video", model:"gen4.5", url:""},
 ];
-function SettingsPanel({ onClose }: { onClose: () => void }) {
+function SettingsPanel({ onClose, priority = false }: { onClose: () => void; priority?: boolean }) {
   const drawerRef = useDrawerFocus(onClose);
   const [providers,setProviders] = useState<ProviderProfile[]>([]);
   const [name,setName] = useState("openai");
@@ -334,17 +341,17 @@ function SettingsPanel({ onClose }: { onClose: () => void }) {
     try {await api.upsertProvider(choice.capability,name,key,model,url);setKey("");await refresh();window.dispatchEvent(new Event("sceneforge:providers-changed"));setMessage("Provider saved.");}
     catch(e:any){setMessage(e.message);}finally{setBusy(false);}
   }
-  return <div className="drawer-backdrop" onClick={onClose}><div className="drawer provider-studio" ref={drawerRef} role="dialog" aria-modal="true" aria-label="Editor panel" tabIndex={-1} onClick={e=>e.stopPropagation()}>
+  return <div className={`drawer-backdrop ${priority?'settings-front':''}`} onClick={onClose}><div className="drawer provider-studio" ref={drawerRef} role="dialog" aria-modal="true" aria-label="Editor panel" tabIndex={-1} onClick={e=>e.stopPropagation()}>
     <button className="icon-btn drawer-close" aria-label="Close panel" onClick={onClose}><X size={16}/></button>
-    <h3>Settings — Providers</h3><p className="hint">Anthropic Claude analyzes images and writes prompts, but does not provide a photo-generation API. Choose an image engine below.</p><p className="hint">Connect image-generation services. Local narration engines are managed separately under Audio → Local voice engines.</p>
+    <h3>Settings — Providers</h3><p className="hint">Connect the image or video provider you want to use. Cloud API keys are protected by your operating system's credential store and are used only for your requests.</p><p className="hint">Local video generation uses ComfyUI and model files installed on this computer. Local narration engines are managed separately under Audio → Local voice engines.</p>
     <div className="provider-list">{providers.filter(p=>PROVIDER_OPTIONS.some(o=>o.name===p.name)).map(p=><article className="provider-card" key={p.id}><strong>{PROVIDER_OPTIONS.find(o=>o.name===p.name)?.label||p.name}</strong><small>{p.capability} · {p.model} · {p.masked_key||"No key required"}</small><div className="button-row"><button className="text-btn" disabled={busy} onClick={()=>select(p.name)}>Edit</button><button className="text-btn" disabled={busy} onClick={async()=>{try{await api.deleteProviderProfile(p.id);await refresh();window.dispatchEvent(new Event("sceneforge:providers-changed"));}catch(e:any){setMessage(e.message);}}}>Remove</button></div></article>)}</div>
     <fieldset disabled={busy} className="provider-form"><label className="control-label">Provider<select aria-label="Provider" value={name} onChange={e=>select(e.target.value)}>{PROVIDER_OPTIONS.map(o=><option value={o.name} key={o.name}>{o.label}</option>)}</select></label>
     <p className="hint">{PROVIDER_NOTES[name]}</p>
-    {(name==="cloudflare"||name==="local_sd"||name==="elevenlabs")&&<label className="control-label">{name==="cloudflare"?"Cloudflare account ID":name==="elevenlabs"?"ElevenLabs API URL":"Local engine URL"}<input aria-label="Provider connection" value={url} onChange={e=>setUrl(e.target.value)}/></label>}
-    <label className="control-label">Model<input disabled={name==="cloudflare"} aria-label="Provider model" value={model} onChange={e=>setModel(e.target.value)}/></label>
+    {(name==="cloudflare"||name==="local_sd"||name==="elevenlabs"||name==="local_comfy")&&<label className="control-label">{name==="cloudflare"?"Cloudflare account ID":name==="elevenlabs"?"ElevenLabs API URL":"Local engine URL"}<input aria-label="Provider connection" value={url} onChange={e=>setUrl(e.target.value)}/></label>}
+    <label className="control-label">Model<input disabled={name==="cloudflare"||choice.capability==="video"} aria-label="Provider model" value={model} onChange={e=>setModel(e.target.value)}/></label>
 
-    {name!=="local_sd"&&<label className="control-label">{choice.capability==="image"?"API key (re-enter to save)":"Service token"}<input aria-label="Provider API key" type="password" autoComplete="off" value={key} onChange={e=>setKey(e.target.value)}/></label>}
-    <button className="btn btn-primary" disabled={busy||(name!=="local_sd"&&!key.trim())} onClick={save}>{busy?"Saving…":"Save provider"}</button></fieldset>
+    {name!=="local_sd"&&name!=="local_comfy"&&<label className="control-label">{choice.capability==="image"?"API key (re-enter to save)":"Service token"}<input aria-label="Provider API key" type="password" autoComplete="off" value={key} onChange={e=>setKey(e.target.value)}/></label>}
+    <button className="btn btn-primary" disabled={busy||(name!=="local_sd"&&name!=="local_comfy"&&!key.trim())} onClick={save}>{busy?"Saving…":"Save provider"}</button></fieldset>
     {message&&<p role="status">{message}</p>}<button className="btn" onClick={onClose}>Close</button>
   </div></div>;
 }
@@ -929,6 +936,24 @@ export default function App() {
       await api.addShot(scene.id,asset.id);setSelectedId(scene.id);
     }
   }
+  async function addGeneratedVideoToTimeline(assetId:string,placement:'after'|'inside'){
+    if(!project)throw new Error('Open a project before adding generated video.');
+    const asset=await api.getAsset(assetId);const target=selected?.id||null;
+    if(placement==='inside'&&target)await placeVisuals(target,[asset]);
+    else if(placement==='after'&&target)await placeVisuals(null,[asset],{after:target});
+    else await addPoolAssets([asset]);
+    const latest=await api.getProject(project.id);projectRef.current=latest;setProject(latest);setMediaVersion(v=>v+1);setLibraryTab('Scenes');
+    window.dispatchEvent(new Event('sceneforge-media-changed'));
+    const inserted=latest.scenes.find(s=>s.shots.some(shot=>shot.asset_id===assetId));
+    if(inserted)setSelectedId(inserted.id);
+    return inserted?.id;
+  }
+  async function captionGeneratedScene(sceneId:string){
+    if(!project)throw new Error('Open a project before generating captions.');
+    await api.autoCaptions(sceneId,{provider:'auto'});
+    const latest=await api.getProject(project.id);projectRef.current=latest;setProject(latest);setSelectedId(sceneId);
+    window.dispatchEvent(new CustomEvent('sceneforge-open-tab',{detail:{sceneId,tab:'Text'}}));
+  }
   async function dropFilesOnTimeline(sceneId:string|null,files:File[],insert?:{before?:string;after?:string}){
     if(!project)return;
     const plan=planFileDrop(files,!!sceneId);
@@ -985,6 +1010,7 @@ export default function App() {
   const [hoverTx, setHoverTx] = useState<string|null>(null);   // transition previewed on the picture
   const [multi, setMulti] = useState<string[]>([]);            // several parts selected on the timeline
   const [exportOpen, setExportOpen] = useState(false);
+  const [videoGenOpen,setVideoGenOpen]=useState(false);
   const [projectMode, setProjectMode] = useState<'new'|'open'>('open');
   /** Back to the project list (to start a new project or open another), after saves finish. */
   async function goToProjects(mode:'new'|'open'){
@@ -1124,16 +1150,17 @@ export default function App() {
       <button className="brand brand-button" title="Back to projects" disabled={dirty||busy||exporting} onClick={()=>action(async()=>{setProjects(await api.listProjects()); projectRef.current=null; setProject(null);})}><span className="brand-mark"><Film size={19}/></span><span>SceneForge</span></button>
       <span className="toolbar-divider"/>
       <div className="project-identity"><input aria-label="Project name" value={titleDraft} onChange={e=>{setTitleDraft(e.target.value); setStates(prev=>({...prev,title:"Unsaved changes"}));}} onBlur={()=>void saveTitle()}/><span role="status" className={`save-status ${failed ? "save-error" : ""}`}>{busy ? "Saving…" : status}</span></div>
-      <div className="toolbar-end"><select aria-label="Project aspect ratio" value={project.aspect} disabled={busy||exporting} onChange={e=>action(async()=>{await api.updateProject(project.id,{aspect:e.target.value}); await refresh();})}>{ASPECTS.map(a=><option key={a}>{a}</option>)}</select><button className="icon-btn" title="Provider settings" aria-label="Provider settings" onClick={()=>setSettingsOpen(true)}><Settings size={18}/></button><button className="btn btn-primary" disabled={exporting||dirty||busy||!project.scenes.length} onClick={()=>setExportOpen(true)}><Upload size={15}/>{exporting ? `Exporting ${Math.round(exportJob?.progress||0)}%` : "Export video"}</button></div>
+      <div className="toolbar-end"><select aria-label="Project aspect ratio" value={project.aspect} disabled={busy||exporting} onChange={e=>action(async()=>{await api.updateProject(project.id,{aspect:e.target.value}); await refresh();})}>{ASPECTS.map(a=><option key={a}>{a}</option>)}</select><button className="icon-btn" title="Provider settings" aria-label="Provider settings" onClick={()=>setSettingsOpen(true)}><Settings size={18}/></button><button className="btn video-gen-launch" disabled={busy||exporting} onClick={()=>setVideoGenOpen(true)}><Clapperboard size={15}/>Generate video</button><button className="btn btn-primary" disabled={exporting||dirty||busy||!project.scenes.length} onClick={()=>setExportOpen(true)}><Upload size={15}/>{exporting ? `Exporting ${Math.round(exportJob?.progress||0)}%` : "Export video"}</button></div>
     </header>
     {titleCard&&<TitleDesigner width={project.width} height={project.height} busy={busy} onClose={()=>setTitleCard(false)} onCreate={d=>void addTitleCard(d)}/>}
     {project&&multi.length>1&&selected&&<BatchBar source={selected} scenes={project.scenes.filter(x=>multi.includes(x.id))} onClear={()=>setMulti([])} onDone={()=>void refresh()}/>}
     {exportOpen&&project&&<ExportDialog project={project} onClose={()=>setExportOpen(false)} onExport={settings=>{setExportOpen(false);void renderFullVideo(settings);}}/>}
+    {videoGenOpen&&project&&<VideoGenerationPanel project={project} selectedSceneId={selected?.id||null} onClose={()=>setVideoGenOpen(false)} onOpenSettings={()=>setSettingsOpen(true)} onAdd={addGeneratedVideoToTimeline} onCaptions={captionGeneratedScene}/>}
     {exporting&&exportJob&&<ProgressCard floating title="Exporting video" stage={exportJob.stage} progress={exportJob.progress||0} status={exportJob.status} onCancel={()=>void api.cancelJob(exportJob.id).catch(()=>{})}/>}
     {(error||exportJob?.status==="failed")&&<div role="alert" className="error-box"><details><summary>Operation failed — show details</summary><pre>{error||exportJob?.error}</pre></details><button className="text-btn" onClick={()=>{setError(null);if(exportJob?.status==='failed')setExportJobId(null);}}>Dismiss</button></div>}
     <div className="editor-menubar">
       {['File','AI Engines','Edit','View','Help'].map(name=><div className="editor-menu" key={name}><button aria-expanded={menu===name} onClick={()=>{if(name==='AI Engines'){setInfoPanel({panel:'ai'});setMenu('');}else setMenu(menu===name?'':name);}}>{name}</button>{menu===name&&<div className="editor-menu-items">
-       {name==='File'&&<><button disabled={busy||exporting} onClick={()=>{setMenu('');void goToProjects('new');}}>New project… <kbd>Ctrl+N</kbd></button><button disabled={busy||exporting} onClick={()=>{setMenu('');void goToProjects('open');}}>Open project… <kbd>Ctrl+O</kbd></button><button disabled={busy||exporting} onClick={()=>{setMenu('');void addPart();}}>New scene</button><button disabled={busy||exporting} onClick={()=>importRef.current?.click()}>Import files to Media Pool…</button><button disabled={busy||exporting} onClick={()=>folderRef.current?.click()}>Import folder to Media Pool…</button><button disabled={!selected||busy||exporting} onClick={()=>audioImportRef.current?.click()}>Import audio to selected scene…</button><button onClick={()=>{setMenu('');setSettingsOpen(true);}}>Provider settings…</button></>}
+       {name==='File'&&<><button disabled={busy||exporting} onClick={()=>{setMenu('');void goToProjects('new');}}>New project… <kbd>Ctrl+N</kbd></button><button disabled={busy||exporting} onClick={()=>{setMenu('');void goToProjects('open');}}>Open project… <kbd>Ctrl+O</kbd></button><button disabled={busy||exporting} onClick={()=>{setMenu('');void addPart();}}>New scene</button><button disabled={busy||exporting} onClick={()=>{setMenu('');setVideoGenOpen(true);}}>Generate video from text…</button><button disabled={busy||exporting} onClick={()=>importRef.current?.click()}>Import files to Media Pool…</button><button disabled={busy||exporting} onClick={()=>folderRef.current?.click()}>Import folder to Media Pool…</button><button disabled={!selected||busy||exporting} onClick={()=>audioImportRef.current?.click()}>Import audio to selected scene…</button><button onClick={()=>{setMenu('');setSettingsOpen(true);}}>Provider settings…</button></>}
        {name==='Edit'&&<><button disabled={!history.length||busy||dirty||exporting} onClick={()=>{setMenu('');void undoTimeline();}}>Undo {history[history.length-1]?.label||'timeline edit'}</button><button disabled={!future.length||busy||dirty||exporting} onClick={()=>{setMenu('');void redoTimeline();}}>Redo {future[future.length-1]?.label||'timeline edit'}</button><button disabled={!selected||busy||exporting} onClick={()=>{setMenu('');if(selected)void deleteScene(selected.id);}}>Delete selected scene…</button></>}
        {name==='View'&&<><button onClick={()=>{setSidebar(!sidebar);setMenu('');}}>Toggle scene library</button><button onClick={()=>{document.querySelector('.studio-shell')?.classList.toggle('inspector-hidden');setMenu('');}}>Toggle inspector</button><button onClick={()=>{setExportPanel(!exportPanel);setMenu('');}}>Show / hide export result</button><button onClick={()=>{setMenu('');if(document.fullscreenElement)void document.exitFullscreen();else void document.documentElement.requestFullscreen();}}>Fullscreen / restore</button></>}
        {name==='Help'&&<button onClick={()=>{setMenu('');setInfoPanel({panel:'about'});}}>About SceneForge</button>}
@@ -1160,7 +1187,7 @@ export default function App() {
       </main>
     </div>
     <ProjectTimeline notice={importStatus} onDropFiles={(id,files,insert)=>void dropFilesOnTimeline(id,files,insert)} onDropAssets={(id,assets,insert)=>void dropAssetsOnTimeline(id,assets,insert)} onDuration={resizeDuration} onTrimShot={(sceneId,shotId,sourceIn,sourceOut)=>{const shot=project.scenes.find(s=>s.id===sceneId)?.shots.find(x=>x.id===shotId);if(shot){const before={source_in_ms:shot.source_in_ms,source_out_ms:shot.source_out_ms};void record("trim video clip",()=>api.updateShot(shotId,before),()=>api.updateShot(shotId,{source_in_ms:sourceIn,source_out_ms:sourceOut}));}}} onRender={()=>void renderFullVideo()} exportScenes={exportScenes} exportAsset={exportJob?.status==="succeeded"?exportJob.artifact_asset_id:null} project={project} selectedId={selected?.id||""} disabled={busy||exporting} onSelect={setSelectedId} onAdd={addPart} multi={multi} onMulti={(id,mode)=>{if(!project)return;setMulti(m=>{if(mode==='clear')return [];const base=m.length?m:(selected?[selected.id]:[]);if(mode==='toggle')return base.includes(id)?base.filter(x=>x!==id):[...base,id];const ids=project.scenes.map(x=>x.id),a=ids.indexOf(selected?.id||id),b=ids.indexOf(id);return ids.slice(Math.min(a,b),Math.max(a,b)+1);});}} clipboard={clip} onClipboard={c=>{setClip(c);setImportStatus(c.kind==='scene'?`Copied scene “${c.label}”. Select a scene and press Ctrl+V (or right-click → Paste) to paste it after that scene.`:`Copied ${c.label}. Select another scene's narration and press Ctrl+V to paste.`);}} onDuplicate={id=>void duplicateScene(id)} onPaste={id=>void pasteClip(id)} onReorder={ids=>record('scene order',()=>api.reorderScenes(project.id,project.scenes.map(s=>s.id)),()=>api.reorderScenes(project.id,ids))} onUpdate={(id,patch)=>record('transition',()=>api.updateScene(id,{transition_in:project.scenes.find(s=>s.id===id)!.transition_in_json}),()=>api.updateScene(id,patch))} onDelete={()=>selected&&void deleteScene(selected.id)} onAudio={()=>audioImportRef.current?.click()} onRemoveAudio={()=>selected&&void removeNarration(selected)} onRemoveSceneAudio={id=>{const s=project.scenes.find(x=>x.id===id);if(s)void removeNarration(s);}} onUndo={undoTimeline} onRedo={redoTimeline} canUndo={!!history.length} canRedo={!!future.length} onSplit={(at,baked)=>{if(!selected)return;const snapshot=selected;let rightId="";void record("split scene",async()=>{if(rightId)await api.deleteScene(rightId);await api.restoreScene(snapshot.id,snapshot);setEditorEpoch(v=>v+1);setSelectedId(snapshot.id);},async()=>{const right=await api.splitScene(snapshot.id,at,baked);rightId=right.id;setEditorEpoch(v=>v+1);setSelectedId(right.id);});}}/>
-    {settingsOpen&&<SettingsPanel onClose={()=>setSettingsOpen(false)}/>}
+    {settingsOpen&&<SettingsPanel priority={videoGenOpen} onClose={()=>setSettingsOpen(false)}/>}
 
     {infoPanel?.panel==='ai'&&<AIEnginesPanel section={infoPanel.section} onClose={()=>setInfoPanel(null)} onOpenSettings={()=>{setInfoPanel(null);setSettingsOpen(true);}}/>}
     {infoPanel?.panel==='about'&&<AboutPanel onClose={()=>setInfoPanel(null)}/>}

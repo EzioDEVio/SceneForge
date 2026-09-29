@@ -1,8 +1,8 @@
 {
   "name": "sceneforge-desktop",
-  "version": "0.6.0-wip.10",
+  "version": "0.7.0-wip.1",
   "private": true,
-  "description": "SceneForge Studio \u2014 open-source editor for narrated documentary videos",
+  "description": "SceneForge Studio — open-source editor for narrated documentary videos",
   "author": {
     "name": "EzioDEVio",
     "url": "https://github.com/EzioDEVio/SceneForge"

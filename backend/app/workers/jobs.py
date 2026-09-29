@@ -249,6 +249,105 @@ def _run_export_job(job_id: str, project_id: str, selected_ids: list[str] | None
             _contexts.pop(job_id, None)
 
 
+def _run_video_generation_job(job_id: str, project_id: str, request_data: dict) -> None:
+    """Generate a video off the API thread, validate it and add it to Media Pool."""
+    import os
+    import uuid
+    from pathlib import Path
+
+    from app.config import MEDIA_DIR
+    from app.db.models import ProviderProfile
+    from app.providers import video_generation as video
+    from app.render.ffmpeg_utils import FFmpegError, probe
+    from app.render.renderer import _content_hash_file
+    from app.security.secrets import reveal
+
+    ctx = RenderContext()
+    with _lock:
+        _contexts[job_id] = ctx
+    _emit(job_id, {"status": JobStatus.RUNNING, "stage": "connecting to the selected video model", "progress": 0})
+    dest_path = None
+    try:
+        with session_scope() as db:
+            project = db.get(Project, project_id)
+            profile = db.query(ProviderProfile).filter(
+                ProviderProfile.capability == "video", ProviderProfile.name == request_data["provider"]
+            ).first()
+            if not project or not profile:
+                raise video.VideoGenerationError("The project or saved video provider could not be found.")
+            model, width, height = video.validate_request(request_data)
+            try:
+                key = reveal(profile.secret_ref or "") if request_data["provider"] != "local_comfy" else ""
+            except Exception as exc:
+                raise video.VideoGenerationError("The saved provider key is unavailable. Re-enter it in Settings → Providers.") from exc
+            base_url = profile.base_url
+            project_title = project.title
+            db.expunge_all()
+
+        def stage(name: str, pct: int = 0) -> None:
+            _emit(job_id, {"stage": name, "progress": pct})
+
+        payload, creator = video.generate_video_bytes(
+            provider=request_data["provider"], model=model, api_key=key, base_url=base_url,
+            data=request_data, width=width, height=height, stage=stage,
+            cancelled=lambda: ctx.cancel_requested,
+        )
+        if ctx.cancel_requested:
+            raise video.VideoGenerationCancelled("Generation cancelled.")
+        if len(payload) < 1024:
+            raise video.VideoGenerationError("The provider returned an empty or incomplete video file.")
+        # MPEG-4/QuickTime containers advertise `ftyp` at offset four; WebM
+        # starts with the EBML signature. Do not trust a remote filename.
+        ext, mime = ("webm", "video/webm") if payload.startswith(b"\x1a\x45\xdf\xa3") else ("mp4", "video/mp4")
+        project_dir = Path(MEDIA_DIR) / project_id
+        project_dir.mkdir(parents=True, exist_ok=True)
+        dest_path = project_dir / f"generated_video_{uuid.uuid4().hex}.{ext}"
+        dest_path.write_bytes(payload)
+        try:
+            info = probe(str(dest_path))
+        except FFmpegError as exc:
+            raise video.VideoGenerationError("The provider returned a video SceneForge could not decode. Try another model or lower resolution.") from exc
+        if not info.has_video or not info.duration_ms:
+            raise video.VideoGenerationError("The provider result did not contain a playable video stream.")
+
+        model = video.model_for(request_data["provider"], request_data["model"])
+        estimate = video.estimate_cost(model, int(request_data["duration_seconds"]), request_data["resolution"])
+        metadata = {"provider": request_data["provider"], "model": model["model"], "model_id": model["id"],
+                    "prompt": request_data["prompt"], "negative_prompt": request_data.get("negative_prompt", ""),
+                    "aspect_ratio": request_data["aspect_ratio"], "width": info.width or width,
+                    "height": info.height or height, "duration_seconds": round(info.duration_ms / 1000, 3),
+                    "estimated_cost": estimate, "native_audio": info.has_audio,
+                    "model_native_audio": model["native_audio"]}
+        with session_scope() as db:
+            asset = Asset(
+                project_id=project_id, type=AssetType.VIDEO,
+                content_hash=_content_hash_file(str(dest_path)),
+                storage_key=os.path.relpath(dest_path, MEDIA_DIR), mime=mime,
+                original_filename=_safe_download_name(model["name"] + " " + project_title) + "." + ext,
+                duration_ms=info.duration_ms, width=info.width, height=info.height,
+                origin=AssetOrigin.GENERATED, creator=creator,
+                license_note="Generated video · review the selected model's terms before commercial use",
+                generation_metadata_json=metadata,
+            )
+            db.add(asset)
+            db.flush()
+            job = db.get(RenderJob, job_id)
+            job.artifact_asset_id = asset.id
+        _emit(job_id, {"status": JobStatus.SUCCEEDED, "stage": "video ready in Media Pool", "progress": 100})
+    except Exception as exc:  # noqa: BLE001
+        if dest_path:
+            try:
+                Path(dest_path).unlink(missing_ok=True)
+            except OSError:
+                pass
+        status = JobStatus.CANCELLED if ctx.cancel_requested or isinstance(exc, video.VideoGenerationCancelled) else JobStatus.FAILED
+        _emit(job_id, {"status": status, "stage": "cancelled" if status == JobStatus.CANCELLED else "video generation failed",
+                       "error": str(exc) if isinstance(exc, video.VideoGenerationError) else f"Video generation failed: {exc}\n{traceback.format_exc()[-1800:]}"})
+    finally:
+        with _lock:
+            _contexts.pop(job_id, None)
+
+
 def start_part_job(job_id: str, project_id: str, scene_id: str) -> None:
     t = threading.Thread(target=_run_part_job, args=(job_id, project_id, scene_id), daemon=True)
     t.start()
@@ -256,4 +355,9 @@ def start_part_job(job_id: str, project_id: str, scene_id: str) -> None:
 
 def start_export_job(job_id: str, project_id: str, selected_ids: list[str] | None = None, settings: dict | None = None) -> None:
     t = threading.Thread(target=_run_export_job, args=(job_id, project_id, selected_ids, settings), daemon=True)
+    t.start()
+
+
+def start_video_generation_job(job_id: str, project_id: str, request_data: dict) -> None:
+    t = threading.Thread(target=_run_video_generation_job, args=(job_id, project_id, request_data), daemon=True)
     t.start()

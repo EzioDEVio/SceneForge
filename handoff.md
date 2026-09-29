@@ -1,15 +1,63 @@
-# SceneForge 0.6.0 WIP — Session Handoff
+# SceneForge 0.7.0 WIP — Session Handoff
 
-**Prepared:** 2026-09-28
-**Current source:** branch `chatgpt/0.6.0-wip.10` in `EzioDEVio/SceneForge`
-**Current working version:** `0.6.0-wip.10` (unreleased source snapshot)
+**Prepared:** 2026-09-29
+**Current source:** branch `chatgpt/0.7.0-video-generation` in `EzioDEVio/SceneForge`
+**Current working version:** `0.7.0-wip.1` (unreleased source snapshot)
+**Base:** preserved `chatgpt/0.6.0-wip.10` editor branch
 **Published baseline:** GitHub release `0.5.3`
 
 ## Purpose and handling
 
-This handoff records the review, troubleshooting, repairs, and feature work discussed in this session. It distinguishes existing release behavior from features already present in the submitted 0.6.0 work and from changes made to the current reviewed source. The 0.5.3 source remains the published baseline. GitHub currently has the published 0.5.3 history; the locally tested Claude 0.6.0 WIP commits had not been pushed. The work is published as a Claude-baseline snapshot branch followed by a separate ChatGPT-assisted commit/branch. The wip.10 source is not a stable release.
+This handoff preserves the earlier 0.5.3/0.6.0 review below and records the new 0.7.0 text-to-video milestone first. The 0.5.3 published release remains part of the product history; 0.6.0-wip.10 is the source baseline for this additive branch. The 0.7.0-wip.1 branch is not a stable release.
 
 Reviewed inputs in this workspace include the 0.5.3 source ZIP, the original 0.6.0 WIP ZIP, reviewed wip.2–wip.6 snapshots, their READMEs and handoffs, the SceneForge session handoff, chat notes, and the user screenshots. The 0.5.3 technical handoff predates the 0.5.3/0.6.0 work and should not be treated as a complete description of the present build.
+
+## Current 0.7.0-wip.1 additions
+
+- Added a separate text-to-video workspace while preserving the existing AI Engines and Help menus, editor tabs, scenes, Media Pool, timeline, captions, effects and overlays.
+- Added a curated local catalog for LTX-2.5 Fast, Wan 2.1 T2V 1.3B, Wan 2.2 TI2V 5B, Wan 2.2 T2V A14B, and compatible custom ComfyUI workflows.
+- Added paid integrations for Google Veo 3.1 Lite/Fast/Standard and Runway Gen-4.5/WAN 3.0. Rates are shown per second/per resolution and the selected clip receives a total estimate. Rates were checked 2026-09-28; provider billing can change. Cloud starts require explicit cost confirmation checked by both UI and API.
+- Added model-specific ratio, duration and resolution validation; local custom dimensions (multiples of 16); API workflow import; local ComfyUI status; loopback-only server access; background job progress/cancellation; and output media validation.
+- Generated output becomes a normal project Media Pool asset. The user can add it to the selected scene or create a timeline scene. The caption action uses existing local speech transcription (scene narration when present, otherwise video sound) and opens Text for timed caption edits and styles. Existing Clip Audio, Effects and Overlays remain available.
+- Local ComfyUI and model weights/workflows are installed separately and are not bundled. A visible notice explains that custom nodes run inside ComfyUI with the user's permissions. Paid provider API keys use the OS credential store.
+- Added UI interaction tests for local custom-size generation → asset insertion → caption handoff and cloud rate display → explicit paid confirmation.
+- The Release workflow is configured to create temporary Windows, Linux and macOS build artifacts after branch push. A branch build is not a GitHub release; no stable tag is created by this milestone.
+
+### Current verification and remaining acceptance tests
+
+- `npm run build` passed (TypeScript and Vite; Vite retains a bundle-size advisory above 500 kB).
+- `npm test` passed: 191 existing editor component checks, 19 unit checks, 2 text-to-video panel checks and 6 share checks; provider APIs are mocked.
+- `npm test` in `desktop/` passed: 14 lifecycle/update/storage checks.
+- `python -m compileall -q backend/app tests/integration/test_video_generation.py` and `git diff --check` passed.
+- The new FastAPI integration test is wired into CI but could not run locally: backend packages are not present and package downloads were unavailable in this workspace.
+- No real local or paid video has been generated. Acceptance needs ComfyUI with model-specific weights and an API workflow, plus Google/Runway credentials and billing for cloud tests. Verify result media/audio, captions, timeline insertion, rendering and export on target operating systems.
+- Do not describe 0.7.0-wip.1 as a stable public release until CI and real-provider/installer acceptance tests pass.
+
+### Provider catalog, published rates and setup
+
+Rates shown by the app, checked 2026-09-28:
+
+| Provider/model | Published price |
+|---|---|
+| Google Veo 3.1 Lite | $0.05/sec at 720p; $0.08/sec at 1080p |
+| Google Veo 3.1 Fast | $0.10/sec at 720p; $0.12/sec at 1080p; $0.30/sec at 4K |
+| Google Veo 3.1 Standard | $0.40/sec at 720p and 1080p; $0.60/sec at 4K |
+| Runway Gen-4.5 | $0.12/sec (12 credits/sec; Runway lists a credit at $0.01) |
+| Runway WAN 3.0 | $0.05/sec at 480p; $0.10/sec at 720p; $0.20/sec at 1080p |
+| Local ComfyUI choices | No provider API fee; user's hardware, electricity, storage and licenses still apply |
+
+The app and [README.md](README.md) link to official prices and setup pages. Estimates can differ from final provider bills, taxes, regional billing or account credits. Local weights are not included: users run ComfyUI on loopback, install the chosen model and dependencies, export with **Save (API Format)**, and import that JSON. Common prompt/size/frame-count/seed inputs are mapped; specialized graphs may need adjustment. Cloud output sizes, ratios and durations are limited to the chosen model's supported options; local custom width/height must be multiples of 16.
+
+### Files changed for 0.7.0-wip.1
+
+- Backend: `backend/app/providers/video_generation.py`, `backend/app/api/video_generation.py`, `backend/app/domain/schemas.py`, `backend/app/api/providers.py`, `backend/app/workers/jobs.py`, `backend/app/main.py`.
+- Frontend: `frontend/src/VideoGenerationPanel.tsx`, `frontend/src/App.tsx`, `frontend/src/api.ts`, `frontend/src/styles.css`; UI regression test: `frontend/tests/video_generation.mjs`.
+- Build metadata and CI: `desktop/package.json`, `desktop/package-lock.json`, `.github/workflows/checks.yml`, `.github/workflows/release.yml`.
+- Notes: `README.md`, `desktop/RELEASE_NOTES.md`, `docs/REVIEW_0.7.0_VIDEO_GENERATION.md`.
+
+---
+
+## Earlier 0.6.0 handoff and history
 
 ## User requirements carried forward
 

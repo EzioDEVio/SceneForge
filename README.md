@@ -42,7 +42,9 @@ Get the installer for your system from the **[latest release](https://github.com
 
 **Share and overlays** — after export, a local-first Share dialog offers download, file-location access in the desktop app, and upload steps for YouTube, TikTok, Instagram and Facebook. Direct account uploads are not included. Overlays also include a searchable, categorized emoji/sticker picker; selected symbols use the standard image-overlay editor and render pipeline.
 
-The features above include the **0.6.0 work in progress** from source. The latest published installer may not include them yet; check the release notes for the version you download.
+**Text-to-video (0.7.0 WIP)** — a separate Generate Video workspace lets you choose a local ComfyUI model or a paid API model, see per-second list rates and a duration/quality estimate, set a supported aspect ratio or local custom dimensions, and generate a clip. The result becomes a normal project asset that can be added to a new timeline scene or the selected scene. From there, use existing clip audio controls, local speech captions, caption styles, effects and overlays. Cloud requests require an explicit cost confirmation in the UI and backend.
+
+The features above include the **0.6.0 and 0.7.0 work in progress** from source. The latest published installer may not include them yet; check the release notes for the version you download.
 
 ## AI providers
 
@@ -53,6 +55,25 @@ AI is optional. You can build a complete video from your own photos, clips and r
 | Images | OpenAI, Google Gemini, Cloudflare Workers AI, Hugging Face | Stable Diffusion via AUTOMATIC1111 (point SceneForge at its folder: *AI Engines* menu) |
 | Voice | ElevenLabs (with exact word timing), Together AI | Chatterbox and Kokoro (separate services); espeak is an optional basic fallback with its own install |
 | Captions | OpenAI Whisper or ElevenLabs Scribe | Faster-Whisper (model download required once) |
+| Text-to-video | Google Veo 3.1 and Runway Gen-4.5 / WAN 3.0 APIs | ComfyUI workflows for LTX-2.5, Wan 2.1, Wan 2.2 and compatible custom workflows |
+
+### Text-to-video model choices and prices
+
+The 0.7.0 WIP catalog below shows the provider's published USD rate per generated second and estimates the selected clip's cost before a request starts. Prices were checked on **2026-09-28** and can change; provider billing, taxes, account credits, retries and regional terms can affect the final charge. Local generation has no API fee, but uses the user's hardware and electricity. Review each model's license before publishing or using output commercially.
+
+| Provider and model | Published price | Current output options in SceneForge |
+|---|---:|---|
+| Google Veo 3.1 Lite | $0.05/sec at 720p; $0.08/sec at 1080p | 4, 6 or 8 sec; 16:9 or 9:16; 1080p only at 8 sec |
+| Google Veo 3.1 Fast | $0.10/sec at 720p; $0.12/sec at 1080p; $0.30/sec at 4K | 4, 6 or 8 sec; 16:9 or 9:16; 1080p/4K only at 8 sec |
+| Google Veo 3.1 Standard | $0.40/sec at 720p or 1080p; $0.60/sec at 4K | 4, 6 or 8 sec; 16:9 or 9:16; 1080p/4K only at 8 sec |
+| Runway Gen-4.5 | $0.12/sec (12 credits/sec at $0.01 per credit) | 2–10 sec at 720p; 16:9 or 9:16 |
+| Runway WAN 3.0 | $0.05/sec at 480p; $0.10/sec at 720p; $0.20/sec at 1080p | 2–30 sec; 16:9 or 9:16; native audio |
+
+Official price references: [Google Veo pricing](https://ai.google.dev/gemini-api/docs/pricing#veo), [Google Veo API options](https://ai.google.dev/gemini-api/docs/veo), [Runway API pricing](https://docs.dev.runwayml.com/guides/pricing/), [Runway API changelog](https://docs.dev.runwayml.com/api-details/api_changelog/).
+
+**Local model catalog:** LTX-2.5 Fast, Wan 2.1 T2V 1.3B, Wan 2.2 TI2V 5B, Wan 2.2 T2V A14B, plus a Custom ComfyUI workflow option. Models differ in quality, speed, audio, resolution and GPU needs. For example, ComfyUI's Wan 2.2 5B workflow can fit around 8 GB VRAM with native offloading; LTX-2.5 documentation lists much higher system requirements (32 GB+ VRAM, 32 GB RAM and 100 GB free disk). Those are model-specific guides, not guarantees of performance. See the [Wan 2.2 setup](https://docs.comfy.org/tutorials/video/wan/wan2_2) and [LTX ComfyUI setup](https://docs.ltx.io/open-source-model/integration-tools/comfy-ui).
+
+**Local setup:** ComfyUI, model weights, required custom nodes and API-format workflow files are installed separately; they are not bundled with SceneForge. Start ComfyUI, connect its loopback address under **Settings → Providers**, download the matching model and workflow, export with **Save (API Format)**, then import the JSON into Generate Video. Custom ComfyUI nodes execute inside ComfyUI with the user's permissions, so import workflows and nodes from sources you trust. Local custom dimensions must be multiples of 16. Cloud providers expose only their supported sizes, ratios and durations.
 
 **What installs:** Source setup needs Python, Node.js and FFmpeg. The Windows desktop installer bundles the app, private backend runtime and FFmpeg so end users do not need those tools installed separately. Optional Chatterbox/Kokoro narration servers and Stable Diffusion image generation are separate installs today; their large models are not bundled. The Whisper model downloads automatically the first time captions run. Rendering and exports use local FFmpeg; cloud features only run when you choose a provider and supply its key.
 

@@ -13,6 +13,19 @@ export type Asset = {
   height: number | null;
   duration_ms: number | null;
   origin: string;
+  creator?: string | null;
+  license_note?: string | null;
+};
+
+export type VideoModel = {
+  id:string; provider:string; provider_label:string; name:string; model:string; kind:'local'|'cloud';
+  price_per_second:number|Record<string,number>; resolutions:string[]; ratios:string[];
+  duration_min:number; duration_max:number; durations:number[]; native_audio:boolean|null;
+  requirements:string; workflow_url:string; terms_url?:string; cost_note:string; workflow_imported?:boolean;
+};
+export type VideoGenerationRequest = {
+  provider:string; model:string; prompt:string; negative_prompt?:string; aspect_ratio:string;
+  width:number; height:number; duration_seconds:number; resolution:string; seed?:number|null; confirm_paid?:boolean;
 };
 
 export type Shot = {
@@ -72,7 +85,7 @@ export type FontSettings = {
 };
 
 /** Must match BUILD_ID in backend/app/main.py. */
-export const BUILD_ID = "v0.6.0-wip.10";
+export const BUILD_ID = "v0.7.0-wip.1";
 
 export type Adjust = Partial<Record<'exposure'|'contrast'|'highlights'|'shadows'|'temperature'|'tint'|'saturation'|'vibrance'|'sharpen'|'vignette'|'grain', number>>;
 export type Look = {
@@ -290,6 +303,14 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ prompt, size, provider_id: providerId, local_options: localOptions }),
     }),
+  videoGenerationCatalog: () => req<{models:VideoModel[];prices_checked:string}>("/api/video-generation/catalog"),
+  localVideoStatus: () => req<{ready:boolean;message:string}>("/api/video-generation/local/status"),
+  importLocalVideoWorkflow: (modelId:string,file:File) => {
+    const form=new FormData();form.append('file',file);
+    return req<{ok:boolean;model_id:string;node_count:number}>("/api/video-generation/local/workflows/"+encodeURIComponent(modelId),{method:'POST',body:form});
+  },
+  generateVideo: (projectId:string, body:VideoGenerationRequest) =>
+    req<{job_id:string}>("/api/video-generation/projects/"+projectId+"/generate",{method:'POST',body:JSON.stringify(body)}),
 };
 
 export function subscribeJob(jobId: string, onEvent: (e: any) => void): () => void {

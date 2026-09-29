@@ -14,10 +14,16 @@ router = APIRouter(prefix="/api/providers", tags=["providers"])
 SUPPORTED = {
     "image": {"openai", "gemini", "cloudflare", "huggingface", "together", "local_sd"},
     "speech": {"kokoro", "chatterbox", "elevenlabs"},
+    "video": {"local_comfy", "google_veo", "runway"},
 }
 
 
 def _to_out(p: ProviderProfile) -> schemas.ProviderProfileOut:
+    if p.capability == "video" and p.name == "local_comfy":
+        return schemas.ProviderProfileOut(
+            id=p.id, capability=p.capability, name=p.name, model=p.model,
+            base_url=p.base_url, masked_key="Local engine · no API key", configured=bool(p.base_url),
+        )
     configured = True
     try:
         key = reveal(p.secret_ref or "")
@@ -44,6 +50,8 @@ def upsert_provider(body: schemas.ProviderProfileCreate, db: Session = Depends(g
         raise HTTPException(400, f"Unsupported provider '{body.name}' for {body.capability}. Supported: {list(SUPPORTED[body.capability])}")
     if body.capability == "image" and body.name != "local_sd" and not body.api_key.strip():
         raise HTTPException(400, "API key is required.")
+    if body.capability == "video" and body.name != "local_comfy" and not body.api_key.strip() and not db.query(ProviderProfile).filter(ProviderProfile.capability == "video", ProviderProfile.name == body.name).first():
+        raise HTTPException(400, "API key is required.")
 
     if body.name == "cloudflare":
         import re
@@ -54,6 +62,11 @@ def upsert_provider(body: schemas.ProviderProfileCreate, db: Session = Depends(g
         from app.providers.image_options import local_url
         try: body.base_url = local_url(body.base_url)
         except ValueError as exc: raise HTTPException(400, str(exc))
+    if body.name == "local_comfy":
+        from app.providers.video_generation import VideoGenerationError, validate_local_comfy_url
+        try: body.base_url = validate_local_comfy_url(body.base_url)
+        except VideoGenerationError as exc: raise HTTPException(400, str(exc))
+        body.model = "ComfyUI local video engine"
     if body.name == 'elevenlabs':
         if not body.api_key.strip(): raise HTTPException(400, 'ElevenLabs API key is required.')
         body.base_url = 'https://api.elevenlabs.io/v1'
@@ -65,7 +78,7 @@ def upsert_provider(body: schemas.ProviderProfileCreate, db: Session = Depends(g
     existing = db.query(ProviderProfile).filter(ProviderProfile.capability == body.capability, ProviderProfile.name == body.name).first()
     old_ref = existing.secret_ref if existing else ''
     try:
-        protected = obscure(body.api_key) if body.api_key.strip() or not existing else old_ref
+        protected = ("" if body.name == "local_comfy" else obscure(body.api_key)) if body.api_key.strip() or not existing or body.name == "local_comfy" else old_ref
     except ValueError as exc:
         raise HTTPException(503, str(exc))
     if existing:
@@ -112,6 +125,8 @@ def delete_profile(profile_id: str, db: Session = Depends(get_db)):
 
 
 def _forget_unshared(profile, db):
+    if not profile.secret_ref:
+        return
     if not db.query(ProviderProfile).filter(ProviderProfile.id != profile.id, ProviderProfile.secret_ref == profile.secret_ref).first():
         try: forget(profile.secret_ref or '')
         except ValueError as exc: raise HTTPException(503, str(exc))

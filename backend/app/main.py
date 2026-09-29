@@ -9,7 +9,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
-from app.api import assets, images, projects, providers, render, scenes, voice, local_speech
+from app.api import assets, images, projects, providers, render, scenes, voice, local_speech, video_generation
 from app.db.database import init_db, SessionLocal
 from app.db.models import ProviderProfile
 from app.security.secrets import migrate_credentials
@@ -51,18 +51,19 @@ app.include_router(render.router)
 app.include_router(providers.router)
 app.include_router(images.router)
 app.include_router(local_speech.router)
+app.include_router(video_generation.router)
 
 
 # Must match BUILD_ID in frontend/src/api.ts. Bump on any API change so a
 # new interface connected to an old backend (e.g. a still-running old
 # start.bat window) shows "Backend update required" instead of silently
 # losing settings the old backend does not know.
-BUILD_ID = "v0.6.0-wip.10"
+BUILD_ID = "v0.7.0-wip.1"
 
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "build": BUILD_ID, "credential_warning": 'Some saved credentials could not be secured. Unlock your OS credential store, restart, or re-enter the keys in Settings.' if getattr(app.state,'credential_migration_failures',0) else '', "features": ["local_speech", "combined_effects"]}
+    return {"status": "ok", "build": BUILD_ID, "credential_warning": 'Some saved credentials could not be secured. Unlock your OS credential store, restart, or re-enter the keys in Settings.' if getattr(app.state,'credential_migration_failures',0) else '', "features": ["local_speech", "combined_effects", "text_to_video"]}
 
 
 @app.get('/api/close-status')

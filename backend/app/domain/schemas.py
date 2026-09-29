@@ -257,6 +257,20 @@ class GenerateImageRequest(BaseModel):
     provider_id: str | None = None
 
 
+class GenerateVideoRequest(BaseModel):
+    provider: str = Field(pattern=r"^(local_comfy|google_veo|runway)$")
+    model: str = Field(min_length=2, max_length=80)
+    prompt: str = Field(min_length=1, max_length=5000)
+    negative_prompt: str = Field(default="", max_length=1000)
+    aspect_ratio: str = Field(default="16:9", pattern=r"^(16:9|9:16|1:1|custom)$")
+    width: int = Field(default=1280, ge=256, le=4096)
+    height: int = Field(default=720, ge=256, le=4096)
+    duration_seconds: int = Field(default=5, ge=1, le=30)
+    resolution: str = Field(default="720p", pattern=r"^(480p|720p|1080p|4k)$")
+    seed: int | None = Field(default=None, ge=0, le=4294967295)
+    confirm_paid: bool = False
+
+
 class TextLayer(BaseModel):
     kind: str = Field(default="text_plus", pattern=r"^(text|text_box|text_plus)$")
     box_width: float = Field(default=80, ge=20, le=100)
