@@ -46,6 +46,7 @@ try{
   await screen.findByRole('dialog',{name:'Generate video from text'});
   await screen.findByText('ComfyUI is connected.');
   assert.ok(screen.getByText(/Workflow → Browse Workflow Templates/),'local setup names the ComfyUI template location');
+  assert.ok(screen.getByText(/File → Load/),'local setup names ComfyUI’s current workflow-load command');
   assert.ok(screen.getByText(/File → Export Workflow \(API\)/),'local setup names the API export command');
   const checksBefore=statusChecks;
   await user.click(screen.getByRole('button',{name:/Check again/}));
