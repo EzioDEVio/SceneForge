@@ -2,13 +2,17 @@
 
 **Source branch:** `chatgpt/0.7.0-video-generation`
 
-**App version:** `0.7.0-wip.1`
+**App version:** `0.7.0-wip.2`
 
 **Status:** unreleased work in progress; provider output has not been live-tested in this environment.
 
 ## What changed
 
-The app has a separate **Generate video** workspace opened from the editor toolbar or File menu. It preserves the existing SceneForge editor and its AI Engines/Help entry points. Users choose a local or cloud model, enter a prompt and optional local negative prompt, select supported quality/aspect/duration settings, see published per-second rates and the selected-job estimate, and confirm before a cloud generation request is accepted.
+The app has a separate **Generate video** workspace opened from the editor toolbar or File menu. It preserves the existing SceneForge editor and its AI Engines/Help entry points. The generator now uses a higher-contrast graphite palette, stronger field labels, and visible selected-engine/model states. Setup links call the Electron external-link bridge, so they open in the user's browser in the desktop app instead of being denied as popup windows.
+
+Users can select 1, 2 or 3 outputs for both video and image generation. Video candidates are produced as sequential independent provider requests, saved as separate Media Pool assets, displayed for preview, and the selected take is the one sent to the timeline. A fixed video seed increments per take; random seeds remain random. Hosted video cost estimates and the required consent scale by candidate count, and changing duration, quality or count clears prior consent. If a later take fails or the user cancels, already completed options remain available. Image Studio generates multiple candidates sequentially and prompts users to acknowledge that hosted image providers may bill each result; a fixed Stable Diffusion seed advances per candidate.
+
+The local setup panel gives a step-by-step ComfyUI/model/workflow guide, clickable install/model references, and an optional NVIDIA `nvidia-smi` hardware check. It recommends a model based on detected VRAM. Paid Google and Runway choices provide account/API-key steps and direct links to their provider consoles.
 
 When generation completes, SceneForge validates the returned video with FFprobe, stores it as a normal generated project asset, and previews it in the panel. The user can add it inside the selected scene or create a scene after the selected one. Existing clip sound, editing, caption, effects and overlay features are then available. **Generate captions & open Text** uses the existing local auto-caption path and closes the generator after it opens Text, so the timed caption segments can be edited.
 
@@ -26,7 +30,11 @@ When generation completes, SceneForge validates the returned video with FFprobe,
 
 All local choices expose 16:9, 9:16, 1:1 and custom dimensions. Custom width and height must each be 256–4096 pixels and divisible by 16. Local generation has no provider API charge, but uses the user's GPU/CPU, electricity, storage and the model's license. SceneForge does not bundle ComfyUI, weights, custom nodes or workflows.
 
+For an 8 GB GPU, the official ComfyUI Wan 2.2 guide says the TI2V 5B workflow should fit with native offloading; start at 480p and expect slower generation. Wan 2.1 T2V 1.3B at 480p is the lighter fallback. A desktop GeForce RTX 4090 specification lists 24 GB; NVIDIA lists 16 GB for the RTX 4090 Laptop, so an 8 GB reading may be another GPU or available memory after reservation. Check the detected model/VRAM in the generator or with `nvidia-smi` before choosing a model. These recommendations are starting points, not guarantees.
+
 The configured local endpoint accepts HTTP loopback only (`127.0.0.1`, `localhost`, or `::1`); requests bypass proxy environment variables. Imported workflows must be ComfyUI **Save (API Format)** JSON, at most 2 MB. Custom nodes execute in ComfyUI with the user's permissions; use workflows and nodes from sources the user trusts.
+
+Vast.ai remote GPU generation is not part of the current build. See the [separate feasibility note](VAST_GPU_RELAY_PROPOSAL.md) for an opt-in text-to-video benchmark, all-in cost measurements and a suggested remote-worker design.
 
 ### Paid APIs
 
@@ -42,29 +50,30 @@ Prices are USD per generated second, checked on **2026-09-28**. The generator li
 
 The settings panel stores Google/Runway keys through the existing OS credential store. The generator blocks cloud start until the chosen profile is configured and the user confirms the displayed estimate. The backend checks that confirmation as well.
 
-Official references: [Google Veo pricing](https://ai.google.dev/gemini-api/docs/pricing#veo), [Google Veo API](https://ai.google.dev/gemini-api/docs/veo), [Runway pricing](https://docs.dev.runwayml.com/guides/pricing/), [Runway API changelog](https://docs.dev.runwayml.com/api-details/api_changelog/), [Wan 2.2 ComfyUI guide](https://docs.comfy.org/tutorials/video/wan/wan2_2), [LTX ComfyUI guide](https://docs.ltx.io/open-source-model/integration-tools/comfy-ui).
+Official references: [Google Veo pricing](https://ai.google.dev/gemini-api/docs/pricing#veo), [Google Veo API](https://ai.google.dev/gemini-api/docs/veo), [Google AI Studio API keys](https://aistudio.google.com/app/apikey), [Google current key instructions](https://ai.google.dev/gemini-api/docs/api-key), [Runway pricing](https://docs.dev.runwayml.com/guides/pricing/), [Runway developer console](https://dev.runwayml.com/), [Runway API key setup and billing](https://docs.dev.runwayml.com/guides/setup/), [Runway API changelog](https://docs.dev.runwayml.com/api-details/api_changelog/), [ComfyUI install guide](https://docs.comfy.org/get_started/introduction), [Wan 2.2 ComfyUI guide](https://docs.comfy.org/tutorials/video/wan/wan2_2), [NVIDIA GPU memory support matrix](https://docs.nvidia.com/nim/visual-genai/latest/support-matrix.html), [LTX ComfyUI guide](https://docs.ltx.io/open-source-model/integration-tools/comfy-ui).
 
 ## Setup for users
 
-1. Install/start ComfyUI separately and set its local URL under **Settings → Providers**.
-2. Install the chosen model weights and matching workflow, including any required custom nodes.
-3. Open the workflow in ComfyUI and export it with **Save (API Format)**.
-4. In SceneForge, select that local model and import the workflow JSON.
-5. For cloud providers, add the provider key in **Settings → Providers**; Google and Runway may require account billing/credits.
-6. Generate and insert the clip, then use Text → Auto captions if the clip has speech/audio. Silent models can use audio added in SceneForge's Audio tools.
+1. Open the generator's **Local setup · step by step** guide and install/start ComfyUI from its official instructions.
+2. Follow the selected model's guide, download its model files, and load or download the matching workflow.
+3. Set the ComfyUI loopback address under **Settings → Providers**, then click **Check again**.
+4. Export the workflow as **Save (API Format)** and import it in SceneForge.
+5. For Google or Runway, open the generator's **Step-by-step API key setup** guide; create a key, review access/credits, and save it under **Settings → Providers**.
+6. Generate 1–3 takes, compare them, add a selected clip to the timeline, and use Text → Auto captions if it has speech/audio.
 
 Model files and separate ComfyUI requirements are not included in the Windows, macOS or Linux base installer. See README for the per-model links and version limitations.
 
 ## Implementation map
 
 - `backend/app/providers/video_generation.py`: catalog, estimates, request validation, ComfyUI workflow transforms, Google Veo and Runway API adapters.
-- `backend/app/api/video_generation.py`: model catalog, local status/workflow import, paid confirmation and job creation endpoints.
+- `backend/app/api/video_generation.py`: model catalog, local status/GPU detection/workflow import, paid confirmation and job creation endpoints.
 - `backend/app/api/providers.py`: stores local ComfyUI profile and cloud keys in the existing provider settings/credential system.
-- `backend/app/workers/jobs.py`: background provider generation, cancellation, FFprobe validation, asset record and generation metadata.
-- `frontend/src/VideoGenerationPanel.tsx`: separate interface, cost disclosure, setup, progress, preview, timeline insertion and caption handoff.
+- `backend/app/workers/jobs.py`: sequential candidate generation, cancellation, partial-result retention, FFprobe validation, asset records and per-candidate metadata.
+- `frontend/src/VideoGenerationPanel.tsx`: high-contrast interface, working external links, setup guides, VRAM recommendation, cost disclosure, candidate preview/selection, timeline insertion and caption handoff.
+- `frontend/src/App.tsx`: 1–3 candidate generation and selection in AI Image Studio.
 - `frontend/src/App.tsx`: toolbar/File menu entry point, existing timeline insertion and Text panel integration.
-- `tests/integration/test_video_generation.py`: server-side catalog, price estimate, Google/Runway/ComfyUI request adapter mocks, provider validation, loopback security, workflow mapping/import, and paid-confirmation coverage.
-- `frontend/tests/video_generation.mjs`: mocked UI checks for custom local dimensions, generated asset insertion, caption-to-Text handoff, published cloud rates and paid consent.
+- `tests/integration/test_video_generation.py`: server-side catalog, GPU guidance, price estimate, Google/Runway/ComfyUI request adapter mocks, provider validation, loopback security, workflow mapping/import, candidate-count validation, and paid-confirmation coverage.
+- `frontend/tests/video_generation.mjs`: mocked UI checks for setup-link bridge, custom dimensions, candidate selection, timeline insertion, caption handoff, scaled cloud estimate and paid consent.
 
 ## Verification in this workspace
 

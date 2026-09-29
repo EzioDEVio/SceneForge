@@ -183,10 +183,15 @@ function ImageChatDrawer({
   const [error, setError] = useState<string | null>(null);
   const [providerId,setProviderId] = useState("");
   const [size,setSize] = useState("1024x1024");
+  const [imageCandidateCount,setImageCandidateCount]=useState<1|2|3>(1);
+  const [paidImageBatchConfirmed,setPaidImageBatchConfirmed]=useState(false);
+  const [imageCandidateProgress,setImageCandidateProgress]=useState(0);
   const [sd,setSd]=useState({family:'sd15',steps:30,cfg_scale:7,seed:-1,negative_prompt:'blurry, low quality, distorted, watermark, text',hires:false});
   const [history,setHistory] = useState<{id:string;prompt:string;provider:string}[]>([]);
   useEffect(()=>{api.imageHistory(scene.id).then(setHistory).catch(()=>{});},[scene.id]);
-  const [generated, setGenerated] = useState<{ id: string } | null>(null);
+  const [generated, setGenerated] = useState<{ id: string }[]>([]);
+  const [selectedGeneratedId,setSelectedGeneratedId]=useState("");
+  const selectedGenerated=generated.find(item=>item.id===selectedGeneratedId)||generated[0]||null;
 
   useEffect(() => {
     api.listProviders().then(setProviders).catch(() => setProviders([]));
@@ -216,22 +221,29 @@ function ImageChatDrawer({
   async function generate() {
     setBusy(true);
     setError(null);
-    setGenerated(null);
+    setGenerated([]);setSelectedGeneratedId("");setImageCandidateProgress(0);
+    let completed=0;
     try {
-      const asset = await api.generateImage(scene.id, prompt, size, imageProvider?.id, imageProvider?.name==='local_sd'?sd:undefined);
-      setGenerated({ id: asset.id });
+      for(let i=0;i<imageCandidateCount;i++){
+        setImageCandidateProgress(i+1);
+        const localOptions=imageProvider?.name==='local_sd'?{...sd,seed:sd.seed<0?-1:(sd.seed+i)%4294967296}:undefined;
+        const asset=await api.generateImage(scene.id,prompt,size,imageProvider?.id,localOptions);
+        completed++;
+        setGenerated(current=>[...current,{id:asset.id}]);
+        setSelectedGeneratedId(current=>current||asset.id);
+      }
       setHistory(await api.imageHistory(scene.id));
     } catch (e: any) {
-      setError(e.message);
+      setError(completed?`Generated ${completed} of ${imageCandidateCount} images. ${e.message}`:e.message);
     } finally {
       setBusy(false);
     }
   }
 
   async function useImage() {
-    if (!generated) return;
+    if (!selectedGenerated) return;
     setBusy(true);setError(null);
-    try {await api.addShot(scene.id, generated.id);onImageAttached();onClose();}
+    try {await api.addShot(scene.id, selectedGenerated.id);onImageAttached();onClose();}
     catch(e:any){setError(e.message);}finally{setBusy(false);}
   }
 
@@ -261,9 +273,11 @@ function ImageChatDrawer({
           value={prompt}
           onChange={(e) => setPrompt(e.target.value)}
         />
+        <div className="provider-form image-candidate-controls"><label className="control-label">Number of image options<select aria-label="Number of image options" value={imageCandidateCount} onChange={e=>{setImageCandidateCount(Number(e.target.value) as 1|2|3);setPaidImageBatchConfirmed(false);}}><option value={1}>1 image</option><option value={2}>2 images</option><option value={3}>3 images</option></select></label><p>{imageCandidateCount>1?`SceneForge makes ${imageCandidateCount} separate images; select one below. ${imageProvider?.name==='local_sd'?'Each uses another local render.':'Your provider may charge for each generated image.'}`:'Generate several options to compare before adding one to this scene.'}</p></div>
+        {imageCandidateCount>1&&imageProvider?.name!=='local_sd'&&<label className="video-gen-paid-confirm image-batch-confirm"><input type="checkbox" checked={paidImageBatchConfirmed} onChange={e=>setPaidImageBatchConfirmed(e.target.checked)}/><span>I understand the provider may charge separately for each of the {imageCandidateCount} images.</span></label>}
         <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
-          <button className="btn btn-primary" onClick={generate} disabled={!configured || busy || !prompt.trim()}>
-            {busy ? <><Loader2 size={14} className="spin" /> Generating…</> : <><Wand2 size={14} /> Generate image</>}
+          <button className="btn btn-primary" onClick={()=>void generate()} disabled={!configured || busy || !prompt.trim() || (imageCandidateCount>1&&imageProvider?.name!=='local_sd'&&!paidImageBatchConfirmed)}>
+            {busy ? <><Loader2 size={14} className="spin" /> Generating {imageCandidateProgress} of {imageCandidateCount}…</> : <><Wand2 size={14} /> {imageCandidateCount>1?`Generate ${imageCandidateCount} images`:'Generate image'}</>}
           </button>
         </div>
 
@@ -279,16 +293,17 @@ function ImageChatDrawer({
 
         {error && <div className="error-box" style={{ marginTop: 14 }}>{error}</div>}
 
-        {generated && (
+        {selectedGenerated && (
           <div style={{ marginTop: 14 }}>
-            <img src={api.assetStreamUrl(generated.id)} alt="" style={{ width: "100%", borderRadius: 8 }} />
+            {generated.length>1&&<div className="image-candidate-grid" role="radiogroup" aria-label="Choose a generated image">{generated.map((item,index)=><button type="button" role="radio" aria-checked={item.id===selectedGenerated.id} className={item.id===selectedGenerated.id?'selected':''} key={item.id} onClick={()=>setSelectedGeneratedId(item.id)}><img src={api.assetStreamUrl(item.id)} alt={`Generated option ${index+1}`}/><span>Option {index+1}</span></button>)}</div>}
+            <img src={api.assetStreamUrl(selectedGenerated.id)} alt="Selected generated image preview" style={{ width: "100%", borderRadius: 8 }} />
             <button className="btn btn-primary" style={{ marginTop: 8 }} disabled={busy} onClick={useImage}>
-              <Check size={14} /> Use this image
+              <Check size={14} /> {generated.length>1?'Use selected image':'Use this image'}
             </button>
           </div>
         )}
 
-        {!!history.length&&<section><h4>Recent generations</h4><div className="generation-history">{history.map(h=><button key={h.id} title={h.prompt} onClick={()=>{setGenerated({id:h.id});setPrompt(h.prompt);}}><img src={api.assetStreamUrl(h.id)} alt={h.prompt}/><span>{h.provider}</span></button>)}</div></section>}
+        {!!history.length&&<section><h4>Recent generations</h4><div className="generation-history">{history.map(h=><button key={h.id} title={h.prompt} onClick={()=>{setGenerated([{id:h.id}]);setSelectedGeneratedId(h.id);setPrompt(h.prompt);}}><img src={api.assetStreamUrl(h.id)} alt={h.prompt}/><span>{h.provider}</span></button>)}</div></section>}
         <button className="btn" style={{ marginTop: 16 }} onClick={onClose}>Close</button>
       </div>
     </div>

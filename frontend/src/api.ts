@@ -25,8 +25,9 @@ export type VideoModel = {
 };
 export type VideoGenerationRequest = {
   provider:string; model:string; prompt:string; negative_prompt?:string; aspect_ratio:string;
-  width:number; height:number; duration_seconds:number; resolution:string; seed?:number|null; confirm_paid?:boolean;
+  width:number; height:number; duration_seconds:number; resolution:string; seed?:number|null; candidate_count?:1|2|3; confirm_paid?:boolean;
 };
+export type LocalVideoSystem = {detected:boolean;gpu_name:string|null;vram_gb:number|null;recommended_model_ids:string[];message:string};
 
 export type Shot = {
   crop_json?: {x:number;y:number;width:number;height:number}|null;
@@ -85,7 +86,7 @@ export type FontSettings = {
 };
 
 /** Must match BUILD_ID in backend/app/main.py. */
-export const BUILD_ID = "v0.7.0-wip.1";
+export const BUILD_ID = "v0.7.0-wip.2";
 
 export type Adjust = Partial<Record<'exposure'|'contrast'|'highlights'|'shadows'|'temperature'|'tint'|'saturation'|'vibrance'|'sharpen'|'vignette'|'grain', number>>;
 export type Look = {
@@ -153,6 +154,7 @@ export type Job = {
   progress: number;
   error: string | null;
   artifact_asset_id: string | null;
+  result_asset_ids?: string[];
 };
 
 export type ProviderProfile = {
@@ -305,6 +307,7 @@ export const api = {
     }),
   videoGenerationCatalog: () => req<{models:VideoModel[];prices_checked:string}>("/api/video-generation/catalog"),
   localVideoStatus: () => req<{ready:boolean;message:string}>("/api/video-generation/local/status"),
+  localVideoSystem: () => req<LocalVideoSystem>("/api/video-generation/local/system"),
   importLocalVideoWorkflow: (modelId:string,file:File) => {
     const form=new FormData();form.append('file',file);
     return req<{ok:boolean;model_id:string;node_count:number}>("/api/video-generation/local/workflows/"+encodeURIComponent(modelId),{method:'POST',body:form});

@@ -34,6 +34,34 @@ def local_status(db: Session = Depends(get_db)):
         raise HTTPException(400, str(exc))
 
 
+@router.get("/local/system")
+def local_system():
+    """Return optional local NVIDIA GPU details to tailor the model setup guide."""
+    import subprocess
+
+    try:
+        result = subprocess.run(
+            ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"],
+            capture_output=True, text=True, timeout=4, check=False,
+        )
+        first = next((line for line in result.stdout.splitlines() if line.strip()), "")
+        name, memory = (part.strip() for part in first.split(",", 1))
+        vram_mb = int(float(memory))
+        vram_gb = round(vram_mb / 1024, 1)
+        if vram_gb < 8.0:
+            recommended = ["wan2.1-t2v-1.3b"]
+            note = "Start with Wan 2.1 T2V 1.3B at 480p. Wan 2.2 TI2V 5B is documented for about 8 GB VRAM with native offloading, so it may be tight below that."
+        else:
+            recommended = ["wan2.2-ti2v-5b", "wan2.1-t2v-1.3b"]
+            note = "Wan 2.2 TI2V 5B is a reasonable first test. Choose 480p and use ComfyUI native offloading if memory is tight."
+        return {"detected": True, "gpu_name": name, "vram_gb": vram_gb,
+                "recommended_model_ids": recommended, "message": note}
+    except (OSError, subprocess.TimeoutExpired, ValueError):
+        return {"detected": False, "gpu_name": None, "vram_gb": None,
+                "recommended_model_ids": ["wan2.1-t2v-1.3b"],
+                "message": "GPU memory could not be detected automatically. The 1.3B workflow is the lighter starting point; verify the selected model's requirements before downloading it."}
+
+
 @router.post("/local/workflows/{model_id}")
 async def import_local_workflow(model_id: str, file: UploadFile = File(...)):
     try:
@@ -89,6 +117,11 @@ def start_video_generation(project_id: str, body: schemas.GenerateVideoRequest, 
             raise HTTPException(400, "The saved provider key is unavailable. Re-enter it in Settings → Providers.")
 
     cost = video.estimate_cost(model, body.duration_seconds, body.resolution)
+    if cost.get("usd") is not None:
+        cost["usd"] = round(cost["usd"] * body.candidate_count, 4)
+    if cost.get("credits") is not None:
+        cost["credits"] = round(cost["credits"] * body.candidate_count, 2)
+    cost["candidate_count"] = body.candidate_count
     job = RenderJob(
         project_id=project_id,
         scene_id=None,

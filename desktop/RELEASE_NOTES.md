@@ -1,4 +1,4 @@
-# SceneForge Studio 0.7.0-wip.1 (unreleased)
+# SceneForge Studio 0.7.0-wip.2 (unreleased)
 
 This is an unreleased source milestone on `chatgpt/0.7.0-video-generation`, not a published GitHub release. No provider has been live-tested from this branch. The interface and mocked flow tests pass; run the backend integration suite in CI and test model providers with valid local installations or API keys before treating results as production-ready.
 
@@ -9,18 +9,23 @@ This is an unreleased source milestone on `chatgpt/0.7.0-video-generation`, not 
 - Added per-resolution per-second provider list rates, checked 2026-09-28, and a total estimate based on chosen duration/quality. Cloud generation requires explicit cost confirmation in both the interface and API.
 - Added provider-specific limits for duration, resolution and aspect ratio. Local ComfyUI workflows can use custom dimensions from 256 to 4096 pixels, in multiples of 16.
 - Added local ComfyUI status, API-workflow JSON import, safe loopback-only connection validation, job progress/cancellation, and generated-video decoding checks.
+- Restyled the generator as a high-contrast graphite workspace; engine/model choices, quality, ratio, duration and seed controls now have stronger visual hierarchy. External setup links open through the desktop shell instead of Electron's blocked new-window path.
+- Added guided local ComfyUI setup steps, clickable install/model references and an optional NVIDIA GPU/VRAM check that recommends a lighter model. Added step-by-step Google and Runway API-key setup links.
+- Added a 1–3 video-candidate setting. Each take is generated as a separate request, cloud estimates and consent cover the full count, completed options stay in the Media Pool, and a user can preview/select one before timeline insertion. A specified seed advances for each take.
+- Added the same 1–3 compare-and-select workflow to AI Image Studio; hosted providers show a per-image billing acknowledgment, while local Stable Diffusion advances a fixed seed for each option.
 - Generated results are stored as project Media Pool assets, can be inserted into the selected scene or as a new timeline scene, and can be passed to existing local auto captions. Successful caption handoff closes the generator and opens Text for segment edits/styles.
 - Model weights, ComfyUI, workflow nodes and workflow files are not included in the base installer. Local custom nodes execute within ComfyUI using the user's permissions; only import trusted workflows.
 - Full API references and install details are in [README.md](../README.md); current scope and checks are in [the 0.7.0 review](../docs/REVIEW_0.7.0_VIDEO_GENERATION.md).
 
 ## Verification
 - `npm run build` — passed (TypeScript and Vite; advisory bundle-size warning remains).
-- `npm test` — passed: 191 existing editor component checks, 19 unit checks, 2 text-to-video panel flows, and 6 Share dialog checks. Existing tests use mocked APIs and do not replace visual QA.
+- `npm test` — passed: existing editor component checks, unit checks, text-to-video panel flows (including multi-candidate selection, paid estimate scaling and Electron setup links), and Share dialog checks. Provider APIs are mocked and do not replace visual QA.
 - `npm test` in `desktop/` — passed: 14 lifecycle/update/storage checks.
 - `python -m compileall -q backend/app tests/integration/test_video_generation.py` — passed.
 - `git diff --check` — passed.
 - `tests/integration/test_video_generation.py` could not run in this workspace: backend packages such as `requests` and FastAPI are not installed, and package downloads are unavailable. CI installs `backend/requirements.txt` and runs the integration test.
-- No real ComfyUI, Google Veo or Runway generation was performed. Test local model availability, GPU requirements, real account billing, result audio, captions and export codecs separately.
+- No real ComfyUI, Google Veo or Runway generation was performed. Test local model availability, GPU requirements, real account billing, result audio, captions and export codecs separately. The local setup is guided but does not install ComfyUI, download model weights or install custom nodes automatically.
+- Vast.ai remains a separate optional remote-GPU prototype idea. Before app integration, benchmark end-to-end generation and data transfer costs, make upload scope explicit, and guarantee that instances are destroyed after jobs.
 
 # SceneForge Studio 0.6.0-wip.10 (unreleased)
 

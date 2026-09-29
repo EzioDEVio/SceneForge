@@ -250,7 +250,7 @@ def _run_export_job(job_id: str, project_id: str, selected_ids: list[str] | None
 
 
 def _run_video_generation_job(job_id: str, project_id: str, request_data: dict) -> None:
-    """Generate a video off the API thread, validate it and add it to Media Pool."""
+    """Generate one to three candidate videos off the API thread and add them to Media Pool."""
     import os
     import uuid
     from pathlib import Path
@@ -267,6 +267,8 @@ def _run_video_generation_job(job_id: str, project_id: str, request_data: dict) 
         _contexts[job_id] = ctx
     _emit(job_id, {"status": JobStatus.RUNNING, "stage": "connecting to the selected video model", "progress": 0})
     dest_path = None
+    completed_ids: list[str] = []
+    candidate_count = max(1, min(3, int(request_data.get("candidate_count", 1))))
     try:
         with session_scope() as db:
             project = db.get(Project, project_id)
@@ -284,56 +286,75 @@ def _run_video_generation_job(job_id: str, project_id: str, request_data: dict) 
             project_title = project.title
             db.expunge_all()
 
-        def stage(name: str, pct: int = 0) -> None:
-            _emit(job_id, {"stage": name, "progress": pct})
-
-        payload, creator = video.generate_video_bytes(
-            provider=request_data["provider"], model=model, api_key=key, base_url=base_url,
-            data=request_data, width=width, height=height, stage=stage,
-            cancelled=lambda: ctx.cancel_requested,
-        )
-        if ctx.cancel_requested:
-            raise video.VideoGenerationCancelled("Generation cancelled.")
-        if len(payload) < 1024:
-            raise video.VideoGenerationError("The provider returned an empty or incomplete video file.")
-        # MPEG-4/QuickTime containers advertise `ftyp` at offset four; WebM
-        # starts with the EBML signature. Do not trust a remote filename.
-        ext, mime = ("webm", "video/webm") if payload.startswith(b"\x1a\x45\xdf\xa3") else ("mp4", "video/mp4")
         project_dir = Path(MEDIA_DIR) / project_id
         project_dir.mkdir(parents=True, exist_ok=True)
-        dest_path = project_dir / f"generated_video_{uuid.uuid4().hex}.{ext}"
-        dest_path.write_bytes(payload)
-        try:
-            info = probe(str(dest_path))
-        except FFmpegError as exc:
-            raise video.VideoGenerationError("The provider returned a video SceneForge could not decode. Try another model or lower resolution.") from exc
-        if not info.has_video or not info.duration_ms:
-            raise video.VideoGenerationError("The provider result did not contain a playable video stream.")
-
         model = video.model_for(request_data["provider"], request_data["model"])
         estimate = video.estimate_cost(model, int(request_data["duration_seconds"]), request_data["resolution"])
-        metadata = {"provider": request_data["provider"], "model": model["model"], "model_id": model["id"],
-                    "prompt": request_data["prompt"], "negative_prompt": request_data.get("negative_prompt", ""),
-                    "aspect_ratio": request_data["aspect_ratio"], "width": info.width or width,
-                    "height": info.height or height, "duration_seconds": round(info.duration_ms / 1000, 3),
-                    "estimated_cost": estimate, "native_audio": info.has_audio,
-                    "model_native_audio": model["native_audio"]}
-        with session_scope() as db:
-            asset = Asset(
-                project_id=project_id, type=AssetType.VIDEO,
-                content_hash=_content_hash_file(str(dest_path)),
-                storage_key=os.path.relpath(dest_path, MEDIA_DIR), mime=mime,
-                original_filename=_safe_download_name(model["name"] + " " + project_title) + "." + ext,
-                duration_ms=info.duration_ms, width=info.width, height=info.height,
-                origin=AssetOrigin.GENERATED, creator=creator,
-                license_note="Generated video · review the selected model's terms before commercial use",
-                generation_metadata_json=metadata,
+
+        for index in range(candidate_count):
+            if ctx.cancel_requested:
+                raise video.VideoGenerationCancelled("Generation cancelled.")
+            candidate_data = dict(request_data)
+            candidate_data["candidate_index"] = index + 1
+            if candidate_data.get("seed") is not None:
+                candidate_data["seed"] = (int(candidate_data["seed"]) + index) % (2 ** 32)
+
+            def stage(name: str, pct: int = 0) -> None:
+                _emit(job_id, {"stage": f"Candidate {index + 1} of {candidate_count} · {name}",
+                               "progress": int((index * 100 + max(0, min(100, pct))) / candidate_count)})
+
+            payload, creator = video.generate_video_bytes(
+                provider=request_data["provider"], model=model, api_key=key, base_url=base_url,
+                data=candidate_data, width=width, height=height, stage=stage,
+                cancelled=lambda: ctx.cancel_requested,
             )
-            db.add(asset)
-            db.flush()
-            job = db.get(RenderJob, job_id)
-            job.artifact_asset_id = asset.id
-        _emit(job_id, {"status": JobStatus.SUCCEEDED, "stage": "video ready in Media Pool", "progress": 100})
+            if ctx.cancel_requested:
+                raise video.VideoGenerationCancelled("Generation cancelled.")
+            if len(payload) < 1024:
+                raise video.VideoGenerationError("The provider returned an empty or incomplete video file.")
+            # MPEG-4/QuickTime containers advertise `ftyp` at offset four; WebM
+            # starts with the EBML signature. Do not trust a remote filename.
+            ext, mime = ("webm", "video/webm") if payload.startswith(b"\x1a\x45\xdf\xa3") else ("mp4", "video/mp4")
+            dest_path = project_dir / f"generated_video_{uuid.uuid4().hex}.{ext}"
+            dest_path.write_bytes(payload)
+            try:
+                info = probe(str(dest_path))
+            except FFmpegError as exc:
+                raise video.VideoGenerationError("The provider returned a video SceneForge could not decode. Try another model or lower resolution.") from exc
+            if not info.has_video or not info.duration_ms:
+                raise video.VideoGenerationError("The provider result did not contain a playable video stream.")
+
+            metadata = {"provider": request_data["provider"], "model": model["model"], "model_id": model["id"],
+                        "prompt": request_data["prompt"], "negative_prompt": request_data.get("negative_prompt", ""),
+                        "aspect_ratio": request_data["aspect_ratio"], "width": info.width or width,
+                        "height": info.height or height, "duration_seconds": round(info.duration_ms / 1000, 3),
+                        "estimated_cost": estimate, "native_audio": info.has_audio,
+                        "model_native_audio": model["native_audio"], "candidate_index": index + 1,
+                        "candidate_count": candidate_count, "seed": candidate_data.get("seed")}
+            with session_scope() as db:
+                asset = Asset(
+                    project_id=project_id, type=AssetType.VIDEO,
+                    content_hash=_content_hash_file(str(dest_path)),
+                    storage_key=os.path.relpath(dest_path, MEDIA_DIR), mime=mime,
+                    original_filename=_safe_download_name(model["name"] + " " + project_title + f" take {index + 1}") + "." + ext,
+                    duration_ms=info.duration_ms, width=info.width, height=info.height,
+                    origin=AssetOrigin.GENERATED, creator=creator,
+                    license_note="Generated video · review the selected model's terms before commercial use",
+                    generation_metadata_json=metadata,
+                )
+                db.add(asset)
+                db.flush()
+                job = db.get(RenderJob, job_id)
+                completed_ids.append(asset.id)
+                plan = dict(job.plan_json or {})
+                plan["result_asset_ids"] = list(completed_ids)
+                job.plan_json = plan
+                job.artifact_asset_id = asset.id
+            dest_path = None
+
+        _emit(job_id, {"status": JobStatus.SUCCEEDED,
+                       "stage": f"{len(completed_ids)} candidate video{'s' if len(completed_ids) != 1 else ''} ready in Media Pool",
+                       "progress": 100})
     except Exception as exc:  # noqa: BLE001
         if dest_path:
             try:
@@ -341,8 +362,11 @@ def _run_video_generation_job(job_id: str, project_id: str, request_data: dict) 
             except OSError:
                 pass
         status = JobStatus.CANCELLED if ctx.cancel_requested or isinstance(exc, video.VideoGenerationCancelled) else JobStatus.FAILED
-        _emit(job_id, {"status": status, "stage": "cancelled" if status == JobStatus.CANCELLED else "video generation failed",
-                       "error": str(exc) if isinstance(exc, video.VideoGenerationError) else f"Video generation failed: {exc}\n{traceback.format_exc()[-1800:]}"})
+        message = str(exc) if isinstance(exc, video.VideoGenerationError) else f"Video generation failed: {exc}\n{traceback.format_exc()[-1800:]}"
+        stage = "cancelled" if status == JobStatus.CANCELLED else "video generation failed"
+        if completed_ids:
+            stage = f"{len(completed_ids)} of {candidate_count} candidates ready · {stage}"
+        _emit(job_id, {"status": status, "stage": stage, "error": message})
     finally:
         with _lock:
             _contexts.pop(job_id, None)

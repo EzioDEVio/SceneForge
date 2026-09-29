@@ -86,7 +86,9 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
     job = db.get(RenderJob, job_id)
     if not job:
         raise HTTPException(404, "Job not found")
-    return job
+    result = schemas.JobOut.model_validate(job).model_dump()
+    result["result_asset_ids"] = (job.plan_json or {}).get("result_asset_ids", [])
+    return result
 
 
 @router.post("/api/jobs/{job_id}/cancel")

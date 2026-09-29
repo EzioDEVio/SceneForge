@@ -211,6 +211,7 @@ class JobOut(BaseModel):
     progress: int
     error: str | None
     artifact_asset_id: str | None
+    result_asset_ids: list[str] = Field(default_factory=list)
 
     class Config:
         from_attributes = True
@@ -268,6 +269,7 @@ class GenerateVideoRequest(BaseModel):
     duration_seconds: int = Field(default=5, ge=1, le=30)
     resolution: str = Field(default="720p", pattern=r"^(480p|720p|1080p|4k)$")
     seed: int | None = Field(default=None, ge=0, le=4294967295)
+    candidate_count: int = Field(default=1, ge=1, le=3)
     confirm_paid: bool = False
 
 

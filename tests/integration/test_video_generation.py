@@ -1,5 +1,6 @@
 """Catalog, estimate and local ComfyUI workflow contract; no provider keys or GPU required."""
 import os, pathlib, sys, tempfile
+from types import SimpleNamespace
 from unittest.mock import patch
 
 root = pathlib.Path(__file__).resolve().parents[2]
@@ -92,6 +93,12 @@ from app.db.database import engine
 with TestClient(app) as client:
     response = client.get("/api/video-generation/catalog")
     assert response.status_code == 200 and len(response.json()["models"]) >= 9
+    hardware = client.get("/api/video-generation/local/system")
+    assert hardware.status_code == 200 and "recommended_model_ids" in hardware.json()
+    with patch("subprocess.run", return_value=SimpleNamespace(stdout="NVIDIA GeForce RTX 4090, 8192\n")):
+        detected = client.get("/api/video-generation/local/system").json()
+    assert detected["gpu_name"] == "NVIDIA GeForce RTX 4090" and detected["vram_gb"] == 8.0
+    assert detected["recommended_model_ids"][0] == "wan2.2-ti2v-5b"
     response = client.post("/api/providers", json={"capability":"video", "name":"local_comfy", "api_key":"", "base_url":"http://127.0.0.1:8188"})
     assert response.status_code == 200 and response.json()["configured"]
     assert response.json()["masked_key"] == "Local engine · no API key"
@@ -103,6 +110,31 @@ with TestClient(app) as client:
     response = client.post("/api/video-generation/local/workflows/ltx-2.5-fast", files={"file":("ltx.json", __import__("json").dumps(workflow), "application/json")})
     assert response.status_code == 200 and response.json()["node_count"] == 3
     assert client.get("/api/video-generation/catalog").json()["models"][0]["workflow_imported"]
+
+    from app.workers import jobs as job_worker
+    local_request = {"provider":"local_comfy", "model":"ltx-2.5-fast", "prompt":"A test clip",
+                     "negative_prompt":"", "aspect_ratio":"16:9", "width":1280, "height":720,
+                     "duration_seconds":4, "resolution":"720p", "seed":41,
+                     "candidate_count":3, "confirm_paid":False}
+    generation_job_id = ""
+    with patch.object(job_worker, "start_video_generation_job") as start_job:
+        started = client.post(f"/api/video-generation/projects/{project['id']}/generate", json=local_request)
+        assert started.status_code == 200 and start_job.call_args.args[2]["candidate_count"] == 3
+        generation_job_id = started.json()["job_id"]
+        status = client.get(f"/api/jobs/{started.json()['job_id']}")
+        assert status.status_code == 200 and status.json()["result_asset_ids"] == []
+    too_many = client.post(f"/api/video-generation/projects/{project['id']}/generate", json={**local_request, "candidate_count":4})
+    assert too_many.status_code == 422
+
+    mock_video = b"x" * 2048
+    probe_result = SimpleNamespace(has_video=True, duration_ms=1000, width=1280, height=720, has_audio=False)
+    with patch.object(video, "generate_video_bytes", side_effect=[(mock_video, "mock-local") for _ in range(3)]) as generate_mock, \
+         patch("app.render.ffmpeg_utils.probe", return_value=probe_result):
+        job_worker._run_video_generation_job(generation_job_id, project["id"], local_request)
+    finished = client.get(f"/api/jobs/{generation_job_id}").json()
+    assert finished["status"] == "succeeded" and len(finished["result_asset_ids"]) == 3
+    assert len(set(finished["result_asset_ids"])) == 3 and finished["artifact_asset_id"] == finished["result_asset_ids"][-1]
+    assert [call.kwargs["data"]["seed"] for call in generate_mock.call_args_list] == [41, 42, 43]
 
     class FakeComfySession:
         trust_env = True
@@ -126,4 +158,4 @@ with TestClient(app) as client:
 
 engine.dispose()
 temp.cleanup()
-print("PASS model catalog/prices, Google and Runway request adapters, ComfyUI queue/output flow, workflow mapping/import, paid confirmation, and loopback-only local connection")
+print("PASS model catalog/prices, GPU guidance endpoint, Google and Runway request adapters, ComfyUI queue/output flow, workflow mapping/import, candidate-count validation, paid confirmation, and loopback-only local connection")
