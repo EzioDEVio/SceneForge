@@ -1,14 +1,12 @@
 export type AppPreferences = {
-  theme: 'graphite'|'light';
+  theme: 'graphite'|'light'|'midnight'|'warm';
   accent: 'violet'|'blue'|'teal';
   density: 'compact'|'comfortable';
   reduceMotion: boolean;
-  defaultAspect: '16:9'|'9:16'|'1:1';
-  defaultFps: 24|25|30|50|60;
 };
 
 export const DEFAULT_PREFERENCES: AppPreferences = {
-  theme:'graphite',accent:'violet',density:'compact',reduceMotion:false,defaultAspect:'16:9',defaultFps:30,
+  theme:'graphite',accent:'violet',density:'compact',reduceMotion:false,
 };
 const STORAGE_KEY='sceneforge.preferences.v1';
 const ACCENT:Record<AppPreferences['accent'],string>={violet:'#9783ff',blue:'#62a8ff',teal:'#43c8b5'};
@@ -17,12 +15,10 @@ export function readPreferences(storage:Pick<Storage,'getItem'>|undefined=typeof
   try {
     const parsed=JSON.parse(storage?.getItem(STORAGE_KEY)||'{}') as Partial<AppPreferences>;
     return {
-      theme:parsed.theme==='light'?'light':'graphite',
+      theme:parsed.theme==='light'||parsed.theme==='midnight'||parsed.theme==='warm'?parsed.theme:'graphite',
       accent:parsed.accent==='blue'||parsed.accent==='teal'?parsed.accent:'violet',
       density:parsed.density==='comfortable'?'comfortable':'compact',
       reduceMotion:parsed.reduceMotion===true,
-      defaultAspect:parsed.defaultAspect==='9:16'||parsed.defaultAspect==='1:1'?parsed.defaultAspect:'16:9',
-      defaultFps:[24,25,30,50,60].includes(Number(parsed.defaultFps))?Number(parsed.defaultFps) as AppPreferences['defaultFps']:30,
     };
   } catch {return {...DEFAULT_PREFERENCES};}
 }

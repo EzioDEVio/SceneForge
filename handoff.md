@@ -1,18 +1,36 @@
-# SceneForge 0.7.0 WIP — Session Handoff
+# SceneForge 0.7.0 Release Candidate — Session Handoff
 
-**Prepared:** 2026-09-29
+**Prepared:** 2026-09-30
 **Current source:** branch `chatgpt/0.7.0-video-generation` in `EzioDEVio/SceneForge`
-**Current working version:** `0.7.0-wip.1` (unreleased source snapshot)
+**Current working version:** 0.7.0 release candidate (unreleased)
 **Base:** preserved `chatgpt/0.6.0-wip.10` editor branch
 **Published baseline:** GitHub release `0.5.3`
 
 ## Purpose and handling
 
-This handoff preserves the earlier 0.5.3/0.6.0 review below and records the new 0.7.0 text-to-video milestone first. The 0.5.3 published release remains part of the product history; 0.6.0-wip.10 is the source baseline for this additive branch. The 0.7.0-wip.1 branch is not a stable release.
+This handoff preserves the earlier 0.5.3/0.6.0 review below and records the 0.7.0 text-to-video milestone plus the latest UI/timeline follow-up. The 0.5.3 published release remains unchanged; 0.6.0-wip.10 is the source baseline for this additive branch. The 0.7.0 candidate is not a stable release. Keep it separate and wait for a fresh Windows installer test before merge or publication.
 
 Reviewed inputs in this workspace include the 0.5.3 source ZIP, the original 0.6.0 WIP ZIP, reviewed wip.2–wip.6 snapshots, their READMEs and handoffs, the SceneForge session handoff, chat notes, and the user screenshots. The 0.5.3 technical handoff predates the 0.5.3/0.6.0 work and should not be treated as a complete description of the present build.
 
-## Current 0.7.0-wip.1 additions
+## Latest UI and timeline follow-up
+
+- **Project home:** Preferences is under File. Removed the redundant static mode tabs, provider selector and duplicate new-project defaults. Project aspect/frame rate stay in Create Project; the existing top-level AI Engines and Help menus, Media Pool and editor features remain.
+- **Editor navigation and themes:** Added an explicit Projects button to return to create/open projects instead of Reload. The upper-right Theme menu offers Graphite Night, Daylight, Midnight Blue and Warm Studio. Corrected Daylight contrast for inspector buttons/forms, cards and timeline panels.
+- **Safe zones and close behavior:** Restored the Safe zones toggle above the timeline. Close readiness now checks live in-process generation/render/export work, so an idle app is not held open by stale job rows left after a prior crash.
+- **Timeline tools:** Added per-project locks for T1 text, V1 picture, A1 narration and A2 clip sound; A2 quick mute buttons for embedded source audio; and explicit ripple-delete labels/confirmation that state the scene gap closes. Existing snapping, named markers, scene drag-reorder, eligible linked video/audio trims, split and undo/redo remain.
+- **Visual library:** The candidate offers 55 transitions, 31 caption styles and a searchable 66-item emoji/graphic-sticker library. The Effects panel groups 8 additional color filters (Golden hour, Arctic, Portra film, Matte fade, Color pop, Teal shadows, Rose glow and Blue monochrome) separately and adds FFmpeg-rendered Chromatic split and Motion trail effects. Existing visual looks, LUT tools and effect panels remain.
+- **Limits:** The timeline remains scene-based. It does not yet provide independent unrestricted clip movement across unlimited tracks or full multitrack compositing.
+
+### Latest regression checks (2026-09-30)
+
+- Frontend production build passed (TypeScript + Vite); minified editor bundle is 540.73 kB and Vite prints its advisory above 500 kB.
+- Frontend tests passed: 215 editor component checks, 19 unit checks, 2 video-generation flows and 6 share dialog checks.
+- Desktop tests passed: 18 lifecycle, close-flow and storage checks.
+- Direct backend integration scripts passed for video generation, stale/live close readiness, and FFmpeg filter smoke tests. Chromatic split and Motion trail also passed the full scene filter graph.
+- Python compile checks and `git diff --check` passed. Frontend flows use a mock API; they do not replace installed-app visual testing.
+- GitHub’s Linux keyring credential gate and Windows/Linux/macOS release workflow still need to pass on the candidate branch. Test the resulting Windows installer before merge/publication. No stable tag or public release is being created.
+
+## Initial 0.7.0 text-to-video milestone
 
 - Added a separate text-to-video workspace while preserving the existing AI Engines and Help menus, editor tabs, scenes, Media Pool, timeline, captions, effects and overlays.
 - Added a curated local catalog for LTX-2.5 Fast, Wan 2.1 T2V 1.3B, Wan 2.2 TI2V 5B, Wan 2.2 T2V A14B, and compatible custom ComfyUI workflows.
@@ -23,15 +41,15 @@ Reviewed inputs in this workspace include the 0.5.3 source ZIP, the original 0.6
 - Added UI interaction tests for local custom-size generation → asset insertion → caption handoff and cloud rate display → explicit paid confirmation.
 - The Release workflow is configured to create temporary Windows, Linux and macOS build artifacts after branch push. A branch build is not a GitHub release; no stable tag is created by this milestone.
 
-### Current verification and remaining acceptance tests
+### Earlier verification notes (superseded by Latest regression checks above)
 
-- `npm run build` passed (TypeScript and Vite; Vite retains a bundle-size advisory above 500 kB).
-- `npm test` passed: 191 existing editor component checks, 19 unit checks, 2 text-to-video panel checks and 6 share checks; provider APIs are mocked.
-- `npm test` in `desktop/` passed: 14 lifecycle/update/storage checks.
+- `npm run build` passed on the initial text-to-video snapshot (later candidate build: 540.73 kB).
+- `npm test` passed on the initial text-to-video snapshot (current candidate: 215 editor checks, 19 unit checks, 2 video-generation flows and 6 share checks).
+- `npm test` in `desktop/` passed on the initial snapshot (current candidate: 18 checks).
 - `python -m compileall -q backend/app tests/integration/test_video_generation.py` and `git diff --check` passed.
-- The new FastAPI integration test is wired into CI but could not run locally: backend packages are not present and package downloads were unavailable in this workspace.
-- No real local or paid video has been generated. Acceptance needs ComfyUI with model-specific weights and an API workflow, plus Google/Runway credentials and billing for cloud tests. Verify result media/audio, captions, timeline insertion, rendering and export on target operating systems.
-- Do not describe 0.7.0-wip.1 as a stable public release until CI and real-provider/installer acceptance tests pass.
+- Backend integration scripts now pass locally; the GitHub Linux keyring gate remains a CI-only check.
+- No live ComfyUI, Google Veo or Runway request was repeated in the latest regression pass. The user previously tested Runway successfully and generated ComfyUI clips; broad prompts produced low-quality output and took about 8–10 minutes for five seconds.
+- Complete candidate CI and test the fresh Windows installer before merge/publication; do not create a stable release tag before those gates pass.
 
 ### Provider catalog, published rates and setup
 
@@ -129,13 +147,13 @@ SceneForge remains a scene-assembly editor. It supports scene reordering/inserti
 
 | Request | State in the reviewed source | Still needed |
 |---|---|---|
-| More caption styles | 24 styles exist, including six newer styles (Creator punch, Soft subtitle, Glass panel, Pastel pop, Cyber cyan, Clean white) and additional variants already in the style library. | Review visual consistency in a real browser and rendered scenes; add further styles only where they add a distinct use case. |
+| More caption styles | 31 styles are available, including Bold outline, Yellow box, Green karaoke, Blue glow, Handwritten, News lower third, Elegant serif, TikTok word pop, Reels minimal, Creator highlight, Arabic clean and Neon lime karaoke. | Review visual consistency in a real browser and rendered scenes; preserve Arabic shaping and per-word timing. |
 | More effects and helpful feature descriptions | Many non-look effects already exist (for example glitch, Old Film, camera shake, spotlight, redaction, light leaks, split toning, LUTs, annotations). Effect tiles have previews/search and section cards. | Click-open guidance now covers these tabs and major feature sections; some low-level controls may still need more specific explanations as user testing identifies confusion. |
 | Clip Audio controls | Separate inspector with volume, mute, narration ducking, fade-in and fade-out; backend validation/rendering and persistence implemented. | Manually verify on actual source clips in browser/desktop and after split, undo, and export. |
-| Trending transitions | 42 choices with live previews; additional cover, slide, zoom, wipe, blur, radial, wind, squeeze, rectangle, and morph-like transitions. | Avoid near-duplicates; compare rendered results and add only clearly differentiated motion. Do not use third-party proprietary assets without rights review. |
+| Trending transitions | 55 choices with live previews, including cover/reveal directions, vertical/horizontal slices, wind, diagonal wipes and distance morph. | Review live previews and rendered results for distinct motion; avoid proprietary assets. |
 | Social sharing | Post-export prompt includes download, desktop open-file-location, platform links and posting guidance. | Direct account uploads require platform developer setup, user authorization and policy review. |
-| Timeline tools | Undo/redo, scene move/insert, split/restore, A2 source-audio lane, drag/drop, multi-select, snapping, named markers, playhead, keyboard shortcuts and constrained linked video/audio edge trimming are available. Deleting a scene closes the sequence gap. | Track lock/mute/solo, unlinking audio, arbitrary independent clip moves, ripple delete as a distinct edit command, and trim handles for general/multitrack audio remain backlog. |
-| Stickers, filters, emoji | Searchable categorized 48-item emoji/sticker picker in Overlays; added Teal & Amber, Pastel and Bleach Bypass render filters; existing LUT/looks remain. | Rights-cleared sticker packs, favorites and downloadable pack management remain possible follow-up work. |
+| Timeline tools | Undo/redo, scene move/reorder, split/restore, A2 source-audio lane, drag/drop, multi-select, snapping, named markers, playhead, keyboard shortcuts, constrained linked video/audio edge trimming, per-lane locks, A2 quick mute, and scene ripple delete are available. Deleting a scene closes the sequence gap. | Track solo, unlinking audio, arbitrary independent clip moves, and trim handles for general/multitrack audio remain backlog. |
+| Stickers, filters, emoji | Searchable 66-item emoji/graphic-sticker picker; 8 extra color filters; Chromatic split and Motion trail creative effects; existing LUT/looks remain. | Rights-cleared themed sticker packs, favorites and downloadable pack management remain possible follow-up work. |
 | Title cards | Six title-card presets, solid/gradient backgrounds, title animations and duration controls already exist. | The generated background is baked into the card; reopening to edit the original background/animation as editable source remains limited. Improve slider grouping/labels and preview consistency. |
 
 ## Local services, costs, and install expectations
@@ -207,16 +225,16 @@ The candidate branch is `chatgpt/0.7.0-video-generation`. The public release rem
 
 ### Added for this candidate
 
-- Preferences panel: Graphite/Light theme, Violet/Blue/Teal accent, Compact/Comfortable spacing and reduced interface motion; local preferences persist on this computer.
-- Project page setup: default aspect and frame rate for new projects, plus current-project aspect/frame-rate controls. Existing renders may become stale when page setup changes.
+- Preferences are under File; editor theme switching is also available at upper right (Graphite Night, Daylight, Midnight Blue, Warm Studio). Accent, density and reduced motion persist locally.
+- Project aspect ratio and frame rate are set in Create Project. The editor retains its current-project aspect control. Existing renders may become stale when page setup changes.
 - Native desktop close choices: Save, Don’t save, Save and exit, and Cancel. Failed saves and active render/export/generation block exit; repeated close requests are serialized.
 - Local video hardware guidance: NVIDIA GPU name/count/VRAM and system RAM detection, model suggestion, and per-model warning when detected hardware is below listed requirements. Detection does not install ComfyUI or download models.
 - Build identifiers/package version set to 0.7.0.
 
 ### Local verification
 
-- `npm run build` — passed. Vite's advisory reports a 531.66 kB minified bundle (500 kB threshold).
-- `npm test` — passed: 199 editor component checks, 19 unit checks, 2 video-generation UI flows and 6 share checks.
+- `npm run build` — passed. Vite's advisory reports a 540.73 kB minified bundle (500 kB threshold).
+- `npm test` — passed: 215 editor component checks, 19 unit checks, 2 video-generation UI flows and 6 share checks.
 - `npm test` in `desktop/` — passed: 18 desktop tests.
 - `PYTHONPATH=backend /tmp/sceneforge-release-venv/bin/python tests/integration/test_video_generation.py` — passed.
 - Python compile checks and `git diff --check` — passed.

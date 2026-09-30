@@ -189,6 +189,20 @@ _EFFECT_FILTERS: dict[str, str] = {
     EffectPreset.TEAL_AMBER: "colorbalance=rs=-0.08:gs=-0.02:bs=0.12:rh=0.10:gh=0.035:bh=-0.09,eq=contrast=1.08:saturation=1.12",
     EffectPreset.PASTEL: "eq=contrast=0.90:brightness=0.06:saturation=0.78,colorbalance=rs=0.025:gs=0.018:bs=-0.015",
     EffectPreset.BLEACH_BYPASS: "hue=s=0.48,eq=contrast=1.32:brightness=-0.015,colorbalance=bs=0.035:rh=0.025",
+    # Eight additional, render-safe color filters. These are separate from the
+    # motion/film effects so users can browse simple color treatments quickly.
+    EffectPreset.GOLDEN_HOUR: "colorbalance=rs=0.08:gs=0.015:bs=-0.08:rh=0.12:gh=0.04:bh=-0.12,eq=gamma=1.04:saturation=1.08",
+    EffectPreset.ARCTIC: "colorbalance=rs=-0.045:gs=0.005:bs=0.10:rh=-0.015:gh=0.015:bh=0.09,eq=contrast=1.04:saturation=0.92",
+    EffectPreset.PORTRA: "curves=preset=lighter,colorbalance=rs=0.025:gs=0.008:bs=-0.035:rh=0.035:gh=0.015:bh=-0.045,eq=saturation=0.96",
+    EffectPreset.MATTE: "curves=all='0/0.08 0.24/0.27 0.75/0.76 1/0.94',eq=contrast=0.94:saturation=0.88",
+    EffectPreset.POP_COLOR: "eq=contrast=1.12:saturation=1.34:gamma=1.02,unsharp=5:5:0.45:3:3:0",
+    EffectPreset.TEAL_SHADOW: "colorbalance=bs=0.12:gs=0.025:rs=-0.06:bh=0.08:gh=0.015:rh=0.04,eq=contrast=1.06:saturation=1.02",
+    EffectPreset.ROSE_GLOW: "colorbalance=rs=0.055:gs=-0.015:bs=0.025:rh=0.07:gh=0.005:bh=-0.01,eq=brightness=0.025:saturation=0.95,gblur=sigma=0.35:steps=1",
+    EffectPreset.MONO_BLUE: "hue=s=0,colorbalance=rs=-0.06:gs=0.01:bs=0.15,eq=contrast=1.08",
+    # Deliberate color-channel displacement for energetic RGB edges.
+    EffectPreset.CHROMATIC_SPLIT: "chromashift=cbh=10:crh=-10:edge=smear",
+    # Blend adjacent frames for a soft movement trail, separate from color looks.
+    EffectPreset.MOTION_TRAIL: "tmix=frames=4:weights='1 0.55 0.25 0.1'",
 }
 
 

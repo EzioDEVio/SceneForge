@@ -617,8 +617,8 @@ XFADE_NAMES = {
     "zoom_in": "zoomin", "smooth_left": "smoothleft", "smooth_right": "smoothright",
     "radial": "radial", "pixelize": "pixelize", "blur": "hblur", "diagonal": "diagtl",
     "squeeze": "squeezeh", "fade_grays": "fadegrays", "wind": "hlwind", "slice": "hlslice",
-    "open": "horzopen", "close": "horzclose", "fade_fast": "fadefast",
-    "slide_up": "slideup", "slide_down": "slidedown", "smooth_up": "smoothup", "smooth_down": "smoothdown", "wipe_up": "wipeup", "wipe_down": "wipedown", "cover_left": "coverleft", "cover_right": "coverright", "reveal_left": "revealleft", "reveal_right": "revealright", "vert_open": "vertopen", "vert_close": "vertclose", "diagonal_tr": "diagtr", "rect_crop": "rectcrop", "distance": "distance", "slice_vertical": "vuslice", "wind_up": "vuwind", "squeeze_v": "squeezev", "film_burn": f"custom:expr='{FILM_BURN_EXPR}'",
+    "open": "horzopen", "close": "horzclose", "fade_fast": "fadefast", "fade_slow": "fadeslow",
+    "slide_up": "slideup", "slide_down": "slidedown", "smooth_up": "smoothup", "smooth_down": "smoothdown", "wipe_up": "wipeup", "wipe_down": "wipedown", "cover_left": "coverleft", "cover_right": "coverright", "reveal_left": "revealleft", "reveal_right": "revealright", "vert_open": "vertopen", "vert_close": "vertclose", "diagonal_tr": "diagtr", "rect_crop": "rectcrop", "distance": "distance", "slice_vertical": "vuslice", "wind_up": "vuwind", "squeeze_v": "squeezev", "cover_up": "coverup", "cover_down": "coverdown", "reveal_up": "revealup", "reveal_down": "revealdown", "wipe_tl": "wipetl", "wipe_tr": "wipetr", "wipe_bl": "wipebl", "wipe_br": "wipebr", "slice_horizontal": "hrslice", "wind_right": "hrwind", "wind_down": "vdwind", "film_burn": f"custom:expr='{FILM_BURN_EXPR}'",
 }
 
 

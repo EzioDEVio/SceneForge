@@ -14,7 +14,15 @@ Users can select 1, 2 or 3 outputs for both video and image generation. Video ca
 
 The local setup panel gives a step-by-step ComfyUI/model/workflow guide, clickable install/model references, and an optional NVIDIA `nvidia-smi` hardware check. It recommends a model based on detected VRAM. Paid Google and Runway choices provide account/API-key steps and direct links to their provider consoles.
 
-Settings now includes a local theme/accent/density/reduced-motion panel, defaults for new projects, and page setup controls for the current project's aspect ratio and frame rate. The native desktop close dialog offers **Save**, **Don’t save**, **Save and exit**, and **Cancel**; it blocks shutdown if saving fails or generation/render/export is active. Local video setup reports detected NVIDIA GPU count/name/VRAM and system RAM, recommends a model, and shows warnings when hardware is below listed requirements. This is guidance only; the app does not install ComfyUI or download model weights.
+Preferences is under **File**, with local accent/density/reduced-motion controls. The editor’s upper-right theme menu offers Graphite Night, Daylight, Midnight Blue and Warm Studio. New-project aspect ratio and frame rate stay in **Create Project**; the editor retains its current-project aspect control. The native desktop close dialog offers **Save**, **Don’t save**, **Save and exit**, and **Cancel**; it blocks shutdown if saving fails or generation/render/export is active. Close readiness uses live in-process jobs so stale database records do not block an idle close. Local video setup reports detected NVIDIA GPU count/name/VRAM and system RAM, recommends a model, and shows warnings when hardware is below listed requirements. This is guidance only; the app does not install ComfyUI or download model weights.
+
+## UI, timeline and visual catalog follow-up
+
+- Project home no longer repeats static mode tabs, AI provider settings or project defaults; Preferences is in File. Existing AI Engines, Help, Media Pool, Scenes and editor panels remain available.
+- The editor has a dedicated **Projects** return button. The **Safe zones** control is restored above the timeline, and the Daylight theme has readable foreground/background colors across inspector controls and timeline panels.
+- Timeline additions include T1/V1/A1/A2 lane locks, A2 per-video quick mute, and explicit ripple-delete wording/confirmation. Existing scene reorder, snapping, named markers, split, eligible source-audio-linked trimming and undo/redo remain. The timeline remains scene-based rather than a full multitrack nonlinear editor.
+- Current catalog counts: **55 transitions**, **31 caption styles**, **66 searchable emoji/graphic stickers**, **8 additional color filters**, and 2 render-backed creative effects (Chromatic split and Motion trail).
+- Effects additions are validated through FFmpeg; test both hover previews and rendered output. Color-filter thumbnails are visual approximations, so the rendered result is authoritative.
 
 When generation completes, SceneForge validates the returned video with FFprobe, stores it as a normal generated project asset, and previews it in the panel. The user can add it inside the selected scene or create a scene after the selected one. Existing clip sound, editing, caption, effects and overlay features are then available. **Generate captions & open Text** uses the existing local auto-caption path and closes the generator after it opens Text, so the timed caption segments can be edited.
 
@@ -79,13 +87,13 @@ Model files and separate ComfyUI requirements are not included in the Windows, m
 
 ## Verification in this workspace
 
-- `npm run build` — passed; Vite reports a 531.66 kB minified bundle, above its 500 kB advisory threshold.
-- `npm test` — passed: 199 editor component checks, 19 unit checks, 2 video-generation flows and 6 Share dialog checks. Provider calls are mocked.
+- `npm run build` — passed; Vite reports a 540.73 kB minified bundle, above its 500 kB advisory threshold.
+- `npm test` — passed: 215 editor component checks, 19 unit checks, 2 video-generation flows and 6 Share dialog checks. Provider calls are mocked.
 - `npm test` in `desktop/` — passed: all 18 tests, including close/save decisions and active-work protection.
 - `tests/integration/test_video_generation.py` — passed locally with the pinned backend dependencies.
 - Python compile checks and `git diff --check` — passed.
 - GitHub's broader credential checks need a native Linux Secret Service and remain a CI gate. The Release workflow must also build and exercise the Windows, Linux and macOS packages.
-- The 531.66 kB editor bundle is over Vite's 500 kB advisory threshold; the build succeeds. No live provider calls were part of this regression pass.
+- The 540.73 kB editor bundle is over Vite's 500 kB advisory threshold; the build succeeds. No live provider calls were part of this regression pass.
 
 ## Remaining acceptance work
 

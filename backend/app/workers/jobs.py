@@ -33,6 +33,17 @@ from app.render.timeline import part_plan_hash
 _lock = threading.Lock()
 _contexts: dict[str, RenderContext] = {}
 _event_queues: dict[str, "queue.Queue"] = {}
+_active_jobs: set[str] = set()
+
+
+def active_job_ids() -> set[str]:
+    """Return jobs that are executing in this backend process.
+
+    RenderJob rows are a durable history and can remain queued/running after
+    a crash. They must not keep an otherwise idle desktop app from closing.
+    """
+    with _lock:
+        return set(_active_jobs)
 
 
 def _safe_download_name(title: str) -> str:
@@ -151,6 +162,7 @@ def _run_part_job(job_id: str, project_id: str, scene_id: str) -> None:
     finally:
         with _lock:
             _contexts.pop(job_id, None)
+            _active_jobs.discard(job_id)
 
 
 def _run_export_job(job_id: str, project_id: str, selected_ids: list[str] | None = None, settings: dict | None = None) -> None:
@@ -247,6 +259,7 @@ def _run_export_job(job_id: str, project_id: str, selected_ids: list[str] | None
     finally:
         with _lock:
             _contexts.pop(job_id, None)
+            _active_jobs.discard(job_id)
 
 
 def _run_video_generation_job(job_id: str, project_id: str, request_data: dict) -> None:
@@ -370,18 +383,37 @@ def _run_video_generation_job(job_id: str, project_id: str, request_data: dict) 
     finally:
         with _lock:
             _contexts.pop(job_id, None)
+            _active_jobs.discard(job_id)
 
 
 def start_part_job(job_id: str, project_id: str, scene_id: str) -> None:
-    t = threading.Thread(target=_run_part_job, args=(job_id, project_id, scene_id), daemon=True)
-    t.start()
+    with _lock:
+        _active_jobs.add(job_id)
+    try:
+        threading.Thread(target=_run_part_job, args=(job_id, project_id, scene_id), daemon=True).start()
+    except Exception:
+        with _lock:
+            _active_jobs.discard(job_id)
+        raise
 
 
 def start_export_job(job_id: str, project_id: str, selected_ids: list[str] | None = None, settings: dict | None = None) -> None:
-    t = threading.Thread(target=_run_export_job, args=(job_id, project_id, selected_ids, settings), daemon=True)
-    t.start()
+    with _lock:
+        _active_jobs.add(job_id)
+    try:
+        threading.Thread(target=_run_export_job, args=(job_id, project_id, selected_ids, settings), daemon=True).start()
+    except Exception:
+        with _lock:
+            _active_jobs.discard(job_id)
+        raise
 
 
 def start_video_generation_job(job_id: str, project_id: str, request_data: dict) -> None:
-    t = threading.Thread(target=_run_video_generation_job, args=(job_id, project_id, request_data), daemon=True)
-    t.start()
+    with _lock:
+        _active_jobs.add(job_id)
+    try:
+        threading.Thread(target=_run_video_generation_job, args=(job_id, project_id, request_data), daemon=True).start()
+    except Exception:
+        with _lock:
+            _active_jobs.discard(job_id)
+        raise
