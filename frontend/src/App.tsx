@@ -24,6 +24,7 @@ import {applyPreferences,readPreferences,writePreferences,type AppPreferences} f
 import {SceneEffectsPanel, SceneFxPreview, RouteCanvas, AnnotationCanvas} from "./EffectsPanels";
 import {SpeedControls, ClipSoundControls} from "./SpeedControls";
 import type {CaptionSegment,Overlay,ProjectAudioClip} from "./api";
+import {AUDIO_TRACKS,type AudioTrackId,type TimelineSettings} from "./timeline/timeline.types";
 import {CaptionSegmentsEditor} from "./CaptionSegmentsEditor";
 import type {CaptionDirection} from "./CaptionSegmentsEditor";
 import {sceneDuration} from "./duration";
@@ -949,14 +950,24 @@ export default function App() {
     if(JSON.stringify(before)===JSON.stringify(next))return;
     await record('timeline audio edit',()=>write(before),()=>write(next));
   }
-  function projectAudioClip(asset:{id:string;original_filename:string;duration_ms?:number|null},startMs=0):ProjectAudioClip{
-    const duration=Math.max(200,Math.round(asset.duration_ms||1000));
-    return {id:crypto.randomUUID(),asset_id:asset.id,name:asset.original_filename||'Audio clip',start_ms:Math.max(0,Math.round(startMs)),source_in_ms:0,source_out_ms:duration,source_duration_ms:duration,volume:100,fade_in_ms:0,fade_out_ms:0,mute:false};
+  async function updateTimelineSettings(next:TimelineSettings,options?:{undoable?:boolean;label?:string}){
+    if(!project)return;
+    const before=(projectRef.current?.finishing_json||project.finishing_json||{}).timeline;
+    const write=async(value:TimelineSettings|undefined)=>{const current=projectRef.current||project;const fin={...(current.finishing_json||{})};if(value)fin.timeline=value;else delete fin.timeline;await api.updateProject(project.id,{finishing:fin});};
+    if(JSON.stringify(before)===JSON.stringify(next))return;
+    if(options?.undoable)await record(options.label||'timeline change',()=>write(before),()=>write(next));
+    else await action(async()=>{await write(next);await refresh();});
   }
-  async function addTimelineAudioAssets(assets:{id:string;original_filename:string;duration_ms?:number|null}[],startMs=0){
+  function projectAudioClip(asset:{id:string;original_filename:string;duration_ms?:number|null},startMs=0,track?:string):ProjectAudioClip{
+    const duration=Math.max(200,Math.round(asset.duration_ms||1000));
+    const clip:ProjectAudioClip={id:crypto.randomUUID(),asset_id:asset.id,name:asset.original_filename||'Audio clip',start_ms:Math.max(0,Math.round(startMs)),source_in_ms:0,source_out_ms:duration,source_duration_ms:duration,volume:100,fade_in_ms:0,fade_out_ms:0,mute:false};
+    if(track&&track!=='A3'&&(AUDIO_TRACKS as readonly string[]).includes(track))clip.track=track as AudioTrackId;
+    return clip;
+  }
+  async function addTimelineAudioAssets(assets:{id:string;original_filename:string;duration_ms?:number|null}[],startMs=0,track?:string){
     if(!project||!assets.length)return;
     const existing=(projectRef.current?.finishing_json||project.finishing_json||{}).audio_clips||[];
-    const created=assets.map(asset=>projectAudioClip(asset,startMs));
+    const created=assets.map(asset=>projectAudioClip(asset,startMs,track));
     await updateProjectAudioClips([...existing,...created]);
     const last=created[created.length-1];if(last)setSelectedAudioClipId(last.id);
   }
@@ -1024,12 +1035,12 @@ export default function App() {
     const latest=await api.getProject(project.id);projectRef.current=latest;setProject(latest);setSelectedId(sceneId);
     window.dispatchEvent(new CustomEvent('sceneforge-open-tab',{detail:{sceneId,tab:'Text'}}));
   }
-  async function dropFilesOnTimeline(sceneId:string|null,files:File[],insert?:{before?:string;after?:string;audioTrack?:boolean;timeMs?:number}){
+  async function dropFilesOnTimeline(sceneId:string|null,files:File[],insert?:{before?:string;after?:string;audioTrack?:boolean;timeMs?:number;track?:string}){
     if(!project)return;
     if(insert?.audioTrack){
       const audioFiles=files.filter(file=>mediaKind(file.name)==='audio'),unsupported=files.filter(file=>mediaKind(file.name)!=='audio').map(file=>file.name),uploaded:Asset[]=[];
       await action(async()=>{for(const file of audioFiles){setImportStatus(`Importing ${file.name}…`);try{uploaded.push(await api.uploadAsset(project.id,file));}catch(e:any){unsupported.push(`${file.name}: ${e.message}`);}}setMediaVersion(v=>v+1);});
-      if(uploaded.length){await addTimelineAudioAssets(uploaded,insert.timeMs||0);setImportStatus(`${uploaded.length} audio clip${uploaded.length===1?'':'s'} added to A3. Drag to move; drag an edge to trim.${unsupported.length?` Skipped: ${unsupported.slice(0,3).join(', ')}.`:''}`);}
+      if(uploaded.length){await addTimelineAudioAssets(uploaded,insert.timeMs||0,insert.track);setImportStatus(`${uploaded.length} audio clip${uploaded.length===1?'':'s'} added to ${insert.track||'A3'}. Drag to move; drag an edge to trim.${unsupported.length?` Skipped: ${unsupported.slice(0,3).join(', ')}.`:''}`);}
       else setImportStatus(unsupported.length?`No audio clips added. Skipped: ${unsupported.slice(0,3).join(', ')}.`:'No supported audio files found.');
       return;
     }
@@ -1047,10 +1058,10 @@ export default function App() {
     if(plan.rejected.length)notes.push(`Skipped unsupported: ${plan.rejected.slice(0,3).join(', ')}${plan.rejected.length>3?'…':''}`);
     setImportStatus(notes.join('. ')+(notes.length?'.':''));
   }
-  async function dropAssetsOnTimeline(sceneId:string|null,dragged:DraggedAsset[],insert?:{before?:string;after?:string;audioTrack?:boolean;timeMs?:number}){
+  async function dropAssetsOnTimeline(sceneId:string|null,dragged:DraggedAsset[],insert?:{before?:string;after?:string;audioTrack?:boolean;timeMs?:number;track?:string}){
     if(!project)return;
     const audio=dragged.filter(a=>a.type==='audio'),visual=dragged.filter(a=>a.type==='image'||a.type==='video');
-    if(insert?.audioTrack){await addTimelineAudioAssets(audio,insert.timeMs||0);setImportStatus(audio.length?`${audio.length} audio clip${audio.length===1?'':'s'} added to A3.`:'Drop an audio item from the Media Pool onto A3.');return;}
+    if(insert?.audioTrack){await addTimelineAudioAssets(audio,insert.timeMs||0,insert.track);setImportStatus(audio.length?`${audio.length} audio clip${audio.length===1?'':'s'} added to ${insert.track||'A3'}.`:'Drop an audio item from the Media Pool onto an audio track (A3–A8).');return;}
     await action(async()=>{
       if(audio[0]&&sceneId)await attachAudio(sceneId,()=>api.useAudioAsset(sceneId,audio[0].id) as Promise<{id:string}>);
       await placeVisuals(sceneId,visual as unknown as Asset[],insert);
@@ -1275,7 +1286,7 @@ export default function App() {
         <div id="sequence-viewer"/>
       </main>
     </div>
-    <ProjectTimeline notice={importStatus} onDropFiles={(id,files,insert)=>void dropFilesOnTimeline(id,files,insert)} onDropAssets={(id,assets,insert)=>void dropAssetsOnTimeline(id,assets,insert)} onDuration={resizeDuration} onTrimShot={(sceneId,shotId,sourceIn,sourceOut)=>{const shot=project.scenes.find(s=>s.id===sceneId)?.shots.find(x=>x.id===shotId);if(shot){const before={source_in_ms:shot.source_in_ms,source_out_ms:shot.source_out_ms};void record("trim video clip",()=>api.updateShot(shotId,before),()=>api.updateShot(shotId,{source_in_ms:sourceIn,source_out_ms:sourceOut}));}}} onRender={()=>void renderFullVideo()} exportScenes={exportScenes} exportAsset={exportJob?.status==="succeeded"?exportJob.artifact_asset_id:null} project={project} selectedId={selected?.id||""} selectedAudioClipId={selectedAudioClipId} onAudioClipSelect={setSelectedAudioClipId} onUpdateAudioClips={clips=>void updateProjectAudioClips(clips)} disabled={busy||exporting} onSelect={setSelectedId} onAdd={addPart} multi={multi} onMulti={(id,mode)=>{if(!project)return;setMulti(m=>{if(mode==='clear')return [];const base=m.length?m:(selected?[selected.id]:[]);if(mode==='toggle')return base.includes(id)?base.filter(x=>x!==id):[...base,id];const ids=project.scenes.map(x=>x.id),a=ids.indexOf(selected?.id||id),b=ids.indexOf(id);return ids.slice(Math.min(a,b),Math.max(a,b)+1);});}} clipboard={clip} onClipboard={c=>{setClip(c);setImportStatus(c.kind==='scene'?`Copied scene “${c.label}”. Select a scene and press Ctrl+V (or right-click → Paste) to paste it after that scene.`:`Copied ${c.label}. Select another scene's narration and press Ctrl+V to paste.`);}} onDuplicate={id=>void duplicateScene(id)} onPaste={id=>void pasteClip(id)} onReorder={ids=>record('scene order',()=>api.reorderScenes(project.id,project.scenes.map(s=>s.id)),()=>api.reorderScenes(project.id,ids))} onUpdate={(id,patch)=>record('transition',()=>api.updateScene(id,{transition_in:project.scenes.find(s=>s.id===id)!.transition_in_json}),()=>api.updateScene(id,patch))} onDelete={()=>selected&&void deleteScene(selected.id)} onDeleteScene={id=>void deleteScene(id)} onToggleClipAudio={(shotId,audio)=>{const shot=project.scenes.flatMap(s=>s.shots).find(x=>x.id===shotId);if(!shot)return;const before=shot.audio_json||{volume:100,mute:false,duck:true};void record('toggle clip sound',()=>api.updateShot(shotId,{audio:before}),()=>api.updateShot(shotId,{audio}));}} onAudio={()=>audioImportRef.current?.click()} onRemoveAudio={()=>selected&&void removeNarration(selected)} onRemoveSceneAudio={id=>{const s=project.scenes.find(x=>x.id===id);if(s)void removeNarration(s);}} onUndo={undoTimeline} onRedo={redoTimeline} canUndo={!!history.length} canRedo={!!future.length} onSplit={(at,baked)=>{if(!selected)return;const snapshot=selected;let rightId="";void record("split scene",async()=>{if(rightId)await api.deleteScene(rightId);await api.restoreScene(snapshot.id,snapshot);setEditorEpoch(v=>v+1);setSelectedId(snapshot.id);},async()=>{const right=await api.splitScene(snapshot.id,at,baked);rightId=right.id;setEditorEpoch(v=>v+1);setSelectedId(right.id);});}}/>
+    <ProjectTimeline onUpdateTimeline={(next,options)=>void updateTimelineSettings(next,options)} notice={importStatus} onDropFiles={(id,files,insert)=>void dropFilesOnTimeline(id,files,insert)} onDropAssets={(id,assets,insert)=>void dropAssetsOnTimeline(id,assets,insert)} onDuration={resizeDuration} onTrimShot={(sceneId,shotId,sourceIn,sourceOut)=>{const shot=project.scenes.find(s=>s.id===sceneId)?.shots.find(x=>x.id===shotId);if(shot){const before={source_in_ms:shot.source_in_ms,source_out_ms:shot.source_out_ms};void record("trim video clip",()=>api.updateShot(shotId,before),()=>api.updateShot(shotId,{source_in_ms:sourceIn,source_out_ms:sourceOut}));}}} onRender={()=>void renderFullVideo()} exportScenes={exportScenes} exportAsset={exportJob?.status==="succeeded"?exportJob.artifact_asset_id:null} project={project} selectedId={selected?.id||""} selectedAudioClipId={selectedAudioClipId} onAudioClipSelect={setSelectedAudioClipId} onUpdateAudioClips={clips=>void updateProjectAudioClips(clips)} disabled={busy||exporting} onSelect={setSelectedId} onAdd={addPart} multi={multi} onMulti={(id,mode)=>{if(!project)return;setMulti(m=>{if(mode==='clear')return [];const base=m.length?m:(selected?[selected.id]:[]);if(mode==='toggle')return base.includes(id)?base.filter(x=>x!==id):[...base,id];const ids=project.scenes.map(x=>x.id),a=ids.indexOf(selected?.id||id),b=ids.indexOf(id);return ids.slice(Math.min(a,b),Math.max(a,b)+1);});}} clipboard={clip} onClipboard={c=>{setClip(c);setImportStatus(c.kind==='scene'?`Copied scene “${c.label}”. Select a scene and press Ctrl+V (or right-click → Paste) to paste it after that scene.`:`Copied ${c.label}. Select another scene's narration and press Ctrl+V to paste.`);}} onDuplicate={id=>void duplicateScene(id)} onPaste={id=>void pasteClip(id)} onReorder={ids=>record('scene order',()=>api.reorderScenes(project.id,project.scenes.map(s=>s.id)),()=>api.reorderScenes(project.id,ids))} onUpdate={(id,patch)=>record('transition',()=>api.updateScene(id,{transition_in:project.scenes.find(s=>s.id===id)!.transition_in_json}),()=>api.updateScene(id,patch))} onDelete={()=>selected&&void deleteScene(selected.id)} onDeleteScene={id=>void deleteScene(id)} onToggleClipAudio={(shotId,audio)=>{const shot=project.scenes.flatMap(s=>s.shots).find(x=>x.id===shotId);if(!shot)return;const before=shot.audio_json||{volume:100,mute:false,duck:true};void record('toggle clip sound',()=>api.updateShot(shotId,{audio:before}),()=>api.updateShot(shotId,{audio}));}} onAudio={()=>audioImportRef.current?.click()} onRemoveAudio={()=>selected&&void removeNarration(selected)} onRemoveSceneAudio={id=>{const s=project.scenes.find(x=>x.id===id);if(s)void removeNarration(s);}} onUndo={undoTimeline} onRedo={redoTimeline} canUndo={!!history.length} canRedo={!!future.length} onSplit={(at,baked)=>{if(!selected)return;const snapshot=selected;let rightId="";void record("split scene",async()=>{if(rightId)await api.deleteScene(rightId);await api.restoreScene(snapshot.id,snapshot);setEditorEpoch(v=>v+1);setSelectedId(snapshot.id);},async()=>{const right=await api.splitScene(snapshot.id,at,baked);rightId=right.id;setEditorEpoch(v=>v+1);setSelectedId(right.id);});}}/>
     {settingsOpen&&<SettingsPanel key={settingsInitialTab} priority={videoGenOpen} initialTab={settingsInitialTab} onClose={()=>setSettingsOpen(false)} preferences={preferences} onPreferencesChange={updatePreferences} disabled={busy||exporting}/>}
 
     {infoPanel?.panel==='ai'&&<AIEnginesPanel section={infoPanel.section} onClose={()=>setInfoPanel(null)} onOpenSettings={()=>{setInfoPanel(null);openSettings('providers');}}/>}

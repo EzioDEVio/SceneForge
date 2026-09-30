@@ -126,4 +126,25 @@ invalid={**timeline_audio[0],'fade_in_ms':500,'fade_out_ms':500}
 check('timeline audio rejects fades longer than the trimmed clip',client.patch(f'/api/projects/{pid}',json={'finishing':{'audio_clips':[invalid]}}).status_code==400)
 clip_mix=audio(export())
 check('A3 audio is audible inside each placed clip and absent in the gap',rms(clip_mix,2.5,2.8)>0.03 and rms(clip_mix,3.0,3.25)<0.005 and rms(clip_mix,3.6,3.9)>0.01)
+
+# --- timeline v1: audio tracks A3-A8, track mute/solo, markers ------------------
+multi=[{**timeline_audio[0]},{**timeline_audio[1],'track':'A5'}]
+saved=client.patch(f'/api/projects/{pid}',json={'finishing':{'audio_clips':multi,'timeline':{'version':1,'tracks':{'V1':{'locked':True},'A5':{'mute':False}},'audio_tracks':['A5'],'markers':[{'id':'m1','time_ms':2300,'duration_ms':700,'label':'Cue','color':'blue'}]}}}).json()['finishing_json']
+check('A3 stays implicit and other audio tracks are stored on the clip','track' not in saved['audio_clips'][0] and saved['audio_clips'][1]['track']=='A5')
+check('timeline settings round-trip: locks, visible tracks and range markers',saved['timeline']['tracks']=={'V1':{'locked':True}} and saved['timeline']['audio_tracks']==['A3','A5'] and saved['timeline']['markers'][0]['duration_ms']==700)
+bad_track=client.patch(f'/api/projects/{pid}',json={'finishing':{'audio_clips':[{**timeline_audio[0],'track':'A9'}]}})
+bad_state=client.patch(f'/api/projects/{pid}',json={'finishing':{'timeline':{'tracks':{'V1':{'mute':True}}}}})
+future=client.patch(f'/api/projects/{pid}',json={'finishing':{'timeline':{'version':2}}})
+check('unknown tracks, scene-track mute and newer timeline versions are rejected',bad_track.status_code==400 and bad_state.status_code==400 and future.status_code==400)
+mix=audio(export())
+check('A5 clip is mixed at its sequence time alongside A3',rms(mix,2.5,2.8)>0.03 and rms(mix,3.6,3.9)>0.01 and rms(mix,3.0,3.25)<0.005)
+client.patch(f'/api/projects/{pid}',json={'finishing':{'audio_clips':multi,'timeline':{'tracks':{'A5':{'mute':True}}}}})
+mix=audio(export())
+check('muting A5 silences only its clip in export',rms(mix,2.5,2.8)>0.03 and rms(mix,3.6,3.9)<0.005)
+client.patch(f'/api/projects/{pid}',json={'finishing':{'audio_clips':multi,'timeline':{'tracks':{'A5':{'solo':True}}}}})
+mix=audio(export())
+check('soloing A5 leaves only A5 among timeline audio tracks',rms(mix,2.5,2.8)<0.005 and rms(mix,3.6,3.9)>0.01)
+from app.render.finishing import audible_clips
+check('audible clips: clip mute, track mute and solo combine as documented',[c['id'] for c in audible_clips({'audio_clips':[{'id':'x'},{'id':'y','track':'A4'},{'id':'z','track':'A4','mute':True}],'timeline':{'tracks':{'A4':{'solo':True}}}})]==['y'])
+client.patch(f'/api/projects/{pid}',json={'finishing':{'audio_clips':timeline_audio}})
 print(f'{n} finishing checks passed')

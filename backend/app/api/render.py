@@ -24,11 +24,16 @@ def render_part_endpoint(scene_id: str, db: Session = Depends(get_db)):
     if not scene.shots:
         raise HTTPException(400, "This part has no media yet — add an image or video before generating.")
 
-    job = RenderJob(project_id=scene.project_id, scene_id=scene_id, scope=JobScope.PART, status=JobStatus.QUEUED)
-    db.add(job)
-    db.commit()
-    db.refresh(job)
-    job_worker.start_part_job(job.id, scene.project_id, scene_id)
+    job_id = job_worker.reserve_job_id()
+    try:
+        job = RenderJob(id=job_id, project_id=scene.project_id, scene_id=scene_id, scope=JobScope.PART, status=JobStatus.QUEUED)
+        db.add(job)
+        db.commit()
+        db.refresh(job)
+        job_worker.start_part_job(job.id, scene.project_id, scene_id)
+    except Exception:
+        job_worker.release_job_id(job_id)
+        raise
     return {"job_id": job.id}
 
 
@@ -50,11 +55,16 @@ def export_project_endpoint(project_id: str, skip_empty: bool = False, body: dic
         raise HTTPException(400, "These scenes have no media: " + ", ".join(empty) + ". Add media, or choose to export only scenes with media.")
     selected_ids = [s.id for s in project.scenes if s.shots]
     if not selected_ids: raise HTTPException(400, "Add media to at least one scene before exporting.")
-    job = RenderJob(project_id=project_id, scene_id=None, scope=JobScope.FULL_EXPORT, status=JobStatus.QUEUED)
-    db.add(job)
-    db.commit()
-    db.refresh(job)
-    job_worker.start_export_job(job.id, project_id, selected_ids, settings)
+    job_id = job_worker.reserve_job_id()
+    try:
+        job = RenderJob(id=job_id, project_id=project_id, scene_id=None, scope=JobScope.FULL_EXPORT, status=JobStatus.QUEUED)
+        db.add(job)
+        db.commit()
+        db.refresh(job)
+        job_worker.start_export_job(job.id, project_id, selected_ids, settings)
+    except Exception:
+        job_worker.release_job_id(job_id)
+        raise
     return {"job_id": job.id}
 
 

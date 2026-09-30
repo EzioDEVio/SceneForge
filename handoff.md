@@ -12,6 +12,60 @@ This handoff preserves the earlier 0.5.3/0.6.0 review below and records the 0.7.
 
 Reviewed inputs in this workspace include the 0.5.3 source ZIP, the original 0.6.0 WIP ZIP, reviewed wip.2–wip.6 snapshots, their READMEs and handoffs, the SceneForge session handoff, chat notes, and the user screenshots. The 0.5.3 technical handoff predates the 0.5.3/0.6.0 work and should not be treated as a complete description of the present build.
 
+## 0.7.0 RC5 — CI fix and timeline v1 (Claude continuation, 2026-09-30)
+
+**Branch:** local `claude/0.7.0-rc5-timeline`, based on `codex/0.7.0-release-candidate` source commit `3d6107a`. That commit's tree `c813c8c` is identical to GitHub `chatgpt/0.7.0-video-generation` at `c9a8ee7`. Nothing has been pushed, merged, tagged or published. No paid or live provider call was made. The Windows UI was **not** tested by Claude.
+
+### What changed
+- **CI regression.** `test_editor_plus.py` expected 409 from a bare `running` row, but RC4 correctly treats rows without a live worker as stale.
+  - The test now uses a genuinely live job (`jobs.live_job`).
+  - Render, export and video-generation endpoints reserve the job ID as live before committing the queued row, which closes the commit-to-thread-start race.
+  - New checks: a reserved job blocks deletion (409); a stale queued row does not.
+- **Timeline v1.**
+  - Audio tracks A3–A8, each with mute, solo and lock.
+  - Edit tools V/A/B/N/Y/U/C, plus Razor All.
+  - Project-saved markers (point and range, with colours) and track locks, migrated from browser storage.
+  - Versioned `finishing_json.timeline`, with backend validation.
+  - Viewport virtualization, rAF-coalesced drag previews, Ctrl+wheel zoom around the pointer.
+  - Design, migration and limits are in `docs/TIMELINE_ARCHITECTURE.md`.
+- **Files.**
+  - Backend: `backend/app/workers/jobs.py`, `backend/app/api/render.py`, `backend/app/api/video_generation.py`, `backend/app/render/finishing.py`, `backend/app/main.py` (build ID `v0.7.0-rc5`).
+  - Frontend: `frontend/src/timeline/{timeline.types.ts,timeMath.ts,editOps.ts}` (new), `ProjectTimeline.tsx`, `App.tsx`, `FinishingPanel.tsx`, `api.ts`, `studio.css`.
+  - Tests: `frontend/tests/timeline.mjs` (new), `frontend/tests/editor.mjs`, `frontend/package.json`, `tests/integration/test_editor_plus.py`, `tests/integration/test_finishing.py`.
+- **Migration.** Additive and versioned. A clip without `track` is on A3. A project without `timeline` reads browser-stored markers and locks once, and they are saved into the project on the next timeline change. To downgrade, remove `timeline` and `track`; clips on A4–A8 then play on A3.
+
+### Verification (Linux container, Python 3.12, Node 22, system FFmpeg)
+- Frontend:
+  - Production build passed; the editor bundle is 572.5 kB (was 555.7 kB), and Vite's >500 kB advisory is unchanged.
+  - 237 component checks (226 before), 19 unit, 38 new timeline model/migration/edit-operation checks, 2 video-generation flows and 6 share-dialog checks.
+- Desktop: 18/18 passed.
+- Backend: the full `checks.yml` integration sequence was run under a disposable gnome-keyring exactly as CI runs it, and all 21 scripts passed. That includes `test_editor_plus.py` (16 checks) and `test_stale_jobs.py` (6 at the time; 10 after the real-render check was added).
+- `test_finishing.py`, rerun with the RC5 additions: 29/29 passed (22 existing plus 7 new). The new checks cover:
+  - A3 staying implicit on clips
+  - timeline round-trip
+  - rejection of invalid tracks, invalid track states and newer versions
+  - A5 mixed at its sequence time
+  - A5 mute silencing only that clip
+  - A5 solo
+  - the audibility rules
+- `test_source_split.py` passed.
+- `test_cancel_live.py` could not run here: it needs a running server plus a local TTS voice engine, and it is not part of CI.
+- In its place, `test_stale_jobs.py` now has a real-FFmpeg render check (10 checks in total): a render that is in progress blocks deletion (409) and leaves the job intact; it then finishes, releases its live slot, and the project deletes (200).
+- Edit-operation timing in Node, per call:
+  - 64 clips: ≤31 µs
+  - 1,000 clips: ≤70 µs
+  - With 1,000 clips at 55 px/s in a 1,600 px view, 45 clips are rendered.
+- **GitHub workflow diagnosis.** Run 36763871406 failed only because of the stale-row test assumption above; the product behaviour was correct. The workflow itself needs no change, because `npm test` now includes `tests/timeline.mjs`. Push the branch (with authorization) to get a real CI rerun.
+
+### Manual Windows checklist (not yet run)
+1. Install the RC5 installer from a CI artifact. Open an RC4 project that has markers and locks: they should appear, and after one marker edit they are saved in the project.
+2. Drop audio on A3. Add A4 and drag a clip down onto it. Mute A4 and export: the clip should be silent. Solo A4 and export: only A4 should be heard among A3–A8, while narration and music are unchanged.
+3. Press each tool key (V, A, B, N, Y, U, C) and repeat each gesture on two touching clips. Undo and redo each one.
+4. Shift+C with clips on three tracks and one track locked: the locked track must stay uncut.
+5. Start a render, then try to delete that project (expect "Wait for rendering…"). Cancel the render and delete again (expect success).
+6. Ctrl+wheel over the timeline: the time under the pointer stays in place. Scroll across a long project: it should feel smooth.
+7. Recheck the RC4 items that are still open: Whisper on the clean-audio sample that previously failed, and any local or cloud generation provider you plan to ship.
+
 ## User test follow-up: editable cuts, captions, audio and overlays
 
 This follow-up addresses the latest local test findings while keeping 0.5.3 and the existing 0.7.0 features intact. The candidate API build ID is `v0.7.0-rc4`; the packaged app version remains 0.7.0 until a stable release is approved.

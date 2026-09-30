@@ -10,6 +10,7 @@ from fastapi.testclient import TestClient
 from app.main import app
 from app.db.database import SessionLocal
 from app.db.models import RenderJob
+from app.workers import jobs
 from app.providers.image_options import generate, local_url
 from app.providers.openai_image import ImageProviderError
 n=0
@@ -45,12 +46,24 @@ with TestClient(app) as client:
   hf.return_value.text_to_image.return_value=Image.new('RGB',(64,64))
   data=generate(SimpleNamespace(name='huggingface',model='test/image'), 'hf_fixture','test','1024x1024')
   check('HF SDK routes requested model and returns PNG',data.startswith(b'\x89PNG') and hf.return_value.text_to_image.call_args.kwargs['model']=='test/image')
+ # A job that is executing in this process must block deletion. The row alone is not
+ # enough: after a crash, orphaned rows are recovered instead of blocking forever.
  with SessionLocal() as db:
   job=RenderJob(project_id=p['id'],scene_id=scene,scope='part',status='running');db.add(job);db.commit();jid=job.id
- check('Cannot delete project during an active render',client.delete('/api/projects/'+p['id']).status_code==409)
+ with jobs.live_job(jid):
+  r=client.delete('/api/projects/'+p['id'])
+  check('Cannot delete project during an active render',r.status_code==409 and 'rendering' in r.text)
+  with SessionLocal() as db: check('Blocked delete leaves the live job running',db.get(RenderJob,jid).status=='running')
+ check('Live job registry is released after the block',jid not in jobs.active_job_ids())
+ # Reserved ids count as live before the worker thread starts (no commit-to-start race).
+ rid=jobs.reserve_job_id()
+ with SessionLocal() as db:
+  db.add(RenderJob(id=rid,project_id=p['id'],scope='full_export',status='queued'));db.commit()
+ check('A reserved, not-yet-started job also blocks deletion',client.delete('/api/projects/'+p['id']).status_code==409)
+ jobs.release_job_id(rid)
  with SessionLocal() as db:
   db.get(RenderJob,jid).status='succeeded';db.commit()
- check('Can delete project after render completes',client.delete('/api/projects/'+p['id']).status_code==200)
+ check('Stale queued row without a live worker does not block deletion',client.delete('/api/projects/'+p['id']).status_code==200)
  check('Deleting project preserves provider settings',len(client.get('/api/providers').json())==2)
  check('Missing project reports 404',client.delete('/api/projects/'+p['id']).status_code==404)
 print(f'{n} editor-plus checks passed')

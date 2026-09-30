@@ -156,15 +156,21 @@ def start_video_generation(project_id: str, body: schemas.GenerateVideoRequest, 
     if cost.get("credits") is not None:
         cost["credits"] = round(cost["credits"] * body.candidate_count, 2)
     cost["candidate_count"] = body.candidate_count
-    job = RenderJob(
-        project_id=project_id,
-        scene_id=None,
-        scope="video_generation",
-        status=JobStatus.QUEUED,
-        plan_json={"provider": body.provider, "model": body.model, "cost_estimate": cost},
-    )
-    db.add(job)
-    db.commit()
-    db.refresh(job)
-    job_worker.start_video_generation_job(job.id, project_id, body.model_dump())
+    job_id = job_worker.reserve_job_id()
+    try:
+        job = RenderJob(
+            id=job_id,
+            project_id=project_id,
+            scene_id=None,
+            scope="video_generation",
+            status=JobStatus.QUEUED,
+            plan_json={"provider": body.provider, "model": body.model, "cost_estimate": cost},
+        )
+        db.add(job)
+        db.commit()
+        db.refresh(job)
+        job_worker.start_video_generation_job(job.id, project_id, body.model_dump())
+    except Exception:
+        job_worker.release_job_id(job_id)
+        raise
     return {"job_id": job.id}

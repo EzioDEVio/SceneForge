@@ -22,6 +22,8 @@ from __future__ import annotations
 import queue
 import threading
 import traceback
+import uuid
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 
 from app.db.database import session_scope
@@ -44,6 +46,36 @@ def active_job_ids() -> set[str]:
     """
     with _lock:
         return set(_active_jobs)
+
+
+def reserve_job_id() -> str:
+    """Create a job id that already counts as live.
+
+    Callers reserve the id before committing the queued RenderJob row, so a
+    project delete that lands between the commit and the worker start sees a
+    live job (409) instead of treating the brand-new row as stale.
+    """
+    job_id = str(uuid.uuid4())
+    with _lock:
+        _active_jobs.add(job_id)
+    return job_id
+
+
+def release_job_id(job_id: str) -> None:
+    """Drop a reserved id when its job could not be queued or started."""
+    with _lock:
+        _active_jobs.discard(job_id)
+
+
+@contextmanager
+def live_job(job_id: str):
+    """Mark a job live for the duration of the block (tests and tools)."""
+    with _lock:
+        _active_jobs.add(job_id)
+    try:
+        yield job_id
+    finally:
+        release_job_id(job_id)
 
 
 def recover_interrupted_jobs() -> int:

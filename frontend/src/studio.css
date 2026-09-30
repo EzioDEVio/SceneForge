@@ -637,3 +637,31 @@ button:hover>.sample-squeeze_v span+span,.tx-live.sample-squeeze_v span+span{ani
 .tx-live.sample-wind_right span+span,button:hover>.sample-wind_right span+span,button:focus-visible>.sample-wind_right span+span{animation:sf-tx-wind-r 1.5s ease-in-out infinite}
 .tx-live.sample-wind_down span+span,button:hover>.sample-wind_down span+span,button:focus-visible>.sample-wind_down span+span{animation:sf-tx-wind-d 1.5s ease-in-out infinite}
 .tx-live.sample-cut span+span,button:hover>.sample-cut span+span,button:focus-visible>.sample-cut span+span{animation:none;opacity:1}
+
+/* Timeline v1: audio tracks A3–A8, mute/solo, edit tools, range markers */
+.timeline-tools{display:inline-flex;align-items:center;gap:2px;margin-right:8px;padding:2px;border:1px solid #454a58;border-radius:7px;background:#23272f}
+.timeline-tools>button{min-width:24px;height:24px;padding:0 6px;border:1px solid transparent;border-radius:5px;background:transparent;color:#cbd1df;font:600 11px/1 inherit;cursor:pointer}
+.timeline-tools>button:hover{background:#303640}
+.timeline-tools>button.active{background:#3c3655;border-color:#a18bff;color:#f0ebff}
+.track-state-buttons{display:inline-flex;gap:3px;margin-left:auto}
+.track-state-buttons+.track-lock-button{margin-left:3px}
+.track-mute-button,.track-solo-button,.track-hide-button{width:22px;height:22px;display:grid;place-items:center;padding:0;border:1px solid #626b7a;border-radius:5px;background:#303640;color:#dce3ee;font:700 10px/1 inherit;cursor:pointer}
+.track-mute-button.active{background:#6b2f2f;border-color:#e07a7a;color:#fff}
+.track-solo-button.active{background:#6b5a1f;border-color:#f2c14e;color:#fff}
+.track-mute-button:disabled,.track-solo-button:disabled,.track-hide-button:disabled{opacity:.48;cursor:wait}
+.track-silent small{color:#e8a0a0}
+.track-add-button{display:flex;align-items:center;gap:4px;width:100%;height:26px;padding:0 8px;border:1px dashed #555d6c;border-radius:5px;background:transparent;color:#aab3c4;font-size:11px;cursor:pointer}
+.track-add-button:hover:not(:disabled){border-color:#a18bff;color:#e9e2ff}
+.track-add-button:disabled{opacity:.5;cursor:default}
+.project-audio-track.silent .project-audio-row{opacity:.45}
+.project-audio-track.locked{background-image:repeating-linear-gradient(135deg,transparent 0 8px,rgba(117,100,168,.12) 8px 16px)}
+.project-audio-row.dragging{outline:2px solid #a18bff;z-index:3}
+.timeline-marker-range{position:absolute;left:0;top:0;height:6px;border-radius:3px;background:currentColor;opacity:.45;pointer-events:none}
+.timeline-marker .timeline-marker-color{width:9px;height:9px;min-width:9px;padding:0;border:1px solid rgba(0,0,0,.4);border-radius:50%;background:currentColor;cursor:pointer}
+.timeline-marker.marker-amber{color:#f2c14e}.timeline-marker.marker-red{color:#ef6b6b}.timeline-marker.marker-green{color:#5fd08a}.timeline-marker.marker-blue{color:#62a8ff}.timeline-marker.marker-purple{color:#b69cff}
+html[data-theme="light"] .studio-shell .timeline-tools{background:#fff;border-color:#cbd2de}
+html[data-theme="light"] .studio-shell .timeline-tools>button{color:#344054}
+html[data-theme="light"] .studio-shell .timeline-tools>button.active{background:#ebe8fb;color:#38298e;border-color:var(--blue)}
+html[data-theme="light"] .studio-shell .track-mute-button,html[data-theme="light"] .studio-shell .track-solo-button,html[data-theme="light"] .studio-shell .track-hide-button{background:#fff;color:#344054;border-color:#cbd2de}
+html[data-theme="light"] .studio-shell .track-add-button{color:#344054;border-color:#aab3c4}
+@media(prefers-reduced-motion:reduce){.project-audio-row{transition:none!important}}

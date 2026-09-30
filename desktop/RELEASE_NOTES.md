@@ -1,3 +1,38 @@
+# SceneForge Studio 0.7.0 RC5 (unreleased)
+
+RC5 builds on RC4 commit `3d6107a` and is committed locally on `claude/0.7.0-rc5-timeline`. It has not been pushed, tagged or published. The public release remains 0.5.3. No live ComfyUI, Google Veo, Runway or other paid provider call was made for RC5.
+
+## CI fix: deleting a project during an active render
+- **Cause.** RC4 changed project deletion so that only jobs live in the current process block it; stale job rows are recovered instead. `test_editor_plus.py` still created a bare `running` row with no live worker and expected 409. The server correctly treated that row as stale and returned 200.
+- **Invariant, unchanged.** A job that is truly active blocks deletion with 409. An abandoned job row never blocks deletion forever.
+- **Race closed.** Render, export and video-generation endpoints now reserve the job ID as live *before* committing the queued row (`reserve_job_id` / `release_job_id`). Previously, a delete that landed between the commit and the worker start could treat a brand-new job as stale.
+- **Tests.** The test now registers a genuinely live job. It adds checks for a reserved-but-not-started job (409), release of the live registry, and a stale queued row (deletable). The existing stale-job suite still passes.
+
+## Timeline v1
+- **Audio tracks A3–A8.** Timeline audio clips can live on six independent tracks.
+  - Add a track from the track header, and remove an empty one.
+  - Move a clip between tracks by dragging it up or down, or with the Audio inspector's Track menu.
+  - Dropping audio on a track places it there.
+  - A1 narration, A2 clip sound and the whole-project music bed keep their meaning.
+- **Track mute, solo and lock** for every audio track, saved with the project and honoured in export.
+  - Solo applies among A3–A8 only; narration, clip sound and music are not affected, and the tooltip says so.
+  - Tracks that won't be heard are dimmed and labelled.
+- **Edit tools** for timeline audio clips:
+  - Select (V) and Track select forward (A)
+  - Ripple trim (B), Roll (N), Slip (Y) and Slide (U)
+  - Blade (C). Shift+click, Shift+C or Shift+scissors runs Razor All across unlocked audio tracks.
+  - Delete removes the focused clip; Shift+Delete ripple-deletes it.
+  - Every tool uses the same pure edit function for the drag preview and the saved result, and all edits are undoable.
+- **Markers** are saved with the project (they were previously kept only in this browser profile).
+  - New **range markers** span the selected audio clip(s) or scene.
+  - A marker's colour can be changed.
+  - Marker edits can be undone.
+  - Existing browser-stored markers and locks migrate into the project automatically.
+- **Versioned timeline format.** `finishing_json.timeline` is at version 1, and A3 stays implicit on clips so older data keeps its meaning. The backend rejects unknown tracks, invalid track states and newer versions. See `docs/TIMELINE_ARCHITECTURE.md`.
+- **Performance.** Off-screen audio clips are not rendered, drag previews are coalesced to one update per animation frame, and Ctrl+wheel zooms around the pointer.
+- **Unchanged.** V1 remains scene-based. Gain envelopes, clip-attached markers, compound clips and free multitrack video are roadmap items, not part of RC5.
+- **Build ID** is now `v0.7.0-rc5`.
+
 # SceneForge Studio 0.7.0 RC4 (unreleased)
 
 This is an installer-test candidate on `chatgpt/0.7.0-video-generation`, not a published GitHub release. Keep it on this branch until the Windows installer has been tested; the public release remains unchanged. A prior local build was reported to generate successfully with Runway, but this regression pass does not repeat live provider calls.

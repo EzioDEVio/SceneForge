@@ -1,8 +1,11 @@
 """A restarted app must not let orphaned job rows block project cleanup."""
 import os
 import pathlib
+import subprocess
 import sys
 import tempfile
+import threading
+import time
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 tmp = tempfile.TemporaryDirectory()
@@ -63,5 +66,34 @@ with TestClient(app) as client:
               client.delete('/api/projects/' + active_project['id']).status_code == 409)
     finally:
         jobs._active_jobs.discard(active_id)
+
+    # End to end with a real FFmpeg render. The worker is held at a gate so the delete
+    # deterministically lands while the job is live (reserved before its row existed).
+    image = pathlib.Path(tmp.name) / 'still.png'
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'color=c=teal:s=320x180', '-frames:v', '1', str(image)], check=True)
+    real = client.post('/api/projects', json={'title': 'Real render protection', 'aspect': '16:9', 'fps': 25}).json()
+    asset = client.post(f"/api/assets/upload?project_id={real['id']}", files={'file': ('still.png', image.read_bytes(), 'image/png')}).json()
+    scene_id = client.get('/api/projects/' + real['id']).json()['scenes'][0]['id']
+    client.post(f'/api/scenes/{scene_id}/shots', json={'asset_id': asset['id']}).raise_for_status()
+    client.patch(f'/api/scenes/{scene_id}', json={'timing_mode': 'fixed', 'requested_duration_ms': 1000})
+    gate, original = threading.Event(), jobs._run_part_job
+    def gated(*args):
+        gate.wait(30)
+        return original(*args)
+    jobs._run_part_job = gated
+    try:
+        job_id = client.post(f'/api/scenes/{scene_id}/render').json()['job_id']
+        check('a real render in progress blocks project deletion', client.delete('/api/projects/' + real['id']).status_code == 409)
+        check('the blocked delete leaves the render job intact', client.get(f'/api/jobs/{job_id}').json()['status'] in ('queued', 'running'))
+    finally:
+        jobs._run_part_job = original
+        gate.set()
+    for _ in range(600):
+        status = client.get(f'/api/jobs/{job_id}').json()['status']
+        if status in ('succeeded', 'failed', 'cancelled'):
+            break
+        time.sleep(0.1)
+    check('the real render finishes with FFmpeg and releases its live slot', status == 'succeeded' and job_id not in jobs.active_job_ids())
+    check('the project can be deleted after its render finishes', client.delete('/api/projects/' + real['id']).status_code == 200)
 
 print(f'{checks} stale-job checks passed')

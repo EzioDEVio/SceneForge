@@ -3,13 +3,15 @@
 **Prepared:** 2026-09-30  
 **Project:** [EzioDEVio/SceneForge](https://github.com/EzioDEVio/SceneForge)  
 **Latest published release:** 0.5.3  
-**Current candidate:** 0.7.0 RC4, unreleased  
+**Current candidate:** 0.7.0 RC5, unreleased (local branch `claude/0.7.0-rc5-timeline` on top of RC4)  
 **Candidate branch:** `chatgpt/0.7.0-video-generation`  
 **Candidate commit:** `c9a8ee74831ab8ebc0a48aa0875e8139c98f568b` (tree `c813c8cdfe63446734c19e4031437ce531aedcea`)
 
 This is the single-document handoff: it combines current status and next steps, the session handoff, and cumulative release notes. Historical WIP/RC entries are development snapshots, not published releases. The earliest release notes present in this repository begin at 0.2.0 RC3; earlier prototype history is not reconstructed in the available records.
 
 ## Read this status first
+
+- **RC5 update (2026-09-30):** the RC4 CI failure is fixed (see the RC5 section in Appendix A). RC5 adds timeline v1: audio tracks A3–A8 with mute/solo/lock, edit tools, and project-saved range/colour markers. The full local CI sequence passes. RC5 has not been pushed; GitHub CI must rerun after an authorized push. The RC4 status notes below are kept for history.
 
 - **Public release stays 0.5.3.** The 0.6.0 WIP and 0.7.0 RC4 source additions have not been published as stable releases.
 - **Release workflow:** [Run 36763871298](https://github.com/EzioDEVio/SceneForge/actions/runs/36763871298) succeeded for Windows, Linux and macOS. The Windows job built the installer and passed packaged render, installed-app startup and uninstall smoke checks. The Windows artifact is `SceneForge-Studio-Windows` (artifact ID `11120491437`) and contains `SceneForge-Studio-0.7.0-Windows-x64-Setup.exe`. It is a temporary Actions artifact, not a GitHub Release.
@@ -50,6 +52,60 @@ For source setup, install boundaries, provider configuration and current app fea
 This handoff preserves the earlier 0.5.3/0.6.0 review below and records the 0.7.0 text-to-video milestone plus the latest UI/timeline follow-up. The 0.5.3 published release remains unchanged; 0.6.0-wip.10 is the source baseline for this additive branch. The 0.7.0 candidate is not a stable release. Keep it separate and wait for a fresh Windows installer test before merge or publication.
 
 Reviewed inputs in this workspace include the 0.5.3 source ZIP, the original 0.6.0 WIP ZIP, reviewed wip.2–wip.6 snapshots, their READMEs and handoffs, the SceneForge session handoff, chat notes, and the user screenshots. The 0.5.3 technical handoff predates the 0.5.3/0.6.0 work and should not be treated as a complete description of the present build.
+
+### 0.7.0 RC5 — CI fix and timeline v1 (Claude continuation, 2026-09-30)
+
+**Branch:** local `claude/0.7.0-rc5-timeline`, based on `codex/0.7.0-release-candidate` source commit `3d6107a`. That commit's tree `c813c8c` is identical to GitHub `chatgpt/0.7.0-video-generation` at `c9a8ee7`. Nothing has been pushed, merged, tagged or published. No paid or live provider call was made. The Windows UI was **not** tested by Claude.
+
+#### What changed
+- **CI regression.** `test_editor_plus.py` expected 409 from a bare `running` row, but RC4 correctly treats rows without a live worker as stale.
+  - The test now uses a genuinely live job (`jobs.live_job`).
+  - Render, export and video-generation endpoints reserve the job ID as live before committing the queued row, which closes the commit-to-thread-start race.
+  - New checks: a reserved job blocks deletion (409); a stale queued row does not.
+- **Timeline v1.**
+  - Audio tracks A3–A8, each with mute, solo and lock.
+  - Edit tools V/A/B/N/Y/U/C, plus Razor All.
+  - Project-saved markers (point and range, with colours) and track locks, migrated from browser storage.
+  - Versioned `finishing_json.timeline`, with backend validation.
+  - Viewport virtualization, rAF-coalesced drag previews, Ctrl+wheel zoom around the pointer.
+  - Design, migration and limits are in `docs/TIMELINE_ARCHITECTURE.md`.
+- **Files.**
+  - Backend: `backend/app/workers/jobs.py`, `backend/app/api/render.py`, `backend/app/api/video_generation.py`, `backend/app/render/finishing.py`, `backend/app/main.py` (build ID `v0.7.0-rc5`).
+  - Frontend: `frontend/src/timeline/{timeline.types.ts,timeMath.ts,editOps.ts}` (new), `ProjectTimeline.tsx`, `App.tsx`, `FinishingPanel.tsx`, `api.ts`, `studio.css`.
+  - Tests: `frontend/tests/timeline.mjs` (new), `frontend/tests/editor.mjs`, `frontend/package.json`, `tests/integration/test_editor_plus.py`, `tests/integration/test_finishing.py`.
+- **Migration.** Additive and versioned. A clip without `track` is on A3. A project without `timeline` reads browser-stored markers and locks once, and they are saved into the project on the next timeline change. To downgrade, remove `timeline` and `track`; clips on A4–A8 then play on A3.
+
+#### Verification (Linux container, Python 3.12, Node 22, system FFmpeg)
+- Frontend:
+  - Production build passed; the editor bundle is 572.5 kB (was 555.7 kB), and Vite's >500 kB advisory is unchanged.
+  - 237 component checks (226 before), 19 unit, 38 new timeline model/migration/edit-operation checks, 2 video-generation flows and 6 share-dialog checks.
+- Desktop: 18/18 passed.
+- Backend: the full `checks.yml` integration sequence was run under a disposable gnome-keyring exactly as CI runs it, and all 21 scripts passed. That includes `test_editor_plus.py` (16 checks) and `test_stale_jobs.py` (6 at the time; 10 after the real-render check was added).
+- `test_finishing.py`, rerun with the RC5 additions: 29/29 passed (22 existing plus 7 new). The new checks cover:
+  - A3 staying implicit on clips
+  - timeline round-trip
+  - rejection of invalid tracks, invalid track states and newer versions
+  - A5 mixed at its sequence time
+  - A5 mute silencing only that clip
+  - A5 solo
+  - the audibility rules
+- `test_source_split.py` passed.
+- `test_cancel_live.py` could not run here: it needs a running server plus a local TTS voice engine, and it is not part of CI.
+- In its place, `test_stale_jobs.py` now has a real-FFmpeg render check (10 checks in total): a render that is in progress blocks deletion (409) and leaves the job intact; it then finishes, releases its live slot, and the project deletes (200).
+- Edit-operation timing in Node, per call:
+  - 64 clips: ≤31 µs
+  - 1,000 clips: ≤70 µs
+  - With 1,000 clips at 55 px/s in a 1,600 px view, 45 clips are rendered.
+- **GitHub workflow diagnosis.** Run 36763871406 failed only because of the stale-row test assumption above; the product behaviour was correct. The workflow itself needs no change, because `npm test` now includes `tests/timeline.mjs`. Push the branch (with authorization) to get a real CI rerun.
+
+#### Manual Windows checklist (not yet run)
+1. Install the RC5 installer from a CI artifact. Open an RC4 project that has markers and locks: they should appear, and after one marker edit they are saved in the project.
+2. Drop audio on A3. Add A4 and drag a clip down onto it. Mute A4 and export: the clip should be silent. Solo A4 and export: only A4 should be heard among A3–A8, while narration and music are unchanged.
+3. Press each tool key (V, A, B, N, Y, U, C) and repeat each gesture on two touching clips. Undo and redo each one.
+4. Shift+C with clips on three tracks and one track locked: the locked track must stay uncut.
+5. Start a render, then try to delete that project (expect "Wait for rendering…"). Cancel the render and delete again (expect success).
+6. Ctrl+wheel over the timeline: the time under the pointer stays in place. Scroll across a long project: it should feel smooth.
+7. Recheck the RC4 items that are still open: Whisper on the clean-audio sample that previously failed, and any local or cloud generation provider you plan to ship.
 
 ### User test follow-up: editable cuts, captions, audio and overlays
 
@@ -321,6 +377,41 @@ The accompanying full-source ZIP contains the complete tracked SceneForge projec
 ---
 
 ## Appendix B — Complete cumulative release notes
+
+## SceneForge Studio 0.7.0 RC5 (unreleased)
+
+RC5 builds on RC4 commit `3d6107a` and is committed locally on `claude/0.7.0-rc5-timeline`. It has not been pushed, tagged or published. The public release remains 0.5.3. No live ComfyUI, Google Veo, Runway or other paid provider call was made for RC5.
+
+### CI fix: deleting a project during an active render
+- **Cause.** RC4 changed project deletion so that only jobs live in the current process block it; stale job rows are recovered instead. `test_editor_plus.py` still created a bare `running` row with no live worker and expected 409. The server correctly treated that row as stale and returned 200.
+- **Invariant, unchanged.** A job that is truly active blocks deletion with 409. An abandoned job row never blocks deletion forever.
+- **Race closed.** Render, export and video-generation endpoints now reserve the job ID as live *before* committing the queued row (`reserve_job_id` / `release_job_id`). Previously, a delete that landed between the commit and the worker start could treat a brand-new job as stale.
+- **Tests.** The test now registers a genuinely live job. It adds checks for a reserved-but-not-started job (409), release of the live registry, and a stale queued row (deletable). The existing stale-job suite still passes.
+
+### Timeline v1
+- **Audio tracks A3–A8.** Timeline audio clips can live on six independent tracks.
+  - Add a track from the track header, and remove an empty one.
+  - Move a clip between tracks by dragging it up or down, or with the Audio inspector's Track menu.
+  - Dropping audio on a track places it there.
+  - A1 narration, A2 clip sound and the whole-project music bed keep their meaning.
+- **Track mute, solo and lock** for every audio track, saved with the project and honoured in export.
+  - Solo applies among A3–A8 only; narration, clip sound and music are not affected, and the tooltip says so.
+  - Tracks that won't be heard are dimmed and labelled.
+- **Edit tools** for timeline audio clips:
+  - Select (V) and Track select forward (A)
+  - Ripple trim (B), Roll (N), Slip (Y) and Slide (U)
+  - Blade (C). Shift+click, Shift+C or Shift+scissors runs Razor All across unlocked audio tracks.
+  - Delete removes the focused clip; Shift+Delete ripple-deletes it.
+  - Every tool uses the same pure edit function for the drag preview and the saved result, and all edits are undoable.
+- **Markers** are saved with the project (they were previously kept only in this browser profile).
+  - New **range markers** span the selected audio clip(s) or scene.
+  - A marker's colour can be changed.
+  - Marker edits can be undone.
+  - Existing browser-stored markers and locks migrate into the project automatically.
+- **Versioned timeline format.** `finishing_json.timeline` is at version 1, and A3 stays implicit on clips so older data keeps its meaning. The backend rejects unknown tracks, invalid track states and newer versions. See `docs/TIMELINE_ARCHITECTURE.md`.
+- **Performance.** Off-screen audio clips are not rendered, drag previews are coalesced to one update per animation frame, and Ctrl+wheel zooms around the pointer.
+- **Unchanged.** V1 remains scene-based. Gain envelopes, clip-attached markers, compound clips and free multitrack video are roadmap items, not part of RC5.
+- **Build ID** is now `v0.7.0-rc5`.
 
 ## SceneForge Studio 0.7.0 RC4 (unreleased)
 

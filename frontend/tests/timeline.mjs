@@ -1,0 +1,84 @@
+// Pure checks for the timeline model, migrations, time transform and edit operations.
+import {build} from 'esbuild';
+import {createRequire} from 'node:module';
+import assert from 'node:assert/strict';
+await build({stdin:{contents:"export * from './src/timeline/timeline.types';export * from './src/timeline/timeMath';export * from './src/timeline/editOps';",resolveDir:'.',loader:'ts'},outfile:'node_modules/.cache/timeline-units.cjs',bundle:true,platform:'node',format:'cjs',logLevel:'silent'});
+const require=createRequire(import.meta.url);
+const T=require('../node_modules/.cache/timeline-units.cjs');
+let passed=0;const check=(name,cond)=>{assert.ok(cond,name);console.log('PASS '+name);passed++;};
+const clip=(id,start,inMs,outMs,extra={})=>({id,asset_id:'a',name:id,start_ms:start,source_in_ms:inMs,source_out_ms:outMs,source_duration_ms:10000,volume:100,fade_in_ms:0,fade_out_ms:0,mute:false,...extra});
+const byId=(r,id)=>r.clips.find(c=>c.id===id);
+let n=0;const ids=()=>`n${n++}`;
+
+// --- model + migration -------------------------------------------------------------
+const empty=T.normalizeTimeline(undefined,[]);
+check('v0 project (no timeline key) normalizes to version 1 with only A3 shown',empty.version===1&&empty.audio_tracks.join()==='A3'&&empty.markers.length===0);
+check('clips without a track keep the pre-v1 meaning (A3)',T.clipTrack({})==='A3'&&T.clipTrack({track:'A9'})==='A3'&&T.clipTrack({track:'A6'})==='A6');
+const legacy=T.normalizeTimeline(undefined,[],{markers:[{id:'x',time:1500,label:'Chorus'},{time:'bad'}],locks:{V1:true,A3:true,A1:false}});
+check('browser-stored markers and locks migrate into the project timeline',legacy.markers.length===1&&legacy.markers[0].time_ms===1500&&legacy.markers[0].color==='amber'&&legacy.tracks.V1.locked&&legacy.tracks.A3.locked&&!legacy.tracks.A1);
+const stored=T.normalizeTimeline({version:1,tracks:{A4:{mute:true},V1:{mute:true,locked:true},Z9:{locked:true}},audio_tracks:['A5','nope'],markers:[{id:'b',time_ms:900,duration_ms:400,label:'Range',color:'blue'},{id:'a',time_ms:100,label:'First',color:'pink'}]},[clip('c',0,0,100,{track:'A7'})],{markers:[{time:5,label:'ignored'}]});
+check('stored project timeline wins over browser data and is sanitized',stored.markers.length===2&&stored.markers[0].id==='a'&&stored.markers[0].color==='amber'&&stored.markers[1].duration_ms===400);
+check('mute/solo are kept only for audio tracks; unknown tracks are dropped',stored.tracks.A4.mute&&!stored.tracks.V1.mute&&stored.tracks.V1.locked&&!('Z9' in stored.tracks));
+check('audio tracks with clips are always shown, in track order',stored.audio_tracks.join()==='A3,A5,A7');
+check('downgrade removes the track field so older builds read clips as A3',!('track' in T.downgradeTimeline([clip('c',0,0,100,{track:'A5'})])[0]));
+const solo={...empty,tracks:{A4:{solo:true},A5:{solo:true,mute:true}}};
+check('solo: only soloed timeline audio tracks are audible; mute still wins',!T.isAudioTrackAudible(solo,'A3')&&T.isAudioTrackAudible(solo,'A4')&&!T.isAudioTrackAudible(solo,'A5'));
+check('no solo: every unmuted track is audible',T.isAudioTrackAudible(empty,'A3')&&!T.isAudioTrackAudible({...empty,tracks:{A3:{mute:true}}},'A3'));
+check('next audio track is the first hidden one',T.nextAudioTrack(empty)==='A4'&&T.nextAudioTrack({...empty,audio_tracks:['A3','A4','A5','A6','A7','A8']})===null);
+
+// --- time transform ------------------------------------------------------------------
+const tf=T.timeTransform(50,10);
+check('time→pixel and pixel→time round-trip',tf.msToPx(2000)===110&&Math.abs(tf.pxToMs(tf.msToPx(12345))-12345)<1e-9);
+check('scale is clamped to the zoom range',T.timeTransform(9999).scale===150&&T.timeTransform(-4).scale===.5);
+check('frame length and frame snapping follow the project rate',T.frameMs(25)===40&&Math.abs(T.toFrame(1010,30)-1000)<1e-9);
+const z=T.zoomAround(50,100,200,300);
+check('zooming keeps the time under the pointer fixed',Math.abs((z.scrollLeft+200)/z.scale-(300+200)/50)<1e-9);
+const win=T.visibleWindow(1000,500,100,0);
+check('visible window covers exactly the scrolled viewport (virtualization)',win.from===10000&&win.to===15000&&T.intersectsWindow(14000,20000,win)&&!T.intersectsWindow(0,9000,win));
+const q=[];let applied=[];const co=T.rafCoalesce(v=>applied.push(v),cb=>q.push(cb));co.push(1);co.push(2);co.push(3);q.forEach(f=>f());
+check('pointer updates are coalesced to the latest value per frame',applied.join()==='3'&&q.length===1);
+
+// --- edit operations -------------------------------------------------------------------
+const track=[clip('a',0,0,1000),clip('b',1000,2000,3000),clip('c',2000,0,1000),clip('z',500,0,1000,{track:'A4'})];
+let r=T.blade(track,'a',400,40,ids);
+check('blade splits source and position at a frame boundary',r.ok&&byId(r,'a').source_out_ms===400&&r.clips.length===5&&r.clips.some(c=>c.start_ms===400&&c.source_in_ms===400&&c.source_out_ms===1000));
+check('blade refuses a cut within one frame of an edge',!T.blade(track,'a',10,40,ids).ok&&!T.blade(track,'a',990,40,ids).ok);
+r=T.bladeAll(track,700,['A3','A4'],40,ids);
+check('razor all cuts every clip under the playhead on the chosen tracks',r.ok&&r.clips.length===6&&byId(r,'z').source_out_ms===200);
+r=T.bladeAll(track,700,['A3'],40,ids);
+check('razor all skips locked/unselected tracks',r.ok&&byId(r,'z').source_out_ms===1000);
+r=T.rippleTrim(track,'a','out',-300);
+check('ripple trim out shortens the clip and pulls later clips on the same track',r.ok&&byId(r,'a').source_out_ms===700&&byId(r,'b').start_ms===700&&byId(r,'c').start_ms===1700&&byId(r,'z').start_ms===500);
+r=T.rippleTrim(track,'b','in',250);
+check('ripple trim in keeps the clip start and pulls following clips',r.ok&&byId(r,'b').start_ms===1000&&byId(r,'b').source_in_ms===2250&&byId(r,'c').start_ms===1750&&byId(r,'a').start_ms===0);
+r=T.rippleTrim(track,'a','out',99999);
+check('ripple trim is bounded by the source length',r.ok&&byId(r,'a').source_out_ms===10000&&byId(r,'b').start_ms===10000);
+r=T.roll(track,'a','b',200);
+check('roll moves the edit point without changing total length',r.ok&&byId(r,'a').source_out_ms===1200&&byId(r,'b').start_ms===1200&&byId(r,'b').source_in_ms===2200&&T.clipEnd(byId(r,'b'))===2000);
+r=T.roll(track,'b','c',-500);
+check('roll is limited by the right clip having no earlier media',r.ok&&byId(r,'c').source_in_ms===0&&byId(r,'b').source_out_ms===3000);
+check('roll refuses clips on different tracks',!T.roll(track,'a','z',10).ok);
+r=T.slip(track,'b',-500);
+check('slip changes the source range but not position or length',r.ok&&byId(r,'b').start_ms===1000&&byId(r,'b').source_in_ms===1500&&byId(r,'b').source_out_ms===2500);
+r=T.slip(track,'a',-100);
+check('slip at the source start is reported instead of silently doing nothing',!r.ok);
+const slideTrack=[clip('a',0,0,1000),clip('b',1000,2000,3000),clip('c',2000,500,1500)];
+r=T.slide(slideTrack,'b',-200);
+check('slide moves the clip while its neighbours absorb the change',r.ok&&byId(r,'b').start_ms===800&&byId(r,'b').source_in_ms===2000&&byId(r,'a').source_out_ms===800&&byId(r,'c').start_ms===1800&&byId(r,'c').source_in_ms===300&&T.clipEnd(byId(r,'c'))===3000);
+r=T.slide(track,'b',-200);
+check('slide is limited when the next clip has no earlier media',r.ok&&byId(r,'b').start_ms===1000);
+r=T.slide(slideTrack,'b',5000);
+check('slide right is limited by the next clip keeping at least 100 ms',r.ok&&byId(r,'b').start_ms===1900&&T.clipEnd(byId(r,'c'))-byId(r,'c').start_ms===100);
+r=T.moveClips(track,['b','c'],-5000);
+check('moving a group never places a clip before zero',r.ok&&byId(r,'b').start_ms===0&&byId(r,'c').start_ms===1000);
+r=T.moveClips(track,['a'],100,'A6');
+check('moving a clip to another track keeps its media range',r.ok&&byId(r,'a').track==='A6'&&byId(r,'a').start_ms===100);
+r=T.rippleDelete(track,['b']);
+check('ripple delete closes the gap on that track only',r.ok&&r.clips.length===3&&byId(r,'c').start_ms===1000&&byId(r,'z').start_ms===500);
+check('track select forward selects clips at or after the playhead on one track',T.trackSelectForward(track,'A3',1000).join()==='b,c');
+const faded=T.trim([clip('f',0,0,1000,{fade_in_ms:600,fade_out_ms:400})],'f','out',-500);
+check('trimming clamps fades to the new length',faded.ok&&faded.clips[0].fade_in_ms===500&&faded.clips[0].fade_out_ms===0);
+check('trim in cannot push a clip before the timeline start',T.trim([clip('s',100,500,1000)],'s','in',-400).clips[0].start_ms===0);
+const rows=T.packRows([clip('a',0,0,1000),clip('b',1000,0,1000),clip('c',500,0,1000)]);
+check('touching clips share a row; overlapping clips stack',rows.a===0&&rows.b===0&&rows.c===1);
+console.log(`${passed} timeline checks passed`);

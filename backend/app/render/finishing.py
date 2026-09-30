@@ -54,8 +54,8 @@ MUSIC_DEFAULTS = {"asset_id": None, "volume": 35, "duck": 70, "fade_in_ms": 1500
 
 def clean_finishing(raw: dict, project_id: str, db) -> dict:
     from app.db.models import Asset
-    if not isinstance(raw, dict) or set(raw) - {"music", "audio_clips", "loudnorm", "leader"}:
-        raise FinishingError("Finishing settings may only contain music, audio_clips, loudnorm and leader.")
+    if not isinstance(raw, dict) or set(raw) - {"music", "audio_clips", "loudnorm", "leader", "timeline"}:
+        raise FinishingError("Finishing settings may only contain music, audio_clips, loudnorm, leader and timeline.")
     out: dict = {}
     for key in ("loudnorm", "leader"):
         value = raw.get(key, False)
@@ -82,7 +82,7 @@ def clean_finishing(raw: dict, project_id: str, db) -> dict:
         raise FinishingError("The timeline supports up to 64 project audio clips.")
     clean_clips = []
     for index, clip in enumerate(clips):
-        allowed = {"id", "asset_id", "name", "start_ms", "source_in_ms", "source_out_ms", "source_duration_ms", "volume", "fade_in_ms", "fade_out_ms", "mute"}
+        allowed = {"id", "asset_id", "name", "start_ms", "source_in_ms", "source_out_ms", "source_duration_ms", "volume", "fade_in_ms", "fade_out_ms", "mute", "track"}
         if not isinstance(clip, dict) or set(clip) - allowed:
             raise FinishingError(f"Project audio clip {index + 1} has unsupported settings.")
         asset = db.get(Asset, clip.get("asset_id")) if clip.get("asset_id") else None
@@ -106,11 +106,86 @@ def clean_finishing(raw: dict, project_id: str, db) -> dict:
         if not isinstance(mute, bool):
             raise FinishingError(f"Project audio clip {index + 1} mute must be true or false.")
         name = str(clip.get("name") or asset.original_filename or "Audio clip")[:200]
-        clean_clips.append({"id": str(clip.get("id") or uuid.uuid4()), "asset_id": asset.id, "name": name, "source_duration_ms": source_ms,
-                            "start_ms": start, "source_in_ms": source_in, "source_out_ms": source_out,
-                            "volume": volume, "fade_in_ms": fade_in, "fade_out_ms": fade_out, "mute": mute})
+        track = clip.get("track", "A3")
+        if track not in AUDIO_TRACKS:
+            raise FinishingError(f"Project audio clip {index + 1} track must be one of " + ", ".join(AUDIO_TRACKS) + ".")
+        cleaned = {"id": str(clip.get("id") or uuid.uuid4()), "asset_id": asset.id, "name": name, "source_duration_ms": source_ms,
+                   "start_ms": start, "source_in_ms": source_in, "source_out_ms": source_out,
+                   "volume": volume, "fade_in_ms": fade_in, "fade_out_ms": fade_out, "mute": mute}
+        if track != "A3":   # A3 stays implicit so projects remain readable by pre-timeline-v1 builds
+            cleaned["track"] = track
+        clean_clips.append(cleaned)
     if clean_clips:
         out["audio_clips"] = clean_clips
+    if "timeline" in raw:
+        out["timeline"] = clean_timeline(raw["timeline"])
+    return out
+
+
+# --------------------------------------------------------------------------
+# Timeline settings (version 1): track state, visible audio tracks, markers.
+# Mirrors frontend/src/timeline/timeline.types.ts normalizeTimeline.
+# --------------------------------------------------------------------------
+TIMELINE_VERSION = 1
+SCENE_TRACKS = ("T1", "V1", "A1", "A2")
+AUDIO_TRACKS = ("A3", "A4", "A5", "A6", "A7", "A8")
+MARKER_COLORS = ("amber", "red", "green", "blue", "purple")
+MAX_MARKERS = 200
+
+
+def clean_timeline(raw) -> dict:
+    if not isinstance(raw, dict) or set(raw) - {"version", "tracks", "audio_tracks", "markers"}:
+        raise FinishingError("Timeline settings may only contain version, tracks, audio_tracks and markers.")
+    version = raw.get("version", TIMELINE_VERSION)
+    if isinstance(version, bool) or not isinstance(version, int) or not 0 <= version <= TIMELINE_VERSION:
+        raise FinishingError(f"This SceneForge build reads timeline versions up to {TIMELINE_VERSION}.")
+    tracks_in = raw.get("tracks", {})
+    if not isinstance(tracks_in, dict):
+        raise FinishingError("Timeline tracks must be an object.")
+    tracks: dict = {}
+    for key, state in tracks_in.items():
+        if key not in SCENE_TRACKS + AUDIO_TRACKS:
+            raise FinishingError(f"Unknown timeline track {str(key)[:8]}.")
+        allowed = {"locked", "mute", "solo"} if key in AUDIO_TRACKS else {"locked"}
+        if not isinstance(state, dict) or set(state) - allowed or any(not isinstance(v, bool) for v in state.values()):
+            raise FinishingError(f"Track {key} supports " + ", ".join(sorted(allowed)) + " (true or false).")
+        kept = {k: True for k, v in state.items() if v}
+        if kept:
+            tracks[key] = kept
+    shown = raw.get("audio_tracks", ["A3"])
+    if not isinstance(shown, list) or any(t not in AUDIO_TRACKS for t in shown):
+        raise FinishingError("Visible audio tracks must be A3 to A8.")
+    markers_in = raw.get("markers", [])
+    if not isinstance(markers_in, list) or len(markers_in) > MAX_MARKERS:
+        raise FinishingError(f"A timeline supports up to {MAX_MARKERS} markers.")
+    markers = []
+    for i, m in enumerate(markers_in):
+        if not isinstance(m, dict) or set(m) - {"id", "time_ms", "duration_ms", "label", "color"}:
+            raise FinishingError(f"Marker {i + 1} has unsupported settings.")
+        t, d = m.get("time_ms"), m.get("duration_ms", 0)
+        for name, v in (("time", t), ("length", d)):
+            if isinstance(v, bool) or not isinstance(v, (int, float)) or not 0 <= v <= 86_400_000:
+                raise FinishingError(f"Marker {i + 1} {name} must be between 0 and 24 hours.")
+        color = m.get("color", "amber")
+        if color not in MARKER_COLORS:
+            raise FinishingError(f"Marker {i + 1} colour must be one of " + ", ".join(MARKER_COLORS) + ".")
+        markers.append({"id": str(m.get("id") or uuid.uuid4())[:64], "time_ms": int(t), "duration_ms": int(d),
+                        "label": str(m.get("label") or f"Marker {i + 1}")[:120], "color": color})
+    markers.sort(key=lambda m: m["time_ms"])
+    return {"version": TIMELINE_VERSION, "tracks": tracks,
+            "audio_tracks": [t for t in AUDIO_TRACKS if t == "A3" or t in shown], "markers": markers}
+
+
+def audible_clips(fin: dict) -> list[dict]:
+    """Timeline audio clips heard in export: clip and track mute, then A3–A8 solo."""
+    tracks = ((fin.get("timeline") or {}).get("tracks") or {})
+    soloed = {t for t in AUDIO_TRACKS if (tracks.get(t) or {}).get("solo")}
+    out = []
+    for clip in fin.get("audio_clips", []) or []:
+        track = clip.get("track", "A3")
+        if clip.get("mute") or (tracks.get(track) or {}).get("mute") or (soloed and track not in soloed):
+            continue
+        out.append(clip)
     return out
 
 
@@ -206,7 +281,7 @@ def finish_export(export_path: str, project, cancel_check=None) -> str:
     from app.db.models import Asset
     fin = getattr(project, "finishing_json", None) or {}  # older callers pass minimal project objects
     music, loud = fin.get("music"), fin.get("loudnorm")
-    audio_clips = [clip for clip in fin.get("audio_clips", []) if not clip.get("mute")]
+    audio_clips = audible_clips(fin)
     leader = False   # retired: the countdown is now a scene effect (Effects → Countdown intro)
     if not (music or audio_clips or leader or loud):
         return export_path
