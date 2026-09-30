@@ -100,3 +100,138 @@ html[data-theme="graphite"] .project-home .drawer{background:#282b32;color:#e0e3
 .video-gen-hardware-alert li+li{margin-top:3px}
 html[data-theme="light"] .studio-shell .video-gen-hardware-alert{background:#fff4e5;color:#613b14;border-color:#d5a762}
 html[data-theme="light"] .studio-shell .video-gen-hardware-alert strong{color:#7b4a12}
+
+/* File access is a small app menu on the project picker and native menu in desktop builds. */
+.home-menubar{display:flex;align-items:center}
+.home-menubar .editor-menu>button{border:1px solid transparent;border-radius:5px;padding:7px 12px;color:inherit}
+.home-menubar .editor-menu>button:hover{background:#343740;border-color:#4b505b}
+html[data-desktop-shell="true"] .home-menubar,
+html[data-desktop-shell="true"] .studio-shell>.editor-menubar{display:none}
+.theme-control{position:relative;display:inline-flex;align-items:center}
+.theme-toggle{display:inline-flex;align-items:center;gap:6px;min-height:30px;padding:5px 9px;border:1px solid #484e5b;border-radius:5px;background:#30343d;color:#e4e7ee;font-size:11px}
+.theme-toggle:hover{background:#424754}
+.theme-popover{position:absolute;right:0;top:calc(100% + 6px);z-index:60;min-width:185px;padding:5px;border:1px solid #4a5060;border-radius:7px;background:#252830;box-shadow:0 10px 28px #10131b88}
+.theme-popover button{width:100%;display:flex;align-items:center;gap:9px;padding:8px;border:0;border-radius:4px;background:transparent;color:#e5e8ef;text-align:left;font-size:11px}
+.theme-popover button:hover,.theme-popover button[aria-checked="true"]{background:#3b364b}
+.theme-popover button svg{margin-left:auto;color:#9b89ef}
+.theme-swatch.midnight{background:linear-gradient(135deg,#131c2c 0 50%,#344c70 50%)}
+.theme-swatch.warm{background:linear-gradient(135deg,#28221e 0 50%,#735641 50%)}
+.studio-shell .back-projects{white-space:nowrap}
+.safe-zones.landscape .sz-top{height:8%}
+.safe-zones.landscape .sz-bottom{height:12%}
+.safe-zones.landscape .sz-right{top:8%;bottom:12%;width:7%}
+
+/* Keep the light theme coherent across inspector cards, timeline lanes and controls. */
+html[data-theme="light"] .studio-shell{--panel:#f8f9fc;--surface:#fff;--text:#252c3a;--muted:#647084;--line:#d8dde7;--page:#eef1f6;--blue:var(--sf-user-accent,#6757d9);--blue-hover:var(--sf-user-accent,#6757d9);color-scheme:light;background:#eef1f6;color:#252c3a}
+html[data-theme="light"] .studio-shell .studio-toolbar,
+html[data-theme="light"] .studio-shell .scene-sidebar,
+html[data-theme="light"] .studio-shell .inspector,
+html[data-theme="light"] .studio-shell .script-card,
+html[data-theme="light"] .studio-shell .sequence-dock{background:#f8f9fc;color:#252c3a;border-color:#d5dbe5}
+html[data-theme="light"] .studio-shell .workspace,
+html[data-theme="light"] .studio-shell .editing-area,
+html[data-theme="light"] .studio-shell .editor-main{background:#eef1f6;color:#252c3a}
+html[data-theme="light"] .studio-shell .studio-toolbar .brand,
+html[data-theme="light"] .studio-shell .project-identity input{color:#252c3a}
+html[data-theme="light"] .studio-shell .save-status,
+html[data-theme="light"] .studio-shell .sidebar-hint,
+html[data-theme="light"] .studio-shell .hint,
+html[data-theme="light"] .studio-shell .sidebar-bottom{color:#667286}
+html[data-theme="light"] .studio-shell .sidebar-bottom,
+html[data-theme="light"] .studio-shell .library-tabs,
+html[data-theme="light"] .studio-shell .inspector-heading,
+html[data-theme="light"] .studio-shell .inspector-tabs,
+html[data-theme="light"] .studio-shell .preview-toolbar,
+html[data-theme="light"] .studio-shell .preview-footer{background:#f8f9fc;color:#3a4352;border-color:#d5dbe5}
+html[data-theme="light"] .studio-shell .inspector-body{background:#f8f9fc;color:#283243}
+html[data-theme="light"] .studio-shell .inspector-body :is(h3,h4,label,legend,.caption-manual-heading,.look-heading,.film-option>span){color:#30394a}
+html[data-theme="light"] .studio-shell .inspector-body :is(.hint,.subtle,.muted,.sidebar-hint,.control-help){color:#667286}
+html[data-theme="light"] .studio-shell .inspector-body fieldset,
+html[data-theme="light"] .studio-shell .inspector-body .clip-sound,
+html[data-theme="light"] .studio-shell .inspector-body .auto-captions-panel,
+html[data-theme="light"] .studio-shell .inspector-body .typewriter-controls,
+html[data-theme="light"] .studio-shell .inspector-body .timing-section,
+html[data-theme="light"] .studio-shell .inspector-body .framing-controls,
+html[data-theme="light"] .studio-shell .inspector-body .text-quick{background:#fff;color:#30394a;border-color:#d5dbe5}
+html[data-theme="light"] .studio-shell .inspector-body .text-quick{background:linear-gradient(135deg,#f1effb,#fff 70%)}
+html[data-theme="light"] .studio-shell .inspector-body input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+html[data-theme="light"] .studio-shell .inspector-body select,
+html[data-theme="light"] .studio-shell .inspector-body textarea{background:#fff;color:#252c3a;border-color:#cbd2de}
+html[data-theme="light"] .studio-shell .inspector-body input[type="range"]{accent-color:var(--blue)}
+html[data-theme="light"] .studio-shell .inspector-tabs button{color:#5e697c}
+html[data-theme="light"] .studio-shell .inspector-tabs button[aria-selected="true"]{color:#3c2b9e;background:#ebe8fb}
+html[data-theme="light"] .studio-shell .inspector-body .motion-btn,
+html[data-theme="light"] .studio-shell .inspector-body .effect-tile,
+html[data-theme="light"] .studio-shell .inspector-body .voice-take,
+html[data-theme="light"] .studio-shell .inspector-body .caption-preset,
+html[data-theme="light"] .studio-shell .inspector-body .sticker-choice{background:#fff;color:#424b5b;border-color:#d5dbe5}
+html[data-theme="light"] .studio-shell .inspector-body .motion-btn.selected,
+html[data-theme="light"] .studio-shell .inspector-body .effect-tile.selected,
+html[data-theme="light"] .studio-shell .inspector-body .caption-preset[aria-pressed="true"]{background:#eeecfb;color:#38298e;border-color:var(--blue)}
+html[data-theme="light"] .studio-shell .studio-toolbar .btn,
+html[data-theme="light"] .studio-shell .studio-toolbar .icon-btn,
+html[data-theme="light"] .studio-shell .theme-toggle{background:#fff;color:#30394a;border-color:#cfd5df}
+html[data-theme="light"] .studio-shell .studio-toolbar .btn-primary{background:var(--blue);border-color:var(--blue);color:#fff}
+html[data-theme="light"] .studio-shell .studio-toolbar select{background:#fff;color:#30394a;border-color:#cfd5df}
+html[data-theme="light"] .studio-shell .theme-popover{background:#fff;border-color:#d5dbe5;box-shadow:0 10px 28px #1a243022}
+html[data-theme="light"] .studio-shell .theme-popover button{color:#30394a}
+html[data-theme="light"] .studio-shell .theme-popover button:hover,
+html[data-theme="light"] .studio-shell .theme-popover button[aria-checked="true"]{background:#eeecfb}
+html[data-theme="light"] .studio-shell .sequence-toolbar,
+html[data-theme="light"] .studio-shell .sequence-editbar,
+html[data-theme="light"] .studio-shell .track-headers,
+html[data-theme="light"] .studio-shell .sequence-status{background:#f8f9fc;color:#364152;border-color:#d5dbe5}
+html[data-theme="light"] .studio-shell .sequence-tracks,
+html[data-theme="light"] .studio-shell .sequence-content{background:#edf0f5}
+html[data-theme="light"] .studio-shell .sequence-ruler,
+html[data-theme="light"] .studio-shell .track-ruler-label{background:#f3f5f9;color:#4a5568;border-color:#d5dbe5}
+html[data-theme="light"] .studio-shell .titles-track{background:#f5f6fa}
+html[data-theme="light"] .studio-shell .picture-track{background:#eef1f6}
+html[data-theme="light"] .studio-shell .narration-track,
+html[data-theme="light"] .studio-shell .source-audio-track{background:#edf4f0}
+html[data-theme="light"] .studio-shell .script-box{color:#252c3a}
+html[data-theme="light"] .studio-shell .sequence-editbar button,
+html[data-theme="light"] .studio-shell .timeline-actions button,
+html[data-theme="light"] .studio-shell .timeline-marker-actions button,
+html[data-theme="light"] .studio-shell .sequence-tools button,
+html[data-theme="light"] .studio-shell .sequence-transport button{color:#424c5d}
+html[data-theme="light"] .studio-shell .clip-menu{background:#fff;color:#30394a;border-color:#cfd5df}
+html[data-theme="light"] .studio-shell .clip-menu button{color:#30394a}
+html[data-theme="light"] .studio-shell .clip-menu button:hover:not(:disabled){background:#eeecfb}
+html[data-theme="light"] .studio-shell .menu-help,
+html[data-theme="light"] .studio-shell .overlap-info{color:#667286}
+
+/* Bring every editor-side control out of the old dark-card palette in Daylight. */
+html[data-theme="light"] .studio-shell .inspector-body :is(.btn,.text-btn,.icon-btn,.upload-btn,.ai-btn,.icon-toggle,.feature-help-trigger,.segmented button,.style-toggle,.layer-action,.remove-media,.media-select,.overlay-panel button,.caption-segment-heading button,.caption-preset,.sticker-choice){background:#fff;color:#344054;border-color:#cbd2de}
+html[data-theme="light"] .studio-shell .inspector-body :is(.btn-primary,.btn.primary,.primary,.selected[aria-pressed="true"],.selected[aria-checked="true"]){background:var(--blue);color:#fff;border-color:var(--blue)}
+html[data-theme="light"] .studio-shell .inspector-body :is(.layer-card,.caption-segment-card,.caption-segment-editor,.text-quick,.caption-pro,.auto-captions-panel,.overlay-panel,.typewriter-controls,.timing-section,.framing-controls,.adjust-group){background:#fff;color:#30394a;border-color:#d5dbe5}
+html[data-theme="light"] .studio-shell .inspector-body :is(.layer-card,.caption-segment-card,.caption-segment-editor) :is(h3,h4,strong,label,small,.hint){color:#3c4658}
+html[data-theme="light"] .studio-shell .inspector-body .caption-segment-card textarea,
+html[data-theme="light"] .studio-shell .inspector-body .script-box,
+html[data-theme="light"] .studio-shell .inspector-body .layer-card textarea{background:#fff;color:#252c3a;border-color:#cbd2de}
+html[data-theme="light"] .studio-shell .inspector-body .feature-help-popover{background:#fff;color:#30394a;border-color:#d5dbe5;box-shadow:0 8px 28px #18223525}
+html[data-theme="light"] .studio-shell .track-lock-button{background:#fff;color:#344054;border-color:#cbd2de}
+html[data-theme="light"] .studio-shell .track-lock-button[aria-pressed="true"]{background:#ebe8fb;color:#38298e;border-color:var(--blue)}
+html[data-theme="light"] .studio-shell .sequence-dock .sequence-editbar select,
+html[data-theme="light"] .studio-shell .sequence-dock .sequence-editbar input{background:#fff;color:#344054;border-color:#cbd2de}
+html[data-theme="light"] .studio-shell .sequence-dock .sequence-title,
+html[data-theme="light"] .studio-shell .sequence-dock .selection-label,
+html[data-theme="light"] .studio-shell .sequence-dock .sequence-editbar label{color:#344054}
+html[data-theme="light"] .studio-shell .sequence-dock .sequence-ruler span{color:#4a5568;border-color:#aeb8c8}
+html[data-theme="light"] .studio-shell .sequence-dock .dock-resizer{background:#e2e6ed}
+html[data-theme="light"] .studio-shell .sequence-dock .dock-resizer span{background:#8b95a5}
+html[data-theme="light"] .studio-shell .sequence-dock .picture-clip .clip-label{color:#fff}
+html[data-theme="light"] .studio-shell .sequence-dock .sequence-status{color:#536075}
+
+html[data-theme="midnight"] body{background:#141a25;color:#e2e8f2;color-scheme:dark}
+html[data-theme="midnight"] .studio-shell{--panel:#202a3a;--surface:#192333;--text:#e2e8f2;--muted:#9eacc2;--line:#35445a;--page:#141a25;--blue:var(--sf-user-accent,#9783ff);--blue-hover:#afa0ff;background:#141a25;color:#e2e8f2}
+html[data-theme="midnight"] .studio-shell :is(.studio-toolbar,.scene-sidebar,.inspector,.script-card,.sequence-dock,.sequence-toolbar,.sequence-editbar,.track-headers,.sequence-status){background:#202a3a;color:#e2e8f2;border-color:#35445a}
+html[data-theme="midnight"] .studio-shell :is(.workspace,.editing-area,.editor-main,.sequence-tracks,.sequence-content){background:#141a25}
+html[data-theme="midnight"] .studio-shell .inspector-body :is(fieldset,.clip-sound,.auto-captions-panel,.typewriter-controls,.timing-section,.framing-controls,.text-quick){background:#202a3a;color:#e2e8f2;border-color:#35445a}
+html[data-theme="midnight"] .studio-shell :is(input,select,textarea){background:#192333;color:#e2e8f2;border-color:#40516a}
+html[data-theme="warm"] body{background:#211e1a;color:#eee7de;color-scheme:dark}
+html[data-theme="warm"] .studio-shell{--panel:#302b26;--surface:#28231f;--text:#eee7de;--muted:#b7aa9c;--line:#4b4035;--page:#211e1a;--blue:var(--sf-user-accent,#d9a56f);--blue-hover:#e9bd8e;background:#211e1a;color:#eee7de}
+html[data-theme="warm"] .studio-shell :is(.studio-toolbar,.scene-sidebar,.inspector,.script-card,.sequence-dock,.sequence-toolbar,.sequence-editbar,.track-headers,.sequence-status){background:#302b26;color:#eee7de;border-color:#4b4035}
+html[data-theme="warm"] .studio-shell :is(.workspace,.editing-area,.editor-main,.sequence-tracks,.sequence-content){background:#211e1a}
+html[data-theme="warm"] .studio-shell .inspector-body :is(fieldset,.clip-sound,.auto-captions-panel,.typewriter-controls,.timing-section,.framing-controls,.text-quick){background:#302b26;color:#eee7de;border-color:#4b4035}
+html[data-theme="warm"] .studio-shell :is(input,select,textarea){background:#28231f;color:#eee7de;border-color:#5a4d40}

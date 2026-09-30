@@ -11,4 +11,5 @@ contextBridge.exposeInMainWorld('sceneforgeDesktop', {
   revealExport: assetId => ipcRenderer.invoke('sf:reveal-export', String(assetId)),
   openLogs: () => ipcRenderer.invoke('sf:open-logs'),
   collectDiagnostics: () => ipcRenderer.invoke('sf:diagnostics'),
+  setWorkspaceMode: mode => ipcRenderer.invoke('sf:set-workspace-mode', mode),
 });

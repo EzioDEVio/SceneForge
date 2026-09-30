@@ -72,7 +72,7 @@ globalThis.fetch=async(path,init={})=>{
  else if(path===`/api/projects/${project.id}/scenes`&&method==='POST') {
   const s=clone(fixture.scenes[1]);s.id='new-'+next++;s.title='New scene';project.scenes.push(s);result=s;
  }
- else if(path.startsWith('/api/scenes/shots/')&&method==='PATCH') {const id=path.split('/').at(-1);const shot=project.scenes.flatMap(s=>s.shots).find(s=>s.id===id);Object.assign(shot,body);if(body.motion)shot.motion_json=body.motion;result=shot;}
+ else if(path.startsWith('/api/scenes/shots/')&&method==='PATCH') {const id=path.split('/').at(-1);const shot=project.scenes.flatMap(s=>s.shots).find(s=>s.id===id);Object.assign(shot,body);if(body.motion)shot.motion_json=body.motion;if(body.audio)shot.audio_json=body.audio;result=shot;}
  else if(path.startsWith('/api/scenes/')&&method==='PATCH') {
   await new Promise(r=>setTimeout(r,25));
   if(failNextPatch){failNextPatch=false;return {ok:false,status:503,statusText:'Unavailable',json:async()=>({detail:'Save failed for test'})};}
@@ -91,6 +91,12 @@ const saved=()=>waitFor(()=>assert.equal(screen.getByRole('status').textContent,
 try{
  render(React.createElement(App));
  await screen.findByRole('button',{name:/Editor MVP1 regression Open project/});
+ check('project home keeps project setup in Create Project without static editor tabs or a Preferences shortcut',!!screen.getByRole('combobox',{name:'New project aspect ratio'})&&!!screen.getByRole('combobox',{name:'New project frame rate'})&&!screen.queryByRole('tab',{name:/Media|Edit|Color|Export/})&&!screen.queryByRole('button',{name:'Preferences'}));
+ await user.click(screen.getByRole('button',{name:'File',exact:true}));
+ await user.click(screen.getByRole('button',{name:/Preferences/}));
+ check('Preferences opens from File on the project home',screen.getByRole('heading',{name:'Preferences'}));
+ check('Preferences does not duplicate project format or frame-rate defaults',!screen.queryByRole('combobox',{name:'Default project aspect ratio'})&&!screen.queryByRole('combobox',{name:'Default frame rate'}));
+ await user.click(screen.getByRole('button',{name:'Close',exact:true}));
  await user.type(screen.getByRole('textbox',{name:'Search projects'}),'missing project');
  check('project search filters saved projects',!!screen.getByText('No matching projects.'));
  await user.clear(screen.getByRole('textbox',{name:'Search projects'}));
@@ -144,6 +150,12 @@ try{
  check('shortcuts are ignored while typing in a text field',tc()==='00:00:00:00');
  script.blur();
  check('first clip has no incoming transition',screen.getByRole('combobox',{name:'Incoming transition'}).disabled);
+ await user.click(screen.getByRole('checkbox',{name:'Show safe zones'}));
+ check('safe-zone guide is visible above the timeline when enabled',!!document.querySelector('.safe-zones.landscape'));
+ await user.click(screen.getByRole('checkbox',{name:'Show safe zones'}));
+ await user.click(screen.getByRole('button',{name:'Lock V1 picture track'}));
+ check('V1 lock prevents scene reorder and cut actions',screen.getByRole('button',{name:'Move timeline part later'}).disabled&&screen.getByRole('button',{name:'Split at playhead'}).disabled);
+ await user.click(screen.getByRole('button',{name:'Unlock V1 picture track'}));
  await user.click(screen.getByRole('button',{name:'Move timeline part later'}));
  await waitFor(()=>assert.equal(project.scenes[1].id,firstId));
  check('timeline reordering persists the export sequence');
@@ -184,6 +196,20 @@ try{
  await user.click(screen.getByRole('button',{name:'Warm',exact:true}));await saved();
  check('effect selection persists',project.scenes.find(s=>s.id===firstId).effect_preset==='warm');
  check('effect appears on main preview',visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('saturate'));
+ await user.clear(screen.getByRole('textbox',{name:'Search effects'}));
+ const filterHeading=screen.getByRole('heading',{name:'Color filters · 8 additions'});
+ const creativeHeading=screen.getByRole('heading',{name:'Creative effects · 2 additions'});
+ check('the eight color filters are grouped separately',filterHeading.parentElement.querySelectorAll('.effect-tile').length===8);
+ check('two creative effects are grouped separately from color looks',creativeHeading.parentElement.querySelectorAll('.effect-tile').length===2);
+ await user.type(screen.getByRole('textbox',{name:'Search effects'}),'Chromatic split');
+ await user.click(screen.getByRole('button',{name:'Chromatic split',exact:true}));await saved();
+ check('chromatic split selects its own scene effect',project.scenes.find(s=>s.id===firstId).effect_preset==='chromatic_split');
+ await user.clear(screen.getByRole('textbox',{name:'Search effects'}));
+ await user.type(screen.getByRole('textbox',{name:'Search effects'}),'Golden hour');
+ await user.click(screen.getByRole('button',{name:'Golden hour',exact:true}));await saved();
+ check('new color filters apply as their own render preset',project.scenes.find(s=>s.id===firstId).effect_preset==='golden_hour');
+ await user.clear(screen.getByRole('textbox',{name:'Search effects'}));
+ await user.click(screen.getByRole('button',{name:'Original',exact:true}));await saved();
  fireEvent.change(screen.getByRole('slider',{name:'Exposure'}),{target:{value:'35'}});
  fireEvent.change(screen.getByRole('slider',{name:'Temperature'}),{target:{value:'-40'}});
  check('adjustment preview updates before saving',visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('brightness')&&visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('url(#sf-wb-'));
@@ -238,6 +264,8 @@ try{
  check('motion speed curve saves with the shot motion',!!curve&&requests.some(r=>r.method==='PATCH'&&r.body?.motion?.easing==='ease_out'));
  await user.click(screen.getByRole('tab',{name:'Text',exact:true}));
  // Captions Pro
+ const captionStyleGrid=screen.getAllByRole('group',{name:'Caption styles'}).find(el=>el.classList.contains('caption-presets'));
+ check('caption library includes the added creator and Arabic styles',!!captionStyleGrid&&captionStyleGrid.querySelectorAll('button').length>=31&&!!screen.getByRole('button',{name:'Apply Arabic clean caption style'}));
  await user.click(screen.getByRole('button',{name:'Apply Viral bold caption style'}));await saved();
  check('a caption style preset applies font, case, phrases and box highlight',requests.some(r=>r.body?.font?.family==='Anton'&&r.body.font.case==='upper'&&r.body.font.split==='phrases'&&r.body.font.karaoke_style==='box'));
  await user.click(screen.getByRole('button',{name:'Italic'}));await saved();
@@ -258,6 +286,9 @@ try{
  check('speech captions become individually timed clips on T1',!!screen.getByRole('button',{name:'Edit caption segment: hello from'})&&!!screen.getByRole('button',{name:'Edit caption segment: speech'}));
  const trackOrder=[...document.querySelectorAll('.sequence-content > .titles-track, .sequence-content > .picture-track')].map(el=>el.classList.contains('titles-track')?'text':'picture');
  check('caption and title lane is above the picture lane',trackOrder[0]==='text'&&trackOrder[1]==='picture'&&!!(document.querySelector('.track-headers .track-text-label')?.compareDocumentPosition(document.querySelector('.track-headers .track-video-label'))&4));
+ await user.click(screen.getByRole('button',{name:'Lock T1 text track'}));
+ check('locking T1 prevents editing generated caption clips',screen.getByRole('button',{name:'Edit caption segment: hello from'}).disabled&&screen.getByRole('button',{name:'Unlock T1 text track'}).getAttribute('aria-pressed')==='true');
+ await user.click(screen.getByRole('button',{name:'Unlock T1 text track'}));
  await user.click(screen.getByRole('button',{name:'Edit caption segment: hello from'}));
  await new Promise(resolve=>setTimeout(resolve,180));
  check('clicking a caption clip opens Text and focuses its individual text box',document.activeElement?.getAttribute?.('aria-label')==='Caption segment 1 text');
@@ -370,7 +401,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  // Picture-in-picture overlays
  await user.click(screen.getByRole('tab',{name:'Overlays',exact:true}));
  await waitFor(()=>assert.ok(within(screen.getByRole('combobox',{name:'Add overlay from media'})).getAllByRole('option').length===3));
- check('searchable sticker and emoji library is available in Overlays',screen.getByRole('group',{name:'Sticker choices'}).querySelectorAll('button').length>=40);
+ check('searchable sticker and emoji library includes all 66 emoji and graphic badges',screen.getByRole('group',{name:'Sticker choices'}).querySelectorAll('button').length===66&&!!screen.getByRole('button',{name:'Add Subscribe pill sticker'}));
  await user.type(screen.getByRole('textbox',{name:'Search stickers and emoji'}),'heart');
  check('sticker search filters the curated emoji choices',screen.getByRole('button',{name:'Add Heart sticker'})&&screen.getByRole('button',{name:'Add Heart eyes sticker'}));
  await user.clear(screen.getByRole('textbox',{name:'Search stickers and emoji'}));
@@ -415,13 +446,23 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  const videoPool={id:'pool-vid',type:'video',original_filename:'clip.mp4'};
  fireEvent.drop(picture,{dataTransfer:{types:['application/x-sceneforge-assets'],getData:()=>JSON.stringify([videoPool])}});
  await waitFor(()=>assert.ok(project.scenes.find(s=>s.id===firstScene).shots.some(shot=>shot.asset?.type==='video')));
+ await user.click(screen.getByRole('button',{name:'Mute clip sound for clip.mp4'}));
+ await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.path.includes('/shots/')&&r.body?.audio?.mute===true)));
+ await saved();
+ check('timeline quick mute saves the embedded clip-audio state with undo support',project.scenes.flatMap(s=>s.shots).find(x=>x.asset?.original_filename==='clip.mp4')?.audio_json?.mute===true&&!!screen.getByRole('button',{name:'Undo timeline edit'}));
+ await user.click(screen.getByRole('button',{name:'Undo timeline edit'}));
+ await waitFor(()=>assert.equal(project.scenes.flatMap(s=>s.shots).find(x=>x.asset?.original_filename==='clip.mp4')?.audio_json?.mute,false));
+ check('undo restores the clip audio mute toggle',project.scenes.flatMap(s=>s.shots).find(x=>x.asset?.original_filename==='clip.mp4')?.audio_json?.mute===false);
+ await user.click(screen.getByRole('button',{name:'Lock A2 clip sound track'}));
+ check('A2 lock disables quick mute and embedded audio controls',screen.getByRole('button',{name:'Mute clip sound for clip.mp4'}).disabled&&screen.getByRole('button',{name:'clip.mp4 audio controls'}).disabled);
+ await user.click(screen.getByRole('button',{name:'Unlock A2 clip sound track'}));
  const sourceAudio=screen.getByRole('button',{name:'clip.mp4 audio controls'});
  await user.click(sourceAudio);
  await waitFor(()=>assert.equal(screen.getByRole('tab',{name:'Clip Audio',exact:true}).getAttribute('aria-selected'),'true'));
  check('A2 source-audio clip opens separate Clip Audio controls',!!screen.getByRole('region',{name:'Clip sound'})&&!!screen.getByRole('checkbox',{name:'Mute clip sound'})&&!screen.getByRole('tab',{name:'Motion',exact:true}).getAttribute('aria-selected').includes('true'));
- fireEvent.change(screen.getByRole('slider',{name:'Clip volume'}),{target:{value:'65'}});fireEvent.pointerUp(screen.getByRole('slider',{name:'Clip volume'}),{pointerId:1});
+ const clipVolume=screen.getByRole('slider',{name:'Clip volume'});fireEvent.pointerDown(clipVolume,{pointerId:1});fireEvent.change(clipVolume,{target:{value:'65'}});fireEvent.pointerUp(clipVolume,{pointerId:1});
  await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.path.includes('/shots/')&&r.body?.audio?.volume===65)));check('clip-audio volume slider saves the released value',true);
- fireEvent.change(screen.getByRole('slider',{name:'Clip audio fade in'}),{target:{value:'500'}});fireEvent.pointerUp(screen.getByRole('slider',{name:'Clip audio fade in'}),{pointerId:1});await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.path.includes('/shots/')&&r.body?.audio?.fade_in_ms===500)));check('clip audio fade-in saves and is exposed independently',true);
+ const fadeIn=screen.getByRole('slider',{name:'Clip audio fade in'});fireEvent.pointerDown(fadeIn,{pointerId:1});fireEvent.change(fadeIn,{target:{value:'500'}});fireEvent.pointerUp(fadeIn,{pointerId:1});await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.path.includes('/shots/')&&r.body?.audio?.fade_in_ms===500),JSON.stringify(requests.filter(r=>r.path.includes('/shots/')).slice(-6))));check('clip audio fade-in saves during a consecutive slider edit',true);
  const pool={id:'pool-audio',type:'audio',original_filename:'music.mp3'};
  fireEvent.drop(narration,{dataTransfer:{types:['application/x-sceneforge-assets'],getData:()=>JSON.stringify([pool])}});
  await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/voice-takes/from-asset')&&r.body.asset_id==='pool-audio')));
@@ -507,7 +548,13 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  check('undo removes an added scene',true);
  await user.keyboard('{Control>}{Shift>}z{/Shift}{/Control}');
  await waitFor(()=>assert.equal(project.scenes.some(s=>s.title==='New scene'),true));
+ await saved();
  check('redo restores an added scene',true);
+ const countBeforeRipple=project.scenes.length;
+ globalThis.confirm=()=>true;
+ await user.click(screen.getByRole('button',{name:'Ripple delete selected scene'}));
+ await waitFor(()=>assert.equal(project.scenes.length,countBeforeRipple-1));
+ check('ripple delete removes the chosen scene and closes its timeline gap',!project.scenes.some(s=>s.title==='New scene')&&project.scenes.every((s,i)=>s.order_index===i));
  await waitFor(()=>assert.ok(screen.getByRole('button',{name:/Select scene \d+: Part-1/})));
  check('empty scene blocks rendering',screen.getByRole('button',{name:'Render scene'}).disabled);
  await user.click(screen.getByRole('button',{name:new RegExp('Select scene \\d+: Part-1')}));
@@ -538,31 +585,34 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  closeReady=true;
  await user.selectOptions(screen.getByRole('combobox',{name:'Project aspect ratio'}),'9:16');await saved();
  check('project aspect selection saves',project.aspect==='9:16');
- await user.click(screen.getByRole('button',{name:'Settings',exact:true}));
- check('settings opens with preferences',screen.getByRole('heading',{name:'Settings — Preferences'}));
- await user.click(screen.getByRole('button',{name:'Light',exact:true}));
- check('light theme preference applies immediately',document.documentElement.dataset.theme==='light');
+ await user.click(screen.getByRole('button',{name:'Theme: Graphite Night'}));
+ check('editor theme menu offers day and additional studio themes',screen.getByRole('menuitemradio',{name:/Daylight/})&&screen.getByRole('menuitemradio',{name:/Midnight Blue/})&&screen.getByRole('menuitemradio',{name:/Warm Studio/}));
+ await user.click(screen.getByRole('menuitemradio',{name:/Daylight/}));
+ check('theme control at the upper right applies Daylight immediately',document.documentElement.dataset.theme==='light');
+ await user.click(screen.getByRole('button',{name:'File',exact:true}));
+ await user.click(screen.getByRole('button',{name:/Preferences/}));
+ check('editor Preferences lives under File',screen.getByRole('heading',{name:'Preferences'}));
  await user.click(screen.getByRole('button',{name:'Blue accent'}));
  check('accent choice has a visible selected state',screen.getByRole('button',{name:'Blue accent'}).getAttribute('aria-pressed')==='true');
  await user.click(screen.getByRole('button',{name:'Comfortable',exact:true}));
  check('comfortable spacing updates the editor density',document.documentElement.dataset.density==='comfortable'&&screen.getByRole('button',{name:'Comfortable',exact:true}).getAttribute('aria-pressed')==='true');
  await user.click(screen.getByRole('checkbox',{name:/Reduce interface motion/}));
  check('reduced-motion preference applies to the interface',document.documentElement.dataset.reduceMotion==='true');
- await user.selectOptions(screen.getByRole('combobox',{name:'Default project page setup'}),'9:16');
- await user.selectOptions(screen.getByRole('combobox',{name:'Default frame rate'}),'24');
  const prefs=JSON.parse(localStorage.getItem('sceneforge.preferences.v1'));
- check('appearance and new-project defaults persist locally',prefs.theme==='light'&&prefs.accent==='blue'&&prefs.density==='comfortable'&&prefs.reduceMotion&&prefs.defaultAspect==='9:16'&&prefs.defaultFps===24);
- await user.selectOptions(screen.getByRole('combobox',{name:'Current project frame rate'}),'25');await saved();
- check('current project page setup saves its frame rate',project.fps===25);
- await user.click(screen.getByRole('tab',{name:'AI providers',exact:true}));
- check('AI provider settings remain accessible beside preferences',screen.getByRole('heading',{name:'Settings — AI providers'}));
+ check('appearance preferences persist locally without project defaults',prefs.theme==='light'&&prefs.accent==='blue'&&prefs.density==='comfortable'&&prefs.reduceMotion&&!('defaultAspect' in prefs)&&!('defaultFps' in prefs)&&!screen.queryByRole('combobox',{name:'Default project aspect ratio'})&&!screen.queryByRole('combobox',{name:'Default frame rate'}));
+ await user.click(screen.getByRole('button',{name:'Close',exact:true}));
+ await user.click(screen.getByRole('button',{name:'AI Engines',exact:true}));
+ const engineDialog=await screen.findByRole('dialog',{name:'AI engines & providers'});
+ await user.click(within(engineDialog).getByRole('button',{name:'Open Settings to add or change keys'}));
+ check('provider settings open from the existing AI Engines guide',screen.getByRole('heading',{name:'AI engines · Manage providers'})&&!screen.queryByRole('tab',{name:'AI providers'}));
  await user.selectOptions(screen.getByRole('combobox',{name:'Provider',exact:true}),'gemini');
  await user.type(screen.getByRole('textbox',{name:'Provider model'}),'-custom');
  await user.type(screen.getByLabelText('Provider API key'),'fixture-key');
  await user.click(screen.getByRole('button',{name:'Save provider'}));await screen.findByText('Provider saved.');
  check('Gemini profile saves selected provider and model',profiles.some(p=>p.name==='gemini'&&p.model.endsWith('-custom')));
  check('image providers exclude local speech components',!within(screen.getByRole('combobox',{name:'Provider',exact:true})).queryByText(/Kokoro/));
- await user.click(screen.getByRole('button',{name:'Close',exact:true}));
+ await user.click(within(screen.getByRole('dialog',{name:'Editor panel'})).getByRole('button',{name:'Close',exact:true}));
+ await user.click(within(engineDialog).getByRole('button',{name:'Close'}));
  await user.click(screen.getByRole('tab',{name:'Audio',exact:true}));
  check('robotic narration is not selected by default',screen.getByRole('combobox',{name:'Narration engine'}).value==='unselected');
  await user.click(screen.getByRole('button',{name:'Connect Kokoro',exact:true}));
@@ -591,11 +641,13 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getAllByRole('button',{name:'Transitions'})[0]);
  const coverTile=[...document.querySelectorAll('.transition-presets button')].find(b=>b.textContent.includes('Cover left'));
  await user.hover(coverTile);
- check('42 transitions are offered; none previews on the first playing scene (it cannot take a transition)',[...document.querySelectorAll('.transition-presets button')].length>=42&&coverTile.disabled&&!document.querySelector('.tx-on-canvas'));
+ check('55 distinct transition choices are offered; the first playing scene cannot take an incoming transition',[...document.querySelectorAll('.transition-presets button')].length>=55&&coverTile.disabled&&!document.querySelector('.tx-on-canvas'));
  await user.unhover(coverTile);
  check('moving away ends the transition preview',!document.querySelector('.tx-on-canvas'));
  const pcs=[...document.querySelectorAll('.picture-clip')];
- fireEvent.click(pcs[0],{ctrlKey:true});fireEvent.click(pcs[1],{ctrlKey:true});
+ const selectedPicture=pcs.find(clip=>clip.getAttribute('aria-current')==='true');
+ const otherPictures=pcs.filter(clip=>clip!==selectedPicture).slice(0,2);
+ fireEvent.click(otherPictures[0],{ctrlKey:true});fireEvent.click(otherPictures[1],{ctrlKey:true});
  const bb=await screen.findByRole('region',{name:'Selected parts'});
  check('Ctrl+click selects several parts with a tick and shows the batch bar',document.querySelectorAll('.picture-clip.multi').length>=2&&/parts selected/.test(bb.textContent));
  await user.click(within(bb).getByRole('button',{name:/Apply to/}));
@@ -635,13 +687,15 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  fireEvent.keyDown(document.body,{key:'n',ctrlKey:true});
  const newName=await screen.findByRole('textbox',{name:'New project name'});
  check('Ctrl+N (File → New project) returns to the project page ready to type a name',document.activeElement===newName);
- check('new project form uses saved page setup defaults',screen.getByRole('combobox',{name:'New project aspect ratio'}).value==='9:16'&&screen.getByRole('combobox',{name:'New project frame rate'}).value==='24');
+ check('new project setup remains in its own create form with clear 16:9 and 30 fps defaults',screen.getByRole('combobox',{name:'New project aspect ratio'}).value==='16:9'&&screen.getByRole('combobox',{name:'New project frame rate'}).value==='30');
  cleanup();
  render(React.createElement(App));
  await user.click(await screen.findByRole('button',{name:/Renamed project Open project/}));
  await user.click(screen.getByRole('button',{name:/Select scene \d+: Part-1/}));
  check('reopening restores persisted text',visibleEditor().getByRole('textbox',{name:'Narration script'}).value==='Recoverable draft before exit keep draft');
- await user.click(screen.getByRole('button',{name:'SceneForge'}));
+ await user.click(screen.getByRole('button',{name:'Projects'}));
+ await screen.findByRole('combobox',{name:'New project aspect ratio'});
+ check('Projects exits the editor back to the project creation screen',!!screen.getByRole('button',{name:'Create project'}));
  await user.click(await screen.findByRole('button',{name:'Delete project Renamed project'}));
  await screen.findByText('Your saved projects will appear here.');
  check('confirmed deletion removes the project card',requests.some(r=>r.method==='DELETE'&&r.path===`/api/projects/${project.id}`));

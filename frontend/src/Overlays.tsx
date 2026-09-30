@@ -10,9 +10,29 @@ export const OVERLAY_DEFAULTS: Omit<Overlay, 'id' | 'asset_id'> = {
 const ANIMS: [Overlay['anim_in'], string][] = [['none', 'None'], ['fade', 'Fade'], ['slide_left', 'Slide'], ['slide_up', 'Rise'], ['zoom', 'Zoom pop']];
 const newId = () => 'ov' + Math.random().toString(36).slice(2, 9);
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
-const STICKERS = [
+type StickerPreset={emoji:string;name:string;tags:string;style?:'pill'|'banner'|'burst';background?:string;foreground?:string;outline?:string};
+const STICKERS:StickerPreset[] = [
   ['😀','Grinning face','reaction happy smile'],['😂','Laughing','reaction funny tears'],['🥳','Party','celebration confetti'],['😍','Heart eyes','reaction love'],['😮','Wow','reaction surprised'],['🤔','Thinking','reaction question'],['😎','Cool','reaction sunglasses'],['😭','Crying','reaction sad'],['👏','Clap','hands applause'],['👍','Thumbs up','hands approve'],['👎','Thumbs down','hands dislike'],['❤️','Heart','love symbol'],['🔥','Fire','trending hot'],['✨','Sparkles','magic shine'],['⭐','Star','rating favorite'],['💯','100','perfect score'],['✅','Check','done correct'],['❌','Cross','wrong no'],['⚠️','Warning','alert caution'],['❓','Question','help ask'],['💡','Idea','light bulb tip'],['🎉','Confetti','party celebration'],['🎬','Movie','film video'],['🎵','Music','sound audio'],['📍','Pin','location map'],['🚀','Rocket','launch fast'],['💬','Speech bubble','comment message'],['👀','Eyes','look watch'],['🙏','Thanks','please hands'],['💪','Strong','muscle power'],['🌟','Glow star','star shine'],['☀️','Sun','weather bright'],['🌈','Rainbow','color pride'],['🧠','Brain','think smart'],['💰','Money','cash finance'],['🎯','Target','goal focus'],['🏆','Trophy','winner award'],['☕','Coffee','drink break'],['🍿','Popcorn','movie snack'],['🐱','Cat','animal pet'],['🐶','Dog','animal pet'],['🦋','Butterfly','nature'],['🌸','Blossom','flower spring'],['💖','Sparkling heart','love heart'],['🚨','Siren','alert urgent'],['🛑','Stop','halt'],['▶️','Play','video start'],['⏸️','Pause','video stop'],
-].map(([emoji,name,tags])=>({emoji,name,tags}));
+].map(([emoji,name,tags])=>({emoji,name,tags} as StickerPreset)).concat([
+  {emoji:'🤩',name:'Starstruck',tags:'reaction amazed wow'},
+  {emoji:'🥹',name:'Pleading',tags:'reaction emotional please'},
+  {emoji:'🙌',name:'Raise hands',tags:'hands celebrate success'},
+  {emoji:'👋',name:'Wave hello',tags:'hands greeting'},
+  {emoji:'🫶',name:'Heart hands',tags:'hands love support'},
+  {emoji:'⚡',name:'Lightning',tags:'energy fast power'},
+  {emoji:'💥',name:'Impact',tags:'comic boom action'},
+  {emoji:'🧩',name:'Puzzle piece',tags:'idea problem solve'},
+  {emoji:'📈',name:'Growth chart',tags:'business growth up'},
+  {emoji:'🎤',name:'Microphone',tags:'creator speech music'},
+  {emoji:'🎧',name:'Headphones',tags:'audio podcast music'},
+  {emoji:'👑',name:'Crown',tags:'winner best creator'},
+  {emoji:'SUBSCRIBE',name:'Subscribe pill',tags:'creator channel call to action',style:'pill',background:'#E73549',foreground:'#FFFFFF'},
+  {emoji:'FOLLOW',name:'Follow banner',tags:'creator social call to action',style:'banner',background:'#426BFF',foreground:'#FFFFFF'},
+  {emoji:'NEW',name:'New badge',tags:'label announcement latest',style:'pill',background:'#FFE45C',foreground:'#242015'},
+  {emoji:'WOW!',name:'Wow burst',tags:'comic reaction impact',style:'burst',background:'#FF4D75',foreground:'#FFFFFF',outline:'#FFFFFF'},
+  {emoji:'TIP',name:'Quick tip',tags:'label advice idea tutorial',style:'banner',background:'#23B68B',foreground:'#FFFFFF'},
+  {emoji:'SALE',name:'Sale badge',tags:'label price promotion',style:'burst',background:'#FF793D',foreground:'#FFFFFF',outline:'#FFF4D3'},
+]);
 
 function useProjectMedia(projectId: string) {
   const [media, setMedia] = useState<Asset[]>([]);
@@ -99,15 +119,27 @@ export function OverlayPanel({scene, overlays, selected, onSelect, onChange, dis
     catch (e: any) {setError(e.message || 'Upload failed.');}
     finally {if (file.current) file.current.value = '';}
   }
-  async function addSticker(sticker:{emoji:string;name:string}) {
+  async function addSticker(sticker:StickerPreset) {
     if(overlays.length>=8){setError('A scene can have at most 8 overlays. Remove one before adding another.');return;}
     setStickerBusy(sticker.name);setError('');
     try {
       const canvas=document.createElement('canvas');canvas.width=512;canvas.height=512;
       const ctx=canvas.getContext('2d');if(!ctx)throw new Error('Sticker rendering is unavailable in this browser.');
       ctx.clearRect(0,0,512,512);ctx.textAlign='center';ctx.textBaseline='middle';
-      ctx.font='380px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
-      ctx.shadowColor='rgba(0,0,0,.28)';ctx.shadowBlur=10;ctx.fillText(sticker.emoji,256,264,448);
+      if(sticker.style){
+        ctx.save();ctx.shadowColor='rgba(0,0,0,.24)';ctx.shadowBlur=12;ctx.fillStyle=sticker.background||'#5D55D8';ctx.strokeStyle=sticker.outline||'rgba(30,35,50,.65)';ctx.lineWidth=12;
+        if(sticker.style==='burst'){
+          ctx.beginPath();for(let i=0;i<32;i++){const a=-Math.PI/2+i*Math.PI/16,r=i%2===0?238:190,x=256+Math.cos(a)*r,y=256+Math.sin(a)*r;i===0?ctx.moveTo(x,y):ctx.lineTo(x,y);}ctx.closePath();ctx.fill();ctx.stroke();
+        }else if(sticker.style==='banner'){
+          ctx.beginPath();ctx.moveTo(38,150);ctx.lineTo(425,150);ctx.lineTo(474,256);ctx.lineTo(425,362);ctx.lineTo(38,362);ctx.lineTo(67,256);ctx.closePath();ctx.fill();ctx.stroke();
+        }else{
+          ctx.beginPath();ctx.roundRect(26,144,460,224,112);ctx.fill();ctx.stroke();
+        }
+        ctx.shadowColor='transparent';ctx.fillStyle=sticker.foreground||'#FFFFFF';const size=Math.min(92,430/Math.max(1,sticker.emoji.length*.62));ctx.font=`900 ${size}px system-ui, "Segoe UI", sans-serif`;ctx.fillText(sticker.emoji,256,260,430);ctx.restore();
+      }else{
+        ctx.font='380px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif';
+        ctx.shadowColor='rgba(0,0,0,.28)';ctx.shadowBlur=10;ctx.fillText(sticker.emoji,256,264,448);
+      }
       const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Could not create the sticker image.')),'image/png'));
       const safe=sticker.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
       const asset=await api.uploadAsset(scene.project_id,new File([blob],`sticker-${safe}.png`,{type:'image/png'}));

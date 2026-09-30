@@ -89,6 +89,16 @@ class EffectPreset(str, Enum):
     NOIR = "noir"
     SHARPEN = "sharpen"
     NEGATIVE = "negative"
+    GOLDEN_HOUR = "golden_hour"
+    ARCTIC = "arctic"
+    PORTRA = "portra"
+    MATTE = "matte"
+    POP_COLOR = "pop_color"
+    TEAL_SHADOW = "teal_shadow"
+    ROSE_GLOW = "rose_glow"
+    MONO_BLUE = "mono_blue"
+    CHROMATIC_SPLIT = "chromatic_split"
+    MOTION_TRAIL = "motion_trail"
 
 
 class TransitionType(str, Enum):
@@ -135,6 +145,18 @@ class TransitionType(str, Enum):
     SLICE_VERTICAL = "slice_vertical"
     WIND_UP = "wind_up"
     SQUEEZE_V = "squeeze_v"
+    COVER_UP = "cover_up"
+    COVER_DOWN = "cover_down"
+    REVEAL_UP = "reveal_up"
+    REVEAL_DOWN = "reveal_down"
+    WIPE_TL = "wipe_tl"
+    WIPE_TR = "wipe_tr"
+    WIPE_BL = "wipe_bl"
+    WIPE_BR = "wipe_br"
+    SLICE_HORIZONTAL = "slice_horizontal"
+    WIND_RIGHT = "wind_right"
+    WIND_DOWN = "wind_down"
+    FADE_SLOW = "fade_slow"
 
 
 class TimingMode(str, Enum):

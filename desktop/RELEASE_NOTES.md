@@ -3,11 +3,19 @@
 This is an installer-test candidate on `chatgpt/0.7.0-video-generation`, not a published GitHub release. Keep it on this branch until the Windows installer has been tested; the public release remains unchanged. A prior local build was reported to generate successfully with Runway, but this regression pass does not repeat live provider calls.
 
 ## Preferences, project setup and close flow
-- Added local Appearance preferences for Graphite or Light theme, Violet/Blue/Teal accents, Compact or Comfortable spacing, and reduced interface motion.
-- Added new-project defaults for aspect ratio and frame rate, plus current-project aspect/frame-rate controls. Changing an existing project's setup can make renders stale; render affected scenes again.
+- Preferences now lives under **File**. The editor’s upper-right **Theme** menu offers Graphite Night, Daylight, Midnight Blue and Warm Studio, with accent, density and reduced-motion controls in Preferences.
+- New-project format and frame rate remain in **Create Project**; Preferences no longer repeats those controls. Existing projects keep their own aspect ratio, adjustable from the editor.
 - Added a native close dialog with **Save**, **Don’t save**, **Save and exit**, and **Cancel**. Save flushes changes and keeps the app open; failed saves or active generation/render/export keep SceneForge open.
 - Added local hardware guidance for NVIDIA GPU name, maximum detected VRAM, GPU count and system RAM. Local model choices display requirement warnings when detected hardware is below the model guidance. Detection advises the user; it does not install ComfyUI or download model weights.
 - Set the application build identifier and desktop package to `0.7.0`.
+
+## Startup, theme and timeline follow-up
+- Cleaned the project home: removed the static mode tabs, duplicate provider selector and repeated project-default controls. Existing AI Engines, Help, Media Pool, Scenes and editor tabs remain available.
+- Added an explicit **Projects** button in the editor to return to project creation/opening without using Reload.
+- Restored the **Safe zones** toggle above the timeline. Corrected Daylight theme colors across inspector controls, cards, buttons and timeline panels for readable contrast.
+- Fixed the close readiness check to use live in-process work. A stale queued/running job record left after a prior crash no longer traps an otherwise idle user in the close dialog.
+- Added per-project T1/V1/A1/A2 lane locks, an A2 quick mute button for each video clip’s embedded sound, and an explicitly labeled **Ripple delete** action that closes the scene gap. Existing snapping, markers, scene reorder, linked edge trim, split, and undo/redo remain.
+- Expanded the transition catalog to **55** choices, caption styling to **31** presets, and the searchable emoji/graphic sticker library to **66** items. Added **8** separately grouped color filters plus the FFmpeg-rendered creative effects **Chromatic split** and **Motion trail**.
 
 ## Text-to-video workspace
 - Added a dedicated **Generate video** workspace that leaves the existing editor, top-level AI Engines and Help menus, timeline and media panels in place.
@@ -25,10 +33,11 @@ This is an installer-test candidate on `chatgpt/0.7.0-video-generation`, not a p
 - Full API references and install details are in [README.md](../README.md); current scope and checks are in [the 0.7.0 review](../docs/REVIEW_0.7.0_VIDEO_GENERATION.md).
 
 ## Verification
-- `npm run build` — passed (TypeScript and Vite). Vite reports a 531.66 kB minified editor bundle, above its 500 kB advisory threshold.
-- `npm test` — passed: 199 editor component checks, 19 unit checks, 2 video-generation UI flows and 6 Share dialog checks. Provider requests are mocked; these checks do not replace visual QA.
+- `npm run build` — passed (TypeScript and Vite). Vite reports a 540.73 kB minified editor bundle, above its 500 kB advisory threshold.
+- `npm test` — passed: 215 editor component checks, 19 unit checks, 2 video-generation UI flows and 6 Share dialog checks. Provider requests are mocked; these checks do not replace visual QA.
 - `npm test` in `desktop/` — passed: 18 tests, including the four close choices, save failure, active work and repeated-close handling.
 - `PYTHONPATH=backend /tmp/sceneforge-release-venv/bin/python tests/integration/test_video_generation.py` — passed, covering the model catalog, hardware guidance, provider request adapters, ComfyUI queue/output, workflow mapping, paid confirmation, candidate count and loopback-only connection.
+- Direct backend integration checks for stale/live close readiness and color/creative effects passed; Chromatic split and Motion trail render through the complete scene filter graph.
 - Python compile checks and `git diff --check` — passed.
 - The broader GitHub check uses Linux's native Secret Service for credential tests; that keyring gate still needs to pass in GitHub Actions.
 - No live ComfyUI, Google Veo or Runway generation was repeated in this regression pass. Check installed models, hardware, account billing, returned audio, captions and export codecs separately. The setup guide does not install ComfyUI, download model weights or install custom nodes.

@@ -68,10 +68,8 @@ def health():
 
 @app.get('/api/close-status')
 def close_status():
-    from app.db.models import RenderJob
-    with SessionLocal() as db:
-        active = db.query(RenderJob).filter(RenderJob.status.in_(['queued','running','cancelling'])).count()
-    return {'ready': active == 0}
+    from app.workers import jobs as job_worker
+    return {'ready': not job_worker.active_job_ids()}
 
 
 # Serve the built frontend (npm run build -> frontend/dist) from the same

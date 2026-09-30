@@ -10,6 +10,7 @@ from app.main import app
 from app.db.database import SessionLocal, engine
 from app.db.models import Asset, Scene, VoiceTake, RenderJob
 from app import local_images
+from app.workers import jobs as job_worker
 with TestClient(app) as c:
  project=c.post('/api/projects',json={'title':'Release test'}).json()
  sid=c.get('/api/projects/'+project['id']).json()['scenes'][0]['id']
@@ -24,6 +25,9 @@ with TestClient(app) as c:
  with SessionLocal() as db:assert db.get(VoiceTake,one).accepted and db.get(Scene,sid).revision==rev
  with SessionLocal() as db:
   job=RenderJob(project_id=project['id'],scope='export',status='running');db.add(job);db.commit();jid=job.id
+ assert c.get('/api/close-status').json()=={'ready':True}  # stale DB rows from a prior crash are not live work
+ with patch.object(job_worker,'active_job_ids',return_value={'live-render'}):
+  assert c.get('/api/close-status').json()=={'ready':False}  # current work must still block exit
  assert c.delete('/api/voice-takes/'+one).status_code==409
  with SessionLocal() as db:db.get(RenderJob,jid).status='succeeded';db.commit()
  assert c.delete('/api/voice-takes/'+one).status_code==200

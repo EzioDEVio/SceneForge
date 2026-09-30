@@ -7,7 +7,7 @@ const updates=require('./updates.cjs');
 let updater={check:async()=>{},setBeta:()=>{},beta:()=>false};
 let sdAutostartTurnedOff=false;
 let versionChanged=false;
-let window,backend,quitting=false,origin;
+let window,backend,quitting=false,origin,workspaceMode='home';
 const smoke=process.argv.includes('--smoke-test');
 let failedStartup=false;
 const requestClose=createCloseController({
@@ -91,7 +91,7 @@ async function boot(){
  const fromApp=e=>{try{return new URL(e.senderFrame.url).origin===origin;}catch{return false;}};
  const guard=fn=>async(e,...a)=>{if(!fromApp(e))throw Error('Not allowed');return fn(...a);};
  const openPanel=(panel)=>window.webContents.executeJavaScript(`window.dispatchEvent(new CustomEvent('sceneforge-open-panel',{detail:${JSON.stringify(panel)}}))`);
- for(const ch of ['sf:info','sf:check-updates','sf:set-beta','sf:choose-sd-folder','sf:open-external','sf:open-logs','sf:diagnostics','sf:reveal-export'])ipcMain.removeHandler(ch);
+ for(const ch of ['sf:info','sf:check-updates','sf:set-beta','sf:set-workspace-mode','sf:choose-sd-folder','sf:open-external','sf:open-logs','sf:diagnostics','sf:reveal-export'])ipcMain.removeHandler(ch);
  ipcMain.handle('sf:info',guard(async()=>({version:app.getVersion(),electron:process.versions.electron,chrome:process.versions.chrome,platform:process.platform,arch:process.arch,
   packaged:app.isPackaged,beta:updater.beta(),workspace:dataDir})));
  ipcMain.handle('sf:check-updates',guard(async()=>app.isPackaged?updater.check(false):{status:'error',kind:'dev',message:'Updates are only available in the installed app.'}));
@@ -108,8 +108,9 @@ async function boot(){
  ipcMain.handle('sf:open-logs',guard(async()=>{fs.mkdirSync(path.join(dataDir,'logs'),{recursive:true});return shell.openPath(path.join(dataDir,'logs'));}));
  ipcMain.handle('sf:diagnostics',guard(async()=>{await collectDiagnostics();return true;}));
  const rebuildMenu=()=>Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate()));
- const menuTemplate=()=>([
-  {label:'File',submenu:[{label:'New project…',accelerator:'CmdOrCtrl+N',click:()=>openPanel({panel:'projects',mode:'new'})},{label:'Open project…',accelerator:'CmdOrCtrl+O',click:()=>openPanel({panel:'projects',mode:'open'})},{type:'separator'},{label:'Open workspace folder',click:()=>shell.openPath(dataDir)},{label:'Open logs',click:()=>shell.openPath(path.join(dataDir,'logs'))},{type:'separator'},{role:'quit'}]},
+ ipcMain.handle('sf:set-workspace-mode',guard(mode=>{workspaceMode=mode==='editor'?'editor':'home';rebuildMenu();return true;}));
+ const menuTemplate=()=>{
+ const menus=workspaceMode==='editor'?[
   {label:'AI Engines',submenu:[
    {label:'AI engines & providers…',accelerator:'CmdOrCtrl+Shift+A',click:()=>openPanel({panel:'ai'})},
    {label:'Getting started with AI',click:()=>openPanel({panel:'ai',section:'start'})},
@@ -119,7 +120,11 @@ async function boot(){
    {label:'Local voices (Chatterbox, Kokoro)',click:()=>openPanel({panel:'ai',section:'voices'})},
   ]},
   {label:'Edit',submenu:[{role:'undo'},{role:'redo'},{type:'separator'},{role:'cut'},{role:'copy'},{role:'paste'},{role:'selectAll'}]},
-  {label:'View',submenu:[{role:'reload'},{role:'resetZoom'},{role:'zoomIn'},{role:'zoomOut'},{role:'togglefullscreen'},{type:'separator'},{label:'Developer tools (for bug reports)',accelerator:'CmdOrCtrl+Shift+I',click:()=>window.webContents.toggleDevTools()}]},
+  {label:'View',submenu:[{role:'resetZoom'},{role:'zoomIn'},{role:'zoomOut'},{role:'togglefullscreen'},{type:'separator'},{label:'Return to projects',click:()=>openPanel({panel:'projects',mode:'open'})},{label:'Developer tools (for bug reports)',accelerator:'CmdOrCtrl+Shift+I',click:()=>window.webContents.toggleDevTools()}]},
+ ]:[];
+ return [
+  {label:'File',submenu:[{label:'New project…',accelerator:'CmdOrCtrl+N',click:()=>openPanel({panel:'projects',mode:'new'})},{label:'Open project…',accelerator:'CmdOrCtrl+O',click:()=>openPanel({panel:'projects',mode:'open'})},{label:'Preferences…',accelerator:'CmdOrCtrl+,',click:()=>openPanel({panel:'preferences'})},{type:'separator'},{label:'Open workspace folder',click:()=>shell.openPath(dataDir)},{label:'Open logs',click:()=>shell.openPath(path.join(dataDir,'logs'))},{type:'separator'},{role:'quit'}]},
+  ...menus,
   {label:'Help',submenu:[
    {label:'Check for updates…',enabled:app.isPackaged,click:()=>updater.check(true)},
    {label:'Receive beta updates',type:'checkbox',checked:updater.beta(),enabled:app.isPackaged,click:item=>{const r=updater.setBeta(item.checked);dialog.showMessageBox(window,{type:'info',message:item.checked?'Beta updates on':'Beta updates off',detail:r.message});if(item.checked)updater.check(false);}},
@@ -129,7 +134,7 @@ async function boot(){
    {label:'SceneForge on GitHub',click:()=>shell.openExternal('https://github.com/EzioDEVio/SceneForge')},
    {label:'About SceneForge Studio',click:()=>openPanel({panel:'about'})}
   ]}
- ]);
+ ];};
  rebuildMenu();
  // A new version must not show the previous version's saved editor files.
  if(versionChanged){try{await session.fromPartition('sceneforge-desktop').clearCache();}catch(e){console.error('cache clear failed',e);}}
