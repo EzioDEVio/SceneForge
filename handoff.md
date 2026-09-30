@@ -12,6 +12,32 @@ This handoff preserves the earlier 0.5.3/0.6.0 review below and records the 0.7.
 
 Reviewed inputs in this workspace include the 0.5.3 source ZIP, the original 0.6.0 WIP ZIP, reviewed wip.2–wip.6 snapshots, their READMEs and handoffs, the SceneForge session handoff, chat notes, and the user screenshots. The 0.5.3 technical handoff predates the 0.5.3/0.6.0 work and should not be treated as a complete description of the present build.
 
+## User test follow-up: editable cuts, captions, audio and overlays
+
+This follow-up addresses the latest local test findings while keeping 0.5.3 and the existing 0.7.0 features intact. The candidate API build ID is `v0.7.0-rc2`; the packaged app version remains 0.7.0 until a stable release is approved.
+
+- **Cutting before render:** scissors now cuts at the timeline playhead. A single source shot can split without rendering even if it has generated caption segments or timed text. Both scenes continue to reference the original media with source ranges/audio settings divided at the cut; caption segments and timed text are divided and rebased. Filmstrip thumbnails start at each segment's source-in time. A ratio change exits the last-export monitor so an old export cannot look like it restored the full source. Multiple shots, accepted separate narration, animation or speed changes still require rendering before a baked split.
+- **Regenerating Auto Captions:** the action changes to **Regenerate captions** when a transcript exists. When both a scene narration take and video sound exist, a picker lets the user select the source. Text/Text+/Text Box editing appears immediately below Auto Captions.
+- **A3 timeline audio:** project-level audio clips are independent of scene narration (A1), source-video sound (A2), and the whole-project music bed. Drop MP3, WAV, M4A, AAC, OGG or FLAC from the Media Pool or desktop onto A3. Clips may overlap and are vertically stacked. They support drag-to-move, edge trim, scissors split at playhead, mute, volume, trim-in/out and fades; export mixes each unmuted clip at its sequence time. Settings live additively in `finishing_json`, so existing projects keep their music settings. The backend limits projects to 64 audio clips and checks project ownership, ranges, levels, fades and mute values.
+- **Overlay composition and stickers:** added 2/3 side-by-side, 2/3 vertical-stack and 2×2 arrangement presets for PiP overlays. A preset arranges its first two, three or four overlays; others remain in their current positions. Sticker tiles are constrained to their cards. Custom PNG and WebP uploads support transparent backgrounds; JPEG is accepted with its solid background. Uploads become regular project Media Pool assets and are available from the reusable sticker list on the current device.
+
+### Follow-up roadmap for the larger creative requests
+
+The following items are not part of this editor-fix candidate. They need their own measurable quality, hardware, licensing and render-time work. Add them as optional, reversible tools and keep original media available.
+
+| Priority | Feature | Practical first implementation |
+|---|---|---|
+| 1 | Voice isolation | Optional local model/service with compatibility checks, first-run model download/progress, bypass and A/B preview; store a processed stem alongside the original. |
+| 2 | Tracked overlays and object attachment | User-set tracking points and editable keyframes first; optional local AI tracking after. Add restrained float/pendulum motion as a keyframe preset. Enables stickers, callouts, blur/redaction and text to follow an object. |
+| 3 | Subject cutout/background removal | Segment a selected object/person, track/refine its matte through the shot, and render separate foreground/background layers. Requires VRAM/time benchmarks and a correction path for hair/occlusion. |
+| 4 | Speed-ramp curves/optical flow | Add a visual velocity curve, then separately benchmark frame interpolation. Keep source timing editable and make slower interpolation optional. |
+| 5 | Text reveal/material fills | Add original SceneForge reveal masks first. Prompt-generated texture fills can be generated/imported as a texture and clipped inside the text mask; also allow licensed/user-supplied textures without AI. |
+| 6 | Grade and effects packs | Add halation/film grades, procedural camera-shake presets, practical lens-flare overlays with Screen/Add blending and masked text-reveal transitions. Use original or licensed assets, retain LUT/filter tools, and document pack licenses. |
+| 7 | Beat-aware music re-edit | Build on current beat detection with trim candidates, downbeat-aware section matching and crossfades; preview before applying and preserve the source soundtrack. |
+| 8 | Fusion-style node graph | A full node compositor is a separate architecture project. Consider a constrained non-destructive effect-order graph only after clip-level tracks and parameter serialization are stable. |
+
+Resolve Studio currently describes AI object isolation/tracking, Speed Warp optical-flow retiming and audio AI tools; Adobe documents Object Masking and mask tracking. This is a feasibility comparison, not a promise of SceneForge feature parity. References: [Blackmagic Resolve Studio](https://www.blackmagicdesign.com/products/davinciresolve/studio), [Adobe Object Masking](https://helpx.adobe.com/premiere/desktop/add-video-effects/work-with-masks/object-masking.html), [Adobe mask tracking](https://helpx.adobe.com/premiere/desktop/add-video-effects/work-with-masks/track-masks.html), and [CapCut editing tools](https://www.capcut.com/tools).
+
 ## Latest UI and timeline follow-up
 
 - **Project home:** Preferences is under File. Removed the redundant static mode tabs, provider selector and duplicate new-project defaults. Project aspect/frame rate stay in Create Project; the existing top-level AI Engines and Help menus, Media Pool and editor features remain.
@@ -19,15 +45,17 @@ Reviewed inputs in this workspace include the 0.5.3 source ZIP, the original 0.6
 - **Safe zones and close behavior:** Restored the Safe zones toggle above the timeline. Close readiness now checks live in-process generation/render/export work, so an idle app is not held open by stale job rows left after a prior crash.
 - **Timeline tools:** Added per-project locks for T1 text, V1 picture, A1 narration and A2 clip sound; A2 quick mute buttons for embedded source audio; and explicit ripple-delete labels/confirmation that state the scene gap closes. Existing snapping, named markers, scene drag-reorder, eligible linked video/audio trims, split and undo/redo remain.
 - **Visual library:** The candidate offers 55 transitions, 31 caption styles and a searchable 66-item emoji/graphic-sticker library. The Effects panel groups 8 additional color filters (Golden hour, Arctic, Portra film, Matte fade, Color pop, Teal shadows, Rose glow and Blue monochrome) separately and adds FFmpeg-rendered Chromatic split and Motion trail effects. Existing visual looks, LUT tools and effect panels remain.
-- **Limits:** The timeline remains scene-based. It does not yet provide independent unrestricted clip movement across unlimited tracks or full multitrack compositing.
+- **Limits:** Visual editing is still arranged as scenes on V1. A3 now supports independent project audio clips, but unrestricted clip-based video editing across arbitrary tracks and full multitrack compositing remain future work.
 
 ### Latest regression checks (2026-09-30)
 
-- Frontend production build passed (TypeScript + Vite); minified editor bundle is 540.73 kB and Vite prints its advisory above 500 kB.
-- Frontend tests passed: 215 editor component checks, 19 unit checks, 2 video-generation flows and 6 share dialog checks.
+- Frontend production build passed (TypeScript + Vite); minified editor bundle is 555.65 kB and Vite prints its advisory above 500 kB.
+- Frontend tests passed: 225 editor component checks, 19 unit checks, 2 video-generation flows and 6 share dialog checks.
 - Desktop tests passed: 18 lifecycle, close-flow and storage checks.
 - Direct backend integration scripts passed for video generation, stale/live close readiness, and FFmpeg filter smoke tests. Chromatic split and Motion trail also passed the full scene filter graph.
 - Python compile checks and `git diff --check` passed. Frontend flows use a mock API; they do not replace installed-app visual testing.
+- The follow-up source-split integration test passed against real FFmpeg media: it verifies an unrendered cut, linked source audio, split caption/text timings, segment thumbnail selection and a complete export.
+- The finishing/export integration test passed all 22 checks, including multiple A3 clips, fade validation, audible clip placement and silence in the gap. The suite emits a Starlette/httpx deprecation warning from its test client; all checks succeeded.
 - GitHub’s Linux keyring credential gate and Windows/Linux/macOS release workflow still need to pass on the candidate branch. Test the resulting Windows installer before merge/publication. No stable tag or public release is being created.
 
 ## Initial 0.7.0 text-to-video milestone

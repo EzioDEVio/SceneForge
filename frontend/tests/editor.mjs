@@ -41,7 +41,7 @@ globalThis.fetch=async(path,init={})=>{
  else if(path==='/api/projects'&&method==='GET') result=[project];
  else if(path===`/api/projects/${project.id}`&&method==='GET') result=project;
  else if(/^\/api\/scenes\/[^/]+$/.test(path)&&method==='GET')result=project.scenes.find(s=>s.id===path.split('/').at(-1));
- else if(path===`/api/projects/${project.id}`&&method==='PATCH'){Object.assign(project,body); result=project;}
+ else if(path===`/api/projects/${project.id}`&&method==='PATCH'){Object.assign(project,body);if(body.finishing){project.finishing_json=body.finishing;delete project.finishing;}result=project;}
  else if(path===`/api/projects/${project.id}`&&method==='DELETE')result={ok:true};
  else if(path==='/api/providers'&&method==='GET') result=profiles;
  else if(path==='/api/providers'&&method==='POST'){const p={...body,id:'provider-'+body.name,configured:true,masked_key:'masked'};profiles=profiles.filter(v=>v.name!==p.name).concat(p);result=p;}
@@ -59,7 +59,7 @@ globalThis.fetch=async(path,init={})=>{
  else if(path.startsWith('/api/assets?'))result=[{id:'pool-img',type:'image',original_filename:'map.png',width:800,height:600},{id:'pool-vid',type:'video',original_filename:'clip.mp4',width:1280,height:720}];
  else if(/^\/api\/assets\/[^/?]+$/.test(path)&&method==='GET')result={id:path.split('/')[3],type:path.split('/')[3]==='pool-vid'?'video':'image',original_filename:path.split('/')[3]==='pool-vid'?'clip.mp4':'map.png',width:800,height:600};
  else if(path.startsWith('/api/assets/lut?')&&method==='POST'){const f=body.get('file');if(/broken/.test(f.name))return {ok:false,status:400,statusText:'Bad',json:async()=>({detail:'This LUT could not be read: Expected 35937 entries, found 3.'})};result={id:'lut-'+next++,type:'lut',original_filename:f.name,width:33};}
- else if(path.startsWith('/api/assets/upload')&&method==='POST'){const f=body.get('file');result={id:'up-'+next++,type:/\.(mp4|mov)$/i.test(f.name)?'video':'image',original_filename:f.name,width:640,height:360,duration_ms:null};}
+ else if(path.startsWith('/api/assets/upload')&&method==='POST'){const f=body.get('file');result={id:'up-'+next++,type:/\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(f.name)?'audio':/\.(mp4|mov|mkv|webm|avi)$/i.test(f.name)?'video':'image',original_filename:f.name,width:640,height:360,duration_ms:/\.(mp3|wav|m4a|aac|ogg|flac)$/i.test(f.name)?5000:null};}
  else if(/\/api\/scenes\/[^/]+\/voice-takes\/upload$/.test(path)){const sc=project.scenes.find(s=>s.id===path.split('/')[3]);const take={id:'take-'+next++,accepted:true,voice:'Uploaded audio',source:'upload',measured_duration_ms:5200,stale:false,edit_json:{},effective_duration_ms:5200,audio_asset:{id:'aud-'+next++,type:'audio',original_filename:body.get('file').name}};sc.voice_takes.forEach(t=>t.accepted=false);sc.voice_takes.push(take);result=take;}
  else if(path.endsWith('/voice-takes/from-asset')&&method==='POST'){const sc=project.scenes.find(s=>s.id===path.split('/')[3]);const take={id:'take-'+next++,accepted:true,voice:'Uploaded audio',source:'upload',measured_duration_ms:3000,stale:false,edit_json:{},effective_duration_ms:3000,audio_asset:{id:body.asset_id,type:'audio',original_filename:'music.mp3'}};sc.voice_takes.forEach(t=>t.accepted=false);sc.voice_takes.push(take);result=take;}
  else if(/\/api\/scenes\/[^/]+\/voice-takes\/clear-selection$/.test(path)){const sc=project.scenes.find(s=>s.id===path.split('/')[3]);sc.voice_takes.forEach(t=>t.accepted=false);result={ok:true};}
@@ -265,6 +265,8 @@ try{
  await user.click(screen.getByRole('tab',{name:'Text',exact:true}));
  // Captions Pro
  const captionStyleGrid=screen.getAllByRole('group',{name:'Caption styles'}).find(el=>el.classList.contains('caption-presets'));
+ const textLayers=screen.getByText('Text overlays').closest('.text-layers');
+ check('text layer editor sits directly after Auto Captions and before manual captions',!!textLayers&&screen.getByRole('region',{name:'Auto captions'}).compareDocumentPosition(textLayers)&4&&textLayers.compareDocumentPosition(screen.getByRole('textbox',{name:'On-screen captions'}))&4);
  check('caption library includes the added creator and Arabic styles',!!captionStyleGrid&&captionStyleGrid.querySelectorAll('button').length>=31&&!!screen.getByRole('button',{name:'Apply Arabic clean caption style'}));
  await user.click(screen.getByRole('button',{name:'Apply Viral bold caption style'}));await saved();
  check('a caption style preset applies font, case, phrases and box highlight',requests.some(r=>r.body?.font?.family==='Anton'&&r.body.font.case==='upper'&&r.body.font.split==='phrases'&&r.body.font.karaoke_style==='box'));
@@ -277,11 +279,17 @@ try{
  check('the caption preview is drawn on the picture',!!document.querySelector('.preview-canvas .caption-preview'));
  await user.click(screen.getByRole('button',{name:'Apply Classic caption style'}));await saved();
  const acc=screen.getByRole('region',{name:'Auto captions'});
+ project.scenes[0].shots[0].asset.type='video';
+ // Persist a scene edit after changing the fixture so App reloads the updated shot into React state.
+ await user.click(screen.getByRole('button',{name:'Apply Classic caption style'}));await saved();
  await user.selectOptions(within(acc).getByRole('combobox',{name:'Speech language'}),'ar');
  await user.selectOptions(within(acc).getByRole('combobox',{name:'Auto caption style'}),'Red highlight');
+ await user.selectOptions(within(acc).getByRole('combobox',{name:'Caption audio source'}),'clips');
  await user.click(within(acc).getByRole('button',{name:/Generate captions/}));
  await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/auto-captions'))));
- check('Auto captions card sends the chosen language and phrase length, then reports detection',requests.some(r=>r.path.endsWith('/auto-captions')&&r.body.language==='ar'&&r.body.phrase_words===2)&&!!(await within(acc).findByText(/language: en/)));
+ check('Auto captions card can regenerate from the video sound with chosen language and phrase length',requests.some(r=>r.path.endsWith('/auto-captions')&&r.body.language==='ar'&&r.body.phrase_words===2&&r.body.source==='clips')&&!!(await within(acc).findByText(/language: en/)));
+ project.scenes[0].shots[0].asset.type='image';
+ await user.click(screen.getByRole('button',{name:'Apply Classic caption style'}));await saved();
  await waitFor(()=>assert.ok(screen.getByRole('button',{name:'Edit caption segment: hello from'})));
  check('speech captions become individually timed clips on T1',!!screen.getByRole('button',{name:'Edit caption segment: hello from'})&&!!screen.getByRole('button',{name:'Edit caption segment: speech'}));
  const trackOrder=[...document.querySelectorAll('.sequence-content > .titles-track, .sequence-content > .picture-track')].map(el=>el.classList.contains('titles-track')?'text':'picture');
@@ -420,12 +428,52 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  check('duplicate adds a second overlay offset from the first',ovSave().length===2&&ovSave()[1].x===81&&ovSave()[1].id!==ovSave()[0].id);
  await user.click(screen.getByRole('button',{name:'Send overlay 2 back'}));await saved();
  check('stacking order can be changed',ovSave()[0].x===81);
+ await user.click(screen.getByRole('button',{name:'2 side by side'}));await saved();
+ check('overlay layout preset places two PiP items side by side',ovSave()[0].x===25&&ovSave()[1].x===75&&ovSave()[0].width===42&&ovSave()[1].width===42);
  await user.click(screen.getByRole('checkbox',{name:'Glide to another position'}));await user.click(screen.getByRole('checkbox',{name:'Green screen'}));await saved();
  check('overlay glide and green screen save',ovSave().some(o=>o.x2!=null&&o.chroma==='#00FF00'));
  await user.click(screen.getByRole('button',{name:'Delete overlay 2'}));await user.click(screen.getByRole('button',{name:'Delete overlay 1'}));await saved();
  check('deleting overlays removes them from the scene and the preview',ovSave().length===0&&!screen.queryByRole('button',{name:/Drag to move/}));
+ const originalCanvasContext=dom.window.HTMLCanvasElement.prototype.getContext;
+ dom.window.HTMLCanvasElement.prototype.getContext=function(){return {clearRect(){},save(){},restore(){},fillText(){},beginPath(){},moveTo(){},lineTo(){},closePath(){},fill(){},stroke(){},roundRect(){}};};
+ dom.window.HTMLCanvasElement.prototype.toBlob=function(callback){callback(new Blob(['png'],{type:'image/png'}));};
+ await user.click(screen.getByRole('button',{name:'Add Subscribe pill sticker'}));
+ await waitFor(()=>assert.ok(ovSave()?.length===1&&ovSave()[0].width===19));await saved();
+ check('built-in stickers start at a compact size',ovSave().length===1&&ovSave()[0].width===19&&ovSave()[0].border===0);
+ dom.window.HTMLCanvasElement.prototype.getContext=originalCanvasContext;
+ await user.click(screen.getByRole('button',{name:'Delete overlay 1'}));await saved();
+ fireEvent.change(screen.getByLabelText('Upload custom sticker'),{target:{files:[new File(['png'],'transparent-sticker.png',{type:'image/png'})]}});
+ await waitFor(()=>assert.ok(requests.some(r=>r.path.startsWith('/api/assets/upload')&&r.body.get('file')?.name==='transparent-sticker.png')));
+ await waitFor(()=>assert.ok(screen.getByRole('button',{name:'Add uploaded sticker transparent-sticker.png'})));
+ await waitFor(()=>assert.ok(ovSave()?.some(o=>o.width===18&&o.asset_id.startsWith('up-'))));
+ check('custom PNG sticker uploads to the project and is reusable from its sticker list',ovSave().some(o=>o.width===18&&o.asset_id.startsWith('up-')));
+ await user.click(screen.getByRole('button',{name:/Delete overlay/}));await saved();
  await user.click(screen.getByRole('tab',{name:'Effects',exact:true}));
  await user.click(screen.getByRole('button',{name:'Original',exact:true}));await saved();
+ const a3=screen.getByLabelText('Project audio timeline track');
+ const audioData=(name)=>({types:['Files'],files:[new File(['audio'],name,{type:'audio/mpeg'})],items:[],dropEffect:'',getData:()=>''});
+ fireEvent.drop(a3,{dataTransfer:audioData('music-a.mp3'),clientX:100});
+ await waitFor(()=>assert.equal(project.finishing_json?.audio_clips?.length,1));
+ check('dropping an MP3 on A3 imports it as a visible project timeline clip',requests.some(r=>r.method==='PATCH'&&r.body?.finishing?.audio_clips?.[0]?.name==='music-a.mp3')&&!!screen.getByRole('button',{name:'Select audio clip music-a.mp3'}));
+ fireEvent.drop(a3,{dataTransfer:audioData('music-b.mp3'),clientX:160});
+ await waitFor(()=>assert.equal(project.finishing_json?.audio_clips?.length,2));
+ check('multiple project audio clips are saved and stacked on A3',project.finishing_json.audio_clips.length===2&&!!screen.getByRole('button',{name:'Select audio clip music-b.mp3'}));
+ const audioBlock=screen.getByRole('button',{name:'Select audio clip music-a.mp3'});
+ fireEvent.pointerDown(audioBlock,{pointerId:1,clientX:100});fireEvent.pointerMove(window,{pointerId:1,clientX:155});fireEvent.pointerUp(window,{pointerId:1,clientX:155});
+ await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.body?.finishing?.audio_clips?.some(c=>c.name==='music-a.mp3'&&c.start_ms>0))));
+ check('project audio clip can be dragged to a new time on the timeline',project.finishing_json.audio_clips.find(c=>c.name==='music-a.mp3').start_ms>0);
+ await user.click(screen.getByRole('button',{name:'Select audio clip music-a.mp3'}));
+ check('selecting an A3 clip opens the Audio inspector controls',screen.getByRole('tab',{name:'Audio',exact:true}).getAttribute('aria-selected')==='true'&&!!screen.getByRole('slider',{name:'Timeline audio clip volume'}));
+ fireEvent.change(screen.getByRole('slider',{name:'Timeline audio clip volume'}),{target:{value:'70'}});
+ await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.body?.finishing?.audio_clips?.some(c=>c.name==='music-a.mp3'&&c.volume===70))));
+ check('project audio clip volume control saves independently',project.finishing_json.audio_clips.find(c=>c.name==='music-a.mp3').volume===70);
+ const timelineRuler=screen.getByRole('slider',{name:'Timeline playhead'});timelineRuler.getBoundingClientRect=()=>({left:0,top:0,width:2000,height:24,right:2000,bottom:24});
+ const audioClipBeforeCut=project.finishing_json.audio_clips.find(c=>c.name==='music-a.mp3');
+ const cutAt=audioClipBeforeCut.start_ms+2000,zoom=Number(screen.getByRole('slider',{name:'Timeline zoom'}).value);
+ fireEvent.pointerDown(timelineRuler,{pointerId:2,clientX:cutAt/1000*zoom});
+ await user.click(screen.getByRole('button',{name:'Split at playhead'}));
+ await waitFor(()=>assert.equal(project.finishing_json.audio_clips.length,3));
+ check('A3 scissors split the selected audio at the timeline playhead into independently editable clips',project.finishing_json.audio_clips.some(c=>c.name==='music-a.mp3 · B'&&c.source_in_ms>0)&&!!screen.getByRole('button',{name:/Select audio clip music-a\.mp3 · B/}));
  const narration=screen.getAllByRole('button').filter(b=>b.className.includes('narration-clip'))[0];
  const dt=(files)=>({dataTransfer:{types:['Files'],files,items:[],dropEffect:'',getData:()=>''}});
  fireEvent.dragOver(narration,dt([]));

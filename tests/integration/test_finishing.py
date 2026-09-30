@@ -113,4 +113,17 @@ seg=pa[int(2.6*8000):int(4.2*8000)];env=np.convolve(np.abs(seg),np.ones(80)/80,'
 spec=np.abs(np.fft.rfft(env-env.mean()));fq=np.fft.rfftfreq(env.size,1/8000)
 band=(fq>5)&(fq<45)
 check('projector sound clatters at the film frame rate (18 per second)',rms(pa,2.6,4.2)>0.02 and abs(fq[band][spec[band].argmax()]-18)<1.5)
+
+# --- independent project timeline audio clips -------------------------------
+client.patch(f'/api/scenes/{s2}',json={'look':{'film':{'sound':0}}})
+timeline_audio=[
+ {'id':'a3-first','asset_id':music['id'],'name':'First clip','start_ms':2300,'source_in_ms':0,'source_out_ms':700,'volume':100,'fade_in_ms':150,'fade_out_ms':150,'mute':False},
+ {'id':'a3-second','asset_id':music['id'],'name':'Second clip','start_ms':3400,'source_in_ms':1200,'source_out_ms':2000,'volume':65,'fade_in_ms':0,'fade_out_ms':0,'mute':False},
+]
+saved=client.patch(f'/api/projects/{pid}',json={'finishing':{'audio_clips':timeline_audio}})
+check('multiple independent audio clips save with their timeline placement and fades',saved.status_code==200 and len(saved.json()['finishing_json']['audio_clips'])==2)
+invalid={**timeline_audio[0],'fade_in_ms':500,'fade_out_ms':500}
+check('timeline audio rejects fades longer than the trimmed clip',client.patch(f'/api/projects/{pid}',json={'finishing':{'audio_clips':[invalid]}}).status_code==400)
+clip_mix=audio(export())
+check('A3 audio is audible inside each placed clip and absent in the gap',rms(clip_mix,2.5,2.8)>0.03 and rms(clip_mix,3.0,3.25)<0.005 and rms(clip_mix,3.6,3.9)>0.01)
 print(f'{n} finishing checks passed')

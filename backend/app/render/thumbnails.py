@@ -36,12 +36,14 @@ def _lock_for(key: str) -> threading.Lock:
         return _locks.setdefault(key, threading.Lock())
 
 
-def thumbnail_path(asset_id: str, source: Path, kind: str, duration_ms: int | None, width: int = 320) -> Path:
+def thumbnail_path(asset_id: str, source: Path, kind: str, duration_ms: int | None, width: int = 320, time_ms: int = 0) -> Path:
     if kind not in ("image", "video"):
         raise ThumbnailError("Thumbnails are available for images and videos only.")
     width = min(ALLOWED_WIDTHS, key=lambda w: abs(w - int(width)))
     THUMB_DIR.mkdir(parents=True, exist_ok=True)
-    out = THUMB_DIR / f"{asset_id}_{width}.jpg"
+    time_ms = max(0, min(int(time_ms or 0), int(duration_ms or 0)))
+    time_key = f"_t{time_ms}" if kind == "video" and time_ms else ""
+    out = THUMB_DIR / f"{asset_id}_{width}{time_key}.jpg"
     key = str(out)
     with _lock_for(key):
         if out.exists() and out.stat().st_mtime >= source.stat().st_mtime and out.stat().st_size > 0:
@@ -49,7 +51,8 @@ def thumbnail_path(asset_id: str, source: Path, kind: str, duration_ms: int | No
         tmp = out.with_name(f"{out.stem}.{os.getpid()}.{threading.get_ident()}.tmp.jpg")
         args = [FFMPEG_BIN, "-y", "-hide_banner", "-nostdin", "-loglevel", "error"]
         if kind == "video":
-            args += ["-ss", f"{poster_offset_s(duration_ms):.3f}"]
+            offset_s = time_ms / 1000 if time_ms else poster_offset_s(duration_ms)
+            args += ["-ss", f"{offset_s:.3f}"]
         args += ["-i", str(source), "-frames:v", "1",
                  "-vf", f"scale='min({width},iw)':-2:flags=bicubic", "-q:v", "4", str(tmp)]
         flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0  # type: ignore[attr-defined]

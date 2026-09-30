@@ -243,7 +243,7 @@ def restore_asset(asset_id: str, db: Session = Depends(get_db)):
 
 
 @router.get("/{asset_id}/thumbnail")
-def asset_thumbnail(asset_id: str, w: int = 320, db: Session = Depends(get_db)):
+def asset_thumbnail(asset_id: str, w: int = 320, time_ms: int = 0, db: Session = Depends(get_db)):
     """Cached JPEG thumbnail (image) or poster frame (video)."""
     asset = db.get(Asset, asset_id)
     if not asset:
@@ -255,7 +255,7 @@ def asset_thumbnail(asset_id: str, w: int = 320, db: Session = Depends(get_db)):
     if base not in path.parents or not path.exists():
         raise HTTPException(404, "Asset file missing on disk")
     try:
-        thumb = thumbnail_path(asset.id, path, asset.type, asset.duration_ms, w)
+        thumb = thumbnail_path(asset.id, path, asset.type, asset.duration_ms, w, time_ms)
     except ThumbnailError as e:
         raise HTTPException(422, str(e))
     return FileResponse(thumb, media_type="image/jpeg", headers={"Cache-Control": "private, max-age=3600"})
