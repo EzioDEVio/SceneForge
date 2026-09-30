@@ -24,7 +24,7 @@ def create_project(body: schemas.ProjectCreate, db: Session = Depends(get_db)):
     if body.aspect not in [a.value for a in AspectRatio]:
         raise HTTPException(400, f"Unsupported aspect '{body.aspect}'")
     w, h = ASPECT_DIMENSIONS[AspectRatio(body.aspect)]
-    project = Project(title=body.title, language=body.language, aspect=body.aspect, width=w, height=h)
+    project = Project(title=body.title, language=body.language, aspect=body.aspect, fps=body.fps, width=w, height=h)
     db.add(project)
     db.flush()
     # Spec: "Start a new project with three editable rows, labeled
@@ -67,6 +67,8 @@ def update_project(project_id: str, body: schemas.ProjectUpdate, db: Session = D
         project.title = body.title
     if body.language is not None:
         project.language = body.language
+    if body.fps is not None:
+        project.fps = body.fps
     if body.finishing is not None:
         from app.render.finishing import FinishingError, clean_finishing
         try:

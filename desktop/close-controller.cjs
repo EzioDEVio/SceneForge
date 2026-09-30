@@ -1,16 +1,21 @@
 'use strict';
-// Keep confirmation/save/shutdown serialized, even when X is pressed twice.
-function createCloseController({confirm,save,stop,exit,report}) {
+// Serialize the native close flow so repeated X presses cannot duplicate saves or shutdown.
+function createCloseController({confirm,prepare,stop,exit,report}) {
  let pending=false;
  return async function requestClose(){
   if(pending)return;
   pending=true;
   try{
-   if(!await confirm())return;
-   if(!await save()){await report('Changes could not be saved, or work is still running. SceneForge will stay open. Wait for the operation to finish or resolve the save error, then try again.');return;}
+   const decision=await confirm();
+   if(decision===false||decision==='cancel'||decision==null)return;
+   const shouldSave=decision==='save'||decision==='save-and-exit';
+   const shouldExit=decision!=='save';
+   const result=await prepare(shouldSave,shouldExit);
+   if(!result?.ready){await report(result?.reason||'save-failed');return;}
+   if(!shouldExit)return;
    await stop();
    exit();
-  }catch{await report('SceneForge could not finish saving. The application will stay open.');}
+  }catch{await report('save-failed');}
   finally{pending=false;}
  };
 }

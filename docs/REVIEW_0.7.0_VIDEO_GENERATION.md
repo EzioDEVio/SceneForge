@@ -1,10 +1,10 @@
-# SceneForge 0.7.0 WIP: Text-to-video review
+# SceneForge 0.7.0 release-candidate review
 
 **Source branch:** `chatgpt/0.7.0-video-generation`
 
-**App version:** `0.7.0-wip.2`
+**App version:** `0.7.0`
 
-**Status:** unreleased work in progress; provider output has not been live-tested in this environment.
+**Status:** unreleased installer-test candidate. Keep this branch separate until the user tests the Windows installer. A prior local build was reported to generate successfully with Runway; this regression pass uses mocked provider calls.
 
 ## What changed
 
@@ -13,6 +13,8 @@ The app has a separate **Generate video** workspace opened from the editor toolb
 Users can select 1, 2 or 3 outputs for both video and image generation. Video candidates are produced as sequential independent provider requests, saved as separate Media Pool assets, displayed for preview, and the selected take is the one sent to the timeline. A fixed video seed increments per take; random seeds remain random. Hosted video cost estimates and the required consent scale by candidate count, and changing duration, quality or count clears prior consent. If a later take fails or the user cancels, already completed options remain available. Image Studio generates multiple candidates sequentially and prompts users to acknowledge that hosted image providers may bill each result; a fixed Stable Diffusion seed advances per candidate.
 
 The local setup panel gives a step-by-step ComfyUI/model/workflow guide, clickable install/model references, and an optional NVIDIA `nvidia-smi` hardware check. It recommends a model based on detected VRAM. Paid Google and Runway choices provide account/API-key steps and direct links to their provider consoles.
+
+Settings now includes a local theme/accent/density/reduced-motion panel, defaults for new projects, and page setup controls for the current project's aspect ratio and frame rate. The native desktop close dialog offers **Save**, **Don’t save**, **Save and exit**, and **Cancel**; it blocks shutdown if saving fails or generation/render/export is active. Local video setup reports detected NVIDIA GPU count/name/VRAM and system RAM, recommends a model, and shows warnings when hardware is below listed requirements. This is guidance only; the app does not install ComfyUI or download model weights.
 
 When generation completes, SceneForge validates the returned video with FFprobe, stores it as a normal generated project asset, and previews it in the panel. The user can add it inside the selected scene or create a scene after the selected one. Existing clip sound, editing, caption, effects and overlay features are then available. **Generate captions & open Text** uses the existing local auto-caption path and closes the generator after it opens Text, so the timed caption segments can be edited.
 
@@ -77,20 +79,18 @@ Model files and separate ComfyUI requirements are not included in the Windows, m
 
 ## Verification in this workspace
 
-- `npm run build` — passed (TypeScript and Vite; current editor bundle is 511.58 kB minified, over Vite's advisory threshold).
-- `npm test` — passed: 191 component checks, 19 unit checks, 2 new text-to-video UI flows, 6 Share dialog checks.
-- `npm test` in `desktop/` — passed: 14 tests.
-- `python -m compileall -q backend/app tests/integration/test_video_generation.py` — passed.
-- `git diff --check` — passed.
-- The GitHub Actions Release matrix on feature commit `17de02742088315c00cbd7cd6f9b7e2d4a76c872` passed for Windows, Linux and Apple Silicon macOS. The jobs built installer artifacts and passed packaged-backend render checks; Windows also passed silent install and app startup, and Linux/macOS passed their packaged editor end-to-end checks. macOS remains marked experimental in the workflow.
-- The feature-specific `tests/integration/test_video_generation.py` is included in `.github/workflows/checks.yml`. It could not run locally because this workspace's Python lacks backend dependencies such as Requests/FastAPI/SQLAlchemy. CI installs `backend/requirements.txt`; see the branch Actions page for the current result.
-- No real ComfyUI model, Google Veo call or Runway call was made; provider generation is still untested against live services. The packaged installer checks exercise startup and editing/rendering, not paid or local model generation.
-- Provider progress is generally unavailable, so SceneForge shows an indeterminate active-job bar. Cancelling a queued ComfyUI task removes that task; a ComfyUI generation already running may need to be stopped in ComfyUI. Canceling an accepted Google request does not promise to stop the remote task.
+- `npm run build` — passed; Vite reports a 531.66 kB minified bundle, above its 500 kB advisory threshold.
+- `npm test` — passed: 199 editor component checks, 19 unit checks, 2 video-generation flows and 6 Share dialog checks. Provider calls are mocked.
+- `npm test` in `desktop/` — passed: all 18 tests, including close/save decisions and active-work protection.
+- `tests/integration/test_video_generation.py` — passed locally with the pinned backend dependencies.
+- Python compile checks and `git diff --check` — passed.
+- GitHub's broader credential checks need a native Linux Secret Service and remain a CI gate. The Release workflow must also build and exercise the Windows, Linux and macOS packages.
+- The 531.66 kB editor bundle is over Vite's 500 kB advisory threshold; the build succeeds. No live provider calls were part of this regression pass.
 
 ## Remaining acceptance work
 
-- Review the source-branch backend integration run and fix any environment-specific failures.
+- Review this branch's GitHub CI and platform workflow results and fix any failures.
 - On a supported machine, import each built-in ComfyUI API workflow and test prompt/dimensions/seed, audio output, cancel behavior, and local generated-file transfer.
 - Test Google and Runway with user-owned valid credentials and provider billing; verify returned file download, actual dimensions/duration/audio, published price and failure/cancellation errors.
 - Add generated video to both an empty and populated project, apply captions/effects/overlays/audio, render/export, and open outputs in target-platform players.
-- Manually install and test the Windows, Linux and macOS branch artifacts on user machines. A pushed branch build is a temporary Actions artifact, not a published release.
+- Install and test the Windows branch artifact on the user's machine before merging or publishing. A pushed branch build is a temporary Actions artifact, not a published release.

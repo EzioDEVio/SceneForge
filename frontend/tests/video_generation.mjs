@@ -14,7 +14,7 @@ const {render,screen,waitFor,cleanup}=await import('@testing-library/react');
 const {default:userEvent}=await import('@testing-library/user-event');
 
 const models=[
-  {id:'wan2.1-t2v-1.3b',provider:'local_comfy',provider_label:'Local · ComfyUI',name:'Wan 2.1 · T2V 1.3B',model:'Wan2.1-T2V-1.3B',kind:'local',price_per_second:0,resolutions:['480p'],ratios:['16:9','9:16','1:1','custom'],duration_min:1,duration_max:5,durations:[],native_audio:false,requirements:'Local test model',workflow_url:'https://docs.comfy.org',workflow_imported:true,cost_note:'No API fee.'},
+  {id:'wan2.1-t2v-1.3b',provider:'local_comfy',provider_label:'Local · ComfyUI',name:'Wan 2.1 · T2V 1.3B',model:'Wan2.1-T2V-1.3B',kind:'local',price_per_second:0,resolutions:['480p'],ratios:['16:9','9:16','1:1','custom'],duration_min:1,duration_max:5,durations:[],native_audio:false,requirements:'Local test model',min_vram_gb:8,workflow_url:'https://docs.comfy.org',workflow_imported:true,cost_note:'No API fee.'},
   {id:'custom-comfy-workflow',provider:'local_comfy',provider_label:'Local · ComfyUI',name:'Custom ComfyUI workflow',model:'user-supplied',kind:'local',price_per_second:0,resolutions:['480p','720p'],ratios:['16:9','9:16','1:1','custom'],duration_min:1,duration_max:30,durations:[],native_audio:null,requirements:'Trusted workflow',workflow_url:'https://docs.comfy.org',workflow_imported:false,cost_note:'No API fee.'},
   {id:'veo-3.1-lite',provider:'google_veo',provider_label:'Google Gemini API',name:'Veo 3.1 Lite',model:'veo-3.1-lite-generate-preview',kind:'cloud',price_per_second:{'720p':0.05,'1080p':0.08},resolutions:['720p','1080p'],ratios:['16:9','9:16'],duration_min:4,duration_max:8,durations:[4,6,8],native_audio:true,requirements:'Cloud test model',workflow_url:'https://ai.google.dev',cost_note:'Google list price per second.'},
 ];
@@ -27,7 +27,7 @@ globalThis.fetch=async(path,init={})=>{
   let result;
   if(path==='/api/video-generation/catalog')result={models,prices_checked:'2026-09-28'};
   else if(path==='/api/video-generation/local/status'){statusChecks++;result={ready:true,message:'ComfyUI is connected.'};}
-  else if(path==='/api/video-generation/local/system')result={detected:true,gpu_name:'Test GPU',vram_gb:8,recommended_model_ids:['wan2.2-ti2v-5b','wan2.1-t2v-1.3b'],message:'Test hardware guidance'};
+  else if(path==='/api/video-generation/local/system')result={detected:true,gpu_name:'Test GPU',vram_gb:6,system_ram_gb:16,gpu_count:1,recommended_model_ids:['wan2.1-t2v-1.3b'],message:'Test hardware guidance'};
   else if(path==='/api/providers')result=profiles;
   else if(path==='/api/video-generation/projects/project-1/generate'){generationRequest=JSON.parse(init.body);result={job_id:'job-1'};}
   else if(path==='/api/jobs/job-1')result={id:'job-1',project_id:'project-1',scene_id:null,scope:'video_generation',status:'succeeded',stage:'video ready in Media Pool',progress:100,error:null,artifact_asset_id:'generated-2',result_asset_ids:['generated-1','generated-2']};
@@ -45,6 +45,7 @@ try{
   const view=render(React.createElement(VideoGenerationPanel,props));
   await screen.findByRole('dialog',{name:'Generate video from text'});
   await screen.findByText('ComfyUI is connected.');
+  await screen.findByText(/Hardware compatibility warning/);
   assert.ok(screen.getByText(/Workflow → Browse Workflow Templates/),'local setup names the ComfyUI template location');
   assert.ok(screen.getByText(/File → Load/),'local setup names ComfyUI’s current workflow-load command');
   assert.ok(screen.getByText(/File → Export Workflow \(API\)/),'local setup names the API export command');

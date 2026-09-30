@@ -11,11 +11,18 @@ let window,backend,quitting=false,origin;
 const smoke=process.argv.includes('--smoke-test');
 let failedStartup=false;
 const requestClose=createCloseController({
- confirm:async()=>smoke||failedStartup||(await dialog.showMessageBox(window,{type:'question',title:'Close SceneForge?',message:'Save your project and exit?',detail:'SceneForge saves automatically. Save and exit also waits for any pending project edits. Changes already saved will be kept.',buttons:['Save and exit','Cancel'],defaultId:1,cancelId:1,noLink:true})).response===0,
- save:async()=>smoke||failedStartup||!origin||await window.webContents.executeJavaScript('typeof window.__sceneForgePrepareClose === "function" ? window.__sceneForgePrepareClose() : false'),
+ confirm:async()=>{
+  if(smoke||failedStartup)return 'discard';
+  const {response}=await dialog.showMessageBox(window,{type:'question',title:'Close SceneForge?',message:'What would you like to do with this project?',detail:'Save keeps SceneForge open. Save and exit writes your changes before closing. Don’t save closes without saving; active rendering, export or generation must finish first.',buttons:['Save','Don’t save','Save and exit','Cancel'],defaultId:2,cancelId:3,noLink:true});
+  return response===0?'save':response===1?'discard':response===2?'save-and-exit':'cancel';
+ },
+ prepare:async(saveChanges,exiting)=>smoke||failedStartup?{ready:true}:!origin?{ready:false,reason:'save-failed'}:await window.webContents.executeJavaScript('typeof window.__sceneForgePrepareClose === "function" ? window.__sceneForgePrepareClose('+Boolean(saveChanges)+','+Boolean(exiting)+') : {ready:false,reason:"save-failed"}'),
  stop:()=>Promise.resolve(backend?.stop()),
  exit:()=>{quitting=true;window?.webContents.on('will-prevent-unload',e=>e.preventDefault());app.quit();},
- report:message=>dialog.showMessageBox(window,{type:'warning',title:'SceneForge is still open',message})
+ report:async reason=>{
+  const active=reason==='active-work',pending=reason==='pending-work';
+  await dialog.showMessageBox(window,{type:active||pending?'info':'warning',title:'SceneForge is still open',message:active?'Finish active work before closing.':pending?'SceneForge is finishing a project change.':'SceneForge could not save your changes.',detail:active?'Wait for the current render, export or video generation to finish, then close the app again.':pending?'Keep the app open until the current save or edit completes, then try again.':"Your project remains open so you can retry the save. Check the editor save status and make sure the workspace is writable.",buttons:['Keep SceneForge open'],defaultId:0,cancelId:0,noLink:true});
+ }
 });
 // One user-data folder name for every platform; projects from older names are migrated in boot().
 app.setName('SceneForge Studio');

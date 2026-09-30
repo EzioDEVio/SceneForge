@@ -1,6 +1,13 @@
-# SceneForge Studio 0.7.0-wip.2 (unreleased)
+# SceneForge Studio 0.7.0 RC (unreleased)
 
-This is an unreleased source milestone on `chatgpt/0.7.0-video-generation`, not a published GitHub release. No provider has been live-tested from this branch. The interface and mocked flow tests pass; run the backend integration suite in CI and test model providers with valid local installations or API keys before treating results as production-ready.
+This is an installer-test candidate on `chatgpt/0.7.0-video-generation`, not a published GitHub release. Keep it on this branch until the Windows installer has been tested; the public release remains unchanged. A prior local build was reported to generate successfully with Runway, but this regression pass does not repeat live provider calls.
+
+## Preferences, project setup and close flow
+- Added local Appearance preferences for Graphite or Light theme, Violet/Blue/Teal accents, Compact or Comfortable spacing, and reduced interface motion.
+- Added new-project defaults for aspect ratio and frame rate, plus current-project aspect/frame-rate controls. Changing an existing project's setup can make renders stale; render affected scenes again.
+- Added a native close dialog with **Save**, **Don’t save**, **Save and exit**, and **Cancel**. Save flushes changes and keeps the app open; failed saves or active generation/render/export keep SceneForge open.
+- Added local hardware guidance for NVIDIA GPU name, maximum detected VRAM, GPU count and system RAM. Local model choices display requirement warnings when detected hardware is below the model guidance. Detection advises the user; it does not install ComfyUI or download model weights.
+- Set the application build identifier and desktop package to `0.7.0`.
 
 ## Text-to-video workspace
 - Added a dedicated **Generate video** workspace that leaves the existing editor, top-level AI Engines and Help menus, timeline and media panels in place.
@@ -18,13 +25,14 @@ This is an unreleased source milestone on `chatgpt/0.7.0-video-generation`, not 
 - Full API references and install details are in [README.md](../README.md); current scope and checks are in [the 0.7.0 review](../docs/REVIEW_0.7.0_VIDEO_GENERATION.md).
 
 ## Verification
-- `npm run build` — passed (TypeScript and Vite; advisory bundle-size warning remains).
-- `npm test` — passed: existing editor component checks, unit checks, text-to-video panel flows (including multi-candidate selection, paid estimate scaling and Electron setup links), and Share dialog checks. Provider APIs are mocked and do not replace visual QA.
-- `npm test` in `desktop/` — passed: 14 lifecycle/update/storage checks.
-- `python -m compileall -q backend/app tests/integration/test_video_generation.py` — passed.
-- `git diff --check` — passed.
-- `tests/integration/test_video_generation.py` could not run in this workspace: backend packages such as `requests` and FastAPI are not installed, and package downloads are unavailable. CI installs `backend/requirements.txt` and runs the integration test.
-- No real ComfyUI, Google Veo or Runway generation was performed. Test local model availability, GPU requirements, real account billing, result audio, captions and export codecs separately. The local setup is guided but does not install ComfyUI, download model weights or install custom nodes automatically.
+- `npm run build` — passed (TypeScript and Vite). Vite reports a 531.66 kB minified editor bundle, above its 500 kB advisory threshold.
+- `npm test` — passed: 199 editor component checks, 19 unit checks, 2 video-generation UI flows and 6 Share dialog checks. Provider requests are mocked; these checks do not replace visual QA.
+- `npm test` in `desktop/` — passed: 18 tests, including the four close choices, save failure, active work and repeated-close handling.
+- `PYTHONPATH=backend /tmp/sceneforge-release-venv/bin/python tests/integration/test_video_generation.py` — passed, covering the model catalog, hardware guidance, provider request adapters, ComfyUI queue/output, workflow mapping, paid confirmation, candidate count and loopback-only connection.
+- Python compile checks and `git diff --check` — passed.
+- The broader GitHub check uses Linux's native Secret Service for credential tests; that keyring gate still needs to pass in GitHub Actions.
+- No live ComfyUI, Google Veo or Runway generation was repeated in this regression pass. Check installed models, hardware, account billing, returned audio, captions and export codecs separately. The setup guide does not install ComfyUI, download model weights or install custom nodes.
+- The platform Release workflow still needs to build and exercise Windows, Linux and macOS packages. After it passes, test the Windows installer before merging or publishing. Action artifacts are temporary branch-test builds.
 - Vast.ai remains a separate optional remote-GPU prototype idea. Before app integration, benchmark end-to-end generation and data transfer costs, make upload scope explicit, and guarantee that instances are destroyed after jobs.
 
 # SceneForge Studio 0.6.0-wip.10 (unreleased)

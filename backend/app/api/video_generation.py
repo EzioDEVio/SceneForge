@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import os
+import ctypes
+import subprocess
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
@@ -20,7 +22,7 @@ router = APIRouter(prefix="/api/video-generation", tags=["video-generation"])
 
 @router.get("/catalog")
 def get_catalog():
-    return {"models": video.catalog(), "prices_checked": "2026-09-28"}
+    return {"models": video.catalog(), "prices_checked": "2026-09-29"}
 
 
 @router.get("/local/status")
@@ -36,30 +38,62 @@ def local_status(db: Session = Depends(get_db)):
 
 @router.get("/local/system")
 def local_system():
-    """Return optional local NVIDIA GPU details to tailor the model setup guide."""
-    import subprocess
-
+    """Return optional NVIDIA GPU and RAM details to tailor local model guidance."""
+    system_ram_gb = None
     try:
-        result = subprocess.run(
-            ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"],
-            capture_output=True, text=True, timeout=4, check=False,
-        )
-        first = next((line for line in result.stdout.splitlines() if line.strip()), "")
-        name, memory = (part.strip() for part in first.split(",", 1))
-        vram_mb = int(float(memory))
-        vram_gb = round(vram_mb / 1024, 1)
-        if vram_gb < 8.0:
-            recommended = ["wan2.1-t2v-1.3b"]
-            note = "Start with Wan 2.1 T2V 1.3B at 480p. Wan 2.2 TI2V 5B is documented for about 8 GB VRAM with native offloading, so it may be tight below that."
+        if os.name == "nt":
+            class MemoryStatusEx(ctypes.Structure):
+                _fields_ = [("dwLength", ctypes.c_ulong), ("dwMemoryLoad", ctypes.c_ulong),
+                            ("ullTotalPhys", ctypes.c_ulonglong), ("ullAvailPhys", ctypes.c_ulonglong),
+                            ("ullTotalPageFile", ctypes.c_ulonglong), ("ullAvailPageFile", ctypes.c_ulonglong),
+                            ("ullTotalVirtual", ctypes.c_ulonglong), ("ullAvailVirtual", ctypes.c_ulonglong),
+                            ("ullAvailExtendedVirtual", ctypes.c_ulonglong)]
+            memory = MemoryStatusEx()
+            memory.dwLength = ctypes.sizeof(memory)
+            if ctypes.windll.kernel32.GlobalMemoryStatusEx(ctypes.byref(memory)):
+                system_ram_gb = round(memory.ullTotalPhys / (1024 ** 3), 1)
         else:
+            system_ram_gb = round(os.sysconf("SC_PAGE_SIZE") * os.sysconf("SC_PHYS_PAGES") / (1024 ** 3), 1)
+    except (AttributeError, OSError, ValueError):
+        pass
+    try:
+        command = ["nvidia-smi", "--query-gpu=name,memory.total", "--format=csv,noheader,nounits"]
+        try:
+            result = subprocess.run(command, capture_output=True, text=True, timeout=4, check=False)
+        except FileNotFoundError:
+            # NVIDIA's Windows installer may not add the standard NVSMI path to PATH.
+            nvsmis = Path(os.environ.get("ProgramFiles", r"C:\Program Files")) / "NVIDIA Corporation" / "NVSMI" / "nvidia-smi.exe"
+            if os.name != "nt" or not nvsmis.is_file():
+                raise
+            result = subprocess.run([str(nvsmis), *command[1:]], capture_output=True, text=True, timeout=4, check=False)
+        detected_gpus = []
+        for line in result.stdout.splitlines():
+            try:
+                name, memory = (part.strip() for part in line.split(",", 1))
+                detected_gpus.append((name, int(float(memory))))
+            except (ValueError, TypeError):
+                continue
+        if not detected_gpus:
+            raise ValueError("No NVIDIA GPU details were returned")
+        name, vram_mb = max(detected_gpus, key=lambda item: item[1])
+        vram_gb = round(vram_mb / 1024, 1)
+        if vram_gb >= 32.0 and system_ram_gb is not None and system_ram_gb >= 32.0:
+            recommended = ["ltx-2.5-fast", "wan2.2-ti2v-5b", "wan2.1-t2v-1.3b"]
+            note = "This computer meets LTX-2.5's listed VRAM and system-RAM minimums. Wan 2.2 5B remains a lighter first test."
+        elif vram_gb >= 8.0:
             recommended = ["wan2.2-ti2v-5b", "wan2.1-t2v-1.3b"]
             note = "Wan 2.2 TI2V 5B is a reasonable first test. Choose 480p and use ComfyUI native offloading if memory is tight."
+        else:
+            recommended = ["wan2.1-t2v-1.3b"]
+            note = "This GPU is below the listed 8 GB VRAM guidance for the Wan workflows. The 1.3B workflow is the lightest option but may still run out of memory."
         return {"detected": True, "gpu_name": name, "vram_gb": vram_gb,
+                "system_ram_gb": system_ram_gb, "gpu_count": len(detected_gpus),
                 "recommended_model_ids": recommended, "message": note}
     except (OSError, subprocess.TimeoutExpired, ValueError):
         return {"detected": False, "gpu_name": None, "vram_gb": None,
+                "system_ram_gb": system_ram_gb, "gpu_count": 0,
                 "recommended_model_ids": ["wan2.1-t2v-1.3b"],
-                "message": "GPU memory could not be detected automatically. The 1.3B workflow is the lighter starting point; verify the selected model's requirements before downloading it."}
+                "message": "GPU memory could not be detected automatically. SceneForge cannot verify whether a local model fits this computer; start with the lightest workflow and check its requirements before downloading it."}
 
 
 @router.post("/local/workflows/{model_id}")

@@ -200,3 +200,28 @@ The following still need hands-on or real-service verification: browser visual b
 - `frontend/src/studio.css` — inspector responsive layout.
 - `frontend/tests/editor.mjs`, `tests/integration/test_v06.py` — regression checks.
 - `work/053` — preserved released 0.5.3 baseline; `work/060` — submitted local 0.6.0 source; `work/review` — current reviewed working source.
+
+## 0.7.0 release-candidate continuation (2026-09-30)
+
+The candidate branch is `chatgpt/0.7.0-video-generation`. The public release remains unchanged. Do not merge or publish this candidate until the Windows installer has been tested by the user.
+
+### Added for this candidate
+
+- Preferences panel: Graphite/Light theme, Violet/Blue/Teal accent, Compact/Comfortable spacing and reduced interface motion; local preferences persist on this computer.
+- Project page setup: default aspect and frame rate for new projects, plus current-project aspect/frame-rate controls. Existing renders may become stale when page setup changes.
+- Native desktop close choices: Save, Don’t save, Save and exit, and Cancel. Failed saves and active render/export/generation block exit; repeated close requests are serialized.
+- Local video hardware guidance: NVIDIA GPU name/count/VRAM and system RAM detection, model suggestion, and per-model warning when detected hardware is below listed requirements. Detection does not install ComfyUI or download models.
+- Build identifiers/package version set to 0.7.0.
+
+### Local verification
+
+- `npm run build` — passed. Vite's advisory reports a 531.66 kB minified bundle (500 kB threshold).
+- `npm test` — passed: 199 editor component checks, 19 unit checks, 2 video-generation UI flows and 6 share checks.
+- `npm test` in `desktop/` — passed: 18 desktop tests.
+- `PYTHONPATH=backend /tmp/sceneforge-release-venv/bin/python tests/integration/test_video_generation.py` — passed.
+- Python compile checks and `git diff --check` — passed.
+- The CI-only native-keyring credential checks have not run locally; GitHub Actions must provide the native keyring gate. The Release matrix must build and run its packaged-app checks for Windows, Linux and macOS.
+
+### Next release gate
+
+Push only to `chatgpt/0.7.0-video-generation`; review both GitHub Actions workflows and use the Windows Actions artifact for user testing. The branch artifact is temporary and is not a GitHub release. Merge to `main` or publish only after the user confirms Windows installation, editing, export and playback.

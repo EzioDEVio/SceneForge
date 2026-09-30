@@ -22,6 +22,9 @@ class FakeResponse:
 by_id = {row["id"]: row for row in video.catalog()}
 assert {"ltx-2.5-fast", "wan2.1-t2v-1.3b", "wan2.2-ti2v-5b", "wan2.2-t2v-a14b", "custom-comfy-workflow"} <= set(by_id)
 assert {"veo-3.1-lite", "veo-3.1-fast", "veo-3.1", "runway-gen4.5", "runway-wan3"} <= set(by_id)
+assert by_id["wan2.2-ti2v-5b"]["min_vram_gb"] == 8
+assert by_id["wan2.1-t2v-1.3b"]["min_vram_gb"] == 8
+assert by_id["ltx-2.5-fast"]["min_vram_gb"] == 32 and by_id["ltx-2.5-fast"]["min_system_ram_gb"] == 32
 assert video.estimate_cost(by_id["veo-3.1-lite"], 8, "720p")["usd"] == 0.4
 assert video.estimate_cost(by_id["runway-wan3"], 8, "1080p")["usd"] == 1.6
 assert video.estimate_cost(by_id["wan2.2-ti2v-5b"], 8, "720p")["usd"] == 0
@@ -95,16 +98,25 @@ with TestClient(app) as client:
     assert response.status_code == 200 and len(response.json()["models"]) >= 9
     hardware = client.get("/api/video-generation/local/system")
     assert hardware.status_code == 200 and "recommended_model_ids" in hardware.json()
-    with patch("subprocess.run", return_value=SimpleNamespace(stdout="NVIDIA GeForce RTX 4090, 8192\n")):
+    with patch("subprocess.run", return_value=SimpleNamespace(stdout="NVIDIA GeForce RTX 3060, 6144\nNVIDIA GeForce RTX 4090, 8192\n")):
         detected = client.get("/api/video-generation/local/system").json()
     assert detected["gpu_name"] == "NVIDIA GeForce RTX 4090" and detected["vram_gb"] == 8.0
+    assert detected["gpu_count"] == 2 and detected["system_ram_gb"] is not None
     assert detected["recommended_model_ids"][0] == "wan2.2-ti2v-5b"
+    with patch("subprocess.run", return_value=SimpleNamespace(stdout="NVIDIA GeForce RTX 2060, 6144\n")):
+        lower_hardware = client.get("/api/video-generation/local/system").json()
+    assert lower_hardware["vram_gb"] == 6.0
+    assert lower_hardware["recommended_model_ids"][0] == "wan2.1-t2v-1.3b"
     response = client.post("/api/providers", json={"capability":"video", "name":"local_comfy", "api_key":"", "base_url":"http://127.0.0.1:8188"})
     assert response.status_code == 200 and response.json()["configured"]
     assert response.json()["masked_key"] == "Local engine · no API key"
     response = client.post("/api/providers", json={"capability":"video", "name":"local_comfy", "api_key":"", "base_url":"http://example.com:8188"})
     assert response.status_code == 400
-    project = client.post("/api/projects", json={"title":"Video generation cost guard", "aspect":"16:9"}).json()
+    project = client.post("/api/projects", json={"title":"Video generation cost guard", "aspect":"16:9", "fps":25}).json()
+    assert project["fps"] == 25
+    updated_project = client.patch(f"/api/projects/{project['id']}", json={"fps":24})
+    assert updated_project.status_code == 200 and updated_project.json()["fps"] == 24
+    assert client.patch(f"/api/projects/{project['id']}", json={"fps":23}).status_code == 422
     response = client.post(f"/api/video-generation/projects/{project['id']}/generate", json={**base, "confirm_paid": False})
     assert response.status_code == 400 and "Confirm the displayed provider cost estimate" in response.json()["detail"]
     response = client.post("/api/video-generation/local/workflows/ltx-2.5-fast", files={"file":("ltx.json", __import__("json").dumps(workflow), "application/json")})

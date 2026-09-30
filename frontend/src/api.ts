@@ -22,12 +22,13 @@ export type VideoModel = {
   price_per_second:number|Record<string,number>; resolutions:string[]; ratios:string[];
   duration_min:number; duration_max:number; durations:number[]; native_audio:boolean|null;
   requirements:string; workflow_url:string; terms_url?:string; cost_note:string; workflow_imported?:boolean;
+  min_vram_gb?:number|null; min_system_ram_gb?:number|null;
 };
 export type VideoGenerationRequest = {
   provider:string; model:string; prompt:string; negative_prompt?:string; aspect_ratio:string;
   width:number; height:number; duration_seconds:number; resolution:string; seed?:number|null; candidate_count?:1|2|3; confirm_paid?:boolean;
 };
-export type LocalVideoSystem = {detected:boolean;gpu_name:string|null;vram_gb:number|null;recommended_model_ids:string[];message:string};
+export type LocalVideoSystem = {detected:boolean;gpu_name:string|null;vram_gb:number|null;system_ram_gb:number|null;gpu_count:number;recommended_model_ids:string[];message:string};
 
 export type Shot = {
   crop_json?: {x:number;y:number;width:number;height:number}|null;
@@ -86,7 +87,7 @@ export type FontSettings = {
 };
 
 /** Must match BUILD_ID in backend/app/main.py. */
-export const BUILD_ID = "v0.7.0-wip.2";
+export const BUILD_ID = "v0.7.0";
 
 export type Adjust = Partial<Record<'exposure'|'contrast'|'highlights'|'shadows'|'temperature'|'tint'|'saturation'|'vibrance'|'sharpen'|'vignette'|'grain', number>>;
 export type Look = {
@@ -196,13 +197,13 @@ async function req<T>(path: string, init?: RequestInit): Promise<T> {
 }
 
 export const api = {
-  createProject: (title: string, aspect: string) =>
-    req<Project>("/api/projects", { method: "POST", body: JSON.stringify({ title, aspect }) }),
+  createProject: (title: string, aspect: string, fps = 30) =>
+    req<Project>("/api/projects", { method: "POST", body: JSON.stringify({ title, aspect, fps }) }),
   deleteProject: (id:string) => req<{ok:boolean}>(`/api/projects/${id}`, {method:"DELETE"}),
   listProjects: () => req<Project[]>("/api/projects"),
   getProject: (id: string) => req<Project>(`/api/projects/${id}`),
   getScene: (id:string)=>req<Scene>(`/api/scenes/${id}`),
-  updateProject: (id: string, body: Partial<{ title: string; aspect: string; finishing: Finishing }>) =>
+  updateProject: (id: string, body: Partial<{ title: string; aspect: string; fps: number; finishing: Finishing }>) =>
     req<Project>(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   addScene: (projectId: string) =>
     req<Scene>(`/api/projects/${projectId}/scenes`, { method: "POST", body: JSON.stringify({}) }),

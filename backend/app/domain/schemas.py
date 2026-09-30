@@ -2,13 +2,21 @@ from __future__ import annotations
 
 from typing import Any
 
-from pydantic import model_validator, BaseModel, Field
+from pydantic import field_validator, model_validator, BaseModel, Field
 
 
 class ProjectCreate(BaseModel):
     title: str = "Untitled project"
     language: str = "ar"
     aspect: str = "16:9"
+    fps: int = 30
+
+    @field_validator("fps")
+    @classmethod
+    def valid_fps(cls, value: int) -> int:
+        if value not in {24, 25, 30, 50, 60}:
+            raise ValueError("Frame rate must be 24, 25, 30, 50, or 60 fps.")
+        return value
 
 
 class ProjectOut(BaseModel):
@@ -31,7 +39,15 @@ class ProjectUpdate(BaseModel):
     title: str | None = None
     aspect: str | None = None
     language: str | None = None
+    fps: int | None = None
     finishing: dict | None = None
+
+    @field_validator("fps")
+    @classmethod
+    def valid_optional_fps(cls, value: int | None) -> int | None:
+        if value is not None and value not in {24, 25, 30, 50, 60}:
+            raise ValueError("Frame rate must be 24, 25, 30, 50, or 60 fps.")
+        return value
 
 
 class AssetOut(BaseModel):

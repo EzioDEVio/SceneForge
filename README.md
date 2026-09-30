@@ -42,9 +42,11 @@ Get the installer for your system from the **[latest release](https://github.com
 
 **Share and overlays** — after export, a local-first Share dialog offers download, file-location access in the desktop app, and upload steps for YouTube, TikTok, Instagram and Facebook. Direct account uploads are not included. Overlays also include a searchable, categorized emoji/sticker picker; selected symbols use the standard image-overlay editor and render pipeline.
 
+**Preferences (0.7.0 candidate)** — choose the Graphite or Light theme, an accent color, panel spacing and reduced interface motion. Set default project aspect ratio and frame rate, or adjust the current project's page setup. The desktop close dialog offers Save, Don’t save, Save and exit, or Cancel.
+
 **Text-to-video (0.7.0 WIP)** — a dark, high-contrast Generate Video workspace offers step-by-step local ComfyUI/model guidance, VRAM-aware model suggestions, Google/Runway key instructions, and paid estimates that scale to 1–3 candidate videos. Compare finished takes and add the selected one to a new or existing scene. Image Studio also supports 1–3 selectable options. Existing clip audio, captions, styles, effects and overlays remain available. Cloud video requests require an explicit total-cost confirmation in the UI and backend.
 
-The features above include the **0.6.0 and 0.7.0 work in progress** from source. The latest published installer may not include them yet; check the release notes for the version you download.
+The features above include the **0.6.0 work in progress** and the **0.7.0 release candidate** from source. The candidate is being tested on its branch and is not a published release; use the latest published installer for the stable build.
 
 ## AI providers
 
