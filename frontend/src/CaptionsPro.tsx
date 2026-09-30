@@ -202,6 +202,7 @@ const LANGS: [string, string][] = [['', 'Detect automatically'], ['ar', 'Arabic'
 export function AutoCaptions({scene, onDone, onStyle}: {scene: Scene; onDone: (s: Scene) => void; onStyle?: (values: F) => void | Promise<void>}) {
   const [lang, setLang] = React.useState('');
   const [provider, setProvider] = React.useState('local');
+  const [source, setSource] = React.useState('auto');
   const [style, setStyle] = React.useState('Viral bold');
   const [wordsPerClip,setWordsPerClip]=React.useState(3);
   const [busy, setBusy] = React.useState(false);
@@ -213,22 +214,24 @@ export function AutoCaptions({scene, onDone, onStyle}: {scene: Scene; onDone: (s
     setBusy(true); setMsg('Listening to the speech…');
     try {
       const preset = CAPTION_PRESETS.find(p => p.name === style);
-      const sc = await api.autoCaptions(scene.id, {provider, language: lang, phrase_words:wordsPerClip}); const t = (sc.font_json as any)?.transcript;
+      const sc = await api.autoCaptions(scene.id, {provider, language: lang, phrase_words:wordsPerClip, source}); const t = (sc.font_json as any)?.transcript;
       if (preset && onStyle) await onStyle({...preset.values, captions_enabled: true, typewriter: false});
       const portions=(sc.font_json as any)?.caption_segments?.length||0;
       setMsg(`Done: ${t?.words?.length || 0} words · ${portions} editable caption clips${t?.language ? ` · language: ${t.language}` : ''}${preset ? ` · style: ${preset.name}` : ''}. Edit each clip below or click it on T1.`); onDone(sc);
     } catch (e: any) {setMsg(e.message || String(e));} finally {setBusy(false);}
   }
   const disabled = !hasNarr && !hasVideo;
+  const hasTranscript = Array.isArray(tr?.words) && tr.words.length > 0;
   return <section className="auto-captions-card" aria-label="Auto captions">
     <header><span className="acc-icon"><Sparkles size={16}/></span><div><strong>Auto captions</strong><span>{disabled ? 'Add narration or a video with sound to this scene first.' : `Turns ${hasNarr ? 'the narration' : 'the speech in your video'} into timed captions, in any language.`}</span></div>
       {tr?.language && <span className="info-badge ok">{tr.language} · {tr.source === 'clips' ? 'video sound' : 'narration'}</span>}</header>
     <div className="acc-grid">
       <label className="control-label">Language<select aria-label="Speech language" value={lang} disabled={disabled} onChange={e => setLang(e.target.value)}>{LANGS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+      {hasNarr && hasVideo && <label className="control-label">Audio source<select aria-label="Caption audio source" value={source} disabled={disabled} onChange={e=>setSource(e.target.value)}><option value="auto">Auto · narration first</option><option value="narration">Scene narration</option><option value="clips">Video clip sound</option></select></label>}
       <label className="control-label">Caption style<select aria-label="Auto caption style" value={style} disabled={disabled} onChange={e => {setStyle(e.target.value);const p=CAPTION_PRESETS.find(x=>x.name===e.target.value);if(p)setWordsPerClip(Number(p.values.phrase_words||3));}}><option value="">Keep current style</option>{CAPTION_PRESETS.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}</select></label>
       <label className="control-label">Service<select aria-label="Transcription service" value={provider} disabled={disabled} onChange={e => setProvider(e.target.value)}><option value="local">Local Whisper · free</option><option value="elevenlabs">ElevenLabs Scribe · cloud</option><option value="openai">OpenAI Whisper · cloud</option></select></label>
       <label className="control-label">Words per caption clip<select aria-label="Words per caption clip" value={wordsPerClip} disabled={disabled} onChange={e=>setWordsPerClip(Math.max(1,Math.min(8,Number(e.target.value)||3)))}>{Array.from({length:8},(_,i)=>i+1).map(n=><option key={n} value={n}>{n} {n===1?'word':'words'}</option>)}</select></label>
-      <button className="btn btn-primary acc-go" disabled={busy || disabled} onClick={() => void go()}><Sparkles size={14}/> {busy ? 'Transcribing…' : 'Generate captions'}</button>
+      <button className="btn btn-primary acc-go" disabled={busy || disabled} onClick={() => void go()}><Sparkles size={14}/> {busy ? 'Transcribing…' : hasTranscript ? 'Regenerate captions' : 'Generate captions'}</button>
     </div>
     {provider === 'local' && <p className="hint">Runs on this PC with no API key. The multilingual Whisper model downloads once on first use; after that, captions work offline.</p>}
     {msg && <p className="info-status" aria-live="polite">{msg}</p>}

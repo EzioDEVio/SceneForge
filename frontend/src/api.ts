@@ -37,7 +37,7 @@ export type Shot = {
   order_index: number;
   fit: string;
   motion_json: { type: string; start?: any; end?: any };
-  speed_json?: {speed?:number};
+  speed_json?: {speed?:number;freeze_at_ms?:number|null};
   source_in_ms: number;
   source_out_ms: number | null;
   duration_ms: number | null;
@@ -87,7 +87,7 @@ export type FontSettings = {
 };
 
 /** Must match BUILD_ID in backend/app/main.py. */
-export const BUILD_ID = "v0.7.0";
+export const BUILD_ID = "v0.7.0-rc2";
 
 export type Adjust = Partial<Record<'exposure'|'contrast'|'highlights'|'shadows'|'temperature'|'tint'|'saturation'|'vibrance'|'sharpen'|'vignette'|'grain', number>>;
 export type Look = {
@@ -100,7 +100,8 @@ export type Overlay = {id: string; asset_id: string; x: number; y: number; width
   radius: number; border: number; border_color: string; shadow: number; start_ms: number; end_ms: number | null;
   anim_in: 'none' | 'fade' | 'slide_left' | 'slide_up' | 'zoom'; anim_out: 'none' | 'fade' | 'slide_left' | 'slide_up' | 'zoom'; anim_ms: number;
   x2?: number | null; y2?: number | null; chroma?: string | null; chroma_similarity?: number; feather?: number};
-export type Finishing = {music?: {asset_id: string; volume: number; duck: number; fade_in_ms: number; fade_out_ms: number} | null; loudnorm?: boolean; leader?: boolean};
+export type ProjectAudioClip = {id: string; asset_id: string; name: string; start_ms: number; source_in_ms: number; source_out_ms: number; source_duration_ms: number; volume: number; fade_in_ms: number; fade_out_ms: number; mute: boolean};
+export type Finishing = {music?: {asset_id: string; volume: number; duck: number; fade_in_ms: number; fade_out_ms: number} | null; audio_clips?: ProjectAudioClip[]; loudnorm?: boolean; leader?: boolean};
 export type FilmLook = {scratches: number; dust: number; flicker: number; weave: number; sound: number; fps: 0 | 16 | 18 | 24; tone: 'color' | 'faded' | 'sepia' | 'bw'};
 
 export type Scene = {
@@ -282,7 +283,7 @@ export const api = {
   restoreAsset: (assetId: string) => req<Asset>(`/api/assets/${assetId}/restore`, {method: 'POST'}),
   beatSync: (projectId: string) => req<{bpm: number; beats: number[]; scenes_changed: number; scenes_kept: number}>(`/api/projects/${projectId}/beat-sync`, {method: 'POST'}),
   assetStreamUrl: (assetId: string) => `/api/assets/${assetId}/stream`,
-  assetThumbUrl: (assetId: string, width = 320) => `/api/assets/${assetId}/thumbnail?w=${width}`,
+  assetThumbUrl: (assetId: string, width = 320, timeMs = 0) => `/api/assets/${assetId}/thumbnail?w=${width}${timeMs > 0 ? `&time_ms=${Math.round(timeMs)}` : ''}`,
   gradedFrameUrl: (sceneId: string, key: string, width = 1280, shotId?: string) => `/api/scenes/${sceneId}/graded-frame?w=${width}&k=${key}${shotId ? `&shot_id=${shotId}` : ''}`,
   assetDownloadUrl: (assetId: string) => `/api/assets/${assetId}/stream?download=1`,
 

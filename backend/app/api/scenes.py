@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from copy import deepcopy
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
@@ -345,32 +347,117 @@ def clear_voice_selection(scene_id: str, db: Session = Depends(get_db)):
 
 @router.post('/{scene_id}/split', response_model=schemas.SceneOut)
 def split_scene(scene_id: str, body: dict, db: Session = Depends(get_db)):
-    """Split a single static visual. Complex scenes require a rendered editor pipeline."""
+    """Split a single source shot in place; use the rendered path for multi-shot or animated scenes."""
     from copy import deepcopy
     from app.db.models import Shot
     scene = db.get(Scene, scene_id)
     if not scene: raise HTTPException(404, 'Scene not found')
     if body.get('baked') is True:
         return _split_rendered(scene, body, db)
-    if len(scene.shots) != 1 or any(t.accepted for t in scene.voice_takes) or scene.subtitle_text or scene.font_json.get('layers') or scene.shots[0].motion_json.get('type', 'static') != 'static':
-        raise HTTPException(400, 'Split currently supports a single static image/video without narration or text. Split before adding those elements.')
-    total = scene.requested_duration_ms or scene.measured_duration_ms or 4000
+    if len(scene.shots) != 1 or any(t.accepted for t in scene.voice_takes):
+        raise HTTPException(400, 'This scene has multiple shots or a separate narration track. Render it before splitting so its audio and picture stay in sync.')
+    shot = scene.shots[0]
+    speed = float((shot.speed_json or {}).get('speed', 1) or 1)
+    if (shot.motion_json or {}).get('type', 'static') != 'static' or abs(speed - 1) > 0.001 or (shot.speed_json or {}).get('freeze_at_ms') is not None:
+        raise HTTPException(400, 'Render this animated or speed-adjusted scene before splitting.')
+    from app.render.media import media_duration_ms
+    if scene.timing_mode == 'fixed' and scene.requested_duration_ms:
+        total = scene.requested_duration_ms
+    else:
+        total = media_duration_ms(scene) or scene.measured_duration_ms or scene.requested_duration_ms or 4000
     at = body.get('at_ms')
     frame = max(1, round(1000 / scene.project.fps))
     if isinstance(at, bool) or not isinstance(at, int) or not frame <= at <= total-frame:
         raise HTTPException(400, 'Place the playhead inside the selected scene, at least one frame from either edge.')
-    shot = scene.shots[0]
     if shot.asset.type == 'video' and (shot.asset.duration_ms or 0) < (shot.source_in_ms or 0)+total:
         raise HTTPException(400, 'Split a video within its source duration; looped videos cannot be split yet.')
+    left_font, right_font = _split_scene_font(scene.font_json or {}, at, total)
+    left_overlays, right_overlays = _split_scene_overlays(scene.overlays_json or [], at, total)
     for sibling in scene.project.scenes:
         if sibling.order_index > scene.order_index: sibling.order_index += 1
-    right = Scene(project_id=scene.project_id, order_index=scene.order_index+1, title=scene.title+' · B', timing_mode='fixed', requested_duration_ms=total-at,
-                  effect_preset=scene.effect_preset, effect_intensity=scene.effect_intensity, font_json=deepcopy(scene.font_json), look_json=deepcopy(scene.look_json or {}), overlays_json=deepcopy(scene.overlays_json or []), transition_in_json={'type':'cut','duration_ms':0})
+    has_timed_captions = bool((scene.font_json or {}).get('caption_segments'))
+    right = Scene(project_id=scene.project_id, order_index=scene.order_index+1, title=scene.title+' · B',
+                  original_text=scene.original_text, spoken_text=scene.spoken_text, subtitle_text=_caption_text(right_font, scene.subtitle_text, has_timed_captions),
+                  timing_mode='fixed', requested_duration_ms=total-at, lead_ms=0, trail_ms=0,
+                  effect_preset=scene.effect_preset, effect_intensity=scene.effect_intensity, font_json=right_font,
+                  look_json=deepcopy(scene.look_json or {}), overlays_json=right_overlays,
+                  transition_in_json={'type':'cut','duration_ms':0})
     db.add(right);db.flush()
-    db.add(Shot(scene_id=right.id,asset_id=shot.asset_id,order_index=0,fit=shot.fit,motion_json=deepcopy(shot.motion_json),crop_json=deepcopy(shot.crop_json),audio_json=deepcopy(shot.audio_json or {}),speed_json=deepcopy(shot.speed_json or {}),source_in_ms=(shot.source_in_ms or 0)+(at if shot.asset.type=='video' else 0),duration_ms=total-at))
-    scene.timing_mode='fixed';scene.requested_duration_ms=at;shot.duration_ms=at;scene.revision+=1
+    right_source_in = (shot.source_in_ms or 0)+(at if shot.asset.type=='video' else 0)
+    right_source_out = shot.source_out_ms
+    db.add(Shot(scene_id=right.id,asset_id=shot.asset_id,order_index=0,fit=shot.fit,motion_json=deepcopy(shot.motion_json),crop_json=deepcopy(shot.crop_json),audio_json=deepcopy(shot.audio_json or {}),speed_json=deepcopy(shot.speed_json or {}),source_in_ms=right_source_in,source_out_ms=right_source_out,duration_ms=total-at))
+    if shot.asset.type == 'video':
+        original_out = shot.source_out_ms or shot.asset.duration_ms or (shot.source_in_ms or 0)+at
+        shot.source_out_ms = min(original_out, (shot.source_in_ms or 0)+at)
+    shot.duration_ms=at
+    scene.timing_mode='fixed';scene.requested_duration_ms=at;scene.font_json=left_font
+    scene.subtitle_text=_caption_text(left_font, scene.subtitle_text, has_timed_captions);scene.overlays_json=left_overlays
+    scene.rendered_asset_id=None;scene.rendered_plan_hash=None;scene.measured_duration_ms=None;scene.revision+=1
     db.commit();db.refresh(right)
     return _out(right)
+
+
+def _caption_text(font: dict, fallback: str, has_timed_captions: bool = False) -> str:
+    rows = font.get('caption_segments') or []
+    return ' '.join(str(row.get('text') or '').strip() for row in rows if str(row.get('text') or '').strip()) if has_timed_captions else fallback
+
+
+def _slice_timed_rows(rows: list, at_ms: int, total_ms: int, *, scene_end_is_zero: bool = False) -> tuple[list, list]:
+    left, right = [], []
+    for raw in rows:
+        if not isinstance(raw, dict):
+            continue
+        row = deepcopy(raw)
+        try:
+            start = max(0, int(row.get('start_ms') or 0))
+            raw_end = row.get('end_ms')
+            end = total_ms if raw_end is None or (scene_end_is_zero and raw_end == 0) else int(raw_end)
+        except (TypeError, ValueError):
+            continue
+        end = max(start, min(total_ms, end))
+        if start < at_ms and min(end, at_ms) > start:
+            part = deepcopy(row);part['start_ms']=start;part['end_ms']=min(end, at_ms);left.append(part)
+        if end > at_ms and max(start, at_ms) < end:
+            part = deepcopy(row);part['start_ms']=max(start, at_ms)-at_ms
+            part['end_ms']=(0 if scene_end_is_zero and (raw_end is None or raw_end == 0 or end == total_ms) else end-at_ms)
+            right.append(part)
+    return left, right
+
+
+def _split_scene_font(raw: dict, at_ms: int, total_ms: int) -> tuple[dict, dict]:
+    original = deepcopy(raw or {})
+    left, right = deepcopy(original), deepcopy(original)
+    segments = original.get('caption_segments') or []
+    if segments:
+        left_rows, right_rows = _slice_timed_rows(segments, at_ms, total_ms)
+        left['caption_segments'], right['caption_segments'] = left_rows, right_rows
+        for font, rows in ((left, left_rows), (right, right_rows)):
+            transcript = deepcopy(font.get('transcript') or {})
+            words = transcript.get('words')
+            if isinstance(words, list):
+                if font is left:
+                    clipped = []
+                    for word in words:
+                        if not isinstance(word, (list, tuple)) or len(word) < 3 or int(word[1]) >= at_ms:
+                            continue
+                        sliced = list(deepcopy(word));sliced[2] = min(at_ms, int(sliced[2]));clipped.append(sliced)
+                    transcript['words'] = clipped
+                else:
+                    sliced = []
+                    for word in words:
+                        if not isinstance(word, (list, tuple)) or len(word) < 3 or int(word[2]) <= at_ms:
+                            continue
+                        sliced.append([word[0], max(0, int(word[1])-at_ms), max(0, int(word[2])-at_ms)])
+                    transcript['words'] = sliced
+            font['transcript'] = transcript
+    layers = original.get('layers') or []
+    if layers:
+        left['layers'], right['layers'] = _slice_timed_rows(layers, at_ms, total_ms, scene_end_is_zero=True)
+    return left, right
+
+
+def _split_scene_overlays(raw: list, at_ms: int, total_ms: int) -> tuple[list, list]:
+    return _slice_timed_rows(raw if isinstance(raw, list) else [], at_ms, total_ms, scene_end_is_zero=True)
 
 
 def _split_rendered(scene, body, db):

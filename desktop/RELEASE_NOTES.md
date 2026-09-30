@@ -1,6 +1,13 @@
-# SceneForge Studio 0.7.0 RC (unreleased)
+# SceneForge Studio 0.7.0 RC2 (unreleased)
 
 This is an installer-test candidate on `chatgpt/0.7.0-video-generation`, not a published GitHub release. Keep it on this branch until the Windows installer has been tested; the public release remains unchanged. A prior local build was reported to generate successfully with Runway, but this regression pass does not repeat live provider calls.
+
+## Test feedback follow-up
+- **Cut source clips at the playhead:** one-shot source video/image scenes can split without first rendering, including editable generated caption segments and timed text. The source video and embedded audio stay linked; segment thumbnails start at each segment's actual source time. Multi-shot scenes, separate narration, motion and speed effects still require a render before a baked cut.
+- **Caption regeneration:** Auto Captions now offers “Regenerate captions” after a transcript exists and lets users choose video sound versus scene narration when both are present. The Text Layers editor sits immediately below Auto Captions.
+- **Project audio lane A3:** MP3, WAV, M4A, AAC, OGG and FLAC files can be dropped from disk or the Media Pool onto A3. Each project clip can be moved, trimmed, split at the playhead, muted, leveled, faded and stacked with other clips. The clips are mixed at their timeline positions on export while preserving the existing whole-project Music bed.
+- **Overlay layouts and stickers:** added 2/3 side-by-side, 2/3 vertical stack and 2×2 layouts for picture-in-picture overlays. Sticker tiles are constrained to their cards. User images can be uploaded as reusable stickers: PNG/WebP support transparent backgrounds; JPEG is supported with its solid background. Uploads remain in the project Media Pool and sticker list on the current device.
+- Updated the matching frontend/backend API build ID to `v0.7.0-rc2`; this remains an unreleased 0.7.0 candidate.
 
 ## Preferences, project setup and close flow
 - Preferences now lives under **File**. The editor’s upper-right **Theme** menu offers Graphite Night, Daylight, Midnight Blue and Warm Studio, with accent, density and reduced-motion controls in Preferences.
@@ -33,11 +40,12 @@ This is an installer-test candidate on `chatgpt/0.7.0-video-generation`, not a p
 - Full API references and install details are in [README.md](../README.md); current scope and checks are in [the 0.7.0 review](../docs/REVIEW_0.7.0_VIDEO_GENERATION.md).
 
 ## Verification
-- `npm run build` — passed (TypeScript and Vite). Vite reports a 540.73 kB minified editor bundle, above its 500 kB advisory threshold.
-- `npm test` — passed: 215 editor component checks, 19 unit checks, 2 video-generation UI flows and 6 Share dialog checks. Provider requests are mocked; these checks do not replace visual QA.
+- `npm run build` — passed (TypeScript and Vite). Vite reports a 555.65 kB minified editor bundle, above its 500 kB advisory threshold.
+- `npm test` — passed: 225 editor component checks, 19 unit checks, 2 video-generation UI flows and 6 Share dialog checks. Provider requests are mocked; these checks do not replace visual QA.
 - `npm test` in `desktop/` — passed: 18 tests, including the four close choices, save failure, active work and repeated-close handling.
 - `PYTHONPATH=backend /tmp/sceneforge-release-venv/bin/python tests/integration/test_video_generation.py` — passed, covering the model catalog, hardware guidance, provider request adapters, ComfyUI queue/output, workflow mapping, paid confirmation, candidate count and loopback-only connection.
 - Direct backend integration checks for stale/live close readiness and color/creative effects passed; Chromatic split and Motion trail render through the complete scene filter graph.
+- The new source-split integration test passed against real FFmpeg media, checking source ranges, linked sound, caption/text timing, source-time thumbnails and export. The finishing/export integration test passed all 22 checks, including A3 clip placement, fade validation, audio output and silence between clips.
 - Python compile checks and `git diff --check` — passed.
 - The broader GitHub check uses Linux's native Secret Service for credential tests; that keyring gate still needs to pass in GitHub Actions.
 - No live ComfyUI, Google Veo or Runway generation was repeated in this regression pass. Check installed models, hardware, account billing, returned audio, captions and export codecs separately. The setup guide does not install ComfyUI, download model weights or install custom nodes.

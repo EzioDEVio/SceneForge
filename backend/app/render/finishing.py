@@ -54,8 +54,8 @@ MUSIC_DEFAULTS = {"asset_id": None, "volume": 35, "duck": 70, "fade_in_ms": 1500
 
 def clean_finishing(raw: dict, project_id: str, db) -> dict:
     from app.db.models import Asset
-    if not isinstance(raw, dict) or set(raw) - {"music", "loudnorm", "leader"}:
-        raise FinishingError("Finishing settings may only contain music, loudnorm and leader.")
+    if not isinstance(raw, dict) or set(raw) - {"music", "audio_clips", "loudnorm", "leader"}:
+        raise FinishingError("Finishing settings may only contain music, audio_clips, loudnorm and leader.")
     out: dict = {}
     for key in ("loudnorm", "leader"):
         value = raw.get(key, False)
@@ -77,6 +77,40 @@ def clean_finishing(raw: dict, project_id: str, db) -> dict:
                 raise FinishingError(f"Music {key} must be between {lo} and {hi}.")
             m[key] = int(v)
         out["music"] = m
+    clips = raw.get("audio_clips", [])
+    if not isinstance(clips, list) or len(clips) > 64:
+        raise FinishingError("The timeline supports up to 64 project audio clips.")
+    clean_clips = []
+    for index, clip in enumerate(clips):
+        allowed = {"id", "asset_id", "name", "start_ms", "source_in_ms", "source_out_ms", "source_duration_ms", "volume", "fade_in_ms", "fade_out_ms", "mute"}
+        if not isinstance(clip, dict) or set(clip) - allowed:
+            raise FinishingError(f"Project audio clip {index + 1} has unsupported settings.")
+        asset = db.get(Asset, clip.get("asset_id")) if clip.get("asset_id") else None
+        if not asset or asset.type != "audio" or asset.project_id != project_id:
+            raise FinishingError(f"Project audio clip {index + 1} must use an audio file from this project's Media Pool.")
+        def bounded(name, default, lo, hi):
+            value = clip.get(name, default)
+            if isinstance(value, bool) or not isinstance(value, (int, float)) or not lo <= value <= hi:
+                raise FinishingError(f"Project audio clip {index + 1} {name} must be between {lo} and {hi}.")
+            return int(value)
+        source_ms = max(200, int(asset.duration_ms or 0))
+        start = bounded("start_ms", 0, 0, 86_400_000)
+        source_in = bounded("source_in_ms", 0, 0, source_ms - 100)
+        source_out = bounded("source_out_ms", source_ms, source_in + 100, source_ms)
+        volume = bounded("volume", 100, 0, 200)
+        fade_in = bounded("fade_in_ms", 0, 0, 10_000)
+        fade_out = bounded("fade_out_ms", 0, 0, 10_000)
+        if fade_in + fade_out > source_out - source_in:
+            raise FinishingError(f"Project audio clip {index + 1} fades are longer than the clip.")
+        mute = clip.get("mute", False)
+        if not isinstance(mute, bool):
+            raise FinishingError(f"Project audio clip {index + 1} mute must be true or false.")
+        name = str(clip.get("name") or asset.original_filename or "Audio clip")[:200]
+        clean_clips.append({"id": str(clip.get("id") or uuid.uuid4()), "asset_id": asset.id, "name": name, "source_duration_ms": source_ms,
+                            "start_ms": start, "source_in_ms": source_in, "source_out_ms": source_out,
+                            "volume": volume, "fade_in_ms": fade_in, "fade_out_ms": fade_out, "mute": mute})
+    if clean_clips:
+        out["audio_clips"] = clean_clips
     return out
 
 
@@ -172,8 +206,9 @@ def finish_export(export_path: str, project, cancel_check=None) -> str:
     from app.db.models import Asset
     fin = getattr(project, "finishing_json", None) or {}  # older callers pass minimal project objects
     music, loud = fin.get("music"), fin.get("loudnorm")
+    audio_clips = [clip for clip in fin.get("audio_clips", []) if not clip.get("mute")]
     leader = False   # retired: the countdown is now a scene effect (Effects → Countdown intro)
-    if not (music or leader or loud):
+    if not (music or audio_clips or leader or loud):
         return export_path
     duration = (probe(export_path).duration_ms or 0) / 1000
     inputs = ["-i", export_path]
@@ -198,6 +233,32 @@ def finish_export(export_path: str, project, cancel_check=None) -> str:
         else:
             graph += [f"{mus}[mus]", "[main][mus]amix=inputs=2:duration=first:normalize=0[mix]"]
         label = "mix"
+    if audio_clips:
+        with SessionLocal() as db:
+            assets = [(clip, db.get(Asset, clip["asset_id"])) for clip in audio_clips]
+            for index, (clip, asset) in enumerate(assets):
+                if not asset:
+                    raise FinishingError(f"Project audio clip {clip.get('name') or index + 1} is missing. Remove it from the timeline and add it again.")
+                source = Path(RENDERS_DIR if asset.origin == "render_output" else MEDIA_DIR) / asset.storage_key
+                inputs += ["-i", str(source)]
+                input_index = sum(1 for item in inputs if item == "-i") - 1
+                clip_ms = max(100, int(clip["source_out_ms"]) - int(clip["source_in_ms"]))
+                fade_in = min(int(clip["fade_in_ms"]), clip_ms) / 1000
+                fade_out = min(int(clip["fade_out_ms"]), clip_ms) / 1000
+                start = int(clip["start_ms"])
+                parts = [f"[{input_index}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo",
+                         f"atrim=start={int(clip['source_in_ms'])/1000:.3f}:end={int(clip['source_out_ms'])/1000:.3f}",
+                         "asetpts=PTS-STARTPTS", f"volume={int(clip['volume'])/100:.3f}"]
+                if fade_in:
+                    parts.append(f"afade=t=in:st=0:d={fade_in:.3f}")
+                if fade_out:
+                    parts.append(f"afade=t=out:st={max(0, clip_ms/1000-fade_out):.3f}:d={fade_out:.3f}")
+                parts.append(f"adelay={start}|{start}")
+                clip_label = f"timeline_audio_{index}"
+                mixed_label = f"timeline_mix_{index}"
+                graph += [f"{','.join(parts)}[{clip_label}]",
+                          f"[{label}][{clip_label}]amix=inputs=2:duration=first:normalize=0[{mixed_label}]"]
+                label = mixed_label
     if loud:
         graph.append(f"[{label}]loudnorm=I={YOUTUBE_LUFS}:TP=-1.5:LRA=11,aresample=48000[lvl]")
         label = "lvl"

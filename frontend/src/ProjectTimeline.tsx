@@ -2,7 +2,7 @@ import {askConfirm,askText} from "./dialogs";
 import React, {useEffect, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {ArrowLeft, ArrowRight, Film, Plus, GripVertical, Play, Pause, Square, SkipBack, SkipForward, Volume2, VolumeX, Type, Maximize2, X, ChevronLeft, ChevronRight, Trash2, Scissors, Undo2, Redo2, Upload, StepBack, StepForward, Clapperboard, ArrowLeftRight, ChevronUp, ChevronDown, Captions,ZoomIn,ZoomOut,Maximize,Magnet,Flag,Lock,Unlock} from 'lucide-react';
-import {api, Project, Scene} from './api';
+import {api, Project, ProjectAudioClip, Scene} from './api';
 import {sceneDuration,snapTimelineTime} from './duration';
 import {NarrationWave} from './NarrationWave';
 import {FeatureHelp} from './FeatureHelp';
@@ -35,14 +35,14 @@ export const timecode=(ms:number,fps=30)=>{
   return [Math.floor(f/fps/3600),Math.floor(f/fps/60)%60,Math.floor(f/fps)%60,f%fps].map(n=>String(n).padStart(2,'0')).join(':');
 };
 type TimelineMarker={id:string;time:number;label:string};
-type TrackKey='T1'|'V1'|'A1'|'A2';
+type TrackKey='T1'|'V1'|'A1'|'A2'|'A3';
 type TrackLocks=Record<TrackKey,boolean>;
 function savedMarkers(projectId:string):TimelineMarker[]{try{const v=JSON.parse(localStorage.getItem(`sceneforge.timelineMarkers.${projectId}`)||'[]');return Array.isArray(v)?v.filter(x=>Number.isFinite(x.time)&&typeof x.label==='string'):[];}catch{return[];}}
-function savedTrackLocks(projectId:string):TrackLocks{try{const v=JSON.parse(localStorage.getItem(`sceneforge.timelineTrackLocks.${projectId}`)||'{}');return {T1:!!v.T1,V1:!!v.V1,A1:!!v.A1,A2:!!v.A2};}catch{return {T1:false,V1:false,A1:false,A2:false};}}
-export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimShot,onRender,onSelect,onAdd,onReorder,onUpdate,exportAsset,exportScenes,onDelete,onDeleteScene,onToggleClipAudio,onAudio,onRemoveAudio,onUndo,onRedo,canUndo,canRedo,onSplit,onDropFiles,onDropAssets,notice,onRemoveSceneAudio,clipboard,onClipboard,onDuplicate,onPaste,multi,onMulti}:{multi?:string[];onMulti?:(id:string,mode:'toggle'|'range'|'clear')=>void;clipboard?:{kind:'scene'|'audio';id:string;label:string}|null;onClipboard?:(c:{kind:'scene'|'audio';id:string;label:string})=>void;onDuplicate?:(id:string)=>void;onPaste?:(targetId:string)=>void;
-  onRemoveSceneAudio?:(sceneId:string)=>void;notice?:string;onDropFiles?:(sceneId:string|null,files:File[],insert?:{before?:string;after?:string})=>void;onDropAssets?:(sceneId:string|null,assets:DraggedAsset[],insert?:{before?:string;after?:string})=>void;
+function savedTrackLocks(projectId:string):TrackLocks{try{const v=JSON.parse(localStorage.getItem(`sceneforge.timelineTrackLocks.${projectId}`)||'{}');return {T1:!!v.T1,V1:!!v.V1,A1:!!v.A1,A2:!!v.A2,A3:!!v.A3};}catch{return {T1:false,V1:false,A1:false,A2:false,A3:false};}}
+export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimShot,onRender,onSelect,onAdd,onReorder,onUpdate,exportAsset,exportScenes,onDelete,onDeleteScene,onToggleClipAudio,onAudio,onRemoveAudio,onUndo,onRedo,canUndo,canRedo,onSplit,onDropFiles,onDropAssets,notice,onRemoveSceneAudio,clipboard,onClipboard,onDuplicate,onPaste,multi,onMulti,selectedAudioClipId,onAudioClipSelect,onUpdateAudioClips}:{multi?:string[];onMulti?:(id:string,mode:'toggle'|'range'|'clear')=>void;clipboard?:{kind:'scene'|'audio';id:string;label:string}|null;onClipboard?:(c:{kind:'scene'|'audio';id:string;label:string})=>void;onDuplicate?:(id:string)=>void;onPaste?:(targetId:string)=>void;
+  onRemoveSceneAudio?:(sceneId:string)=>void;notice?:string;onDropFiles?:(sceneId:string|null,files:File[],insert?:{before?:string;after?:string;audioTrack?:boolean;timeMs?:number})=>void;onDropAssets?:(sceneId:string|null,assets:DraggedAsset[],insert?:{before?:string;after?:string;audioTrack?:boolean;timeMs?:number})=>void;
   onDuration?:(id:string,ms:number)=>void;onTrimShot?:(sceneId:string,shotId:string,sourceIn:number,sourceOut:number)=>void;onRender?:()=>void;onDelete?:()=>void;onDeleteScene?:(id:string)=>void;onToggleClipAudio?:(shotId:string,audio:Record<string,any>)=>void;onAudio?:()=>void;onRemoveAudio?:()=>void;onUndo?:()=>void;onRedo?:()=>void;canUndo?:boolean;canRedo?:boolean;onSplit?:(at:number,baked?:boolean)=>void;
-  exportScenes?:Scene[];exportAsset?:string|null;project:Project;selectedId:string;disabled:boolean;onSelect:(id:string)=>void;onAdd:()=>void;
+  exportScenes?:Scene[];exportAsset?:string|null;project:Project;selectedId:string;disabled:boolean;onSelect:(id:string)=>void;onAdd:()=>void;selectedAudioClipId?:string;onAudioClipSelect?:(id:string)=>void;onUpdateAudioClips?:(clips:ProjectAudioClip[])=>void;
   onReorder:(ids:string[])=>Promise<unknown>;onUpdate:(id:string,patch:any)=>Promise<unknown>;
 }) {
   const [minimized,setMinimized]=useState(false);
@@ -67,25 +67,39 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
   const clips=monitor?exported:authored;
   const length=clips[clips.length-1]?.end||0,exportLength=exported[exported.length-1]?.end||0;
   const selectedClip=clips.find(c=>c.scene.id===selectedId);
+  const projectAudio=project.finishing_json?.audio_clips||[];
+  const activeAudioClip=projectAudio.find(clip=>clip.id===selectedAudioClipId);
+  const [audioDrag,setAudioDrag]=useState<{id:string;mode:'move'|'left'|'right';pointerId:number;x:number;start:number;sourceIn:number;sourceOut:number;previewStart:number;previewIn:number;previewOut:number}|null>(null);
+  const audioDragRef=useRef<typeof audioDrag>(null);
   const firstPlayable=exported[0]?.scene.id===selectedId;
   const staleExport=!!exportAsset&&!!exportScenes&&JSON.stringify(scenes.map(s=>[s.id,s.revision]))!==JSON.stringify(exportScenes.map(s=>[s.id,s.revision]));
   const [toolMessage,setToolMessage]=useState('');
-  const needsBake=!!selected&&(selected.shots.length!==1||selected.voice_takes.some(t=>t.accepted)||!!selected.subtitle_text||!!selected.font_json.layers?.length||(selected.shots[0]?.motion_json.type||'static')!=='static'||(selected.shots[0]?.asset?.type==='video'&&(selected.shots[0].asset.duration_ms||0)<(selected.shots[0].source_in_ms||0)+sceneDuration(selected)));
-  const canSplit=!!selected?.shots.length&&!monitor;
+  const sourceSpeed=Number(selected?.shots[0]?.speed_json?.speed||1);
+  const needsBake=!!selected&&(selected.shots.length!==1||selected.voice_takes.some(t=>t.accepted)||(selected.shots[0]?.motion_json.type||'static')!=='static'||Math.abs(sourceSpeed-1)>.001||selected.shots[0]?.speed_json?.freeze_at_ms!=null||(selected.shots[0]?.asset?.type==='video'&&(selected.shots[0].asset.duration_ms||0)<(selected.shots[0].source_in_ms||0)+sceneDuration(selected)));
+  const canSplit=!!activeAudioClip?!monitor:!!selected?.shots.length&&!monitor;
   async function split(){
+    if(activeAudioClip){
+      const length=activeAudioClip.source_out_ms-activeAudioClip.source_in_ms,frame=Math.max(1,Math.round(1000/project.fps));
+      const relative=position-activeAudioClip.start_ms;
+      if(relative<frame||relative>length-frame){setToolMessage('Move the playhead inside the selected audio clip, at least one frame from either edge.');return;}
+      const at=Math.round(relative/frame)*frame,cut=activeAudioClip.source_in_ms+at;
+      const left={...activeAudioClip,source_out_ms:cut,fade_out_ms:0};
+      const right={...activeAudioClip,id:crypto.randomUUID(),name:`${activeAudioClip.name} · B`,start_ms:activeAudioClip.start_ms+at,source_in_ms:cut,fade_in_ms:0};
+      right.fade_out_ms=Math.min(right.fade_out_ms,right.source_out_ms-right.source_in_ms);
+      left.fade_in_ms=Math.min(left.fade_in_ms,left.source_out_ms-left.source_in_ms);
+      onUpdateAudioClips?.(projectAudio.map(clip=>clip.id===activeAudioClip.id?left:clip).concat(right));
+      onAudioClipSelect?.(right.id);setToolMessage('Audio clip split into two editable pieces.');return;
+    }
     if(!selected||!selectedClip)return;
     if(needsBake&&(!selected.rendered_asset_id||selected.is_stale)){setToolMessage('Render this scene first. Its current motion, captions and sound must be included in the cut.');return;}
-    const local=position-selectedClip.start;
-    const suggested=local>0&&local<selectedClip.duration?local:selectedClip.duration/2;
-    const value=await askText(`Split “${selected.title}” at seconds from its start (length ${(selectedClip.duration/1000).toFixed(2)}s):`,(suggested/1000).toFixed(3));
-    if(value===null)return;
-    const seconds=Number(value),frameMs=1000/project.fps,at=Math.round(Math.round(seconds*project.fps)*frameMs);
-    if(!value.trim()||!Number.isFinite(seconds)||at<Math.round(frameMs)||at>selectedClip.duration-Math.round(frameMs)){setToolMessage('Choose a cut at least one frame from either end.');return;}
-    if(needsBake&&!await askConfirm('Split the rendered scene? Motion, text and sound will be baked into the two clips and cannot be edited separately afterward. Original media files remain on disk. You can undo this split from the timeline.'))return;
+    const frame=Math.max(1,Math.round(1000/project.fps)),local=position-selectedClip.start,at=Math.round(local/frame)*frame;
+    if(at<frame||at>selectedClip.duration-frame){setToolMessage('Move the playhead inside the selected clip, at least one frame from either edge.');return;}
+    if(needsBake&&!await askConfirm('Split the rendered scene? Motion, separate narration, or speed effects will be baked into two clips and cannot be edited separately afterward. Original media files remain on disk. You can undo this split from the timeline.'))return;
     setToolMessage('');onSplit?.(at,needsBake);
   }
 
   useEffect(()=>{setMonitor(false);setPlaying(false);setToolMessage('');},[scenes.length]);
+  useEffect(()=>{if(notice)setToolMessage('');},[notice]);
   useEffect(()=>{const clip=authored.find(c=>c.scene.id===selectedId);if(clip&&scroll.current){const left=clip.start/1000*scale,right=clip.end/1000*scale,view=scroll.current;if(left<view.scrollLeft||right>view.scrollLeft+view.clientWidth)view.scrollLeft=Math.max(0,left-60);}},[selectedId]);
   const host=document.getElementById('sequence-viewer');
   useEffect(()=>{if(rulerSelection.current===selectedId){rulerSelection.current=null;return;}if(!monitor&&selectedClip)setPosition(selectedClip.start);},[selectedId,monitor]);
@@ -94,6 +108,8 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
   useEffect(()=>{if(!ctx)return;const close=()=>setCtx(null);window.addEventListener('click',close);window.addEventListener('keydown',close);return()=>{window.removeEventListener('click',close);window.removeEventListener('keydown',close);};},[ctx]);
   useEffect(()=>{setPosition(p=>Math.min(p,length));},[length]);
   useEffect(()=>{setMonitor(false);setPlaying(false);},[project.id]);
+  const lastAspect=useRef(project.aspect);
+  useEffect(()=>{if(lastAspect.current!==project.aspect){lastAspect.current=project.aspect;setMonitor(false);setPlaying(false);setMediaError('');setPosition(0);}},[project.aspect]);
   useEffect(()=>{if(exportAsset){setMonitor(true);setPosition(0);setMediaError('');}},[exportAsset]);
   useEffect(()=>{const resize=()=>setHeight(h=>Math.min(h,Math.max(250,window.innerHeight*.4)));window.addEventListener('resize',resize);return()=>window.removeEventListener('resize',resize);},[]);
   function snapTime(ms:number){
@@ -121,7 +137,7 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
     if(dropTarget!==key)setDropTarget(key);
     return true;
   }
-  function dropMedia(e:React.DragEvent,sceneId:string|null,insert?:{before?:string;after?:string}):boolean{
+  function dropMedia(e:React.DragEvent,sceneId:string|null,insert?:{before?:string;after?:string;audioTrack?:boolean;timeMs?:number}):boolean{
     const kind=isMediaDrag(e);
     if(!kind)return false;
     e.preventDefault();e.stopPropagation();setDropTarget('');
@@ -205,15 +221,41 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
     e.currentTarget.releasePointerCapture?.(e.pointerId);const {sourceIn,sourceOut}=trim;setTrim(null);
     if(sourceIn!=null&&sourceOut!=null)onTrimShot?.(sceneId,shotId,sourceIn,sourceOut);
   }
+  function selectProjectAudio(id:string){onAudioClipSelect?.(id);setMonitor(false);setPlaying(false);if(selectedId)window.dispatchEvent(new CustomEvent('sceneforge-open-tab',{detail:{sceneId:selectedId,tab:'Audio',audioClipId:id}}));}
+  function beginProjectAudioDrag(clip:ProjectAudioClip,mode:'move'|'left'|'right',e:React.PointerEvent<HTMLDivElement|HTMLSpanElement>){
+    if(disabled||monitor||trackLocks.A3)return;e.preventDefault();e.stopPropagation();selectProjectAudio(clip.id);
+    const start={id:clip.id,mode,pointerId:e.pointerId,x:e.clientX,start:clip.start_ms,sourceIn:clip.source_in_ms,sourceOut:clip.source_out_ms,previewStart:clip.start_ms,previewIn:clip.source_in_ms,previewOut:clip.source_out_ms};
+    audioDragRef.current=start;setAudioDrag(start);
+    const move=(event:PointerEvent)=>{
+      const current=audioDragRef.current;if(!current||event.pointerId!==current.pointerId)return;
+      const frame=Math.max(1,Math.round(1000/project.fps)),delta=Math.round(((event.clientX-current.x)/scale*1000)/frame)*frame;
+      const next={...current};
+      if(current.mode==='move')next.previewStart=Math.max(0,current.start+delta);
+      else if(current.mode==='left'){
+        next.previewIn=Math.max(0,Math.min(current.sourceOut-100,current.sourceIn+delta));
+        next.previewStart=Math.max(0,current.start+(next.previewIn-current.sourceIn));
+      }else next.previewOut=Math.max(current.sourceIn+100,Math.min(clip.source_duration_ms||clip.source_out_ms,current.sourceOut+delta));
+      audioDragRef.current=next;setAudioDrag(next);
+    };
+    const finish=(event:PointerEvent)=>{
+      const current=audioDragRef.current;if(!current||event.pointerId!==current.pointerId)return;
+      window.removeEventListener('pointermove',move);window.removeEventListener('pointerup',finish);window.removeEventListener('pointercancel',finish);
+      audioDragRef.current=null;setAudioDrag(null);
+      if(current.previewStart===current.start&&current.previewIn===current.sourceIn&&current.previewOut===current.sourceOut)return;
+      onUpdateAudioClips?.(projectAudio.map(item=>{if(item.id!==clip.id)return item;const duration=current.previewOut-current.previewIn,fadeIn=Math.min(item.fade_in_ms,duration);return {...item,start_ms:current.previewStart,source_in_ms:current.previewIn,source_out_ms:current.previewOut,fade_in_ms:fadeIn,fade_out_ms:Math.min(item.fade_out_ms,Math.max(0,duration-fadeIn))};}));
+    };
+    window.addEventListener('pointermove',move);window.addEventListener('pointerup',finish);window.addEventListener('pointercancel',finish);
+  }
   const step=scale>=100?1:scale>=40?2:scale>=16?5:scale>=4?15:60;
-  const extent=Math.max(length/1000+3,16);
+  const audioEnd=projectAudio.reduce((end,clip)=>Math.max(end,clip.start_ms+clip.source_out_ms-clip.source_in_ms),0);
+  const extent=Math.max(length/1000+3,audioEnd/1000+3,16);
   return <section className={`sequence-dock ${minimized?'minimized':''}`} aria-label="Video timeline" style={{height:minimized?90:height}}>
     <div className="dock-resizer" role="separator" aria-label="Resize timeline" aria-orientation="horizontal" aria-valuenow={height} aria-valuemin={250} aria-valuemax={Math.max(250,Math.round(window.innerHeight*.6))} tabIndex={0}
       onPointerDown={resize} onPointerMove={e=>{if(e.currentTarget.hasPointerCapture?.(e.pointerId))setHeight(Math.max(250,Math.min(window.innerHeight*.6,Number(e.currentTarget.dataset.height)+Number(e.currentTarget.dataset.origin)-e.clientY)));}}
       onKeyDown={e=>{if(e.key==='ArrowUp'||e.key==='ArrowDown'){e.preventDefault();setHeight(h=>Math.max(250,Math.min(window.innerHeight*.6,h+(e.key==='ArrowUp'?20:-20))));}}}><span/></div>
     <header className="sequence-toolbar">
       <div className="sequence-title"><Film size={16}/><strong>Timeline 01</strong><span>{project.fps} fps</span></div>
-      <div className="timeline-actions"><button aria-label="Undo timeline edit" title={canUndo?"Undo the last timeline edit":"No timeline edits to undo in this session"} disabled={disabled||!canUndo} onClick={onUndo}><Undo2 size={15}/>Undo</button><button aria-label="Redo timeline edit" title={canRedo?"Redo timeline edit":"Nothing to redo — undo a timeline edit first"} disabled={disabled||!canRedo} onClick={onRedo}><Redo2 size={15}/>Redo</button><button aria-label="Split at playhead" title="Cut the scene at a chosen time; source video sound follows the cut. Render complex scenes first." disabled={disabled||!canSplit||trackLocks.V1} onClick={split}><Scissors size={15}/></button><span className="tl-zoom" role="group" aria-label="Preview zoom tools"><button title="Zoom into the preview (Ctrl + mouse wheel on the picture)" aria-label="Zoom preview in" onClick={()=>window.dispatchEvent(new CustomEvent('sceneforge-preview-zoom',{detail:1}))}><ZoomIn size={15}/></button><button title="Zoom out of the preview" aria-label="Zoom preview out" onClick={()=>window.dispatchEvent(new CustomEvent('sceneforge-preview-zoom',{detail:-1}))}><ZoomOut size={15}/></button><button title="Fit the preview" aria-label="Fit preview to window" onClick={()=>window.dispatchEvent(new CustomEvent('sceneforge-preview-zoom',{detail:'fit'}))}><Maximize size={15}/></button></span><button aria-label="Ripple delete selected scene" title="Ripple delete selected scene and close the gap" disabled={disabled||!selected||trackLocks.V1} onClick={onDelete}><Trash2 size={15}/></button><button aria-label="Import timeline audio" title="Import audio into selected scene's A1 lane" disabled={disabled||!selected} onClick={onAudio}><Upload size={15}/><Volume2 size={14}/></button><button aria-label="Remove selected scene audio" title="Remove accepted audio from selected scene" disabled={disabled||!selected?.voice_takes.some(t=>t.accepted)||trackLocks.A1} onClick={onRemoveAudio}><Volume2 size={14}/><X size={12}/></button></div>
+      <div className="timeline-actions"><button aria-label="Undo timeline edit" title={canUndo?"Undo the last timeline edit":"No timeline edits to undo in this session"} disabled={disabled||!canUndo} onClick={onUndo}><Undo2 size={15}/>Undo</button><button aria-label="Redo timeline edit" title={canRedo?"Redo timeline edit":"Nothing to redo — undo a timeline edit first"} disabled={disabled||!canRedo} onClick={onRedo}><Redo2 size={15}/>Redo</button><button aria-label="Split at playhead" title="Split the selected video or audio clip at the playhead. Motion, separate narration, or speed effects require rendering first." disabled={disabled||!canSplit||(activeAudioClip?trackLocks.A3:trackLocks.V1)} onClick={split}><Scissors size={15}/></button><span className="tl-zoom" role="group" aria-label="Preview zoom tools"><button title="Zoom into the preview (Ctrl + mouse wheel on the picture)" aria-label="Zoom preview in" onClick={()=>window.dispatchEvent(new CustomEvent('sceneforge-preview-zoom',{detail:1}))}><ZoomIn size={15}/></button><button title="Zoom out of the preview" aria-label="Zoom preview out" onClick={()=>window.dispatchEvent(new CustomEvent('sceneforge-preview-zoom',{detail:-1}))}><ZoomOut size={15}/></button><button title="Fit the preview" aria-label="Fit preview to window" onClick={()=>window.dispatchEvent(new CustomEvent('sceneforge-preview-zoom',{detail:'fit'}))}><Maximize size={15}/></button></span><button aria-label="Ripple delete selected scene" title="Ripple delete selected scene and close the gap" disabled={disabled||!selected||trackLocks.V1} onClick={onDelete}><Trash2 size={15}/></button><button aria-label="Import timeline audio" title="Import audio into selected scene's A1 lane" disabled={disabled||!selected} onClick={onAudio}><Upload size={15}/><Volume2 size={14}/></button><button aria-label="Remove selected scene audio" title="Remove accepted audio from selected scene" disabled={disabled||!selected?.voice_takes.some(t=>t.accepted)||trackLocks.A1} onClick={onRemoveAudio}><Volume2 size={14}/><X size={12}/></button></div>
       <div className="timeline-marker-actions"><button aria-pressed={snapEnabled} title={snapEnabled?'Snapping on · ruler scrubs snap near scene edges and markers':'Snapping off'} aria-label="Toggle timeline snapping" className={snapEnabled?'active':''} onClick={()=>setSnapEnabled(v=>!v)}><Magnet size={14}/> Snap</button><button disabled={monitor} title="Add a named bookmark at the playhead; click it later to jump back here" aria-label="Add timeline marker" onClick={()=>void addMarker()}><Flag size={14}/> Marker</button><FeatureHelp compact title="Timeline markers" description="Markers are named bookmarks on the ruler. They help you remember a moment, like a title change, music cue, or section boundary." steps="Move the playhead to the moment, click Marker, and enter a short name. Click a marker flag to jump back to it; click its X to remove it. Markers are saved per project in this browser profile."/></div>
       <div className="sequence-transport" role="group" aria-label="Playback">
         <button title="Go to start (Home)" aria-label="Go to timeline start" onClick={()=>seek(0,true)}><SkipBack size={16}/></button>
@@ -237,7 +279,7 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
       <button className="movie-toggle" disabled={!exportAsset} onClick={()=>{setMonitor(!monitor);setPlaying(false);setMediaError('');}}>{monitor?'Return to editing':'Preview last export'}</button>
     </div>
     <div className="sequence-tracks">
-      <aside className="track-headers" aria-label="Track headers"><div className="track-ruler-label">TRACKS</div>{([['T1','Text','Captions & titles','track-text-label',Type],['V1','Picture',`${scenes.length} parts`,'track-video-label',Film],['A1','Narration','Accepted takes','track-audio-label',Volume2],['A2','Clip sound','Video audio','track-source-audio-label',Volume2]] as const).map(([key,label,detail,className,Icon])=><div key={key} className={`${className} ${trackLocks[key]?'track-locked':''}`}><b>{key}</b><Icon size={15}/><span>{label}<small>{trackLocks[key]?'Locked':detail}</small></span><button className="track-lock-button" aria-label={`${trackLocks[key]?'Unlock':'Lock'} ${key} ${label.toLowerCase()} track`} aria-pressed={trackLocks[key]} title={`${trackLocks[key]?'Unlock':'Lock'} ${key} track`} disabled={disabled} onClick={()=>toggleTrackLock(key)}>{trackLocks[key]?<Lock size={12}/>:<Unlock size={12}/>}</button></div>)}</aside>
+      <aside className="track-headers" aria-label="Track headers"><div className="track-ruler-label">TRACKS</div>{([['T1','Text','Captions & titles','track-text-label',Type],['V1','Picture',`${scenes.length} parts`,'track-video-label',Film],['A1','Narration','Accepted takes','track-audio-label',Volume2],['A2','Clip sound','Video audio','track-source-audio-label',Volume2]] as const).map(([key,label,detail,className,Icon])=><div key={key} className={`${className} ${trackLocks[key]?'track-locked':''}`}><b>{key}</b><Icon size={15}/><span>{label}<small>{trackLocks[key]?'Locked':detail}</small></span><button className="track-lock-button" aria-label={`${trackLocks[key]?'Unlock':'Lock'} ${key} ${label.toLowerCase()} track`} aria-pressed={trackLocks[key]} title={`${trackLocks[key]?'Unlock':'Lock'} ${key} track`} disabled={disabled} onClick={()=>toggleTrackLock(key)}>{trackLocks[key]?<Lock size={12}/>:<Unlock size={12}/>}</button></div>)}<div className={`track-project-audio-label ${trackLocks.A3?'track-locked':''}`} style={{height:Math.max(38,projectAudio.length*32)}}><b>A3</b><Volume2 size={15}/><span>Timeline audio<small>{trackLocks.A3?'Locked':`${projectAudio.length} clip${projectAudio.length===1?'':'s'}`}</small></span><button className="track-lock-button" aria-label={`${trackLocks.A3?'Unlock':'Lock'} A3 timeline audio track`} aria-pressed={trackLocks.A3} title={`${trackLocks.A3?'Unlock':'Lock'} A3 track`} disabled={disabled} onClick={()=>toggleTrackLock('A3')}>{trackLocks.A3?<Lock size={12}/>:<Unlock size={12}/>}</button></div></aside>
       <div className="sequence-scroll" ref={scroll}>
         <div className="sequence-content" style={{width:Math.max(650,extent*scale)}}>
           <div className="sequence-ruler" role="slider" aria-label="Timeline playhead" aria-valuemin={0} aria-valuemax={Math.round(length)} aria-valuenow={Math.round(position)} tabIndex={0} onKeyDown={e=>{if(e.key==='ArrowLeft'||e.key==='ArrowRight'){e.preventDefault();seek(position+(e.key==='ArrowLeft'?-1:1)*1000/project.fps,true);}}}
@@ -272,7 +314,7 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
             {clips.map(({scene:s,start,duration,overlap})=><React.Fragment key={s.id}>
               <button draggable={!disabled&&!monitor&&!trackLocks.V1} disabled={disabled} onContextMenu={e=>{e.preventDefault();onSelect(s.id);setCtx({x:e.clientX,y:e.clientY,sceneId:s.id,kind:'scene'});}} onDragStart={e=>{if(trackLocks.V1){e.preventDefault();return;}setDrag(s.id);e.dataTransfer.effectAllowed="move";e.dataTransfer.setData("application/x-sceneforge-scene",s.id);}} onDragEnd={()=>setDrag("")} onDragOver={e=>{if(trackLocks.V1){e.preventDefault();return;}const r=e.currentTarget.getBoundingClientRect(),side=e.clientX<r.left+r.width*.22?'before':e.clientX>r.right-r.width*.22?'after':'inside';if(!dragOverMedia(e,`v:${s.id}:${side}`))e.preventDefault();}} onDragLeave={()=>setDropTarget('')} onDrop={e=>{if(trackLocks.V1){e.preventDefault();e.stopPropagation();return;}const r=e.currentTarget.getBoundingClientRect(),after=e.clientX>=r.left+r.width/2,insert=e.clientX<r.left+r.width*.22?{before:s.id}:e.clientX>r.right-r.width*.22?{after:s.id}:undefined;if(!dropMedia(e,insert?null:s.id,insert)){e.preventDefault();e.stopPropagation();drop(s.id,after);}}} className={`picture-clip ${s.id===selectedId?'selected':''} ${multi?.includes(s.id)?'multi':''} ${s.shots.length?'':'placeholder'} ${dropTarget.startsWith('v:'+s.id)?'drop-target':''}`} style={{left:start/1000*scale,width:Math.max(4,duration/1000*scale-2)}} aria-label={`Storyboard scene ${scenes.indexOf(s)+1}`} aria-current={s.id===selectedId?'true':undefined} onClick={e=>{if(e.ctrlKey||e.metaKey){onMulti?.(s.id,'toggle');return;}if(e.shiftKey){onMulti?.(s.id,'range');return;}onMulti?.(s.id,'clear');onSelect(s.id);seek(start);}} title={`${s.title} · ${(duration/1000).toFixed(1)}s${!s.shots.length?' · Add media':''} · Drag the whole scene to reorder; drop media near either edge to insert before/after`}>
                 <div className="clip-label"><GripVertical size={12}/><strong>{s.title}</strong><small>{(duration/1000).toFixed(1)}s</small></div>
-                {s.shots[0]?.asset&&s.shots[0].asset.type!=='audio'?<div className="filmstrip" data-kind={s.shots[0].asset.type} style={{backgroundImage:`url("${api.assetThumbUrl(s.shots[0].asset_id,160)}")`}}/>:s.shots.length?<div className="clip-placeholder"><Film size={22}/>Video source</div>:<div className="clip-placeholder"><Plus size={18}/>Add media</div>}
+                {s.shots[0]?.asset&&s.shots[0].asset.type!=='audio'?<div className="filmstrip" data-kind={s.shots[0].asset.type} style={{backgroundImage:`url("${api.assetThumbUrl(s.shots[0].asset_id,160,s.shots[0].source_in_ms||0)}")`}}/>:s.shots.length?<div className="clip-placeholder"><Film size={22}/>Video source</div>:<div className="clip-placeholder"><Plus size={18}/>Add media</div>}
               </button>
               {!monitor&&s.shots.length>0&&s.shots.every(shot=>shot.asset?.type==='image')&&<div role="slider" tabIndex={disabled?-1:0} aria-label={`Resize ${s.title} duration`} aria-valuemin={0.5} aria-valuemax={3600} aria-valuenow={duration/1000} className="clip-duration-handle" style={{left:(start+duration)/1000*scale-9}} title="Drag to change duration; arrow keys adjust 0.1s"
                 onPointerDown={e=>{if(disabled)return;e.preventDefault();e.stopPropagation();e.currentTarget.setPointerCapture?.(e.pointerId);setTrim({id:s.id,x:e.clientX,original:duration,ms:duration});}}
@@ -289,6 +331,15 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
           </div>
           <div className="narration-track" aria-label="Narration track">{clips.map(({scene:s,start,duration})=>{const take=s.voice_takes.find(t=>t.accepted);return <button key={s.id} disabled={disabled||trackLocks.A1} onContextMenu={e=>{e.preventDefault();setCtx({x:e.clientX,y:e.clientY,sceneId:s.id,kind:'audio'});}} onDragOver={e=>{if(trackLocks.A1){e.preventDefault();return;}dragOverMedia(e,'a:'+s.id);}} onDragLeave={()=>setDropTarget('')} onDrop={e=>{if(trackLocks.A1){e.preventDefault();return;}dropMedia(e,s.id);}} data-scene-id={s.id} className={`narration-clip ${take?'has-take':''} ${dropTarget==='a:'+s.id?'drop-target':''}`} style={{left:start/1000*scale,width:Math.max(4,duration/1000*scale-2)}} onClick={()=>{onSelect(s.id);if(take)window.dispatchEvent(new CustomEvent('sceneforge-open-tab',{detail:{sceneId:s.id,tab:'Audio'}}));}} title={take?`${take.audio_asset?.original_filename||take.voice||'Narration'} · ${((take.effective_duration_ms??take.measured_duration_ms??0)/1000).toFixed(1)}s · click to edit, Delete to remove, drop audio to replace`:'Drop an audio file here to add sound to this scene'}><Volume2 size={13}/>{take?.audio_asset&&<NarrationWave take={take}/>}<span className="narration-label">{take?take.audio_asset?.original_filename||take.voice||'Narration':dropTarget==='a:'+s.id?'Drop to add audio':'No narration'}</span></button>})}</div>
           <div className="source-audio-track" aria-label="Source clip audio track">{clips.map(({scene:s,start,duration})=>{const shots=s.shots.filter(x=>x.asset?.type==="video");const all=s.shots;const weights=all.map(x=>Math.max(1,x.duration_ms||x.asset?.duration_ms||duration/Math.max(1,all.length)));const total=weights.reduce((a,b)=>a+b,0);return shots.map(shot=>{const i=all.indexOf(shot),leftMs=duration*weights.slice(0,i).reduce((a,b)=>a+b,0)/total,widthMs=duration*weights[i]/total,sound=shot.audio_json||{};const label=shot.asset?.original_filename||s.title;return <div key={shot.id} className={sound.mute?"source-audio-clip-shell muted":"source-audio-clip-shell"} style={{left:(start+leftMs)/1000*scale,width:Math.max(4,widthMs/1000*scale-2)}}><button disabled={disabled||trackLocks.A2} className={sound.mute?"source-audio-clip has-source-audio muted":"source-audio-clip has-source-audio"} onClick={()=>{onSelect(s.id);window.dispatchEvent(new CustomEvent("sceneforge-open-tab",{detail:{sceneId:s.id,shotId:shot.id,tab:"Clip Audio"}}));}} title={`${label} · ${sound.mute?"muted":"on"} · ${sound.volume??100}% · click to edit clip sound`} aria-label={`${label} audio controls`}><Volume2 size={12}/><span>{sound.mute?"Muted":(sound.volume??100)+"%"}</span></button><button className="source-audio-mute" disabled={disabled||trackLocks.A2} aria-label={`${sound.mute?'Unmute':'Mute'} clip sound for ${label}`} title={`${sound.mute?'Unmute':'Mute'} this clip's embedded audio`} onClick={()=>onToggleClipAudio?.(shot.id,{...sound,mute:!sound.mute})}>{sound.mute?<VolumeX size={12}/>:<Volume2 size={12}/>}</button></div>})})}</div>
+          <div className={`project-audio-track ${dropTarget==='a3'?'drop-target':''}`} aria-label="Project audio timeline track" style={{height:Math.max(38,projectAudio.length*32)}} onDragOver={e=>{if(trackLocks.A3){e.preventDefault();return;}dragOverMedia(e,'a3');}} onDragLeave={()=>setDropTarget('')} onDrop={e=>{if(trackLocks.A3){e.preventDefault();return;}const r=e.currentTarget.getBoundingClientRect(),timeMs=Math.max(0,Math.round((e.clientX-r.left)/scale*1000/(1000/project.fps))*(1000/project.fps));dropMedia(e,null,{audioTrack:true,timeMs});}}>
+            {projectAudio.length===0&&<span className="project-audio-empty">Drop MP3, WAV, M4A, AAC, OGG or FLAC here to add a movable timeline audio clip</span>}
+            {projectAudio.map((clip,index)=>{const dragPreview=audioDrag?.id===clip.id?audioDrag:null,startMs=dragPreview?.previewStart??clip.start_ms,sourceIn=dragPreview?.previewIn??clip.source_in_ms,sourceOut=dragPreview?.previewOut??clip.source_out_ms;return <div key={clip.id} className={`project-audio-row ${clip.mute?'muted':''} ${selectedAudioClipId===clip.id?'selected':''}`} style={{top:3+index*32,left:startMs/1000*scale,width:Math.max(24,(sourceOut-sourceIn)/1000*scale-2)}} role="group" aria-label={`Audio clip ${clip.name}`}>
+              <span role="slider" tabIndex={disabled||trackLocks.A3?-1:0} aria-label={`Trim start of ${clip.name}`} aria-valuenow={sourceIn} className="project-audio-trim left" onPointerDown={e=>beginProjectAudioDrag(clip,'left',e)} onKeyDown={e=>{if(!disabled&&!trackLocks.A3&&(e.key==='ArrowLeft'||e.key==='ArrowRight')){e.preventDefault();const delta=(e.key==='ArrowLeft'?-1:1)*Math.round(1000/project.fps),nextIn=Math.max(0,Math.min(clip.source_out_ms-100,clip.source_in_ms+delta));onUpdateAudioClips?.(projectAudio.map(x=>{if(x.id!==clip.id)return x;const duration=x.source_out_ms-nextIn,fadeIn=Math.min(x.fade_in_ms,duration);return {...x,start_ms:Math.max(0,x.start_ms+nextIn-x.source_in_ms),source_in_ms:nextIn,fade_in_ms:fadeIn,fade_out_ms:Math.min(x.fade_out_ms,Math.max(0,duration-fadeIn))};}));}}}/>
+              <button className="project-audio-body" disabled={disabled||trackLocks.A3} aria-label={`Select audio clip ${clip.name}`} title={`${clip.name} · ${((sourceOut-sourceIn)/1000).toFixed(1)}s · drag to move; drag an edge to trim`} onPointerDown={e=>beginProjectAudioDrag(clip,'move',e)} onClick={()=>selectProjectAudio(clip.id)}><Volume2 size={12}/><span>{clip.name}</span><small>{((sourceOut-sourceIn)/1000).toFixed(1)}s</small></button>
+              <span role="slider" tabIndex={disabled||trackLocks.A3?-1:0} aria-label={`Trim end of ${clip.name}`} aria-valuenow={sourceOut} className="project-audio-trim right" onPointerDown={e=>beginProjectAudioDrag(clip,'right',e)} onKeyDown={e=>{if(!disabled&&!trackLocks.A3&&(e.key==='ArrowLeft'||e.key==='ArrowRight')){e.preventDefault();const delta=(e.key==='ArrowLeft'?-1:1)*Math.round(1000/project.fps),nextOut=Math.max(clip.source_in_ms+100,Math.min(clip.source_duration_ms||clip.source_out_ms,clip.source_out_ms+delta));onUpdateAudioClips?.(projectAudio.map(x=>{if(x.id!==clip.id)return x;const duration=nextOut-x.source_in_ms,fadeIn=Math.min(x.fade_in_ms,duration);return {...x,source_out_ms:nextOut,fade_in_ms:fadeIn,fade_out_ms:Math.min(x.fade_out_ms,Math.max(0,duration-fadeIn))};}));}}}/>
+            </div>})}
+          </div>
+
 
         </div>
       </div>
