@@ -64,7 +64,7 @@ export function FinishingPanel({project, disabled, onChanged,selectedClipId,onSe
 
   return <section className="look-section finishing-panel" aria-label="Music and finishing">
     <div className="look-heading"><h3><Music size={15}/> Music & finishing</h3><FeatureHelp compact title="Music and finishing" description="Add a project soundtrack and apply final loudness and audio treatments." steps="Import or choose music, adjust its level and narration ducking, set fades, and render the full project to hear the finished mix."/><span className="hint" aria-live="polite">{status}</span></div>
-    <p className="hint">For the whole video. Applied when you export.</p>
+    <p className="hint">The background music bed plays across the whole video. Use A3 below for independent audio clips with their own move, trim, mute, volume, fade, and split controls.</p>
     <div className="lut-row">
       <select aria-label="Background music" value={m?.asset_id || ''} disabled={disabled} onChange={e => save({...fin, music: e.target.value ? {...MUSIC_DEFAULTS, ...(m || {}), asset_id: e.target.value} : null}, true)}>
         <option value="">No background music</option>
@@ -88,7 +88,7 @@ export function FinishingPanel({project, disabled, onChanged,selectedClipId,onSe
       <div className="section-heading"><h3>Timeline audio clips</h3><span>{audioClips.length} on A3</span></div>
       <div className="lut-row"><select aria-label="Select timeline audio clip" value={activeClip?.id||''} disabled={disabled||!audioClips.length} onChange={e=>onSelectClip?.(e.target.value)}><option value="">No timeline audio clips</option>{audioClips.map(clip=><option key={clip.id} value={clip.id}>{clip.name}</option>)}</select><button className="btn" disabled={disabled} onClick={()=>clipFile.current?.click()}><Upload size={14}/> Add audio clip</button><input ref={clipFile} type="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac" hidden aria-label="Upload timeline audio clip" onChange={e=>void uploadTimelineClip(e.target.files?.[0])}/></div>
       {activeClip?<>
-        <p className="hint">This audio is a separate movable A3 timeline clip. Drag its block to move it; drag either edge to trim it.</p>
+        <p className="hint">Click inside its A3 block to place the playhead, then use the scissors above to split. Drag the block to move it; drag either edge to trim. Volume, mute, and fades are controlled here.</p>
         <div className="section-heading"><strong>{activeClip.name}</strong><button className="text-btn" disabled={disabled} onClick={()=>{const next=audioClips.filter(clip=>clip.id!==activeClip.id);if(onUpdateAudioClips)onUpdateAudioClips(next);else save({...fin,audio_clips:next},true);onSelectClip?.(next[0]?.id||'');}}>Remove clip</button></div>
         <label className="switch-label finishing-toggle"><input type="checkbox" aria-label="Mute timeline audio clip" checked={activeClip.mute} disabled={disabled} onChange={e=>changeAudioClip(activeClip.id,{mute:e.target.checked},true)}/> Mute this clip</label>
         <label className="control-label">Clip volume · {activeClip.volume}%<input aria-label="Timeline audio clip volume" type="range" min={0} max={200} step={5} value={activeClip.volume} disabled={disabled} onChange={e=>changeAudioClip(activeClip.id,{volume:Number(e.target.value)})}/></label>

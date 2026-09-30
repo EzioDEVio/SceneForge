@@ -28,7 +28,7 @@ from pathlib import Path
 
 ANIMS = ("none", "fade", "slide_left", "slide_up", "zoom")
 DEFAULT_OVERLAY = {
-    "asset_id": None, "x": 72.0, "y": 30.0, "width": 34.0, "rotation": 0, "opacity": 100,
+    "asset_id": None, "kind": "media", "x": 72.0, "y": 30.0, "width": 34.0, "rotation": 0, "opacity": 100,
     "radius": 6, "border": 6, "border_color": "#FFFFFF", "shadow": 60,
     "start_ms": 0, "end_ms": None, "anim_in": "fade", "anim_out": "fade", "anim_ms": 600,
     # extras: glide to an end position over the overlay's time, green screen, soft edges
@@ -58,6 +58,10 @@ def clean_overlays(raw, project_id: str, db) -> list[dict]:
         asset = db.get(Asset, o["asset_id"]) if o["asset_id"] else None
         if not asset or asset.type not in ("image", "video") or asset.project_id != project_id:
             raise OverlayError(f"Overlay {i + 1}: choose an image or video from this project.")
+        if "kind" not in item and asset.original_filename.lower().startswith("sticker-"):
+            o["kind"] = "sticker"  # recognize stickers created by earlier versions
+        if o["kind"] not in ("media", "sticker"):
+            raise OverlayError(f"Overlay {i + 1}: kind must be media or sticker.")
         for key, (lo, hi) in _RANGES.items():
             v = o[key]
             if isinstance(v, bool) or not isinstance(v, (int, float)) or not lo <= v <= hi:

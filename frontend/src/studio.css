@@ -514,3 +514,126 @@ button:hover>.sample-squeeze_v span+span,.tx-live.sample-squeeze_v span+span{ani
 .caption-empty-search{margin:6px 0;color:#adb4c2;font-size:11px}
 .caption-manual-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:10px 0 4px}
 .caption-manual-heading h3{margin:0}
+
+/* Clear, clickable media-composition presets; these arrange PIP media layers, not stickers. */
+.media-layout-section{margin:10px 0 12px;padding:10px;border:1px solid #3e4350;border-radius:10px;background:linear-gradient(145deg,#252832,#20232b)}
+.media-layout-section>.section-heading{display:flex;align-items:center;justify-content:space-between;gap:8px;font-size:11px;color:#eceaf7}
+.media-layout-section>.hint{margin:5px 0 8px;font-size:10px;line-height:1.4}
+.media-layout-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}
+.media-layout-button{display:grid;grid-template-columns:48px minmax(0,1fr);grid-template-rows:auto auto;align-items:center;column-gap:8px;min-width:0;padding:7px;border:1px solid #454b59;border-radius:8px;background:#2c303a;color:#e7e9f0;text-align:left;cursor:pointer;transition:background .15s,border-color .15s,transform .15s}
+.media-layout-button:hover:not(:disabled),.media-layout-button:focus-visible{background:#38354b;border-color:#927fe9;transform:translateY(-1px);outline:none}
+.media-layout-button:disabled{opacity:.45;cursor:not-allowed}
+.media-layout-preview{display:grid;grid-column:1;grid-row:1/3;width:48px;height:34px;gap:2px;padding:3px;box-sizing:border-box;border:1px solid #505a6d;border-radius:5px;background:linear-gradient(145deg,#171b24,#252a35)}
+.media-layout-preview i{display:block;min-width:0;min-height:0;border:1px solid #85a9ed;border-radius:2px;background:linear-gradient(135deg,#51698e,#7e70be 55%,#3f9996)}
+.layout-side2{grid-template-columns:repeat(2,1fr)}.layout-side3{grid-template-columns:repeat(3,1fr)}
+.layout-stack2{grid-template-columns:1fr;grid-template-rows:repeat(2,1fr)}.layout-stack3{grid-template-columns:1fr;grid-template-rows:repeat(3,1fr)}
+.layout-grid4{grid-template-columns:repeat(2,1fr);grid-template-rows:repeat(2,1fr)}
+.media-layout-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10px;font-weight:600}
+.media-layout-button small{align-self:start;font-size:9px;color:#aeb7c7}
+.media-layout-empty{margin:8px 0 0;padding:6px 8px;border-radius:5px;background:#1e222b;color:#aab2c1;font-size:9.5px}
+
+/* Give each transition family a preview that reflects its actual motion. */
+@keyframes sf-tx-swipe-l{0%,12%{clip-path:inset(0 100% 0 0)}58%,100%{clip-path:inset(0)}}
+@keyframes sf-tx-swipe-r{0%,12%{clip-path:inset(0 0 0 100%)}58%,100%{clip-path:inset(0)}}
+@keyframes sf-tx-swipe-u{0%,12%{clip-path:inset(100% 0 0 0)}58%,100%{clip-path:inset(0)}}
+@keyframes sf-tx-swipe-d{0%,12%{clip-path:inset(0 0 100% 0)}58%,100%{clip-path:inset(0)}}
+@keyframes sf-tx-diag-tr{0%,12%{clip-path:polygon(100% 0,100% 0,100% 0)}58%,100%{clip-path:polygon(100% 0,0 0,100% 100%)}}
+@keyframes sf-tx-diag-bl{0%,12%{clip-path:polygon(0 100%,0 100%,0 100%)}58%,100%{clip-path:polygon(0 100%,100% 100%,0 0)}}
+@keyframes sf-tx-diag-br{0%,12%{clip-path:polygon(100% 100%,100% 100%,100% 100%)}58%,100%{clip-path:polygon(100% 100%,0 100%,100% 0)}}
+@keyframes sf-tx-smooth-l{0%,12%{transform:translateX(100%) scale(.94);filter:blur(5px)}58%,100%{transform:none;filter:none}}
+@keyframes sf-tx-smooth-r{0%,12%{transform:translateX(-100%) scale(.94);filter:blur(5px)}58%,100%{transform:none;filter:none}}
+@keyframes sf-tx-smooth-u{0%,12%{transform:translateY(100%) scale(.94);filter:blur(5px)}58%,100%{transform:none;filter:none}}
+@keyframes sf-tx-smooth-d{0%,12%{transform:translateY(-100%) scale(.94);filter:blur(5px)}58%,100%{transform:none;filter:none}}
+@keyframes sf-tx-cover-l{0%,12%{transform:translateX(100%);clip-path:inset(0)}58%,100%{transform:none;clip-path:inset(0)}}
+@keyframes sf-tx-cover-r{0%,12%{transform:translateX(-100%);clip-path:inset(0)}58%,100%{transform:none;clip-path:inset(0)}}
+@keyframes sf-tx-cover-u{0%,12%{transform:translateY(100%);clip-path:inset(0)}58%,100%{transform:none;clip-path:inset(0)}}
+@keyframes sf-tx-cover-d{0%,12%{transform:translateY(-100%);clip-path:inset(0)}58%,100%{transform:none;clip-path:inset(0)}}
+@keyframes sf-tx-reveal-l{0%,12%{clip-path:inset(0 100% 0 0)}58%,100%{clip-path:inset(0)}}
+@keyframes sf-tx-reveal-r{0%,12%{clip-path:inset(0 0 0 100%)}58%,100%{clip-path:inset(0)}}
+@keyframes sf-tx-reveal-u{0%,12%{clip-path:inset(100% 0 0 0)}58%,100%{clip-path:inset(0)}}
+@keyframes sf-tx-reveal-d{0%,12%{clip-path:inset(0 0 100% 0)}58%,100%{clip-path:inset(0)}}
+@keyframes sf-tx-open-v{0%,12%{clip-path:inset(50% 0 50% 0)}58%,100%{clip-path:inset(0)}}
+@keyframes sf-tx-close-v{0%,12%{clip-path:inset(0 0 0 0)}58%,100%{clip-path:inset(50% 0 50% 0)}}
+@keyframes sf-tx-wind{0%,12%{transform:rotate(-10deg) scale(.65);clip-path:inset(45% 100% 45% 0)}40%{clip-path:inset(20% 35% 20% 0)}58%,100%{transform:none;clip-path:inset(0)}}
+@keyframes sf-tx-slice-h{0%,12%{clip-path:inset(0 0 100% 0)}30%{clip-path:inset(0 0 66% 0)}45%{clip-path:inset(0 0 33% 0)}58%,100%{clip-path:inset(0)}}
+@keyframes sf-tx-slice-v{0%,12%{clip-path:inset(0 100% 0 0)}30%{clip-path:inset(0 66% 0 0)}45%{clip-path:inset(0 33% 0 0)}58%,100%{clip-path:inset(0)}}
+@keyframes sf-tx-rect{0%,12%{clip-path:inset(50% 50% 50% 50%);filter:saturate(.6)}58%,100%{clip-path:inset(0);filter:none}}
+@keyframes sf-tx-distance{0%,12%{opacity:0;transform:scale(1.28);filter:blur(6px)}38%{opacity:.75;transform:scale(.98);filter:blur(1px)}58%,100%{opacity:1;transform:none;filter:none}}
+@keyframes sf-tx-radial{0%,12%{clip-path:polygon(50% 50%,50% 0,50% 0,50% 0)}35%{clip-path:polygon(50% 50%,50% 0,100% 0,100% 100%)}58%,100%{clip-path:polygon(50% 50%,50% 0,100% 0,100% 100%,0 100%,0 0)}}
+@keyframes sf-tx-film{0%,12%{opacity:.1;filter:sepia(1) blur(8px)}30%{opacity:1;filter:sepia(1) brightness(2.2) saturate(2)}45%{opacity:.65;filter:sepia(.55) contrast(1.6)}58%,100%{opacity:1;filter:none}}
+@keyframes sf-tx-zoom-out{0%,12%{transform:scale(1.4);opacity:0}58%,100%{transform:scale(1);opacity:1}}
+@keyframes sf-tx-squeeze-v{0%,12%{transform:scaleY(0)}58%,100%{transform:none}}
+@keyframes sf-tx-squeeze-h{0%,12%{transform:scaleX(0)}58%,100%{transform:none}}
+@keyframes sf-tx-grey{0%,12%{opacity:0;filter:grayscale(1)}58%,100%{opacity:1;filter:none}}
+@keyframes sf-tx-black{0%,18%{opacity:0;filter:brightness(0)}38%{opacity:1;filter:brightness(0)}58%,100%{opacity:1;filter:none}}
+@keyframes sf-tx-white{0%,18%{opacity:0;filter:brightness(3)}38%{opacity:1;filter:brightness(3)}58%,100%{opacity:1;filter:none}}
+@keyframes sf-tx-pixel{0%,12%{opacity:0;filter:blur(7px) contrast(3)}40%{opacity:.65;filter:blur(2px) contrast(2)}58%,100%{opacity:1;filter:none}}
+@keyframes sf-tx-blur{0%,12%{opacity:0;filter:blur(16px)}58%,100%{opacity:1;filter:none}}
+@keyframes sf-tx-snap{0%,10%{opacity:0;transform:scale(.72)}22%{opacity:1;transform:scale(1.08)}34%,100%{opacity:1;transform:none}}
+.tx-live.sample-slide span+span,button:hover>.sample-slide span+span,button:focus-visible>.sample-slide span+span{animation:sf-tx-slide-l 1.5s ease-in-out infinite}
+@keyframes sf-tx-slide-l{0%,12%{transform:translateX(100%)}58%,100%{transform:none}}
+.tx-live.sample-slide_right span+span,button:hover>.sample-slide_right span+span,button:focus-visible>.sample-slide_right span+span{animation:sf-tx-slide-r 1.5s ease-in-out infinite}
+@keyframes sf-tx-slide-r{0%,12%{transform:translateX(-100%)}58%,100%{transform:none}}
+.tx-live.sample-slide_up span+span,button:hover>.sample-slide_up span+span,button:focus-visible>.sample-slide_up span+span{animation:sf-tx-smooth-u 1.5s ease-in-out infinite}
+.tx-live.sample-slide_down span+span,button:hover>.sample-slide_down span+span,button:focus-visible>.sample-slide_down span+span{animation:sf-tx-smooth-d 1.5s ease-in-out infinite}
+.tx-live.sample-smooth_left span+span,button:hover>.sample-smooth_left span+span,button:focus-visible>.sample-smooth_left span+span{animation:sf-tx-smooth-l 1.5s ease-in-out infinite}
+.tx-live.sample-smooth_right span+span,button:hover>.sample-smooth_right span+span,button:focus-visible>.sample-smooth_right span+span{animation:sf-tx-smooth-r 1.5s ease-in-out infinite}
+.tx-live.sample-smooth_up span+span,button:hover>.sample-smooth_up span+span,button:focus-visible>.sample-smooth_up span+span{animation:sf-tx-smooth-u 1.5s ease-in-out infinite}
+.tx-live.sample-smooth_down span+span,button:hover>.sample-smooth_down span+span,button:focus-visible>.sample-smooth_down span+span{animation:sf-tx-smooth-d 1.5s ease-in-out infinite}
+.tx-live.sample-wipe_left span+span,button:hover>.sample-wipe_left span+span,button:focus-visible>.sample-wipe_left span+span{animation:sf-tx-swipe-l 1.5s ease-in-out infinite}
+.tx-live.sample-wipe_right span+span,button:hover>.sample-wipe_right span+span,button:focus-visible>.sample-wipe_right span+span{animation:sf-tx-swipe-r 1.5s ease-in-out infinite}
+.tx-live.sample-wipe_up span+span,button:hover>.sample-wipe_up span+span,button:focus-visible>.sample-wipe_up span+span{animation:sf-tx-swipe-u 1.5s ease-in-out infinite}
+.tx-live.sample-wipe_down span+span,button:hover>.sample-wipe_down span+span,button:focus-visible>.sample-wipe_down span+span{animation:sf-tx-swipe-d 1.5s ease-in-out infinite}
+.tx-live.sample-diagonal span+span,button:hover>.sample-diagonal span+span,button:focus-visible>.sample-diagonal span+span{animation:tx-diag 1.5s ease-in-out infinite}
+.tx-live.sample-diagonal_tr span+span,button:hover>.sample-diagonal_tr span+span,button:focus-visible>.sample-diagonal_tr span+span{animation:sf-tx-diag-tr 1.5s ease-in-out infinite}
+.tx-live.sample-wipe_bl span+span,button:hover>.sample-wipe_bl span+span,button:focus-visible>.sample-wipe_bl span+span{animation:sf-tx-diag-bl 1.5s ease-in-out infinite}
+.tx-live.sample-wipe_br span+span,button:hover>.sample-wipe_br span+span,button:focus-visible>.sample-wipe_br span+span{animation:sf-tx-diag-br 1.5s ease-in-out infinite}
+.tx-live.sample-wipe_tl span+span,button:hover>.sample-wipe_tl span+span,button:focus-visible>.sample-wipe_tl span+span{animation:tx-diag 1.5s ease-in-out infinite}
+.tx-live.sample-cover_left span+span,button:hover>.sample-cover_left span+span,button:focus-visible>.sample-cover_left span+span{animation:sf-tx-cover-l 1.5s ease-in-out infinite}
+.tx-live.sample-cover_right span+span,button:hover>.sample-cover_right span+span,button:focus-visible>.sample-cover_right span+span{animation:sf-tx-cover-r 1.5s ease-in-out infinite}
+.tx-live.sample-cover_up span+span,button:hover>.sample-cover_up span+span,button:focus-visible>.sample-cover_up span+span{animation:sf-tx-cover-u 1.5s ease-in-out infinite}
+.tx-live.sample-cover_down span+span,button:hover>.sample-cover_down span+span,button:focus-visible>.sample-cover_down span+span{animation:sf-tx-cover-d 1.5s ease-in-out infinite}
+.tx-live.sample-reveal_left span+span,button:hover>.sample-reveal_left span+span,button:focus-visible>.sample-reveal_left span+span{animation:sf-tx-reveal-l 1.5s ease-in-out infinite}
+.tx-live.sample-reveal_right span+span,button:hover>.sample-reveal_right span+span,button:focus-visible>.sample-reveal_right span+span{animation:sf-tx-reveal-r 1.5s ease-in-out infinite}
+.tx-live.sample-reveal_up span+span,button:hover>.sample-reveal_up span+span,button:focus-visible>.sample-reveal_up span+span{animation:sf-tx-reveal-u 1.5s ease-in-out infinite}
+.tx-live.sample-reveal_down span+span,button:hover>.sample-reveal_down span+span,button:focus-visible>.sample-reveal_down span+span{animation:sf-tx-reveal-d 1.5s ease-in-out infinite}
+.tx-live.sample-vert_open span+span,button:hover>.sample-vert_open span+span,button:focus-visible>.sample-vert_open span+span{animation:sf-tx-open-v 1.5s ease-in-out infinite}
+.tx-live.sample-vert_close span+span,button:hover>.sample-vert_close span+span,button:focus-visible>.sample-vert_close span+span{animation:sf-tx-close-v 1.5s ease-in-out infinite}
+.tx-live.sample-open span+span,button:hover>.sample-open span+span,button:focus-visible>.sample-open span+span{animation:tx-open 1.5s ease-in-out infinite}
+.tx-live.sample-close span+span,button:hover>.sample-close span+span,button:focus-visible>.sample-close span+span{animation:tx-close 1.5s ease-in-out infinite}
+.tx-live.sample-radial span+span,button:hover>.sample-radial span+span,button:focus-visible>.sample-radial span+span{animation:sf-tx-radial 1.5s ease-in-out infinite}
+.tx-live.sample-zoom_in span+span,button:hover>.sample-zoom_in span+span,button:focus-visible>.sample-zoom_in span+span{animation:tx-zoom 1.5s ease-in-out infinite}
+.tx-live.sample-distance span+span,button:hover>.sample-distance span+span,button:focus-visible>.sample-distance span+span{animation:sf-tx-distance 1.5s ease-in-out infinite}
+.tx-live.sample-rect_crop span+span,button:hover>.sample-rect_crop span+span,button:focus-visible>.sample-rect_crop span+span{animation:sf-tx-rect 1.5s ease-in-out infinite}
+.tx-live.sample-circle_open span+span,button:hover>.sample-circle_open span+span,button:focus-visible>.sample-circle_open span+span{animation:tx-circle-open 1.5s ease-in-out infinite}
+.tx-live.sample-circle_close span+span,button:hover>.sample-circle_close span+span,button:focus-visible>.sample-circle_close span+span{animation:tx-circle-close 1.5s ease-in-out infinite}
+.tx-live.sample-squeeze span+span,button:hover>.sample-squeeze span+span,button:focus-visible>.sample-squeeze span+span{animation:sf-tx-squeeze-h 1.5s ease-in-out infinite}
+.tx-live.sample-squeeze_v span+span,button:hover>.sample-squeeze_v span+span,button:focus-visible>.sample-squeeze_v span+span{animation:sf-tx-squeeze-v 1.5s ease-in-out infinite}
+.tx-live.sample-slice span+span,button:hover>.sample-slice span+span,button:focus-visible>.sample-slice span+span{animation:sf-tx-slice-h 1.5s ease-in-out infinite}
+.tx-live.sample-slice_horizontal span+span,button:hover>.sample-slice_horizontal span+span,button:focus-visible>.sample-slice_horizontal span+span{animation:sf-tx-slice-h 1.5s steps(4,end) infinite}
+.tx-live.sample-slice_vertical span+span,button:hover>.sample-slice_vertical span+span,button:focus-visible>.sample-slice_vertical span+span{animation:sf-tx-slice-v 1.5s steps(4,end) infinite}
+.tx-live.sample-wind span+span,button:hover>.sample-wind span+span,button:focus-visible>.sample-wind span+span,.tx-live.sample-wind_up span+span,button:hover>.sample-wind_up span+span,button:focus-visible>.sample-wind_up span+span,.tx-live.sample-wind_right span+span,button:hover>.sample-wind_right span+span,button:focus-visible>.sample-wind_right span+span,.tx-live.sample-wind_down span+span,button:hover>.sample-wind_down span+span,button:focus-visible>.sample-wind_down span+span{animation:sf-tx-wind 1.5s ease-in-out infinite}
+.tx-live.sample-fade_through_black span+span,button:hover>.sample-fade_through_black span+span,button:focus-visible>.sample-fade_through_black span+span{animation:sf-tx-black 1.5s ease-in-out infinite}
+.tx-live.sample-fade_white span+span,button:hover>.sample-fade_white span+span,button:focus-visible>.sample-fade_white span+span{animation:sf-tx-white 1.5s ease-in-out infinite}
+.tx-live.sample-fade_grays span+span,button:hover>.sample-fade_grays span+span,button:focus-visible>.sample-fade_grays span+span{animation:sf-tx-grey 1.5s ease-in-out infinite}
+.tx-live.sample-film_burn span+span,button:hover>.sample-film_burn span+span,button:focus-visible>.sample-film_burn span+span{animation:sf-tx-film 1.5s ease-in-out infinite}
+.tx-live.sample-pixelize span+span,button:hover>.sample-pixelize span+span,button:focus-visible>.sample-pixelize span+span{animation:sf-tx-pixel 1.5s ease-in-out infinite}
+.tx-live.sample-blur span+span,button:hover>.sample-blur span+span,button:focus-visible>.sample-blur span+span{animation:sf-tx-blur 1.5s ease-in-out infinite}
+.tx-live.sample-fade_fast span+span,button:hover>.sample-fade_fast span+span,button:focus-visible>.sample-fade_fast span+span{animation:tx-fade .8s steps(3,end) infinite}
+.tx-live.sample-fade_slow span+span,button:hover>.sample-fade_slow span+span,button:focus-visible>.sample-fade_slow span+span{animation:tx-fade 2.4s ease-in-out infinite}
+@keyframes sf-tx-slide-u{0%,12%{transform:translateY(100%)}58%,100%{transform:none}}
+@keyframes sf-tx-slide-d{0%,12%{transform:translateY(-100%)}58%,100%{transform:none}}
+@keyframes sf-tx-wind-u{0%,12%{transform:translateY(100%) rotate(-8deg);clip-path:inset(100% 0 0)}58%,100%{transform:none;clip-path:inset(0)}}
+@keyframes sf-tx-wind-r{0%,12%{transform:translateX(-100%) rotate(8deg);clip-path:inset(0 0 0 100%)}58%,100%{transform:none;clip-path:inset(0)}}
+@keyframes sf-tx-wind-d{0%,12%{transform:translateY(-100%) rotate(8deg);clip-path:inset(0 0 100%)}58%,100%{transform:none;clip-path:inset(0)}}
+@keyframes sf-tx-diag-swipe-tl{0%,12%{clip-path:polygon(0 0,0 0,0 0)}58%,100%{clip-path:polygon(0 0,100% 0,0 100%)}}
+@keyframes sf-tx-diag-swipe-tr{0%,12%{clip-path:polygon(100% 0,100% 0,100% 0)}58%,100%{clip-path:polygon(100% 0,0 0,100% 100%)}}
+.tx-live.sample-slide_up span+span,button:hover>.sample-slide_up span+span,button:focus-visible>.sample-slide_up span+span{animation:sf-tx-slide-u 1.5s ease-in-out infinite}
+.tx-live.sample-slide_down span+span,button:hover>.sample-slide_down span+span,button:focus-visible>.sample-slide_down span+span{animation:sf-tx-slide-d 1.5s ease-in-out infinite}
+.tx-live.sample-wipe_tl span+span,button:hover>.sample-wipe_tl span+span,button:focus-visible>.sample-wipe_tl span+span{animation:sf-tx-diag-swipe-tl 1.5s ease-in-out infinite}
+.tx-live.sample-wipe_tr span+span,button:hover>.sample-wipe_tr span+span,button:focus-visible>.sample-wipe_tr span+span{animation:sf-tx-diag-swipe-tr 1.5s ease-in-out infinite}
+.tx-live.sample-wind span+span,button:hover>.sample-wind span+span,button:focus-visible>.sample-wind span+span{animation:sf-tx-wind 1.5s ease-in-out infinite}
+.tx-live.sample-wind_up span+span,button:hover>.sample-wind_up span+span,button:focus-visible>.sample-wind_up span+span{animation:sf-tx-wind-u 1.5s ease-in-out infinite}
+.tx-live.sample-wind_right span+span,button:hover>.sample-wind_right span+span,button:focus-visible>.sample-wind_right span+span{animation:sf-tx-wind-r 1.5s ease-in-out infinite}
+.tx-live.sample-wind_down span+span,button:hover>.sample-wind_down span+span,button:focus-visible>.sample-wind_down span+span{animation:sf-tx-wind-d 1.5s ease-in-out infinite}
+.tx-live.sample-cut span+span,button:hover>.sample-cut span+span,button:focus-visible>.sample-cut span+span{animation:none;opacity:1}

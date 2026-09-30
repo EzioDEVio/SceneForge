@@ -801,7 +801,8 @@ def auto_captions(scene_id: str, body: dict | None = None, db: Session = Depends
                                  'start_ms': max(0, int(chunk[0][1])), 'end_ms': max(int(chunk[0][1]) + 100, int(chunk[-1][2]))})
     scene.subtitle_text = " ".join(w for w, _, _ in words)
     font = dict(scene.font_json or {})
-    font["transcript"] = {"language": result["language"], "provider": result["provider"], "source": source, "words": words}
+    font["transcript"] = {"language": result["language"], "provider": result["provider"], "source": source,
+                          "word_timing": result.get("word_timing", "provider"), "words": words}
     font['caption_segments'] = caption_segments
     font["captions_enabled"] = True
     scene.font_json = font

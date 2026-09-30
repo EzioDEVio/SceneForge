@@ -33,6 +33,10 @@ app.add_middleware(DesktopSessionMiddleware,token=os.environ.get("SCENEFORGE_DES
 @app.on_event("startup")
 def on_startup():
     init_db()
+    # In-process render/generation threads cannot survive an app restart. Mark
+    # their durable rows interrupted so stale jobs do not block project deletion.
+    from app.workers.jobs import recover_interrupted_jobs
+    recover_interrupted_jobs()
     app.state.credential_migration_failures = migrate_credentials()
     import os,threading
     if os.name=='nt' and os.environ.get('SCENEFORGE_SD_AUTOSTART')!='0':
@@ -58,7 +62,7 @@ app.include_router(video_generation.router)
 # new interface connected to an old backend (e.g. a still-running old
 # start.bat window) shows "Backend update required" instead of silently
 # losing settings the old backend does not know.
-BUILD_ID = "v0.7.0-rc2"
+BUILD_ID = "v0.7.0-rc4"
 
 
 @app.get("/api/health")

@@ -166,10 +166,23 @@ def delete_project(project_id: str, db: Session = Depends(get_db)):
     project = db.get(Project, project_id)
     if not project:
         raise HTTPException(404, "Project not found")
+    from app.workers.jobs import active_job_ids
+    live_ids = active_job_ids()
     active = db.query(RenderJob).filter(RenderJob.project_id == project_id,
-        RenderJob.status.in_(["queued", "running", "cancelling"])).first()
-    if active:
+        RenderJob.status.in_(["queued", "running", "cancelling"])).all()
+    live = [job for job in active if job.id in live_ids]
+    if live:
         raise HTTPException(409, "Wait for rendering to finish or cancel it before deleting this project.")
+    # A worker thread cannot survive a desktop-app restart. Recover any stale
+    # rows here as well as at startup so a project does not stay undeletable
+    # when the editor has been open since a job crashed or was interrupted.
+    for job in active:
+        message = "Interrupted when SceneForge last closed. Start the render or generation again if you still need it."
+        event = {"status": "failed", "stage": "interrupted", "error": message}
+        job.status = "failed"
+        job.stage = "interrupted"
+        job.error = message
+        job.events_json = [*(job.events_json or []), event][-200:]
     # Clear cross-table references before cascading the owning rows.
     for scene in project.scenes:
         scene.rendered_asset_id = None

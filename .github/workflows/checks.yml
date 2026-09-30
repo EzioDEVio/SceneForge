@@ -43,4 +43,6 @@ jobs:
             python tests/integration/test_effect_presets_addon.py
             python tests/integration/test_share_location.py
             python tests/integration/test_video_generation.py
+            python tests/integration/test_local_transcribe.py
+            python tests/integration/test_stale_jobs.py
           '
