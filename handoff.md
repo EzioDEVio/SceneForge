@@ -1,7 +1,7 @@
 # SceneForge 0.7.0 Release Candidate — Session Handoff
 
 **Prepared:** 2026-09-30
-**Current source:** branch `chatgpt/0.7.0-video-generation` in `EzioDEVio/SceneForge`
+**Current source:** branch `chatgpt/0.7.0-video-generation` in `EzioDEVio/SceneForge` (candidate commit `c9a8ee7`; local source tree matches it)
 **Current working version:** 0.7.0 release candidate (unreleased)
 **Base:** preserved `chatgpt/0.6.0-wip.10` editor branch
 **Published baseline:** GitHub release `0.5.3`
@@ -56,13 +56,15 @@ Resolve Studio currently describes AI object isolation/tracking, Speed Warp opti
 
 - Frontend production build passed (TypeScript + Vite); minified editor bundle is 555.65 kB and Vite prints its advisory above 500 kB.
 - Frontend tests passed after the RC4 edits: 226 editor component checks, 19 unit checks, 2 video-generation flows and 6 share-dialog checks.
-- Local Whisper regression script passed five mocked checks, and an FFmpeg smoke check produced mono 16 kHz WAV input. Python compilation and `git diff --check` passed. This workspace lacks the backend integration dependencies, so stale-job API integration and end-to-end inference still need GitHub CI and Windows/manual validation.
+- Local Whisper regression script passed five mocked checks, and an FFmpeg smoke check produced mono 16 kHz WAV input. Python compilation and `git diff --check` passed. Actual Whisper inference on the user's clean audio sample still needs Windows/manual validation.
 - Desktop tests passed: 18 lifecycle, close-flow and storage checks.
 - Direct backend integration scripts passed for video generation, stale/live close readiness, and FFmpeg filter smoke tests. Chromatic split and Motion trail also passed the full scene filter graph.
 - Python compile checks and `git diff --check` passed. Frontend flows use a mock API; they do not replace installed-app visual testing.
 - The follow-up source-split integration test passed against real FFmpeg media: it verifies an unrendered cut, linked source audio, split caption/text timings, segment thumbnail selection and a complete export.
 - The finishing/export integration test passed all 22 checks, including multiple A3 clips, fade validation, audible clip placement and silence in the gap. The suite emits a Starlette/httpx deprecation warning from its test client; all checks succeeded.
-- GitHub’s Linux keyring credential gate and Windows/Linux/macOS release workflow still need to pass on the candidate branch. Test the resulting Windows installer before merge/publication. No stable tag or public release is being created.
+- GitHub Release workflow [36763871298](https://github.com/EzioDEVio/SceneForge/actions/runs/36763871298) passed on Windows, Linux and macOS. Windows packaged render, installer build, installed-app startup and uninstall smoke checks passed. The Windows installer is temporary Actions artifact `11120491437`, not a published release.
+- Build and render checks workflow [36763871406](https://github.com/EzioDEVio/SceneForge/actions/runs/36763871406) failed in `tests/integration/test_editor_plus.py`: its “Cannot delete project during an active render” test received a status other than the expected 409. The credential tests and 40 combined checks before it passed; because the script stops on failure, later integration tests in that sequence did not run. Fix and rerun this gate.
+- No live ComfyUI, Google Veo or Runway generation was repeated for this candidate. Test the fresh Windows installer, local Whisper using the previously failing clean-audio sample, and any local/cloud video provider that you plan to use before merge or publication. No stable tag or public release is being created.
 
 ## Initial 0.7.0 text-to-video milestone
 
@@ -255,25 +257,23 @@ The following still need hands-on or real-service verification: browser visual b
 
 ## 0.7.0 release-candidate continuation (2026-09-30)
 
-The candidate branch is `chatgpt/0.7.0-video-generation`. The public release remains unchanged. Do not merge or publish this candidate until the Windows installer has been tested by the user.
+The public release remains 0.5.3. The 0.7.0 RC4 source is on `chatgpt/0.7.0-video-generation` at `c9a8ee74831ab8ebc0a48aa0875e8139c98f568b` (tree `c813c8cdfe63446734c19e4031437ce531aedcea`). Its package version is 0.7.0 and API build ID is `v0.7.0-rc4`. The CI build-and-render failure must be resolved and the Windows installer must be tested by the user before merge or publication.
 
-### Added for this candidate
+The candidate includes the preferences/theme/close-flow improvements, local hardware guidance, text-to-video and image candidate selection, paid provider estimates and confirmation, timeline/audio/caption fixes, curated transitions, effects/filters and sticker/layout work recorded above. These are RC features, not claims about the 0.5.3 public release.
 
-- Preferences are under File; editor theme switching is also available at upper right (Graphite Night, Daylight, Midnight Blue, Warm Studio). Accent, density and reduced motion persist locally.
-- Project aspect ratio and frame rate are set in Create Project. The editor retains its current-project aspect control. Existing renders may become stale when page setup changes.
-- Native desktop close choices: Save, Don’t save, Save and exit, and Cancel. Failed saves and active render/export/generation block exit; repeated close requests are serialized.
-- Local video hardware guidance: NVIDIA GPU name/count/VRAM and system RAM detection, model suggestion, and per-model warning when detected hardware is below listed requirements. Detection does not install ComfyUI or download models.
-- Build identifiers/package version set to 0.7.0.
+### Current verification and artifacts
 
-### Local verification
+- Release workflow [36763871298](https://github.com/EzioDEVio/SceneForge/actions/runs/36763871298): **success** for Windows, Linux and macOS. Windows packaged render and installed startup/uninstall smoke passed. Open the run and download the `SceneForge-Studio-Windows` artifact (ID `11120491437`); it contains `SceneForge-Studio-0.7.0-Windows-x64-Setup.exe`. This is a temporary Actions artifact, not a GitHub Release.
+- Build and render checks [36763871406](https://github.com/EzioDEVio/SceneForge/actions/runs/36763871406): **failure** in `tests/integration/test_editor_plus.py`, which expected project deletion during an active render to return HTTP 409 but received another status. Linux keyring credential tests and 40 combined checks earlier in that job passed. Tests sequenced after the assertion did not run.
+- Frontend: build passed; 226 component checks, 19 unit checks, two video-generation flows and six share checks passed. Desktop suite: 18 passed. Local video-generation integration and real-FFmpeg source-split/audio-finishing tests passed. Local Whisper mock and normalization smoke checks passed; actual user-sample inference is unverified.
+- Do not merge to `main`, tag or publish 0.7.0 yet. Resolve and rerun the failed CI check, then test the installer and local/cloud workflows that matter to the user.
 
-- `npm run build` — passed. Vite's advisory reports a 540.73 kB minified bundle (500 kB threshold).
-- `npm test` — passed: 215 editor component checks, 19 unit checks, 2 video-generation UI flows and 6 share checks.
-- `npm test` in `desktop/` — passed: 18 desktop tests.
-- `PYTHONPATH=backend /tmp/sceneforge-release-venv/bin/python tests/integration/test_video_generation.py` — passed.
-- Python compile checks and `git diff --check` — passed.
-- The CI-only native-keyring credential checks have not run locally; GitHub Actions must provide the native keyring gate. The Release matrix must build and run its packaged-app checks for Windows, Linux and macOS.
+### What is not bundled or implemented
 
-### Next release gate
+- ComfyUI, custom workflow nodes/files and model weights remain separate installs. Provider keys are user-supplied and stored with the OS credential store. No direct account upload to social platforms is implemented; sharing gives the user export/location and platform instructions.
+- Vast.ai is still a separate feasibility proposal, not an app integration. Auto cutout, subject/object tracking, optical-flow interpolation, advanced voice isolation, AI music re-editing and a full Fusion-style node graph remain roadmap work.
+- The timeline is still scene-based for video. Independent A3 audio clips are editable, while unrestricted multitrack video compositing and universal frame-accurate clip editing remain future work.
 
-Push only to `chatgpt/0.7.0-video-generation`; review both GitHub Actions workflows and use the Windows Actions artifact for user testing. The branch artifact is temporary and is not a GitHub release. Merge to `main` or publish only after the user confirms Windows installation, editing, export and playback.
+## Source archive contents
+
+The accompanying full-source ZIP contains the complete tracked SceneForge project tree (frontend, backend, Electron desktop app, assets, setup/build scripts, workflows, tests and documentation) plus a Git bundle with repository history. It excludes installed dependency folders, build caches/output, local databases and `backend/data` user project files. It is a source package, not a platform installer; the Windows installer is downloaded separately from the successful Release Actions run above. Optional AI model weights, ComfyUI, custom nodes and user API keys are not bundled.

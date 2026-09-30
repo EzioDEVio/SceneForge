@@ -4,7 +4,7 @@
 
 **Free, open-source desktop editor for narrated documentary videos.** Turn a script, photos, clips and a voice into a finished film, one scene at a time, with film-style looks, captions that follow the narration, music, maps and more. Arabic and English are first-class.
 
-[Download](#download) · [What it can do](#what-it-can-do) · [AI providers](#ai-providers) · [Build from source](#build-from-source) · [Contributing](CONTRIBUTING.md) · [License](#license)
+[Download](#download) · [What it can do](#what-it-can-do) · [Project milestones](#project-milestones) · [AI providers](#ai-providers) · [Build from source](#build-from-source) · [Combined history and handoff](PROJECT_HISTORY_AND_HANDOFF.md) · [Contributing](CONTRIBUTING.md) · [License](#license)
 
 ![SceneForge Studio editor with an animated map route](docs/screenshots/editor-map-route.png)
 
@@ -21,6 +21,12 @@ Get the installer for your system from the **[latest release](https://github.com
 **Updates:** on Windows and Linux (AppImage) SceneForge downloads new versions in the background and asks to restart. On macOS it tells you when a new version is out and opens the download page. Help → *Receive beta updates* opts in to test versions.
 
 **Your projects are safe across updates:** they live in your user folder, separate from the app, and the project database is backed up automatically before a new version opens it (Help → *Open project backups*; the last 5 are kept).
+
+### Current candidate status
+
+The latest **published** release remains **0.5.3**. The source branch `chatgpt/0.7.0-video-generation` contains the unreleased **0.7.0 RC4** candidate. Its Windows, Linux and macOS package workflow passed, including Windows installed-app startup, render and uninstall checks. The separate build-and-render checks workflow currently fails at `tests/integration/test_editor_plus.py` because its active-render deletion assertion receives an unexpected status; resolve and rerun that gate before treating the candidate as release-ready. The Windows installer is available as a temporary [GitHub Actions artifact](https://github.com/EzioDEVio/SceneForge/actions/runs/36763871298), not from the public Releases page. Keep the candidate unmerged and unpublished until the Windows installer is tested and the failed CI gate is resolved.
+
+The full implementation inventory, troubleshooting decisions, test record, pending work and historical release notes are in the [combined project handoff and release history](PROJECT_HISTORY_AND_HANDOFF.md).
 
 ## What it can do
 
@@ -47,6 +53,24 @@ Get the installer for your system from the **[latest release](https://github.com
 **Text-to-video (0.7.0 WIP)** — a dark, high-contrast Generate Video workspace offers step-by-step local ComfyUI/model guidance, VRAM-aware model suggestions, Google/Runway key instructions, and paid estimates that scale to 1–3 candidate videos. Compare finished takes and add the selected one to a new or existing scene. Image Studio also supports 1–3 selectable options. Existing clip audio, captions, styles, effects and overlays remain available. Cloud video requests require an explicit total-cost confirmation in the UI and backend.
 
 The features above include the **0.6.0 work in progress** and the **0.7.0 release candidate** from source. The candidate is being tested on its branch and is not a published release; use the latest published installer for the stable build.
+
+## Project milestones
+
+This table summarizes the documented product history. The detailed, cumulative entries begin with the archived **0.2.0 RC3** notes; earlier prototype history is not reconstructed here. Versions marked WIP or RC were development snapshots, not public releases.
+
+| Version | Milestone |
+|---|---|
+| **0.2.0 RC3–RC5** | Built out the scene editor: overlays/PiP, music and clip-audio editing, LUT import, film looks, transitions, photo restoration, split screen, map routes, 3D photos, motion controls and Arabic-aware caption rendering. These were prerelease milestones. |
+| **0.3.0** | First public open-source release, with Windows/Linux/macOS installers, updater and project backups. |
+| **0.3.1–0.3.4** | Guided AI Engines and Help, diagnostics, safer local-model startup, real transition/look previews, map-route improvements, paste-media support, branded installer and Windows stability fixes. |
+| **0.4.0–0.4.1** | Animated titles and captions, text styles, animated annotations and Arabic map-label rendering fixes. |
+| **0.5.0** | Captions Pro: expanded caption styles, fonts, Arabic styles, phrase/word timing, formatting, positioning and animation. |
+| **0.5.1–0.5.2** | Direct annotation editing, accurate arrow previews, scene copy/duplicate/paste and preview zoom/pan. |
+| **0.5.3** | Preserved video sound and source duration, per-clip sound controls, scene countdown intros, 9:16 fit/blur behavior, caption safe positioning and platform safe-zone overlay. This is the latest published release. |
+| **0.6.0 WIP** | Additive editor expansion: local Whisper captions, transition/caption packs, multi-select, progress cards, export formats/presets, T1 timed editable caption clips, feature-help popovers, sharing, emoji/stickers, filters, and timeline/history/audio restoration. It remains unreleased. |
+| **0.7.0 RC4** | Text-to-video and image candidate generation, local ComfyUI setup/hardware guidance, paid-provider cost estimates and confirmation, preferences/themes, safer close flow, improved timeline/audio/captions/transition curation and additional filters. It remains unreleased and has one failed CI gate under investigation. |
+
+See [`desktop/RELEASE_NOTES.md`](desktop/RELEASE_NOTES.md) for version-by-version detail, including fixes and verification, and [`handoff.md`](handoff.md) for the working-session history.
 
 ## AI providers
 
