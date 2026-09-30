@@ -4,7 +4,7 @@ import {api, Asset, Overlay, Scene} from './api';
 import {FeatureHelp} from './FeatureHelp';
 
 export const OVERLAY_DEFAULTS: Omit<Overlay, 'id' | 'asset_id'> = {
-  x: 72, y: 30, width: 34, rotation: 0, opacity: 100, radius: 6, border: 6, border_color: '#FFFFFF', shadow: 60, feather: 0, chroma: null, chroma_similarity: 30, x2: null, y2: null,
+  kind: 'media', x: 72, y: 30, width: 34, rotation: 0, opacity: 100, radius: 6, border: 6, border_color: '#FFFFFF', shadow: 60, feather: 0, chroma: null, chroma_similarity: 30, x2: null, y2: null,
   start_ms: 0, end_ms: null, anim_in: 'fade', anim_out: 'fade', anim_ms: 600,
 };
 const ANIMS: [Overlay['anim_in'], string][] = [['none', 'None'], ['fade', 'Fade'], ['slide_left', 'Slide'], ['slide_up', 'Rise'], ['zoom', 'Zoom pop']];
@@ -114,12 +114,14 @@ export function OverlayPanel({scene, overlays, selected, onSelect, onChange, dis
   function add(asset_id: string, preset:Partial<Overlay> = {}) {
     if (overlays.length >= 8) {setError('A scene can have at most 8 overlays.'); return;}
     const offset = overlays.length * 4;
-    onChange([...overlays, {...OVERLAY_DEFAULTS, ...preset, id: newId(), asset_id, x: preset.x ?? clamp(72 - offset, 10, 90), y: preset.y ?? clamp(30 + offset, 10, 90)}]);
+    onChange([...overlays, {...OVERLAY_DEFAULTS, ...preset, kind:preset.kind||'media', id: newId(), asset_id, x: preset.x ?? clamp(72 - offset, 10, 90), y: preset.y ?? clamp(30 + offset, 10, 90)}]);
     onSelect(overlays.length); setError('');
   }
+  const isSticker=(item:Overlay)=>item.kind==='sticker'||customStickerIds.includes(item.asset_id)||media.find(asset=>asset.id===item.asset_id)?.original_filename.toLowerCase().startsWith('sticker-')===true;
+  const mediaLayerIndexes=overlays.flatMap((item,index)=>isSticker(item)?[]:[index]);
   function arrange(mode:'side2'|'side3'|'stack2'|'stack3'|'grid4'){
     const count=mode==='side3'||mode==='stack3'?3:mode==='grid4'?4:2;
-    if(overlays.length<count){setError(`Add at least ${count} overlays before applying this layout.`);return;}
+    if(mediaLayerIndexes.length<count){setError(`Add at least ${count} video or image layers from the Media Pool before applying this layout.`);return;}
     const spots:Record<typeof mode,{x:number;y:number;width:number}[]>={
       side2:[{x:25,y:50,width:42},{x:75,y:50,width:42}],
       side3:[{x:17,y:50,width:29},{x:50,y:50,width:29},{x:83,y:50,width:29}],
@@ -127,12 +129,12 @@ export function OverlayPanel({scene, overlays, selected, onSelect, onChange, dis
       stack3:[{x:50,y:18,width:26},{x:50,y:50,width:26},{x:50,y:82,width:26}],
       grid4:[{x:25,y:27,width:40},{x:75,y:27,width:40},{x:25,y:73,width:40},{x:75,y:73,width:40}],
     };
-    onChange(overlays.map((item,i)=>i<count?{...item,...spots[mode][i]}:item));setError('');
+    onChange(overlays.map((item,i)=>{const slot=mediaLayerIndexes.indexOf(i);return slot>=0&&slot<count?{...item,kind:'media',...spots[mode][slot]}:item;}));setError('');
   }
   async function uploadCustomSticker(f?:File){
     if(!f)return;
     if(!/\.(png|webp|jpe?g)$/i.test(f.name)){setError('Use PNG or WebP for transparent stickers; JPEG is supported without transparency.');if(stickerFile.current)stickerFile.current.value='';return;}
-    try{const asset=await api.uploadAsset(scene.project_id,f);if(asset.type!=='image')throw new Error('Choose a PNG, WebP, or JPEG image.');setMedia(items=>[...items,asset]);setCustomStickerIds(ids=>ids.includes(asset.id)?ids:[...ids,asset.id]);add(asset.id,{width:18,border:0,radius:0,shadow:25});}
+    try{const asset=await api.uploadAsset(scene.project_id,f);if(asset.type!=='image')throw new Error('Choose a PNG, WebP, or JPEG image.');setMedia(items=>[...items,asset]);setCustomStickerIds(ids=>ids.includes(asset.id)?ids:[...ids,asset.id]);add(asset.id,{kind:'sticker',width:18,border:0,radius:0,shadow:25});}
     catch(e:any){setError(e?.message||'Could not upload the sticker.');}
     finally{if(stickerFile.current)stickerFile.current.value='';}
   }
@@ -166,7 +168,7 @@ export function OverlayPanel({scene, overlays, selected, onSelect, onChange, dis
       const blob=await new Promise<Blob>((resolve,reject)=>canvas.toBlob(b=>b?resolve(b):reject(new Error('Could not create the sticker image.')),'image/png'));
       const safe=sticker.name.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
       const asset=await api.uploadAsset(scene.project_id,new File([blob],`sticker-${safe}.png`,{type:'image/png'}));
-      setMedia(m=>[...m,asset]);add(asset.id,{width:19,border:0,radius:0,shadow:25});
+      setMedia(m=>[...m,asset]);add(asset.id,{kind:'sticker',width:19,border:0,radius:0,shadow:25});
     }catch(e:any){setError(e?.message||'Could not add this sticker.');}
     finally{setStickerBusy('');}
   }
@@ -187,12 +189,17 @@ export function OverlayPanel({scene, overlays, selected, onSelect, onChange, dis
       <button className="btn" disabled={disabled} onClick={() => file.current?.click()}><Upload size={14}/> Upload</button>
       <input ref={file} type="file" accept="image/*,video/*" hidden aria-label="Upload overlay media" onChange={e => void upload(e.target.files?.[0])}/>
     </div>
+    <section className="media-layout-section" aria-label="Media layout presets">
+      <div className="section-heading"><strong>Arrange video & image layers</strong><FeatureHelp compact title="Arrange media layers" description="Place two or more video or image overlays in a clean split-screen layout. Your main scene remains behind them, and stickers stay independently positioned." steps="Add each source with Add from Media Pool or Upload above, then choose a layout. Drag the media on the preview or use Position & size to fine-tune it. These controls arrange media layers only; they do not move stickers or change the scene order."/></div>
+      <p className="hint">Choose video or image layers above. Stickers keep their own position and size.</p>
+      <div className="media-layout-grid" role="group" aria-label="Video and image layout presets">{([['side2','2 side by side',2],['side3','3 side by side',3],['stack2','2 stacked',2],['stack3','3 stacked',3],['grid4','2 × 2 grid',4]] as const).map(([mode,label,count])=><button key={mode} type="button" className="media-layout-button" aria-label={label} title={`${label} · arrange video and image layers`} disabled={disabled||mediaLayerIndexes.length<count} onClick={()=>arrange(mode)}><span className={`media-layout-preview layout-${mode}`} aria-hidden="true">{Array.from({length:count},(_,i)=><i key={i}/>)}</span><span className="media-layout-label">{label}</span><small>{count} media layers</small></button>)}</div>
+      {mediaLayerIndexes.length<2&&<p className="media-layout-empty">Add at least two images or videos to enable split-screen layouts.</p>}
+    </section>
     {error && <p className="form-error" role="alert">{error}</p>}
     <section className="sticker-library" aria-label="Stickers and emoji">
       <div className="section-heading"><h3><Sticker size={15}/> Stickers & emoji</h3><span>{STICKERS.length+customStickerIds.length}</span><FeatureHelp compact title="Stickers and emoji" description="Add a reusable graphic or emoji as a normal image overlay on the scene." steps="Search or browse the sticker grid, click an item, then select it in the overlay list or preview to resize, position, animate, or delete it. Upload PNG or WebP files to keep transparent backgrounds; JPEG images are supported without transparency. Your uploads are saved in this project's Media Pool and listed here on this device."/></div>
       <p className="hint">Choose a sticker, or upload a PNG/WebP (transparent) or JPEG (solid background). Added stickers start at a compact size.</p>
       <label className="search-control"><Search size={14}/><input aria-label="Search stickers and emoji" placeholder="Search stickers…" value={stickerQuery} onChange={e=>setStickerQuery(e.target.value)}/></label>
-      <div className="overlay-layout-presets" role="group" aria-label="Overlay layout presets">{([['side2','2 side by side'],['side3','3 side by side'],['stack2','2 stacked'],['stack3','3 stacked'],['grid4','2 × 2']] as const).map(([mode,label])=><button key={mode} className="text-btn" disabled={disabled||overlays.length<(mode==='side3'||mode==='stack3'?3:mode==='grid4'?4:2)} onClick={()=>arrange(mode)}>{label}</button>)}</div>
       <div className="sticker-upload-row"><button className="btn" disabled={disabled||overlays.length>=8} onClick={()=>stickerFile.current?.click()}><Upload size={13}/> Upload sticker</button><input ref={stickerFile} type="file" accept=".png,.webp,.jpg,.jpeg,image/png,image/webp,image/jpeg" hidden aria-label="Upload custom sticker" onChange={e=>void uploadCustomSticker(e.target.files?.[0])}/></div>
       <div className="sticker-grid" role="group" aria-label="Sticker choices">{STICKERS.filter(s=>`${s.name} ${s.tags} ${s.emoji}`.toLowerCase().includes(stickerQuery.toLowerCase())).map(s=><button key={s.name} className="sticker-choice" title={s.name} aria-label={`Add ${s.name} sticker`} disabled={disabled||!!stickerBusy||overlays.length>=8} onClick={()=>void addSticker(s)}><span aria-hidden="true">{stickerBusy===s.name?'…':s.emoji}</span><small>{s.name}</small></button>)}{media.filter(asset=>asset.type==='image'&&customStickerIds.includes(asset.id)&&`${asset.original_filename} upload custom`.toLowerCase().includes(stickerQuery.toLowerCase())).map(asset=><button key={asset.id} className="sticker-choice custom-sticker-choice" title={asset.original_filename} aria-label={`Add uploaded sticker ${asset.original_filename}`} disabled={disabled||overlays.length>=8} onClick={()=>add(asset.id,{width:18,border:0,radius:0,shadow:25})}><img src={api.assetThumbUrl(asset.id,160)} alt=""/><small>{asset.original_filename}</small></button>)}</div>
       {!STICKERS.some(s=>`${s.name} ${s.tags} ${s.emoji}`.toLowerCase().includes(stickerQuery.toLowerCase()))&&!media.some(asset=>asset.type==='image'&&customStickerIds.includes(asset.id)&&`${asset.original_filename} upload custom`.toLowerCase().includes(stickerQuery.toLowerCase()))&&<p className="hint">No stickers match that search.</p>}

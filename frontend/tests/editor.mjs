@@ -239,7 +239,7 @@ try{
  await user.click(screen.getByRole('switch',{name:'Old film damage'}));await saved();
  check('switching old film off removes it and its preview',requests.some(r=>r.body?.look&&'film' in r.body.look&&r.body.look.film===null)&&!document.querySelector('canvas.film-preview'));
  const tSelect=screen.getAllByRole('combobox').find(c=>[...c.options||[]].some(o=>o.value==='film_burn'));
- check('film burn and 10 more transitions are offered',!!tSelect&&[...tSelect.options].length>=20);
+ check('film burn and the curated transition set are offered',!!tSelect&&[...tSelect.options].length>=20);
  check('LUT import control is offered',!!screen.getByRole('button',{name:/Import .cube/})&&!!screen.getByRole('combobox',{name:'Color LUT'}));
  const folderFiles=[new File(['x'],'Rec709 Kodak 2383 D65.cube'),new File(['x'],'Canon Log to Rec709.ilut'),new File(['x'],'LMT Day for Night.xml'),new File(['x'],'broken.cube'),new File(['x'],'Linear to sRGB.cube')];
  const folderInput=screen.getByLabelText('Import LUT folder');Object.defineProperty(folderInput,'files',{value:folderFiles,configurable:true});fireEvent.change(folderInput);
@@ -415,7 +415,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.clear(screen.getByRole('textbox',{name:'Search stickers and emoji'}));
  await user.selectOptions(screen.getByRole('combobox',{name:'Add overlay from media'}),'pool-img');await saved();
  const ovSave=()=>requests.filter(r=>r.method==='PATCH'&&r.body?.overlays).at(-1)?.body.overlays;
- check('adding an overlay saves it with default placement',ovSave()?.length===1&&ovSave()[0].asset_id==='pool-img'&&ovSave()[0].width===34&&ovSave()[0].anim_in==='fade');
+ check('adding a media layer saves its role and default placement',ovSave()?.length===1&&ovSave()[0].asset_id==='pool-img'&&ovSave()[0].kind==='media'&&ovSave()[0].width===34&&ovSave()[0].anim_in==='fade');
  const item=await screen.findByRole('button',{name:/Overlay 1: map\.png\. Drag to move/});
  check('the overlay appears on the preview, sized to its 4:3 picture',item.dataset.box==='34x25.5@72,30r0'&&!!screen.getByRole('slider',{name:'Resize overlay 1'}));
  item.focus();fireEvent.keyDown(item,{key:'ArrowRight',shiftKey:true});await saved();
@@ -429,7 +429,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getByRole('button',{name:'Send overlay 2 back'}));await saved();
  check('stacking order can be changed',ovSave()[0].x===81);
  await user.click(screen.getByRole('button',{name:'2 side by side'}));await saved();
- check('overlay layout preset places two PiP items side by side',ovSave()[0].x===25&&ovSave()[1].x===75&&ovSave()[0].width===42&&ovSave()[1].width===42);
+ check('video/image layout preset places two media layers side by side',ovSave()[0].x===25&&ovSave()[1].x===75&&ovSave()[0].width===42&&ovSave()[1].width===42&&ovSave().every(o=>o.kind==='media'));
  await user.click(screen.getByRole('checkbox',{name:'Glide to another position'}));await user.click(screen.getByRole('checkbox',{name:'Green screen'}));await saved();
  check('overlay glide and green screen save',ovSave().some(o=>o.x2!=null&&o.chroma==='#00FF00'));
  await user.click(screen.getByRole('button',{name:'Delete overlay 2'}));await user.click(screen.getByRole('button',{name:'Delete overlay 1'}));await saved();
@@ -440,8 +440,13 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getByRole('button',{name:'Add Subscribe pill sticker'}));
  await waitFor(()=>assert.ok(ovSave()?.length===1&&ovSave()[0].width===19));await saved();
  check('built-in stickers start at a compact size',ovSave().length===1&&ovSave()[0].width===19&&ovSave()[0].border===0);
+ const stickerPosition={x:ovSave()[0].x,y:ovSave()[0].y,width:ovSave()[0].width};
+ await user.selectOptions(screen.getByRole('combobox',{name:'Add overlay from media'}),'pool-img');await saved();
+ await user.selectOptions(screen.getByRole('combobox',{name:'Add overlay from media'}),'pool-img');await saved();
+ await user.click(screen.getByRole('button',{name:'2 side by side'}));await saved();
+ check('media layout changes image layers while leaving stickers independently positioned',ovSave().length===3&&ovSave()[0].kind==='sticker'&&ovSave()[0].x===stickerPosition.x&&ovSave()[0].y===stickerPosition.y&&ovSave()[0].width===stickerPosition.width&&ovSave()[1].x===25&&ovSave()[2].x===75);
+ await user.click(screen.getByRole('button',{name:'Delete overlay 3'}));await user.click(screen.getByRole('button',{name:'Delete overlay 2'}));await user.click(screen.getByRole('button',{name:'Delete overlay 1'}));await saved();
  dom.window.HTMLCanvasElement.prototype.getContext=originalCanvasContext;
- await user.click(screen.getByRole('button',{name:'Delete overlay 1'}));await saved();
  fireEvent.change(screen.getByLabelText('Upload custom sticker'),{target:{files:[new File(['png'],'transparent-sticker.png',{type:'image/png'})]}});
  await waitFor(()=>assert.ok(requests.some(r=>r.path.startsWith('/api/assets/upload')&&r.body.get('file')?.name==='transparent-sticker.png')));
  await waitFor(()=>assert.ok(screen.getByRole('button',{name:'Add uploaded sticker transparent-sticker.png'})));
@@ -467,13 +472,12 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  fireEvent.change(screen.getByRole('slider',{name:'Timeline audio clip volume'}),{target:{value:'70'}});
  await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.body?.finishing?.audio_clips?.some(c=>c.name==='music-a.mp3'&&c.volume===70))));
  check('project audio clip volume control saves independently',project.finishing_json.audio_clips.find(c=>c.name==='music-a.mp3').volume===70);
- const timelineRuler=screen.getByRole('slider',{name:'Timeline playhead'});timelineRuler.getBoundingClientRect=()=>({left:0,top:0,width:2000,height:24,right:2000,bottom:24});
  const audioClipBeforeCut=project.finishing_json.audio_clips.find(c=>c.name==='music-a.mp3');
- const cutAt=audioClipBeforeCut.start_ms+2000,zoom=Number(screen.getByRole('slider',{name:'Timeline zoom'}).value);
- fireEvent.pointerDown(timelineRuler,{pointerId:2,clientX:cutAt/1000*zoom});
+ const cutBlock=screen.getByRole('button',{name:'Select audio clip music-a.mp3'});cutBlock.getBoundingClientRect=()=>({left:0,top:0,width:1000,height:28,right:1000,bottom:28});
+ fireEvent.pointerDown(cutBlock,{pointerId:2,clientX:500});fireEvent.pointerUp(window,{pointerId:2,clientX:500});
  await user.click(screen.getByRole('button',{name:'Split at playhead'}));
  await waitFor(()=>assert.equal(project.finishing_json.audio_clips.length,3));
- check('A3 scissors split the selected audio at the timeline playhead into independently editable clips',project.finishing_json.audio_clips.some(c=>c.name==='music-a.mp3 · B'&&c.source_in_ms>0)&&!!screen.getByRole('button',{name:/Select audio clip music-a\.mp3 · B/}));
+ check('pressing an audio clip places the playhead before drag and A3 scissors split at that point',project.finishing_json.audio_clips.some(c=>c.name==='music-a.mp3 · B'&&c.source_in_ms>=audioClipBeforeCut.source_in_ms+(audioClipBeforeCut.source_out_ms-audioClipBeforeCut.source_in_ms)/3)&&!!screen.getByRole('button',{name:/Select audio clip music-a\.mp3 · B/}));
  const narration=screen.getAllByRole('button').filter(b=>b.className.includes('narration-clip'))[0];
  const dt=(files)=>({dataTransfer:{types:['Files'],files,items:[],dropEffect:'',getData:()=>''}});
  fireEvent.dragOver(narration,dt([]));
@@ -689,7 +693,8 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getAllByRole('button',{name:'Transitions'})[0]);
  const coverTile=[...document.querySelectorAll('.transition-presets button')].find(b=>b.textContent.includes('Cover left'));
  await user.hover(coverTile);
- check('55 distinct transition choices are offered; the first playing scene cannot take an incoming transition',[...document.querySelectorAll('.transition-presets button')].length>=55&&coverTile.disabled&&!document.querySelector('.tx-on-canvas'));
+ const transitionLabels=[...document.querySelectorAll('.transition-presets button')].map(b=>b.textContent||'');
+ check('28 curated transition choices avoid repeated directional variants; the first playing scene cannot take an incoming transition',transitionLabels.length===28&&coverTile.disabled&&!transitionLabels.includes('Slide right')&&!transitionLabels.includes('Cover right')&&!document.querySelector('.tx-on-canvas'));
  await user.unhover(coverTile);
  check('moving away ends the transition preview',!document.querySelector('.tx-on-canvas'));
  const pcs=[...document.querySelectorAll('.picture-clip')];

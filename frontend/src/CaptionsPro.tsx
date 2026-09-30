@@ -217,7 +217,7 @@ export function AutoCaptions({scene, onDone, onStyle}: {scene: Scene; onDone: (s
       const sc = await api.autoCaptions(scene.id, {provider, language: lang, phrase_words:wordsPerClip, source}); const t = (sc.font_json as any)?.transcript;
       if (preset && onStyle) await onStyle({...preset.values, captions_enabled: true, typewriter: false});
       const portions=(sc.font_json as any)?.caption_segments?.length||0;
-      setMsg(`Done: ${t?.words?.length || 0} words · ${portions} editable caption clips${t?.language ? ` · language: ${t.language}` : ''}${preset ? ` · style: ${preset.name}` : ''}. Edit each clip below or click it on T1.`); onDone(sc);
+      setMsg(`Done: ${t?.words?.length || 0} words · ${portions} editable caption clips${t?.language ? ` · language: ${t.language}` : ''}${t?.word_timing==='estimated'?' · timing estimated from phrase boundaries':''}${preset ? ` · style: ${preset.name}` : ''}. Edit each clip below or click it on T1.`); onDone(sc);
     } catch (e: any) {setMsg(e.message || String(e));} finally {setBusy(false);}
   }
   const disabled = !hasNarr && !hasVideo;

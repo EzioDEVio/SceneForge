@@ -46,6 +46,32 @@ def active_job_ids() -> set[str]:
         return set(_active_jobs)
 
 
+def recover_interrupted_jobs() -> int:
+    """Close out durable jobs left active by a previous app process.
+
+    Workers are in-process daemon threads, so queued/running rows cannot resume
+    after a restart. Keeping them active would incorrectly prevent deleting an
+    old project even though no render or generation task still exists.
+    """
+    active = active_job_ids()
+    recovered = 0
+    with session_scope() as db:
+        rows = db.query(RenderJob).filter(
+            RenderJob.status.in_([JobStatus.QUEUED, JobStatus.RUNNING, JobStatus.CANCELLING])
+        ).all()
+        for job in rows:
+            if job.id in active:
+                continue
+            message = "Interrupted when SceneForge last closed. Start the render or generation again if you still need it."
+            event = {"status": JobStatus.FAILED, "stage": "interrupted", "error": message}
+            job.status = JobStatus.FAILED
+            job.stage = "interrupted"
+            job.error = message
+            job.events_json = [*(job.events_json or []), event][-200:]
+            recovered += 1
+    return recovered
+
+
 def _safe_download_name(title: str) -> str:
     """Turn a project/scene title into a filesystem-safe download filename
     stem (no extension) so 'Download' produces something readable like

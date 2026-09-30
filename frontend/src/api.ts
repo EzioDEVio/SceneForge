@@ -87,7 +87,7 @@ export type FontSettings = {
 };
 
 /** Must match BUILD_ID in backend/app/main.py. */
-export const BUILD_ID = "v0.7.0-rc2";
+export const BUILD_ID = "v0.7.0-rc4";
 
 export type Adjust = Partial<Record<'exposure'|'contrast'|'highlights'|'shadows'|'temperature'|'tint'|'saturation'|'vibrance'|'sharpen'|'vignette'|'grain', number>>;
 export type Look = {
@@ -96,7 +96,7 @@ export type Look = {
   lut?: {asset_id: string; strength: number} | null;
   film?: FilmLook | null;
 };
-export type Overlay = {id: string; asset_id: string; x: number; y: number; width: number; rotation: number; opacity: number;
+export type Overlay = {id: string; asset_id: string; kind?: 'media'|'sticker'; x: number; y: number; width: number; rotation: number; opacity: number;
   radius: number; border: number; border_color: string; shadow: number; start_ms: number; end_ms: number | null;
   anim_in: 'none' | 'fade' | 'slide_left' | 'slide_up' | 'zoom'; anim_out: 'none' | 'fade' | 'slide_left' | 'slide_up' | 'zoom'; anim_ms: number;
   x2?: number | null; y2?: number | null; chroma?: string | null; chroma_similarity?: number; feather?: number};

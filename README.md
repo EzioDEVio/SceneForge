@@ -26,7 +26,7 @@ Get the installer for your system from the **[latest release](https://github.com
 
 ![Effects panel](docs/screenshots/effects-panel.png)
 
-**Scenes and timeline** — scene-by-scene timeline with picture, narration, source-video-audio and text lanes; drag-and-drop images, videos, audio and whole folders; 55 transitions with live previews; keyboard shortcuts; undo/redo; split and ripple-delete scenes; multi-select and batch apply; ruler snapping and named markers; per-lane locks; quick mute for embedded clip sound; linked source video/audio edge trimming for eligible single-video scenes. This is a scene-based editor, not a full multitrack nonlinear editor.
+**Scenes and timeline** — scene-by-scene timeline with picture, narration, source-video-audio and text lanes; drag-and-drop images, videos, audio and whole folders; 28 curated transitions with live previews (older saved transition types still render); keyboard shortcuts; undo/redo; split and ripple-delete scenes; multi-select and batch apply; ruler snapping and named markers; per-lane locks; quick mute for embedded clip sound; linked source video/audio edge trimming for eligible single-video scenes. This is a scene-based editor, not a full multitrack nonlinear editor.
 
 **Pictures and motion** — Ken Burns zoom and pan with smooth easing; **3D photo (parallax)**, which gives still photos depth; **picture-in-picture overlays** you drag and resize on the preview, with borders, rounded corners, shadows, animations, glide paths and green screen; **split screen** (side by side, top & bottom, three panels, 2×2); **animated map routes** you draw by clicking on the preview; video clip speed, slow-motion ramps and freeze frames; **restore old photo** (dust, grain, contrast and sharpness for archive scans).
 

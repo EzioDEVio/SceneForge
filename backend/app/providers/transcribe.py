@@ -10,6 +10,8 @@ from __future__ import annotations
 
 import requests
 import os
+import subprocess
+import tempfile
 from pathlib import Path
 from threading import Lock
 
@@ -37,13 +39,25 @@ def available(db) -> list[str]:
     return ["local", *[n for n in ("elevenlabs", "openai") if _key(db, n)]]
 
 
+def _normalize_local_audio(path: str, work_dir: str) -> str:
+    """Give Faster-Whisper consistent mono 16 kHz input and lift quiet speech."""
+    from app.config import FFMPEG_BIN
+    target = Path(work_dir) / "whisper-input.wav"
+    flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0  # type: ignore[attr-defined]
+    args = [FFMPEG_BIN, "-y", "-hide_banner", "-nostdin", "-loglevel", "error", "-i", path,
+            "-map", "0:a:0", "-vn", "-af", "dynaudnorm=f=150:g=15:p=0.95",
+            "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", str(target)]
+    subprocess.run(args, check=True, capture_output=True, timeout=300, creationflags=flags)
+    return str(target)
+
+
 def _local(path: str, language: str | None) -> dict:
     """Run CPU int8 Whisper. The small multilingual model is fetched once and cached."""
     global _LOCAL_MODEL
     try:
         from faster_whisper import WhisperModel
-    except ImportError as e:
-        raise TranscribeError("Local captions are unavailable because Faster-Whisper is not installed. Reinstall or update SceneForge.") from e
+    except (ImportError, OSError) as e:
+        raise TranscribeError(f"Local captions could not load Faster-Whisper ({e}). Reinstall or update SceneForge, then try again.") from e
     if _LOCAL_MODEL is None:
         with _LOCAL_LOCK:
             if _LOCAL_MODEL is None:
@@ -53,19 +67,63 @@ def _local(path: str, language: str | None) -> dict:
                     _LOCAL_MODEL = WhisperModel("base", device="cpu", compute_type="int8", download_root=str(model_dir))
                 except Exception as e:
                     raise TranscribeError(f"Could not download or start the local Whisper model: {e}") from e
+    # Normalize both video-extracted audio and narration uploads before local
+    # inference. Quiet embedded dialogue and stereo/downmixed sources otherwise
+    # behave differently from cloud transcription, even with a manual language.
+    temp = tempfile.TemporaryDirectory(prefix="sceneforge-whisper-")
     try:
-        segments, info = _LOCAL_MODEL.transcribe(path, language=language or None, word_timestamps=True, vad_filter=True)
-        words = []
-        text = []
-        for segment in segments:
-            text.append(segment.text.strip())
-            for word in segment.words or []:
-                value = word.word.strip()
-                if value:
-                    words.append([value, int(round(word.start * 1000)), int(round(word.end * 1000))])
-        return {"language": info.language or language or "", "text": " ".join(text).strip(), "words": words, "provider": "local"}
-    except Exception as e:
-        raise TranscribeError(f"Local Whisper transcription failed: {e}") from e
+        try:
+            input_path = _normalize_local_audio(path, temp.name)
+        except Exception:
+            # Keep transcription available if an optional normalization filter
+            # is unavailable in a user's FFmpeg build.
+            input_path = path
+
+        def recognize(use_vad: bool) -> dict:
+            segments, info = _LOCAL_MODEL.transcribe(input_path, language=language or None,
+                                                      word_timestamps=True, vad_filter=use_vad,
+                                                      condition_on_previous_text=False)
+            words = []
+            text = []
+            estimated_timing = False
+            for segment in segments:
+                phrase = (segment.text or "").strip()
+                if phrase:
+                    text.append(phrase)
+                before = len(words)
+                for word in list(segment.words or []):
+                    value = (word.word or "").strip()
+                    if value:
+                        words.append([value, int(round(word.start * 1000)), int(round(word.end * 1000))])
+                # Some short or low-volume clips return recognized segment text
+                # but no usable word alignment. Preserve editable captions with
+                # approximate timings across the recognized phrase.
+                if phrase and len(words) == before:
+                    tokens = phrase.split()
+                    if tokens:
+                        estimated_timing = True
+                        start = max(0, int(round(float(segment.start) * 1000)))
+                        end = max(start + 1, int(round(float(segment.end) * 1000)))
+                        span = end - start
+                        for index, token in enumerate(tokens):
+                            words.append([token, start + span * index // len(tokens), start + span * (index + 1) // len(tokens)])
+            return {"language": info.language or language or "", "text": " ".join(text).strip(), "words": words,
+                    "provider": "local", "word_timing": "estimated" if estimated_timing else "whisper"}
+
+        try:
+            result = recognize(True)
+            # VAD can reject quiet dialogue or clean, short lines. Retry once
+            # without it before reporting that speech was not found.
+            if not result["text"] and not result["words"]:
+                result = recognize(False)
+            return result
+        except Exception as e:
+            try:
+                return recognize(False)
+            except Exception as retry_error:
+                raise TranscribeError(f"Local Whisper transcription failed: {retry_error}") from e
+    finally:
+        temp.cleanup()
 
 
 def _elevenlabs(key: str, path: str, language: str | None) -> dict:

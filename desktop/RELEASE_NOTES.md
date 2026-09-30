@@ -1,4 +1,4 @@
-# SceneForge Studio 0.7.0 RC2 (unreleased)
+# SceneForge Studio 0.7.0 RC4 (unreleased)
 
 This is an installer-test candidate on `chatgpt/0.7.0-video-generation`, not a published GitHub release. Keep it on this branch until the Windows installer has been tested; the public release remains unchanged. A prior local build was reported to generate successfully with Runway, but this regression pass does not repeat live provider calls.
 
@@ -6,8 +6,14 @@ This is an installer-test candidate on `chatgpt/0.7.0-video-generation`, not a p
 - **Cut source clips at the playhead:** one-shot source video/image scenes can split without first rendering, including editable generated caption segments and timed text. The source video and embedded audio stay linked; segment thumbnails start at each segment's actual source time. Multi-shot scenes, separate narration, motion and speed effects still require a render before a baked cut.
 - **Caption regeneration:** Auto Captions now offers “Regenerate captions” after a transcript exists and lets users choose video sound versus scene narration when both are present. The Text Layers editor sits immediately below Auto Captions.
 - **Project audio lane A3:** MP3, WAV, M4A, AAC, OGG and FLAC files can be dropped from disk or the Media Pool onto A3. Each project clip can be moved, trimmed, split at the playhead, muted, leveled, faded and stacked with other clips. The clips are mixed at their timeline positions on export while preserving the existing whole-project Music bed.
-- **Overlay layouts and stickers:** added 2/3 side-by-side, 2/3 vertical stack and 2×2 layouts for picture-in-picture overlays. Sticker tiles are constrained to their cards. User images can be uploaded as reusable stickers: PNG/WebP support transparent backgrounds; JPEG is supported with its solid background. Uploads remain in the project Media Pool and sticker list on the current device.
-- Updated the matching frontend/backend API build ID to `v0.7.0-rc2`; this remains an unreleased 0.7.0 candidate.
+- Clicking inside an A3 clip places the playhead there for a scissors split. The Audio tab distinguishes the whole-project music bed from independent A3 clips and explains the move/trim/mute/volume/fade/split workflow.
+- **Media layout presets:** side-by-side, stacked and 2×2 controls now arrange video/image PiP layers from the Media Pool or Upload. Stickers and emoji are kept independent so layouts do not move them. The controls have visible diagrams and clear enabled/disabled states.
+- **Local Whisper recovery:** if voice activity detection returns no words, local transcription retries without VAD. When the model recognizes text but omits word alignment, SceneForge creates editable captions with estimated intervals and labels the timing as estimated.
+- **A more focused transition picker:** 28 visually distinct transition families replace repeated directional variants in the default list. Existing projects keep rendering their saved transition IDs, and the Inspector labels legacy choices.
+- **More reliable local captions:** the local Whisper path normalizes audio to mono 16 kHz with dynamic leveling when supported, retries without voice activity detection, and keeps recognized phrases when word-level alignment is missing.
+- **Audio editing and cleanup:** clicking an A3 audio block sets the playhead before a drag begins, so the scissors split at the pointed time. Abandoned render records no longer block project deletion while the editor stays open; actual live jobs still do.
+- **Cut feedback and project cleanup:** split warnings auto-dismiss after 3.5 seconds. At startup, stale queued/running/cancelling jobs left by a previous process are marked interrupted, so they no longer block project deletion; live jobs still protect their project.
+- Updated the matching frontend/backend API build ID to `v0.7.0-rc4`; this remains an unreleased 0.7.0 candidate.
 
 ## Preferences, project setup and close flow
 - Preferences now lives under **File**. The editor’s upper-right **Theme** menu offers Graphite Night, Daylight, Midnight Blue and Warm Studio, with accent, density and reduced-motion controls in Preferences.
@@ -22,7 +28,7 @@ This is an installer-test candidate on `chatgpt/0.7.0-video-generation`, not a p
 - Restored the **Safe zones** toggle above the timeline. Corrected Daylight theme colors across inspector controls, cards, buttons and timeline panels for readable contrast.
 - Fixed the close readiness check to use live in-process work. A stale queued/running job record left after a prior crash no longer traps an otherwise idle user in the close dialog.
 - Added per-project T1/V1/A1/A2 lane locks, an A2 quick mute button for each video clip’s embedded sound, and an explicitly labeled **Ripple delete** action that closes the scene gap. Existing snapping, markers, scene reorder, linked edge trim, split, and undo/redo remain.
-- Expanded the transition catalog to **55** choices, caption styling to **31** presets, and the searchable emoji/graphic sticker library to **66** items. Added **8** separately grouped color filters plus the FFmpeg-rendered creative effects **Chromatic split** and **Motion trail**.
+- Added 55 renderable transition IDs, with the default transition picker now curated to 28 distinct families; caption styling includes **31** presets and the searchable emoji/graphic sticker library includes **66** items. Added **8** separately grouped color filters plus the FFmpeg-rendered creative effects **Chromatic split** and **Motion trail**.
 
 ## Text-to-video workspace
 - Added a dedicated **Generate video** workspace that leaves the existing editor, top-level AI Engines and Help menus, timeline and media panels in place.

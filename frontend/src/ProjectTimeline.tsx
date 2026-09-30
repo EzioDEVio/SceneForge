@@ -9,16 +9,20 @@ import {FeatureHelp} from './FeatureHelp';
 import {ASSET_DRAG_TYPE, DraggedAsset, collectDroppedFiles, isMediaDrag} from './timelineDrop';
 
 export const TRANSITIONS = [
-  ['cut','Cut'], ['dissolve','Dissolve'], ['fade_through_black','Fade through black'],
-  ['fade_white','Fade through white'], ['slide','Slide left'], ['slide_right','Slide right'],
-  ['wipe_left','Wipe left'], ['wipe_right','Wipe right'], ['circle_open','Circle reveal'],
-  ['circle_close','Circle close'], ['zoom_in','Zoom in'], ['smooth_left','Smooth slide left'], ['smooth_right','Smooth slide right'],
-  ['radial','Clock wipe'], ['pixelize','Pixelate'], ['blur','Blur'], ['diagonal','Diagonal wipe'], ['squeeze','Squeeze'],
-  ['fade_grays','Fade through grey'], ['film_burn','Film burn'], ['wind','Wind'], ['slice','Slice'], ['open','Open'], ['close','Close'], ['slide_up','Slide up'], ['slide_down','Slide down'], ['smooth_up','Smooth slide up'], ['smooth_down','Smooth slide down'], ['wipe_up','Wipe up'], ['wipe_down','Wipe down'], ['cover_left','Cover left'], ['cover_right','Cover right'], ['reveal_left','Reveal left'], ['reveal_right','Reveal right'], ['vert_open','Open vertical'], ['vert_close','Close vertical'], ['diagonal_tr','Diagonal wipe (right)'], ['rect_crop','Rectangle'], ['distance','Distance morph'], ['slice_vertical','Vertical slice'], ['wind_up','Wind up'], ['squeeze_v','Squeeze vertical'], ['fade_fast','Quick fade'],
-  ['cover_up','Cover up'], ['cover_down','Cover down'], ['reveal_up','Reveal up'], ['reveal_down','Reveal down'],
-  ['wipe_tl','Diagonal wipe · top left'], ['wipe_tr','Diagonal wipe · top right'], ['wipe_bl','Diagonal wipe · bottom left'], ['wipe_br','Diagonal wipe · bottom right'],
-  ['slice_horizontal','Horizontal slice'], ['wind_right','Wind right'], ['wind_down','Wind down'], ['fade_slow','Slow fade'],
+  // A curated set of visibly different families. Directional variants remain
+  // renderable for older projects, but are not repeated as separate tiles.
+  ['cut','Cut'], ['dissolve','Cross dissolve'], ['fade_through_black','Fade through black'],
+  ['fade_white','Flash white'], ['film_burn','Film burn'], ['slide','Slide left'],
+  ['slide_up','Slide up'], ['wipe_left','Wipe left'], ['circle_open','Circle reveal'],
+  ['circle_close','Circle close'], ['zoom_in','Zoom in'], ['smooth_left','Smooth slide'],
+  ['radial','Clock wipe'], ['pixelize','Pixelate'], ['blur','Blur wipe'],
+  ['diagonal','Diagonal wipe'], ['squeeze','Horizontal squeeze'], ['fade_grays','Fade through grey'],
+  ['wind','Wind'], ['slice','Horizontal slice'], ['slice_vertical','Vertical slice'],
+  ['open','Horizontal open'], ['close','Horizontal close'], ['vert_open','Vertical open'],
+  ['rect_crop','Rectangle crop'], ['distance','Distance morph'], ['cover_left','Cover left'],
+  ['reveal_right','Reveal right'],
 ];
+export function transitionLabel(key:string){return TRANSITIONS.find(([type])=>type===key)?.[1]||key.replace(/_/g,' ').replace(/\b\w/g,(char:string)=>char.toUpperCase());}
 export {sceneDuration} from './duration';
 export function sequenceClips(scenes:Scene[]) {
   let cursor=0;
@@ -74,6 +78,13 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
   const firstPlayable=exported[0]?.scene.id===selectedId;
   const staleExport=!!exportAsset&&!!exportScenes&&JSON.stringify(scenes.map(s=>[s.id,s.revision]))!==JSON.stringify(exportScenes.map(s=>[s.id,s.revision]));
   const [toolMessage,setToolMessage]=useState('');
+  const toolMessageTimer=useRef<ReturnType<typeof setTimeout>|null>(null);
+  function showToolMessage(message:string){
+    setToolMessage(message);
+    if(toolMessageTimer.current)clearTimeout(toolMessageTimer.current);
+    toolMessageTimer.current=setTimeout(()=>{setToolMessage('');toolMessageTimer.current=null;},3500);
+  }
+  useEffect(()=>()=>{if(toolMessageTimer.current)clearTimeout(toolMessageTimer.current);},[]);
   const sourceSpeed=Number(selected?.shots[0]?.speed_json?.speed||1);
   const needsBake=!!selected&&(selected.shots.length!==1||selected.voice_takes.some(t=>t.accepted)||(selected.shots[0]?.motion_json.type||'static')!=='static'||Math.abs(sourceSpeed-1)>.001||selected.shots[0]?.speed_json?.freeze_at_ms!=null||(selected.shots[0]?.asset?.type==='video'&&(selected.shots[0].asset.duration_ms||0)<(selected.shots[0].source_in_ms||0)+sceneDuration(selected)));
   const canSplit=!!activeAudioClip?!monitor:!!selected?.shots.length&&!monitor;
@@ -81,25 +92,25 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
     if(activeAudioClip){
       const length=activeAudioClip.source_out_ms-activeAudioClip.source_in_ms,frame=Math.max(1,Math.round(1000/project.fps));
       const relative=position-activeAudioClip.start_ms;
-      if(relative<frame||relative>length-frame){setToolMessage('Move the playhead inside the selected audio clip, at least one frame from either edge.');return;}
+      if(relative<frame||relative>length-frame){showToolMessage('Move the playhead inside the selected audio clip, at least one frame from either edge.');return;}
       const at=Math.round(relative/frame)*frame,cut=activeAudioClip.source_in_ms+at;
       const left={...activeAudioClip,source_out_ms:cut,fade_out_ms:0};
       const right={...activeAudioClip,id:crypto.randomUUID(),name:`${activeAudioClip.name} · B`,start_ms:activeAudioClip.start_ms+at,source_in_ms:cut,fade_in_ms:0};
       right.fade_out_ms=Math.min(right.fade_out_ms,right.source_out_ms-right.source_in_ms);
       left.fade_in_ms=Math.min(left.fade_in_ms,left.source_out_ms-left.source_in_ms);
       onUpdateAudioClips?.(projectAudio.map(clip=>clip.id===activeAudioClip.id?left:clip).concat(right));
-      onAudioClipSelect?.(right.id);setToolMessage('Audio clip split into two editable pieces.');return;
+      onAudioClipSelect?.(right.id);showToolMessage('Audio clip split into two editable pieces.');return;
     }
     if(!selected||!selectedClip)return;
-    if(needsBake&&(!selected.rendered_asset_id||selected.is_stale)){setToolMessage('Render this scene first. Its current motion, captions and sound must be included in the cut.');return;}
+    if(needsBake&&(!selected.rendered_asset_id||selected.is_stale)){showToolMessage('Render this scene first. Its current motion, captions and sound must be included in the cut.');return;}
     const frame=Math.max(1,Math.round(1000/project.fps)),local=position-selectedClip.start,at=Math.round(local/frame)*frame;
-    if(at<frame||at>selectedClip.duration-frame){setToolMessage('Move the playhead inside the selected clip, at least one frame from either edge.');return;}
+    if(at<frame||at>selectedClip.duration-frame){showToolMessage('Move the playhead inside the selected clip, at least one frame from either edge.');return;}
     if(needsBake&&!await askConfirm('Split the rendered scene? Motion, separate narration, or speed effects will be baked into two clips and cannot be edited separately afterward. Original media files remain on disk. You can undo this split from the timeline.'))return;
     setToolMessage('');onSplit?.(at,needsBake);
   }
 
   useEffect(()=>{setMonitor(false);setPlaying(false);setToolMessage('');},[scenes.length]);
-  useEffect(()=>{if(notice)setToolMessage('');},[notice]);
+  useEffect(()=>{if(notice){setToolMessage('');if(toolMessageTimer.current)clearTimeout(toolMessageTimer.current);toolMessageTimer.current=null;}},[notice]);
   useEffect(()=>{const clip=authored.find(c=>c.scene.id===selectedId);if(clip&&scroll.current){const left=clip.start/1000*scale,right=clip.end/1000*scale,view=scroll.current;if(left<view.scrollLeft||right>view.scrollLeft+view.clientWidth)view.scrollLeft=Math.max(0,left-60);}},[selectedId]);
   const host=document.getElementById('sequence-viewer');
   useEffect(()=>{if(rulerSelection.current===selectedId){rulerSelection.current=null;return;}if(!monitor&&selectedClip)setPosition(selectedClip.start);},[selectedId,monitor]);
@@ -224,6 +235,10 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
   function selectProjectAudio(id:string){onAudioClipSelect?.(id);setMonitor(false);setPlaying(false);if(selectedId)window.dispatchEvent(new CustomEvent('sceneforge-open-tab',{detail:{sceneId:selectedId,tab:'Audio',audioClipId:id}}));}
   function beginProjectAudioDrag(clip:ProjectAudioClip,mode:'move'|'left'|'right',e:React.PointerEvent<HTMLDivElement|HTMLSpanElement>){
     if(disabled||monitor||trackLocks.A3)return;e.preventDefault();e.stopPropagation();selectProjectAudio(clip.id);
+    if(mode==='move'){
+      const rect=e.currentTarget.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,(e.clientX-rect.left)/Math.max(1,rect.width)));
+      seek(clip.start_ms+fraction*(clip.source_out_ms-clip.source_in_ms));
+    }
     const start={id:clip.id,mode,pointerId:e.pointerId,x:e.clientX,start:clip.start_ms,sourceIn:clip.source_in_ms,sourceOut:clip.source_out_ms,previewStart:clip.start_ms,previewIn:clip.source_in_ms,previewOut:clip.source_out_ms};
     audioDragRef.current=start;setAudioDrag(start);
     const move=(event:PointerEvent)=>{
@@ -274,7 +289,7 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
       <span className="tool-feedback" aria-live="polite">{toolMessage||shownNotice}</span><span className="selection-label">{selected?.title||'Select a part'}</span>
       <button aria-label="Move timeline part earlier" title="Move part earlier" disabled={disabled||trackLocks.V1||index<=0} onClick={()=>move(-1)}><ArrowLeft size={14}/>Earlier</button>
       <button aria-label="Move timeline part later" title="Move part later" disabled={disabled||trackLocks.V1||index<0||index>=scenes.length-1} onClick={()=>move(1)}><ArrowRight size={14}/>Later</button>
-      <label>Transition<select aria-label="Incoming transition" disabled={disabled||!selected?.shots.length||firstPlayable} value={selected?.transition_in_json.type||'cut'} onChange={e=>selected&&void onUpdate(selected.id,{transition_in:{type:e.target.value,duration_ms:e.target.value==='cut'?0:(selected.transition_in_json.duration_ms||500)}})}>{TRANSITIONS.map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
+      <label>Transition<select aria-label="Incoming transition" disabled={disabled||!selected?.shots.length||firstPlayable} value={selected?.transition_in_json.type||'cut'} onChange={e=>selected&&void onUpdate(selected.id,{transition_in:{type:e.target.value,duration_ms:e.target.value==='cut'?0:(selected.transition_in_json.duration_ms||500)}})}>{selected?.transition_in_json.type&&!TRANSITIONS.some(([key])=>key===selected.transition_in_json.type)&&<option value={selected.transition_in_json.type}>Existing · {transitionLabel(selected.transition_in_json.type)}</option>}{TRANSITIONS.map(([key,label])=><option key={key} value={key}>{label}</option>)}</select></label>
       <label>Duration<input aria-label="Transition seconds" type="number" min={0} max={30} step={.1} key={`${selectedId}-${selected?.transition_in_json.duration_ms}`} defaultValue={(selected?.transition_in_json.duration_ms||0)/1000} disabled={disabled||!selected?.shots.length||firstPlayable||selected.transition_in_json.type==='cut'} onBlur={e=>{if(selected&&e.target.validity.valid&&e.target.value!=='')void onUpdate(selected.id,{transition_in:{...selected.transition_in_json,duration_ms:Math.round(Number(e.target.value)*1000)}});}} onKeyDown={e=>{if(e.key==='Enter')e.currentTarget.blur();}}/>s</label><button aria-label="Remove transition" disabled={disabled||!selected||selected.transition_in_json.type==='cut'} onClick={()=>selected&&void onUpdate(selected.id,{transition_in:{type:'cut',duration_ms:0}})}><X size={12}/>Remove</button><span className="overlap-info" title="Limited to half the duration of either neighboring scene">Overlap {((selectedClip?.overlap||0)/1000).toFixed(2)}s</span>
       <button className="movie-toggle" disabled={!exportAsset} onClick={()=>{setMonitor(!monitor);setPlaying(false);setMediaError('');}}>{monitor?'Return to editing':'Preview last export'}</button>
     </div>
@@ -326,7 +341,7 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
                   onPointerDown={e=>beginShotTrim(s.id,s.shots[0],edge,e,duration)} onPointerMove={e=>moveShotTrim(s.id,s.shots[0],e)} onPointerUp={e=>finishShotTrim(s.id,s.shots[0].id,e)} onPointerCancel={()=>setTrim(null)}
                   onKeyDown={e=>{if(disabled||!(e.key==='ArrowLeft'||e.key==='ArrowRight'))return;e.preventDefault();const shot=s.shots[0],out=shot.source_out_ms??shot.asset?.duration_ms??0,delta=(e.key==='ArrowRight'?1:-1)*Math.round(1000/project.fps),si=edge==='in'?Math.max(0,shot.source_in_ms+delta):shot.source_in_ms,so=edge==='out'?Math.min(shot.asset?.duration_ms||out,out+delta):out;if(so-si>=100)onTrimShot?.(s.id,shot.id,si,so);}}/>)}
               </>}
-              {overlap>0&&<button disabled={disabled} className={`clip-transition ${selectedId===s.id?'selected':''}`} style={{left:start/1000*scale,width:Math.max(20,overlap/1000*scale)}} aria-label={`Edit ${s.title} transition`} title={`${TRANSITIONS.find(t=>t[0]===s.transition_in_json.type)?.[1]} · ${(overlap/1000).toFixed(2)}s (effective overlap)`} onClick={()=>{onSelect(s.id);seek(start);}}><span>⋈</span></button>}
+              {overlap>0&&<button disabled={disabled} className={`clip-transition ${selectedId===s.id?'selected':''}`} style={{left:start/1000*scale,width:Math.max(20,overlap/1000*scale)}} aria-label={`Edit ${s.title} transition`} title={`${transitionLabel(s.transition_in_json.type)} · ${(overlap/1000).toFixed(2)}s (effective overlap)`} onClick={()=>{onSelect(s.id);seek(start);}}><span>⋈</span></button>}
             </React.Fragment>)}
           </div>
           <div className="narration-track" aria-label="Narration track">{clips.map(({scene:s,start,duration})=>{const take=s.voice_takes.find(t=>t.accepted);return <button key={s.id} disabled={disabled||trackLocks.A1} onContextMenu={e=>{e.preventDefault();setCtx({x:e.clientX,y:e.clientY,sceneId:s.id,kind:'audio'});}} onDragOver={e=>{if(trackLocks.A1){e.preventDefault();return;}dragOverMedia(e,'a:'+s.id);}} onDragLeave={()=>setDropTarget('')} onDrop={e=>{if(trackLocks.A1){e.preventDefault();return;}dropMedia(e,s.id);}} data-scene-id={s.id} className={`narration-clip ${take?'has-take':''} ${dropTarget==='a:'+s.id?'drop-target':''}`} style={{left:start/1000*scale,width:Math.max(4,duration/1000*scale-2)}} onClick={()=>{onSelect(s.id);if(take)window.dispatchEvent(new CustomEvent('sceneforge-open-tab',{detail:{sceneId:s.id,tab:'Audio'}}));}} title={take?`${take.audio_asset?.original_filename||take.voice||'Narration'} · ${((take.effective_duration_ms??take.measured_duration_ms??0)/1000).toFixed(1)}s · click to edit, Delete to remove, drop audio to replace`:'Drop an audio file here to add sound to this scene'}><Volume2 size={13}/>{take?.audio_asset&&<NarrationWave take={take}/>}<span className="narration-label">{take?take.audio_asset?.original_filename||take.voice||'Narration':dropTarget==='a:'+s.id?'Drop to add audio':'No narration'}</span></button>})}</div>
@@ -335,7 +350,7 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
             {projectAudio.length===0&&<span className="project-audio-empty">Drop MP3, WAV, M4A, AAC, OGG or FLAC here to add a movable timeline audio clip</span>}
             {projectAudio.map((clip,index)=>{const dragPreview=audioDrag?.id===clip.id?audioDrag:null,startMs=dragPreview?.previewStart??clip.start_ms,sourceIn=dragPreview?.previewIn??clip.source_in_ms,sourceOut=dragPreview?.previewOut??clip.source_out_ms;return <div key={clip.id} className={`project-audio-row ${clip.mute?'muted':''} ${selectedAudioClipId===clip.id?'selected':''}`} style={{top:3+index*32,left:startMs/1000*scale,width:Math.max(24,(sourceOut-sourceIn)/1000*scale-2)}} role="group" aria-label={`Audio clip ${clip.name}`}>
               <span role="slider" tabIndex={disabled||trackLocks.A3?-1:0} aria-label={`Trim start of ${clip.name}`} aria-valuenow={sourceIn} className="project-audio-trim left" onPointerDown={e=>beginProjectAudioDrag(clip,'left',e)} onKeyDown={e=>{if(!disabled&&!trackLocks.A3&&(e.key==='ArrowLeft'||e.key==='ArrowRight')){e.preventDefault();const delta=(e.key==='ArrowLeft'?-1:1)*Math.round(1000/project.fps),nextIn=Math.max(0,Math.min(clip.source_out_ms-100,clip.source_in_ms+delta));onUpdateAudioClips?.(projectAudio.map(x=>{if(x.id!==clip.id)return x;const duration=x.source_out_ms-nextIn,fadeIn=Math.min(x.fade_in_ms,duration);return {...x,start_ms:Math.max(0,x.start_ms+nextIn-x.source_in_ms),source_in_ms:nextIn,fade_in_ms:fadeIn,fade_out_ms:Math.min(x.fade_out_ms,Math.max(0,duration-fadeIn))};}));}}}/>
-              <button className="project-audio-body" disabled={disabled||trackLocks.A3} aria-label={`Select audio clip ${clip.name}`} title={`${clip.name} · ${((sourceOut-sourceIn)/1000).toFixed(1)}s · drag to move; drag an edge to trim`} onPointerDown={e=>beginProjectAudioDrag(clip,'move',e)} onClick={()=>selectProjectAudio(clip.id)}><Volume2 size={12}/><span>{clip.name}</span><small>{((sourceOut-sourceIn)/1000).toFixed(1)}s</small></button>
+              <button className="project-audio-body" disabled={disabled||trackLocks.A3} aria-label={`Select audio clip ${clip.name}`} title={`${clip.name} · click to place the playhead; drag to move; drag an edge to trim`} onPointerDown={e=>beginProjectAudioDrag(clip,'move',e)} onClick={e=>{selectProjectAudio(clip.id);const rect=e.currentTarget.getBoundingClientRect(),fraction=Math.max(0,Math.min(1,(e.clientX-rect.left)/Math.max(1,rect.width)));seek(startMs+fraction*(sourceOut-sourceIn));}}><Volume2 size={12}/><span>{clip.name}</span><small>{((sourceOut-sourceIn)/1000).toFixed(1)}s</small></button>
               <span role="slider" tabIndex={disabled||trackLocks.A3?-1:0} aria-label={`Trim end of ${clip.name}`} aria-valuenow={sourceOut} className="project-audio-trim right" onPointerDown={e=>beginProjectAudioDrag(clip,'right',e)} onKeyDown={e=>{if(!disabled&&!trackLocks.A3&&(e.key==='ArrowLeft'||e.key==='ArrowRight')){e.preventDefault();const delta=(e.key==='ArrowLeft'?-1:1)*Math.round(1000/project.fps),nextOut=Math.max(clip.source_in_ms+100,Math.min(clip.source_duration_ms||clip.source_out_ms,clip.source_out_ms+delta));onUpdateAudioClips?.(projectAudio.map(x=>{if(x.id!==clip.id)return x;const duration=nextOut-x.source_in_ms,fadeIn=Math.min(x.fade_in_ms,duration);return {...x,source_out_ms:nextOut,fade_in_ms:fadeIn,fade_out_ms:Math.min(x.fade_out_ms,Math.max(0,duration-fadeIn))};}));}}}/>
             </div>})}
           </div>
