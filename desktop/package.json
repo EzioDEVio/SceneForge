@@ -51,6 +51,10 @@
         "to": "app-resources/assets"
       },
       {
+        "from": "../services",
+        "to": "app-resources/services"
+      },
+      {
         "from": "vendor/ffmpeg",
         "to": "ffmpeg"
       },

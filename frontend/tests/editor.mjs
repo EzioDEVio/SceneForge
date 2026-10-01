@@ -41,6 +41,7 @@ globalThis.fetch=async(path,init={})=>{
  else if(path==='/api/projects'&&method==='GET') result=[project];
  else if(path===`/api/projects/${project.id}`&&method==='GET') result=project;
  else if(/^\/api\/scenes\/[^/]+$/.test(path)&&method==='GET')result=project.scenes.find(s=>s.id===path.split('/').at(-1));
+ else if(path.endsWith('/detach-audio')&&method==='POST')result={asset:{id:'detached-audio',type:'audio',original_filename:body.source==='shot'?'clip.mp4 sound.wav':'narration.wav',duration_ms:2000},offset_ms:body.source==='shot'?0:250};
  else if(path===`/api/projects/${project.id}`&&method==='PATCH'){Object.assign(project,body);if(body.finishing){project.finishing_json=body.finishing;delete project.finishing;}result=project;}
  else if(path===`/api/projects/${project.id}`&&method==='DELETE')result={ok:true};
  else if(path==='/api/providers'&&method==='GET') result=profiles;
@@ -520,6 +521,27 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await waitFor(()=>assert.equal(project.finishing_json.timeline.tracks.A4?.locked,true));
  check('track locks are saved with the project and disable the lane clips',within(screen.getByLabelText('Audio track A4')).getAllByRole('button',{name:/Select audio clip/}).every(b=>b.disabled));
  await user.click(screen.getByRole('button',{name:'Unlock A4 audio track'}));
+ // --- RC6: delete only the unwanted audio piece, and right-click clip actions ------------
+ const scenesBeforeCut=project.scenes.length,rc6ClipsBefore=project.finishing_json.audio_clips.length;
+ const piece=project.finishing_json.audio_clips.find(c=>c.name==='music-a.mp3 · B');
+ await user.click(screen.getByRole('button',{name:`Select audio clip ${piece.name}`}));
+ fireEvent.keyDown(document.body,{key:'Delete'});
+ await waitFor(()=>assert.equal(project.finishing_json.audio_clips.length,rc6ClipsBefore-1));
+ check('Delete after cutting an audio clip removes only that piece; the scene video stays',project.scenes.length===scenesBeforeCut&&!project.finishing_json.audio_clips.some(c=>c.id===piece.id));
+ await user.click(screen.getByRole('button',{name:'Undo timeline edit'}));
+ await waitFor(()=>assert.equal(project.finishing_json.audio_clips.length,rc6ClipsBefore));
+ fireEvent.contextMenu(screen.getByRole('button',{name:'Select audio clip music-a.mp3'}),{clientX:40,clientY:40});
+ const menu=screen.getByRole('menu',{name:'Timeline clip actions'});
+ check('right-clicking an audio clip offers split, cut, copy, paste, duplicate, mute, move and delete',['Split at playhead','Cut','Copy','Duplicate','Mute','Delete (keep video)','Ripple delete'].every(n=>within(menu).getByRole('menuitem',{name:new RegExp('^'+n.replace(/[()]/g,'\\$&'))})));
+ await user.click(within(menu).getByRole('menuitem',{name:/^Copy/}));
+ fireEvent.contextMenu(screen.getByRole('button',{name:'Select audio clip music-a.mp3'}),{clientX:40,clientY:40});
+ await user.click(within(screen.getByRole('menu',{name:'Timeline clip actions'})).getByRole('menuitem',{name:/^Paste at playhead/}));
+ await waitFor(()=>assert.equal(project.finishing_json.audio_clips.length,rc6ClipsBefore+1));
+ check('copy and paste adds the same audio again on the timeline',project.finishing_json.audio_clips.filter(c=>c.name==='music-a.mp3').length===2);
+ fireEvent.contextMenu(screen.getByRole('button',{name:'Select audio clip music-a.mp3 · B'}),{clientX:40,clientY:40});
+ await user.click(within(screen.getByRole('menu',{name:'Timeline clip actions'})).getByRole('menuitem',{name:'A5'}));
+ await waitFor(()=>assert.equal(project.finishing_json.audio_clips.find(c=>c.name==='music-a.mp3 · B')?.track,'A5'));
+ check('the right-click menu moves a clip to another audio track and shows that track',!!screen.getByLabelText('Audio track A5'));
  const narration=screen.getAllByRole('button').filter(b=>b.className.includes('narration-clip'))[0];
  const dt=(files)=>({dataTransfer:{types:['Files'],files,items:[],dropEffect:'',getData:()=>''}});
  fireEvent.dragOver(narration,dt([]));
@@ -540,6 +562,15 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  const videoPool={id:'pool-vid',type:'video',original_filename:'clip.mp4'};
  fireEvent.drop(picture,{dataTransfer:{types:['application/x-sceneforge-assets'],getData:()=>JSON.stringify([videoPool])}});
  await waitFor(()=>assert.ok(project.scenes.find(s=>s.id===firstScene).shots.some(shot=>shot.asset?.type==='video')));
+ fireEvent.contextMenu(screen.getByRole('button',{name:'clip.mp4 audio controls'}),{clientX:50,clientY:50});
+ const audioCount=project.finishing_json.audio_clips.length;
+ await user.click(screen.getByRole('menuitem',{name:/^Detach clip sound to timeline audio/}));
+ await waitFor(()=>assert.equal(project.finishing_json.audio_clips.length,audioCount+1));
+ await saved();
+ check('detaching a video clip’s sound puts it on A3 and mutes the embedded sound (keeps the video)',project.finishing_json.audio_clips.some(c=>c.asset_id==='detached-audio')&&project.scenes.flatMap(s=>s.shots).find(x=>x.asset?.original_filename==='clip.mp4')?.audio_json?.mute===true&&requests.some(r=>r.path.endsWith('/detach-audio')&&r.body?.source==='shot'&&r.body?.duration_ms>0));
+ await user.click(screen.getByRole('button',{name:'Undo timeline edit'}));
+ await waitFor(()=>assert.equal(project.scenes.flatMap(s=>s.shots).find(x=>x.asset?.original_filename==='clip.mp4')?.audio_json?.mute,false));
+ check('undo restores the clip sound and removes the detached audio clip',!project.finishing_json.audio_clips.some(c=>c.asset_id==='detached-audio'));
  await user.click(screen.getByRole('button',{name:'Mute clip sound for clip.mp4'}));
  await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.path.includes('/shots/')&&r.body?.audio?.mute===true)));
  await saved();

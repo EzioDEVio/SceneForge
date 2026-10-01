@@ -854,3 +854,68 @@ def apply_to_scenes(scene_id: str, body: dict, db: Session = Depends(get_db)):
         changed += 1
     db.commit()
     return {"changed": changed}
+
+
+@router.post("/{scene_id}/detach-audio")
+def detach_audio(scene_id: str, body: dict, db: Session = Depends(get_db)):
+    """Copy a scene's narration (A1) or a shot's embedded sound (A2) into a new project
+    audio file so it can be placed, cut and deleted on the timeline audio tracks.
+
+    The narration is baked with its trim, voice effect, level and fades, so the new clip
+    sounds the same at volume 100. Original media and takes are never modified here;
+    the editor mutes/removes the source in the same undoable step.
+    """
+    import uuid as _uuid
+    from app.config import RENDERS_DIR
+    from app.db.models import Shot
+    from app.render.audio_edit import effective_ms, narration_filter
+    from app.render.ffmpeg_utils import run_ffmpeg
+    from app.render.renderer import _register_output_asset, _resolve_asset_path
+    scene = db.get(Scene, scene_id)
+    if not scene:
+        raise HTTPException(404, "Scene not found")
+    source = (body or {}).get("source")
+    out = RENDERS_DIR / f"detached_audio_{_uuid.uuid4().hex}.wav"
+    if source == "narration":
+        take = next((t for t in scene.voice_takes if t.accepted), None)
+        if not take or not take.audio_asset_id:
+            raise HTTPException(400, "This scene has no narration to move.")
+        from app.db.models import Asset
+        asset = db.get(Asset, take.audio_asset_id)
+        clip_ms = effective_ms(take.measured_duration_ms, take.edit_json) or asset.duration_ms or 0
+        chain = narration_filter(take.edit_json, clip_ms) or "anull"
+        run_ffmpeg(["-i", _resolve_asset_path(asset), "-af", chain, "-vn", "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", str(out)])
+        name = f"{scene.title} narration"
+        offset = 250 if scene.lead_ms is None else int(scene.lead_ms)
+    elif source == "shot":
+        shot = db.get(Shot, (body or {}).get("shot_id"))
+        if not shot or shot.scene_id != scene.id or not shot.asset or shot.asset.type != "video":
+            raise HTTPException(400, "Choose a video clip in this scene.")
+        speed = float((shot.speed_json or {}).get("speed", 1) or 1)
+        if abs(speed - 1) > 0.001 or (shot.speed_json or {}).get("ramp", "none") not in (None, "none") or (shot.speed_json or {}).get("freeze_at_ms") is not None:
+            raise HTTPException(400, "Detaching sound from a speed-changed clip is not supported yet. Reset its speed first, or render the scene and use its audio.")
+        duration = body.get("duration_ms")
+        if isinstance(duration, bool) or not isinstance(duration, (int, float)) or not 100 <= duration <= 86_400_000:
+            raise HTTPException(400, "duration_ms must be between 100 ms and 24 hours.")
+        start = int(shot.source_in_ms or 0)
+        end = min(int(shot.source_out_ms or shot.asset.duration_ms or start + duration), start + int(duration))
+        if end - start < 100:
+            raise HTTPException(400, "The clip is too short to detach its sound.")
+        try:
+            run_ffmpeg(["-ss", f"{start/1000:.6f}", "-i", _resolve_asset_path(shot.asset), "-t", f"{(end-start)/1000:.6f}", "-vn",
+                        "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", str(out)])
+        except Exception:
+            raise HTTPException(400, "This video clip has no sound to detach.")
+        name = f"{shot.asset.original_filename or scene.title} sound"
+        offset = 0
+    else:
+        raise HTTPException(400, "source must be narration or shot.")
+    if not out.exists() or out.stat().st_size < 1000:
+        out.unlink(missing_ok=True)
+        raise HTTPException(400, "No sound was found to detach.")
+    asset = _register_output_asset(scene.project_id, str(out), "audio")
+    asset.original_filename = f"{name[:180]}.wav"
+    db.add(asset)
+    db.commit()
+    db.refresh(asset)
+    return {"asset": schemas.AssetOut.model_validate(asset).model_dump(mode="json"), "offset_ms": offset}

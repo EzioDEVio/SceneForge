@@ -62,7 +62,7 @@ app.include_router(video_generation.router)
 # new interface connected to an old backend (e.g. a still-running old
 # start.bat window) shows "Backend update required" instead of silently
 # losing settings the old backend does not know.
-BUILD_ID = "v0.7.0-rc5"
+BUILD_ID = "v0.7.0-rc6"
 
 
 @app.get("/api/health")

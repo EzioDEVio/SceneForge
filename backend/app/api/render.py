@@ -8,7 +8,7 @@ from sse_starlette.sse import EventSourceResponse
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.db.models import Project, RenderJob, Scene
+from app.db.models import Asset, Project, RenderJob, Scene
 from app.domain import schemas
 from app.domain.constants import JobScope, JobStatus
 from app.workers import jobs as job_worker
@@ -134,3 +134,68 @@ async def job_events(job_id: str, db: Session = Depends(get_db)):
                 yield {"event": "heartbeat", "data": "{}"}
 
     return EventSourceResponse(event_generator())
+
+
+def _scene_start_ms(project, scene_id: str) -> int:
+    """Start of a scene on the editor timeline (mirrors frontend sequenceClips)."""
+    from app.api.projects import scene_duration_ms
+    cursor, previous = 0, None
+    for scene in sorted(project.scenes, key=lambda s: s.order_index):
+        duration = scene_duration_ms(scene)
+        overlap = 0
+        transition = scene.transition_in_json or {}
+        if previous is not None and previous[0].shots and scene.shots and transition.get("type", "cut") != "cut":
+            overlap = min(int(transition.get("duration_ms") or 0), previous[1] / 2, duration / 2)
+        start = cursor - overlap
+        if scene.id == scene_id:
+            return int(start)
+        cursor = start + duration
+        previous = (scene, duration)
+    return 0
+
+
+def _project_length_ms(project) -> int:
+    from app.api.projects import scene_duration_ms
+    ordered = sorted(project.scenes, key=lambda s: s.order_index)
+    return _scene_start_ms(project, ordered[-1].id) + scene_duration_ms(ordered[-1]) if ordered else 0
+
+
+@router.get("/api/scenes/{scene_id}/preview-media")
+def scene_preview_media(scene_id: str, db: Session = Depends(get_db)):
+    """The rendered scene with the timeline audio and music that play under it.
+
+    Cached by content, so it is rebuilt only when the render, the scene's position or the
+    project audio changes. Falls back to the plain rendered part when nothing plays under it.
+    """
+    import hashlib
+    import json
+    from fastapi.responses import FileResponse, RedirectResponse
+    from app.config import RENDERS_DIR
+    from app.render import finishing
+    from app.render.renderer import _resolve_asset_path
+    scene = db.get(Scene, scene_id)
+    if not scene or not scene.rendered_asset_id:
+        raise HTTPException(404, "Render this scene first.")
+    part = db.get(Asset, scene.rendered_asset_id)
+    if not part:
+        raise HTTPException(404, "The rendered scene file is missing. Render the scene again.")
+    project = scene.project
+    part_ms = int(part.duration_ms or scene.measured_duration_ms or 0)
+    plan = finishing.scene_preview_plan(project.finishing_json or {}, _scene_start_ms(project, scene.id), part_ms, _project_length_ms(project))
+    if not plan:
+        return RedirectResponse(f"/api/assets/{part.id}/stream", status_code=307)
+    key = hashlib.sha256(json.dumps({"part": part.id, "plan": plan}, sort_keys=True).encode()).hexdigest()[:24]
+    folder = RENDERS_DIR / "scene_previews"
+    folder.mkdir(parents=True, exist_ok=True)
+    out = folder / f"{scene.id}_{key}.mp4"
+    if not out.exists():
+        for old in folder.glob(f"{scene.id}_*.mp4"):
+            old.unlink(missing_ok=True)
+        tmp = folder / f"{scene.id}_{key}.partial.mp4"
+        try:
+            finishing.mix_scene_preview(_resolve_asset_path(part), plan, str(tmp))
+            tmp.replace(out)
+        except finishing.FinishingError as e:
+            tmp.unlink(missing_ok=True)
+            raise HTTPException(400, str(e))
+    return FileResponse(out, media_type="video/mp4")

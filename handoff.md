@@ -12,6 +12,35 @@ This handoff preserves the earlier 0.5.3/0.6.0 review below and records the 0.7.
 
 Reviewed inputs in this workspace include the 0.5.3 source ZIP, the original 0.6.0 WIP ZIP, reviewed wip.2–wip.6 snapshots, their READMEs and handoffs, the SceneForge session handoff, chat notes, and the user screenshots. The 0.5.3 technical handoff predates the 0.5.3/0.6.0 work and should not be treated as a complete description of the present build.
 
+## 0.7.0 RC6: Windows test follow-up and effects pack (2026-09-30)
+
+The user tested the RC5 installer on Windows and reported five issues. Each is listed with its resolution:
+
+1. **Local Whisper fails; cloud works.** This could not be reproduced in the Linux container, because model downloads are blocked there. RC6 hardens every step and adds diagnostics:
+   - HTTPS downloads without Xet
+   - cache self-repair
+   - an int8 → float32 fallback
+   - a **Check local captions** panel
+   - a packaged-app CI check that the engine loads
+
+   Still open: the user needs to run **Check local captions** and send the output if captions still fail.
+2. **Cutting a sound clip and deleting one half deleted the video.** Fixed:
+   - Delete follows the lane you last worked in (audio or scenes).
+   - Right-click menus were added.
+   - Narration and clip sound can be moved to A3 so they can be cut.
+3. **Right-click cut/copy/paste/delete on the timeline.** Added for audio clips, scenes, narration and clip sound.
+4. **A scene render didn't include the added audio or music.** Fixed with a cached preview mix (`GET /api/scenes/{id}/preview-media`); the rendered part stays clean for export.
+5. **Chatterbox not running.** The installer never included the voice-service files, and starting the engine needs Docker. RC6 bundles the files, adds in-app Start buttons with Docker checks and a live log, and pins a CPU-only PyTorch in the image.
+
+The FFmpeg effects pack is described in `desktop/RELEASE_NOTES.md`. Deferred: AI cutout, AI text textures, AI voice isolation, and a node compositor.
+
+**Tests:**
+- 243 component checks
+- 19 unit and 38 timeline checks
+- 2 video-generation and 6 share-dialog checks
+- 18 desktop checks
+- The full CI integration list, now 23 scripts, including the new `test_effects_rc6.py` (88 checks) and `test_rc6_timeline_audio.py` (12 checks, real FFmpeg)
+
 ## 0.7.0 RC5 — CI fix and timeline v1 (Claude continuation, 2026-09-30)
 
 **Branch:** local `claude/0.7.0-rc5-timeline`, based on `codex/0.7.0-release-candidate` source commit `3d6107a`. That commit's tree `c813c8c` is identical to GitHub `chatgpt/0.7.0-video-generation` at `c9a8ee7`. Nothing has been pushed, merged, tagged or published. No paid or live provider call was made. The Windows UI was **not** tested by Claude.

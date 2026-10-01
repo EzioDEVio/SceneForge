@@ -7,6 +7,7 @@ export const OVERLAY_DEFAULTS: Omit<Overlay, 'id' | 'asset_id'> = {
   kind: 'media', x: 72, y: 30, width: 34, rotation: 0, opacity: 100, radius: 6, border: 6, border_color: '#FFFFFF', shadow: 60, feather: 0, chroma: null, chroma_similarity: 30, x2: null, y2: null,
   start_ms: 0, end_ms: null, anim_in: 'fade', anim_out: 'fade', anim_ms: 600,
 };
+const LOOPS: [NonNullable<Overlay['loop']>, string][] = [['none', 'None'], ['float', 'Float'], ['bob', 'Bob'], ['pendulum', 'Pendulum']];
 const ANIMS: [Overlay['anim_in'], string][] = [['none', 'None'], ['fade', 'Fade'], ['slide_left', 'Slide'], ['slide_up', 'Rise'], ['zoom', 'Zoom pop']];
 const newId = () => 'ov' + Math.random().toString(36).slice(2, 9);
 const clamp = (v: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, v));
@@ -246,6 +247,17 @@ export function OverlayPanel({scene, overlays, selected, onSelect, onChange, dis
             {ANIMS.map(([v, l]) => <button key={v} role="radio" aria-checked={o[key] === v} className={o[key] === v ? 'selected' : ''} disabled={disabled} onClick={() => set({[key]: v} as any)}>{l}</button>)}
           </div></div>)}
         {num('anim_ms', 'Anim. length', 0, 3000, 100, 'ms')}
+      </fieldset>
+      <fieldset className="adjust-group"><legend>Loop motion</legend>
+        <div className="film-option"><span>Idle motion</span>
+          <div className="segmented" role="radiogroup" aria-label="Overlay loop motion">
+            {LOOPS.map(([v, l]) => <button key={v} role="radio" aria-checked={(o.loop || 'none') === v} className={(o.loop || 'none') === v ? 'selected' : ''} disabled={disabled} onClick={() => set({loop: v, loop_amount: o.loop_amount ?? 30, loop_period_ms: o.loop_period_ms ?? 2000})}>{l}</button>)}
+          </div></div>
+        {o.loop && o.loop !== 'none' && <>
+          {num('loop_amount' as any, o.loop === 'pendulum' ? 'Swing' : 'Distance', 0, 100, 1, '%')}
+          {num('loop_period_ms' as any, 'Cycle length', 300, 10000, 100, 'ms')}
+          <p className="hint">{o.loop === 'pendulum' ? 'Swings up to 25° each way, hinged at the top centre of the card.' : o.loop === 'float' ? 'Drifts up and down with a gentle sideways sway.' : 'Bobs up and down.'} Plays for the whole time the overlay is shown.</p>
+        </>}
       </fieldset>
     </div>}
     {o && <p className="hint">Videos play silently and loop. Render the scene for the final result.</p>}

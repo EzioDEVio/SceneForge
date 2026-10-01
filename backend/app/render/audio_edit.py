@@ -19,7 +19,31 @@ VOICE_FX = {
     "clean": "highpass=f=70,afftdn=nf=-25,dynaudnorm=f=150:g=15",
     "radio": "highpass=f=300,lowpass=f=3400,acompressor=threshold=0.1:ratio=6:attack=5:release=80,volume=1.8,alimiter=limit=0.9",
     "telephone": "highpass=f=500,lowpass=f=2600,acompressor=threshold=0.08:ratio=8,volume=2.0,alimiter=limit=0.9",
+    # Dialogue cleanup: a stronger chain of standard FFmpeg filters (spectral
+    # noise reduction, de-essing, compression, levelling). It is noise
+    # reduction, not AI voice isolation: music or other voices stay.
+    "dialogue": "highpass=f=80,lowpass=f=12000,afftdn=nr=18:nf=-30:tn=1,{deesser}"
+                "acompressor=threshold=0.125:ratio=3:attack=10:release=150:makeup=1.5,dynaudnorm=f=200:g=11:p=0.9",
 }
+_DEESSER: str | None = None
+
+
+def _deesser() -> str:
+    """'deesser,' when this FFmpeg build has it (FFmpeg 4.2+), else ''."""
+    global _DEESSER
+    if _DEESSER is None:
+        import subprocess
+        from app.config import FFMPEG_BIN
+        try:
+            out = subprocess.run([FFMPEG_BIN, "-hide_banner", "-filters"], capture_output=True, text=True, timeout=20).stdout
+            _DEESSER = "deesser=i=0.4:m=0.5:f=0.5," if " deesser " in out else ""
+        except Exception:  # noqa: BLE001 - an FFmpeg probe failure just skips de-essing
+            _DEESSER = ""
+    return _DEESSER
+
+
+def voice_fx_filter(name: str) -> str:
+    return VOICE_FX.get(name, "").replace("{deesser}", _deesser() if "{deesser}" in VOICE_FX.get(name, "") else "")
 
 
 class AudioEditError(ValueError):
@@ -92,7 +116,7 @@ def narration_filter(edit: dict | None, clip_ms: int) -> str:
         end = f":end={e['out_ms'] / 1000:.3f}" if e["out_ms"] is not None else ""
         parts.append(f"atrim=start={e['in_ms'] / 1000:.3f}{end},asetpts=PTS-STARTPTS")
     if VOICE_FX.get(e.get("voice_fx", "none")):
-        parts.append(VOICE_FX[e["voice_fx"]])
+        parts.append(voice_fx_filter(e["voice_fx"]))
     if e["volume"] != 100:
         parts.append(f"volume={e['volume'] / 100:.3f}")
     if e["fade_in_ms"]:

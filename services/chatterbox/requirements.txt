@@ -1,5 +1,6 @@
-chatterbox-tts
+# torch/torchaudio are installed first from the CPU-only index in the Dockerfile
+# (the default PyPI torch wheel bundles several GB of CUDA libraries).
+chatterbox-tts==0.1.7
 fastapi
 uvicorn
 soundfile
-librosa

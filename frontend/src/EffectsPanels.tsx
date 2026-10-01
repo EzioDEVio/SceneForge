@@ -3,7 +3,9 @@ import {Vibrate, Focus, EyeOff, Sun, Blend, Plus, Trash2, Palette, LayoutGrid, R
 import type {Look, Scene} from './api';
 import {FeatureHelp} from './FeatureHelp';
 
-export type Shake = {amount: number; speed: number; impact: boolean};
+export type Shake = {amount: number; speed: number; impact: boolean; preset?: 'custom' | 'handheld' | 'walk' | 'run' | 'impact'};
+export type Flare = {x: number; y: number; color: string; blend: 'screen' | 'add'; amount: number; drift: number};
+export type Wiggle = {amount: number; speed: number; size: number};
 export type Spot = {x: number; y: number; w: number; h: number; shape: 'rect' | 'ellipse'; dim: number; feather: number; start_ms: number; end_ms: number | null};
 export type Redact = {x: number; y: number; w: number; h: number; mode: 'blur' | 'pixelate'; strength: number; start_ms: number; end_ms: number | null};
 export type Leak = {amount: number; speed: number; color: 'warm' | 'cool' | 'rainbow'};
@@ -66,6 +68,10 @@ const SHAKE: Shake = {amount: 40, speed: 50, impact: false};
 const SPOT: Spot = {x: 50, y: 50, w: 40, h: 50, shape: 'ellipse', dim: 65, feather: 40, start_ms: 0, end_ms: null};
 const REDACT: Redact = {x: 50, y: 50, w: 20, h: 20, mode: 'blur', strength: 70, start_ms: 0, end_ms: null};
 const LEAK: Leak = {amount: 50, speed: 40, color: 'warm'};
+const FLARE: Flare = {x: 78, y: 22, color: '#FFB060', blend: 'screen', amount: 70, drift: 0};
+const WIGGLE: Wiggle = {amount: 40, speed: 40, size: 50};
+/** Suggested amount/speed when a shake preset is picked (the sliders still apply). */
+const SHAKE_PRESETS: Record<NonNullable<Shake['preset']>, Partial<Shake>> = {custom: {}, handheld: {amount: 35, speed: 40}, walk: {amount: 45, speed: 45}, run: {amount: 65, speed: 60}, impact: {amount: 70, speed: 60}};
 const TONE: Tone = {shadow: '#1E5A8C', highlight: '#F2A541', amount: 40, balance: 0};
 
 function Row({label, value, min, max, step = 1, unit = '', onChange, disabled}: {label: string; value: number; min: number; max: number; step?: number; unit?: string; onChange: (v: number) => void; disabled: boolean}) {
@@ -120,13 +126,14 @@ function StopLabelInput({index, value, onCommit}: {index: number; value: string;
 export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEditing, onRouteEditing, onAddMedia, liveAnnotations, vertical}: {scene: Scene; disabled: boolean; onDraft: (look: Look) => void;
   liveRoute?: RouteFx | null; routeEditing?: boolean; onRouteEditing?: (on: boolean) => void; onAddMedia?: () => void; liveAnnotations?: Annotation[]; vertical?: boolean}) {
   const look = (scene.look_json || {}) as any;
-  const pick = (l: any) => ({countdown: l.countdown || null, annotations: l.annotations || [], shake: l.shake || null, spotlight: l.spotlight || null, redact: l.redact || [], leak: l.leak || null, tone: l.tone || null, wheels: l.wheels || null, layout: l.layout || null, parallax: l.parallax || null});
+  const pick = (l: any) => ({countdown: l.countdown || null, annotations: l.annotations || [], shake: l.shake || null, spotlight: l.spotlight || null, redact: l.redact || [], leak: l.leak || null, flare: l.flare || null, wiggle: l.wiggle || null, tone: l.tone || null, wheels: l.wheels || null, layout: l.layout || null, parallax: l.parallax || null});
   const [st, setSt] = useState(pick(look));
   useEffect(() => {setSt(pick((scene.look_json || {}) as any));}, [scene.id]);
   const route: RouteFx | null = liveRoute === undefined ? (look.route || null) : liveRoute;
   const videoOrImages = scene.shots.length;
   const put = (key: string, value: any) => {setSt(s => ({...s, [key]: value})); onDraft({[key]: value === null || (Array.isArray(value) && !value.length) ? null : value} as any);};
   const {shake, spotlight: sp, redact, leak, tone, wheels, layout, parallax: plx} = st;
+  const flare: Flare | null = (st as any).flare, wiggle: Wiggle | null = (st as any).wiggle;
   // The live list (shared with the on-picture handles) wins, so dragging and sliders never overwrite each other.
   const annots: Annotation[] = liveAnnotations ?? ((st as any).annotations || []);
   const setAnnot = (i: number, p: Partial<Annotation>) => put('annotations', annots.map((a, k) => k === i ? {...a, ...p} : a));
@@ -226,6 +233,7 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
     </Section>
     <Section title="Camera shake" Icon={Vibrate} on={!!shake} onToggle={on => put('shake', on ? {...SHAKE} : null)} disabled={disabled} hint="Handheld wobble for tension or action, with an optional impact zoom at the start. Render to see it.">
       {shake && <>
+        <Pills<NonNullable<Shake['preset']>> label="Shake style" value={shake.preset || 'custom'} options={[['custom', 'Custom'], ['handheld', 'Handheld (subtle)'], ['walk', 'Walking'], ['run', 'Running'], ['impact', 'Impact hit']]} onChange={preset => put('shake', {...shake, ...SHAKE_PRESETS[preset], preset})} disabled={disabled}/>
         <Row label="Shake" value={shake.amount} min={0} max={100} unit="%" onChange={amount => put('shake', {...shake, amount})} disabled={disabled}/>
         <Row label="Speed" value={shake.speed} min={0} max={100} unit="%" onChange={speed => put('shake', {...shake, speed})} disabled={disabled}/>
         <label className="switch-label finishing-toggle"><input type="checkbox" aria-label="Impact zoom" checked={shake.impact} disabled={disabled} onChange={e => put('shake', {...shake, impact: e.target.checked})}/> Impact zoom at the start</label>
@@ -249,6 +257,23 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
         <button className="text-btn" disabled={disabled} onClick={() => put('redact', redact.filter((_: Redact, k: number) => k !== i))}><Trash2 size={12}/> Remove area {i + 1}</button>
       </fieldset>)}
       {redact.length > 0 && redact.length < 6 && <button className="text-btn" disabled={disabled} onClick={() => put('redact', [...redact, {...REDACT, x: Math.min(90, 50 + redact.length * 8)}])}><Plus size={12}/> Add another area</button>}
+    </Section>
+    <Section title="Lens flare" Icon={Sun} on={!!flare} onToggle={on => put('flare', on ? {...FLARE} : null)} disabled={disabled} hint="A procedurally drawn lens flare (glow, streak and ghosts) blended over the picture. Generated by SceneForge, not a photo or AI. Render to see it.">
+      {flare && <>
+        <Row label="Flare left–right" value={flare.x} min={0} max={100} unit="%" onChange={x => put('flare', {...flare, x})} disabled={disabled}/>
+        <Row label="Flare up–down" value={flare.y} min={0} max={100} unit="%" onChange={y => put('flare', {...flare, y})} disabled={disabled}/>
+        <div className="adjust-row changed"><label>Tint</label><input type="color" aria-label="Lens flare colour" value={flare.color} disabled={disabled} onChange={e => put('flare', {...flare, color: e.target.value.toUpperCase()})}/><span/><span/></div>
+        <Pills label="Blend" value={flare.blend} options={[['screen', 'Screen'], ['add', 'Add (brighter)']]} onChange={blend => put('flare', {...flare, blend})} disabled={disabled}/>
+        <Row label="Flare intensity" value={flare.amount} min={0} max={100} unit="%" onChange={amount => put('flare', {...flare, amount})} disabled={disabled}/>
+        <Row label="Horizontal drift" value={flare.drift} min={0} max={100} unit="%" onChange={drift => put('flare', {...flare, drift})} disabled={disabled}/>
+      </>}
+    </Section>
+    <Section title="Wiggle (turbulent displace)" Icon={Blend} on={!!wiggle} onToggle={on => put('wiggle', on ? {...WIGGLE} : null)} disabled={disabled} hint="Warps the picture with slowly moving waves, like heat haze or a dream sequence (FFmpeg displace). Render to see it.">
+      {wiggle && <>
+        <Row label="Wiggle amount" value={wiggle.amount} min={0} max={100} unit="%" onChange={amount => put('wiggle', {...wiggle, amount})} disabled={disabled}/>
+        <Row label="Wiggle speed" value={wiggle.speed} min={0} max={100} unit="%" onChange={speed => put('wiggle', {...wiggle, speed})} disabled={disabled}/>
+        <Row label="Wave size" value={wiggle.size} min={0} max={100} unit="%" onChange={size => put('wiggle', {...wiggle, size})} disabled={disabled}/>
+      </>}
     </Section>
     <Section title="Light leaks" Icon={Sun} on={!!leak} onToggle={on => put('leak', on ? {...LEAK} : null)} disabled={disabled} hint="Soft coloured light drifting in from the edges, like old film or a vintage lens.">
       {leak && <>
@@ -297,6 +322,8 @@ export function SceneFxPreview({look, shots = [], filter, aspect = 16 / 9}: {loo
     {sp && sp.shape === 'ellipse' && <div className="fx-layer" style={{background: hole}}/>}
     {sp && sp.shape === 'rect' && <div className="fx-spot-rect" style={{left: `${sp.x - sp.w / 2}%`, top: `${sp.y - sp.h / 2}%`, width: `${sp.w}%`, height: `${sp.h}%`, boxShadow: `0 0 ${sp.feather / 4}cqw ${sp.feather / 8}cqw rgba(0,0,0,${sp.dim / 100}), 0 0 0 200cqw rgba(0,0,0,${sp.dim / 100})`}}/>}
     {redact.map((r, i) => <div key={i} className="fx-redact" style={{left: `${r.x - r.w / 2}%`, top: `${r.y - r.h / 2}%`, width: `${r.w}%`, height: `${r.h}%`, backdropFilter: `blur(${r.mode === 'pixelate' ? 3 : 2 + r.strength / 8}px)`}}/>)}
+    {look.flare && look.flare.amount > 0 && <div className="fx-layer" style={{mixBlendMode: 'screen', opacity: look.flare.amount / 100,
+      background: `radial-gradient(circle at ${look.flare.x}% ${look.flare.y}%, rgba(255,255,255,.95) 0, ${look.flare.color}cc 2%, ${look.flare.color}33 12%, transparent 30%)`}}/>}
     {leak && leak.amount > 0 && <div className="fx-layer fx-leak" style={{opacity: 0.2 + 0.6 * leak.amount / 100, animationDuration: `${12 - 9 * leak.speed / 100}s`,
       background: `radial-gradient(40% 70% at 0% 40%, rgba(${leakColors[leak.color][0]},0.9), transparent 70%), radial-gradient(35% 60% at 100% 70%, rgba(${leakColors[leak.color][1]},0.8), transparent 70%)`}}/>}
   </div>;

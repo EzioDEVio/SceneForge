@@ -1,3 +1,52 @@
+# SceneForge Studio 0.7.0 RC6 (unreleased)
+
+RC6 builds on RC5 and lives on the same local branch, `claude/0.7.0-rc5-timeline`. It fixes the issues found in the RC5 Windows test and adds an FFmpeg-rendered effects pack. The effects are procedural, not AI. No paid or live provider call was made.
+
+## Fixes from the RC5 Windows test
+- **Delete only the part you cut.** The timeline now tracks whether you last worked in the audio lanes or on the scenes.
+  - After cutting an audio clip, **Delete** removes only the selected piece and never the scene's video.
+  - **Shift+Delete** ripple-deletes the piece.
+  - Ctrl+C, Ctrl+X, Ctrl+V and Ctrl+D copy, cut, paste and duplicate audio clips.
+  - Scissors split whichever lane you are working in.
+- **Right-click menus on the timeline.**
+  - Audio clips (A3–A8): split at playhead, cut, copy, paste at playhead, duplicate, mute, move to another track, delete (keeps the video), ripple delete.
+  - Scenes: split at playhead, duplicate, copy, paste, paste copied audio at the scene start, ripple delete.
+  - Narration (A1): **Move narration to timeline audio** (so it can be cut), and remove narration while keeping the video.
+  - Video sound (A2): **Detach clip sound to timeline audio**, and mute clip sound.
+  - All of these can be undone.
+- **Scene render includes timeline audio and music.** A rendered scene now plays with the A3–A8 clips and the music bed that sit under it, respecting track mute and solo.
+  - The mix is cached and rebuilt when the render, the scene's position or the project audio changes.
+  - The rendered scene file itself stays clean, so **Render full video** still mixes each clip exactly once.
+- **Local Whisper.**
+  - Model downloads use plain HTTPS; the Xet transfer client is turned off.
+  - A half-downloaded model is cleared and downloaded again automatically.
+  - PCs without fast int8 support fall back to float32.
+  - The error now says where the model goes and why it failed.
+  - New **Check local captions** panel under Auto captions: checks the engine, VAD, model folder and download, and can re-download the model.
+  - The packaged-app CI check now fails if the Whisper engine cannot load in the installed build.
+- **Chatterbox and Kokoro.**
+  - The installer now includes the voice-service files.
+  - **Start Chatterbox** and **Start Kokoro** buttons appear in Audio → Voice & narration. They detect whether Docker Desktop is missing, stopped or in Windows-containers mode, show a live start log, and connect automatically once the engine answers.
+  - The Chatterbox image pins `chatterbox-tts==0.1.7` and installs CPU-only PyTorch, which avoids several GB of CUDA downloads.
+
+## Effects pack (FFmpeg, procedural)
+- **Camera shake presets:** handheld, walk, run and impact.
+- **Lens flare:** position, tint, Screen or Add blending, amount and drift.
+- **Wiggle:** turbulent displace.
+- **Lens and film effects:** focus blur, tilt-shift, mosaic, and an RGB split amount.
+- **Film grades:** halation, 2383-style print, tungsten night and cross-process.
+- **Text reveals:** from the right, upward, downward, and split from the centre.
+- **Sticker and overlay loop motion:** float, bob and pendulum.
+- **Speed ramps:** ease-in, ease-out, bullet time, and a custom 3–5 point curve, with optional smooth slow motion using FFmpeg frame interpolation (renders more slowly).
+- **Fit music to video length:** re-edits the music around its beats. The original is kept.
+- **Dialogue cleanup:** a voice effect (noise reduction, not AI voice isolation).
+
+## Deferred (need model and licensing work)
+AI subject cutout, AI-generated text textures, AI voice isolation, and a node-based compositor.
+
+## CI
+The Release workflow now also builds branches named `claude/0.7.0-*` automatically on push. It still creates GitHub Releases only for `v*` tags. The build ID is now `v0.7.0-rc6`.
+
 # SceneForge Studio 0.7.0 RC5 (unreleased)
 
 RC5 builds on RC4 commit `3d6107a` and is committed locally on `claude/0.7.0-rc5-timeline`. It has not been pushed, tagged or published. The public release remains 0.5.3. No live ComfyUI, Google Veo, Runway or other paid provider call was made for RC5.

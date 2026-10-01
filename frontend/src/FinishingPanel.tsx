@@ -13,6 +13,7 @@ export function FinishingPanel({project, disabled, onChanged,selectedClipId,onSe
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [syncing, setSyncing] = useState(false);
+  const [fitting, setFitting] = useState(false);
   const file = useRef<HTMLInputElement>(null);
   const clipFile = useRef<HTMLInputElement>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>();
@@ -81,6 +82,16 @@ export function FinishingPanel({project, disabled, onChanged,selectedClipId,onSe
         <label className="control-label">Fade out · {(m.fade_out_ms / 1000).toFixed(1)} s<input aria-label="Music fade out" type="range" min={0} max={10000} step={500} value={m.fade_out_ms} disabled={disabled} onChange={e => save({...fin, music: {...m, fade_out_ms: Number(e.target.value)}})}/></label>
       </div>
       <p className="hint">The music loops to the length of the video and gets quieter automatically whenever someone is speaking.</p>
+      <button className="btn" disabled={disabled || fitting} onClick={async () => {
+        setFitting(true); setError('');
+        try {
+          const fitted = await api.musicFit(project.id, m.asset_id);
+          setTracks(t => [...t, fitted]);
+          save({...fin, music: {...m, asset_id: fitted.id}}, true);
+          setStatus(`Music re-edited to ${((fitted.duration_ms || 0) / 1000).toFixed(1)} s on the beat · original kept in the list`);
+        } catch (e: any) {setError(e.message || 'Could not fit the music.');} finally {setFitting(false);}
+      }}>{fitting ? 'Re-editing on the beat…' : 'Fit music to video length'}</button>
+      <p className="hint">Beat-aware re-edit (not AI): removes or repeats whole bars on the beat with short crossfades and ends with a fade-out. Saves a new copy and switches the music bed to it; the original file is unchanged.</p>
       <button className="btn" disabled={disabled || syncing} onClick={async () => {setSyncing(true); setError(''); try {const r = await api.beatSync(project.id); setStatus(`${r.bpm} BPM · ${r.scenes_changed} cut${r.scenes_changed === 1 ? '' : 's'} moved onto the beat${r.scenes_kept ? ` · ${r.scenes_kept} narrated scene${r.scenes_kept === 1 ? '' : 's'} kept` : ''}`); await onChanged();} catch (e: any) {setError(e.message || 'Beat sync failed.');} finally {setSyncing(false);}}}>{syncing ? 'Finding the beat…' : 'Sync scene cuts to the beat'}</button>
       <p className="hint">Changes fixed-length scenes so each cut lands on a beat. Scenes that follow their narration keep their length.</p>
     </>}

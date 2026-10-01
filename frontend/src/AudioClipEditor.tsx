@@ -153,7 +153,7 @@ export function AudioClipEditor({scene, take, disabled, onChanged, onRemove}: Pr
         <input aria-label="Fade out" type="range" min={0} max={Math.min(10000, Math.max(0, clipMs - edit.fade_in_ms))} step={100} value={edit.fade_out_ms} disabled={disabled} onChange={e => change({fade_out_ms: Number(e.target.value)})}/></label>
     </div>
     <label className="control-label">Voice effect<select aria-label="Voice effect" value={edit.voice_fx || 'none'} disabled={disabled} onChange={e => change({voice_fx: e.target.value})}>
-      <option value="none">None</option><option value="clean">Clean up (less noise, even level)</option><option value="radio">1940s radio / newsreel</option><option value="telephone">Telephone</option>
+      <option value="none">None</option><option value="clean">Clean up (less noise, even level)</option><option value="dialogue">Dialogue cleanup (noise reduction — not AI voice isolation)</option><option value="radio">1940s radio / newsreel</option><option value="telephone">Telephone</option>
     </select></label>
     {error && <p className="form-error" role="alert">{error}</p>}
     <div className="button-row audio-actions">

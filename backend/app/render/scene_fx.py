@@ -1,12 +1,17 @@
 """Scene-level effects, applied over the whole scene picture (all shots),
 together with picture-in-picture overlays and before captions:
 
-  redact regions (blur / pixelate) -> overlays -> spotlight -> light leaks -> camera shake
+  redact regions (blur / pixelate) -> overlays -> spotlight -> light leaks
+  -> lens flare -> wiggle (turbulent displace) -> camera shake
 
 Keeping them at scene level means their timing is in scene time, even when a
 scene has several images or clips. Settings live in scene.look_json:
 
-  shake     {amount 0-100, speed 0-100, impact bool}
+  shake     {amount 0-100, speed 0-100, impact bool,
+             preset custom|handheld|walk|run|impact}
+  flare     {x, y (% of frame, flare source), color #RRGGBB, blend screen|add,
+             amount 0-100, drift 0-100 (horizontal drift across the scene)}
+  wiggle    {amount 0-100, speed 0-100, size 0-100}  (turbulent displace)
   spotlight {x, y, w, h (% of frame, centre and size), shape rect|ellipse,
              dim 0-100, feather 0-100, start_ms, end_ms|None}
   redact    [{x, y, w, h, mode blur|pixelate, strength 0-100, start_ms, end_ms|None}]  (max 6)
@@ -17,6 +22,7 @@ scene has several images or clips. Settings live in scene.look_json:
 from __future__ import annotations
 
 import hashlib
+import math
 import os
 import re
 import subprocess
@@ -64,11 +70,38 @@ def _only(d, allowed: set, name: str) -> dict:
     return d
 
 
+SHAKE_PRESETS = ("custom", "handheld", "walk", "run", "impact")
+
+
 def clean_shake(d) -> dict:
-    d = _only({"amount": 40, "speed": 50, "impact": False, **(d or {})}, {"amount", "speed", "impact"}, "Camera shake")
+    d = _only({"amount": 40, "speed": 50, "impact": False, "preset": "custom", **(d or {})}, {"amount", "speed", "impact", "preset"}, "Camera shake")
     if not isinstance(d["impact"], bool):
         raise SceneFxError("Camera shake impact must be true or false.")
-    return {"amount": int(_num(d, "amount", 0, 100, "Camera shake")), "speed": int(_num(d, "speed", 0, 100, "Camera shake")), "impact": d["impact"]}
+    if d["preset"] not in SHAKE_PRESETS:
+        raise SceneFxError("Camera shake preset must be one of: " + ", ".join(SHAKE_PRESETS) + ".")
+    out = {"amount": int(_num(d, "amount", 0, 100, "Camera shake")), "speed": int(_num(d, "speed", 0, 100, "Camera shake")), "impact": d["impact"]}
+    if d["preset"] != "custom":
+        out["preset"] = d["preset"]
+    return out
+
+
+FLARE_DEFAULT = {"x": 78, "y": 22, "color": "#FFB060", "blend": "screen", "amount": 70, "drift": 0}
+
+
+def clean_flare(d) -> dict:
+    d = _only({**FLARE_DEFAULT, **(d or {})}, set(FLARE_DEFAULT), "Lens flare")
+    if not isinstance(d["color"], str) or not _HEX.fullmatch(d["color"]):
+        raise SceneFxError("Lens flare colour must look like #RRGGBB.")
+    if d["blend"] not in ("screen", "add"):
+        raise SceneFxError("Lens flare blend must be screen or add.")
+    return {"x": round(float(_num(d, "x", 0, 100, "Lens flare")), 1), "y": round(float(_num(d, "y", 0, 100, "Lens flare")), 1),
+            "color": d["color"].upper(), "blend": d["blend"], "amount": int(_num(d, "amount", 0, 100, "Lens flare")),
+            "drift": int(_num(d, "drift", 0, 100, "Lens flare"))}
+
+
+def clean_wiggle(d) -> dict:
+    d = _only({"amount": 40, "speed": 40, "size": 50, **(d or {})}, {"amount", "speed", "size"}, "Wiggle")
+    return {k: int(_num(d, k, 0, 100, "Wiggle")) for k in ("amount", "speed", "size")}
 
 
 SPOT_DEFAULT = {"x": 50, "y": 50, "w": 40, "h": 50, "shape": "ellipse", "dim": 65, "feather": 40, "start_ms": 0, "end_ms": None}
@@ -128,12 +161,14 @@ def clean_wheels(d) -> dict:
     return out
 
 
-CLEANERS = {"wheels": clean_wheels, "shake": clean_shake, "spotlight": clean_spotlight, "redact": clean_redact, "leak": clean_leak, "tone": clean_tone}
+CLEANERS = {"wheels": clean_wheels, "shake": clean_shake, "spotlight": clean_spotlight, "redact": clean_redact, "leak": clean_leak, "tone": clean_tone,
+            "flare": clean_flare, "wiggle": clean_wiggle}
 
 
 def has_scene_fx(look: dict | None) -> bool:
     look = look or {}
-    return bool(look.get("shake") or look.get("spotlight") or look.get("redact") or look.get("leak") or look.get("route") or look.get("annotations"))
+    return bool(look.get("shake") or look.get("spotlight") or look.get("redact") or look.get("leak") or look.get("route") or look.get("annotations")
+                or look.get("flare") or look.get("wiggle"))
 
 
 # --------------------------------------------------------------------------
@@ -203,6 +238,42 @@ def leak_clip(color: str, speed: int, cache: Path, fps: int = 15, seconds: int =
         return str(out)
 
 
+def flare_png(fl: dict, w: int, h: int, cache: Path) -> tuple[str, int]:
+    """Procedural lens flare on black (for screen/add blending): hot core,
+    soft halo, anamorphic streak, a thin ring and ghosts along the line from
+    the source through the frame centre. When drifting, the canvas is wider
+    than the frame by the drift distance on each side. Returns (png, drift px)."""
+    from PIL import Image
+    drift = int(round(fl["drift"] / 100 * 0.25 * w))
+    key = hashlib.sha256(f"v1|{w}x{h}|{fl['x']}|{fl['y']}|{fl['color']}|{drift}".encode()).hexdigest()[:20]
+    cache.mkdir(parents=True, exist_ok=True)
+    out = cache / f"flare_{key}.png"
+    if out.exists():
+        return str(out), drift
+    cw = w + 2 * drift
+    yy, xx = np.mgrid[0:h, 0:cw].astype(np.float32)
+    sx, sy = drift + fl["x"] / 100 * w, fl["y"] / 100 * h
+    cx, cy = drift + w / 2, h / 2
+    tint = np.array([int(fl["color"][i:i + 2], 16) for i in (1, 3, 5)], np.float32) / 255
+    u = w / 1920
+    r2 = (xx - sx) ** 2 + (yy - sy) ** 2
+    img = np.zeros((h, cw, 3), np.float32)
+    core = np.exp(-r2 / (2 * (28 * u) ** 2))
+    halo = np.exp(-r2 / (2 * (230 * u) ** 2)) * 0.45
+    streak = np.exp(-((yy - sy) ** 2) / (2 * (5 * u) ** 2)) * np.exp(-np.abs(xx - sx) / (620 * u)) * 0.8
+    ring = np.exp(-((np.sqrt(r2) - 150 * u) ** 2) / (2 * (5 * u) ** 2)) * 0.18
+    img += core[..., None] * (0.65 + 0.35 * tint)          # nearly white hot centre
+    img += (halo + streak + ring)[..., None] * tint
+    for k, rad, a in ((0.45, 40, 0.20), (1.25, 22, 0.28), (1.6, 70, 0.12), (2.1, 110, 0.10)):
+        gx, gy = sx + k * (cx - sx), sy + k * (cy - sy)
+        d = np.sqrt((xx - gx) ** 2 + (yy - gy) ** 2)
+        disc = np.clip((rad * u - d) / (rad * u * 0.35), 0, 1) * a
+        hue = np.roll(tint, int(k * 2)) * 0.6 + tint * 0.4     # ghosts shift colour a little
+        img += disc[..., None] * hue
+    Image.fromarray((np.clip(img, 0, 1) * 255).astype(np.uint8), "RGB").save(out)
+    return str(out), drift
+
+
 # --------------------------------------------------------------------------
 # Filter graph pieces (all operate on a labelled stream, return new label)
 # --------------------------------------------------------------------------
@@ -251,17 +322,79 @@ def leak_graph(base: str, lk: dict, clip: str, w: int, h: int, fps: int) -> tupl
 
 def shake_graph(base: str, sk: dict, w: int, h: int, fps: int) -> tuple[list[str], str]:
     """Handheld-style shake (layered sines at different rates) and an optional
-    impact zoom that punches in at the start and settles."""
+    impact zoom that punches in at the start and settles.
+
+    Presets change the character of the motion; amount and speed still scale it:
+      handheld  slow, soft drift (subtle)
+      walk      sway plus a vertical bob on each footstep (~1.8 steps/s)
+      run       faster, bigger footstep bob plus high-frequency jitter
+      impact    violent shake that decays over ~1 s, with the zoom punch"""
     a = sk["amount"] / 100
     spd = 0.4 + 2.2 * sk["speed"] / 100
-    margin = 1.04 + 0.06 * a
+    preset = sk.get("preset", "custom")
     ax, ay = w * 0.012 * a, h * 0.016 * a
-    impact = "+0.14*exp(-it*5)" if sk["impact"] else ""
+    impact = "+0.14*exp(-it*5)" if sk["impact"] or preset == "impact" else ""
+    if preset == "handheld":
+        ax, ay, spd = ax * 0.6, ay * 0.6, spd * 0.35
     dx = f"{ax:.2f}*(sin(it*{7.3 * spd:.3f})+0.6*sin(it*{17.9 * spd:.3f}+1.3)+0.3*sin(it*{31.1 * spd:.3f}))"
     dy = f"{ay:.2f}*(sin(it*{5.9 * spd:.3f}+0.7)+0.6*sin(it*{13.7 * spd:.3f}+2.1)+0.3*sin(it*{27.3 * spd:.3f}))"
+    peak_x, peak_y = ax * 1.9, ay * 1.9
+    if preset in ("walk", "run"):
+        step = (1.8 if preset == "walk" else 2.9) * (0.5 + spd / 2.6)       # footsteps per second
+        big = 1.0 if preset == "walk" else 1.9
+        bx, by = ax * 0.5 * big, ay * 1.6 * big
+        dx = f"{bx:.2f}*sin(it*{math.pi * step:.3f})+{ax * 0.25:.2f}*sin(it*{11.3 * spd:.3f}+0.4)"
+        dy = f"{by:.2f}*(abs(sin(it*{math.pi * step:.3f}))-0.64)+{ay * 0.25:.2f}*sin(it*{9.1 * spd:.3f}+1.1)"
+        if preset == "run":
+            dx += f"+{ax * 0.35:.2f}*sin(it*{41.0 * spd:.3f})"
+            dy += f"+{ay * 0.35:.2f}*sin(it*{37.0 * spd:.3f}+0.5)"
+        peak_x, peak_y = bx + ax * 0.6, by * 0.64 + ay * 0.6
+    elif preset == "impact":
+        env = "(0.25+2.6*exp(-it*3.2))"
+        dx = f"{env}*{ax:.2f}*(sin(it*{23.0 * spd:.3f})+0.5*sin(it*{41.0 * spd:.3f}+1.3))"
+        dy = f"{env}*{ay:.2f}*(sin(it*{19.0 * spd:.3f}+0.7)+0.5*sin(it*{37.0 * spd:.3f}+2.1))"
+        peak_x, peak_y = ax * 2.85 * 1.5, ay * 2.85 * 1.5
+    # zoom in just enough that the moving window never leaves the picture
+    margin = max(1.04 + 0.06 * a, 1 + 2.1 * max(peak_x / w, peak_y / h))
     graph = [f"[{base}]zoompan=z='{margin:.3f}{impact}':d=1:s={w}x{h}:fps={fps}:"
              f"x='iw/2-(iw/zoom/2)+({dx})/zoom':y='ih/2-(ih/zoom/2)+({dy})/zoom'[shk]"]
     return graph, "shk"
+
+
+def flare_graph(base: str, fl: dict, png: str, drift: int, w: int, h: int, fps: int, dur: float) -> tuple[list[str], str]:
+    """Blend the flare over the picture (FFmpeg blend screen / addition).
+    With drift, a frame-sized window slides across the wider flare canvas so
+    the flare travels horizontally over the scene."""
+    from app.render.ffmpeg_utils import escape_path_for_filter
+    crop = f",crop={w}:{h}:x='{2 * drift}*clip(t/{max(dur, 0.1):.3f},0,1)':y=0" if drift else ""
+    mode = "addition" if fl["blend"] == "add" else "screen"
+    graph = [f"movie='{escape_path_for_filter(png)}':loop=0,setpts=N/({fps}*TB){crop},format=gbrp[flc]",
+             f"[{base}]format=gbrp[flb]",
+             f"[flb][flc]blend=all_mode={mode}:all_opacity={fl['amount'] / 100:.3f}:shortest=1,format=yuv420p[flare]"]
+    return graph, "flare"
+
+
+def wiggle_graph(base: str, wg: dict, w: int, h: int, fps: int, dur: float) -> tuple[list[str], str]:
+    """Turbulent displace: two smooth animated noise fields (sums of moving
+    sine waves, computed on a small grid with geq and scaled up) drive
+    FFmpeg's displace filter. Map value 128 = no shift; value-128 = pixels."""
+    amp = wg["amount"] / 100 * 0.02 * w                      # max shift in px
+    omega = 2 * math.pi * (0.15 + 1.6 * wg["speed"] / 100)
+    waves = 1.5 + 5.0 * (1 - wg["size"] / 100)               # waves across the frame (bigger size = broader)
+    gw, gh = 96, 54
+    kx, ky = 2 * math.pi * waves / gw, 2 * math.pi * waves / gw
+
+    def field(p: float) -> str:
+        return (f"128+{amp * 0.62:.2f}*sin(X*{kx:.4f}+T*{omega:.3f}+{p})*cos(Y*{ky * 0.8:.4f}-T*{omega * 0.7:.3f}+{p * 1.7:.2f})"
+                f"+{amp * 0.38:.2f}*sin((X*0.6+Y)*{kx * 2.3:.4f}-T*{omega * 1.6:.3f}+{p * 0.5:.2f})")
+
+    graph = []
+    for lab, p in (("wgx", 0.0), ("wgy", 2.1)):
+        e = field(p)
+        graph.append(f"nullsrc=s={gw}x{gh}:r={fps}:d={dur + 1:.3f},format=gbrp,geq=r='{e}':g='{e}':b='{e}',"
+                     f"scale={w}:{h}:flags=bicubic,format=gbrp[{lab}]")
+    graph += [f"[{base}]format=gbrp[wgb]", "[wgb][wgx][wgy]displace=edge=smear,format=yuv420p[wig]"]
+    return graph, "wig"
 
 
 def _wrap(fn):
@@ -290,3 +423,7 @@ def _clean_countdown(raw):
 
 
 CLEANERS['countdown'] = _clean_countdown
+
+from app.render.filters import clean_focus, clean_mosaic, clean_rgbsplit  # noqa: E402
+
+CLEANERS.update(focus=_wrap(clean_focus), mosaic=_wrap(clean_mosaic), rgbsplit=_wrap(clean_rgbsplit))

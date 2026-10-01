@@ -87,7 +87,7 @@ export type FontSettings = {
 };
 
 /** Must match BUILD_ID in backend/app/main.py. */
-export const BUILD_ID = "v0.7.0-rc5";
+export const BUILD_ID = "v0.7.0-rc6";
 
 export type Adjust = Partial<Record<'exposure'|'contrast'|'highlights'|'shadows'|'temperature'|'tint'|'saturation'|'vibrance'|'sharpen'|'vignette'|'grain', number>>;
 export type Look = {
@@ -95,11 +95,18 @@ export type Look = {
   adjust?: Adjust | null;
   lut?: {asset_id: string; strength: number} | null;
   film?: FilmLook | null;
+  /** rc6 pack parameters (see backend render/filters.py + scene_fx.py). */
+  focus?: {size: number; blur: number; x: number; y: number} | null;
+  mosaic?: {block: number} | null;
+  rgbsplit?: {amount: number} | null;
+  flare?: {x: number; y: number; color: string; blend: 'screen' | 'add'; amount: number; drift: number} | null;
+  wiggle?: {amount: number; speed: number; size: number} | null;
 };
 export type Overlay = {id: string; asset_id: string; kind?: 'media'|'sticker'; x: number; y: number; width: number; rotation: number; opacity: number;
   radius: number; border: number; border_color: string; shadow: number; start_ms: number; end_ms: number | null;
   anim_in: 'none' | 'fade' | 'slide_left' | 'slide_up' | 'zoom'; anim_out: 'none' | 'fade' | 'slide_left' | 'slide_up' | 'zoom'; anim_ms: number;
-  x2?: number | null; y2?: number | null; chroma?: string | null; chroma_similarity?: number; feather?: number};
+  x2?: number | null; y2?: number | null; chroma?: string | null; chroma_similarity?: number; feather?: number;
+  loop?: 'none' | 'float' | 'pendulum' | 'bob'; loop_amount?: number; loop_period_ms?: number};
 export type ProjectAudioClip = {id: string; asset_id: string; name: string; start_ms: number; source_in_ms: number; source_out_ms: number; source_duration_ms: number; volume: number; fade_in_ms: number; fade_out_ms: number; mute: boolean; track?: import('./timeline/timeline.types').AudioTrackId};
 export type Finishing = {music?: {asset_id: string; volume: number; duck: number; fade_in_ms: number; fade_out_ms: number} | null; audio_clips?: ProjectAudioClip[]; loudnorm?: boolean; leader?: boolean; timeline?: import('./timeline/timeline.types').TimelineSettings};
 export type FilmLook = {scratches: number; dust: number; flicker: number; weave: number; sound: number; fps: 0 | 16 | 18 | 24; tone: 'color' | 'faded' | 'sepia' | 'bw'};
@@ -258,6 +265,8 @@ export const api = {
       method: "POST",
       body: JSON.stringify({ text, voice }),
     }),
+  detachAudio: (sceneId: string, body: {source: 'narration' | 'shot'; shot_id?: string; duration_ms?: number}) =>
+    req<{asset: Asset; offset_ms: number}>(`/api/scenes/${sceneId}/detach-audio`, {method: 'POST', body: JSON.stringify(body)}),
   clearNarration: (sceneId: string) => req(`/api/scenes/${sceneId}/voice-takes/clear-selection`, {method: "POST"}),
   editTake: (takeId: string, edit: AudioEdit) => req<VoiceTake>(`/api/voice-takes/${takeId}/edit`, {method: "PATCH", body: JSON.stringify(edit)}),
   waveform: (assetId: string, points = 600) => req<Waveform>(`/api/assets/${assetId}/waveform?points=${points}`),
@@ -281,7 +290,10 @@ export const api = {
 
   getAsset: (assetId: string) => req<Asset>(`/api/assets/${assetId}`),
   restoreAsset: (assetId: string) => req<Asset>(`/api/assets/${assetId}/restore`, {method: 'POST'}),
+  musicFit: (projectId: string, assetId: string, targetMs?: number) => req<Asset>(`/api/projects/${projectId}/music-fit`, {method: 'POST', body: JSON.stringify(targetMs ? {asset_id: assetId, target_ms: Math.round(targetMs)} : {asset_id: assetId})}),
   beatSync: (projectId: string) => req<{bpm: number; beats: number[]; scenes_changed: number; scenes_kept: number}>(`/api/projects/${projectId}/beat-sync`, {method: 'POST'}),
+  /** Rendered scene with the timeline audio (A3–A8) and music under it; `v` refreshes the cached mix. */
+  scenePreviewUrl: (sceneId: string, v: string) => `/api/scenes/${sceneId}/preview-media?v=${encodeURIComponent(v)}`,
   assetStreamUrl: (assetId: string) => `/api/assets/${assetId}/stream`,
   assetThumbUrl: (assetId: string, width = 320, timeMs = 0) => `/api/assets/${assetId}/thumbnail?w=${width}${timeMs > 0 ? `&time_ms=${Math.round(timeMs)}` : ''}`,
   gradedFrameUrl: (sceneId: string, key: string, width = 1280, shotId?: string) => `/api/scenes/${sceneId}/graded-frame?w=${width}&k=${key}${shotId ? `&shot_id=${shotId}` : ''}`,
@@ -289,6 +301,10 @@ export const api = {
 
   health: () => req<{status:string;build?:string;credential_warning?:string}>("/api/health"),
   closeStatus:()=>req<{ready:boolean}>("/api/close-status"),
+  whisperCheck: () => req<{ok: boolean; model_dir: string; checks: {name: string; ok: boolean; detail: string}[]}>(`/api/local-speech/whisper/check`),
+  whisperReset: () => req<{removed: boolean; message: string}>(`/api/local-speech/whisper/reset`, {method: "POST"}),
+  localEngineStatus: (engine: string) => req<{engine: string; reachable: boolean; state: string; docker: string; message: string; log: string; services_bundled: boolean}>(`/api/local-speech/${engine}/status`),
+  startLocalEngine: (engine: string) => req<{state: string}>(`/api/local-speech/${engine}/start`, {method: "POST"}),
   connectLocalSpeech: (engine:string) => req<{profile:ProviderProfile;voices:string[];message:string}>(`/api/local-speech/${engine}/connect`, {method:"POST"}),
   imageHistory: (sceneId:string) => req<{id:string;prompt:string;provider:string}[]>(`/api/scenes/${sceneId}/image-history`),
   providerVoices: (id:string) => req<{voices:VoiceOption[]}>(`/api/providers/profile/${id}/voices`),

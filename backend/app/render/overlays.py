@@ -19,24 +19,37 @@ Overlay fields (all validated by clean_overlays):
   start_ms, end_ms   visible span within the scene (end None = scene end)
   anim_in, anim_out  none | fade | slide_left | slide_up | zoom
   anim_ms            animation length
+  loop               none | float | pendulum | bob  (continuous idle motion)
+  loop_amount        0..100 (float/bob: up to 6 % of frame height; pendulum: up to 25 degrees)
+  loop_period_ms     300..10000, one full cycle
+    float    = sine drift on y plus a smaller, slower sine on x
+    bob      = sine on y only
+    pendulum = rotation oscillation (FFmpeg rotate with a t expression). The
+               pivot is the top centre of the card: the rotation happens about
+               the card centre and the overlay position is shifted per frame so
+               the top-centre point stays put. The card box includes its shadow
+               padding, so the pivot is approximate by that margin.
 """
 from __future__ import annotations
 
 import hashlib
+import math
 import re
 from pathlib import Path
 
 ANIMS = ("none", "fade", "slide_left", "slide_up", "zoom")
+LOOPS = ("none", "float", "pendulum", "bob")
 DEFAULT_OVERLAY = {
     "asset_id": None, "kind": "media", "x": 72.0, "y": 30.0, "width": 34.0, "rotation": 0, "opacity": 100,
     "radius": 6, "border": 6, "border_color": "#FFFFFF", "shadow": 60,
     "start_ms": 0, "end_ms": None, "anim_in": "fade", "anim_out": "fade", "anim_ms": 600,
     # extras: glide to an end position over the overlay's time, green screen, soft edges
     "x2": None, "y2": None, "chroma": None, "chroma_similarity": 30, "feather": 0,
+    "loop": "none", "loop_amount": 30, "loop_period_ms": 2000,
 }
 _RANGES = {"x": (-50, 150), "y": (-50, 150), "width": (3, 100), "rotation": (-180, 180), "opacity": (0, 100),
            "radius": (0, 50), "border": (0, 40), "shadow": (0, 100), "start_ms": (0, 3_600_000), "anim_ms": (0, 5000),
-           "chroma_similarity": (1, 100), "feather": (0, 100)}
+           "chroma_similarity": (1, 100), "feather": (0, 100), "loop_amount": (0, 100), "loop_period_ms": (300, 10000)}
 MAX_OVERLAYS = 8
 
 
@@ -80,8 +93,10 @@ def clean_overlays(raw, project_id: str, db) -> list[dict]:
         for key in ("anim_in", "anim_out"):
             if o[key] not in ANIMS:
                 raise OverlayError(f"Overlay {i + 1}: animation must be one of: {', '.join(ANIMS)}.")
+        if o["loop"] not in LOOPS:
+            raise OverlayError(f"Overlay {i + 1}: loop motion must be one of: {', '.join(LOOPS)}.")
         o["id"] = str(item.get("id") or f"ov{i}")[:40]
-        for key in ("rotation", "opacity", "radius", "border", "shadow", "start_ms", "anim_ms", "chroma_similarity", "feather"):
+        for key in ("rotation", "opacity", "radius", "border", "shadow", "start_ms", "anim_ms", "chroma_similarity", "feather", "loop_amount", "loop_period_ms"):
             o[key] = int(round(o[key]))
         for key in ("x", "y", "width"):
             o[key] = round(float(o[key]), 2)
@@ -172,7 +187,17 @@ def build_overlay_pass(overlays: list[dict], assets: dict, frame_w: int, frame_h
                  f"[{b}:v]format=rgba[b{n}]",
                  f"[b{n}][cm{n}]overlay=x={pad + border}:y={pad + border}:format=auto"]
         post = []
-        if o["rotation"]:
+        loop = o.get("loop", "none")
+        amt = o.get("loop_amount", 30) / 100
+        period = max(0.3, o.get("loop_period_ms", 2000) / 1000)
+        card_h = ch + 2 * (pad + border)
+        swing = ""
+        if loop == "pendulum" and amt > 0:
+            # angle in radians (clockwise positive), static rotation + oscillation
+            base_a = o["rotation"] * math.pi / 180
+            swing = f"({base_a:.5f}+{amt * 25 * math.pi / 180:.5f}*sin(2*PI*t/{period:.3f}))"
+            post.append(f"rotate=a='{swing}':c=none:ow='hypot(iw,ih)':oh='hypot(iw,ih)'")
+        elif o["rotation"]:
             post.append(f"rotate=a={o['rotation']}*PI/180:c=none:ow=rotw({o['rotation']}*PI/180):oh=roth({o['rotation']}*PI/180)")
         if o["opacity"] < 100:
             post.append(f"colorchannelmixer=aa={o['opacity'] / 100:.3f}")
@@ -199,6 +224,18 @@ def build_overlay_pass(overlays: list[dict], assets: dict, frame_w: int, frame_h
             ex = frame_w * (o["x2"] if o.get("x2") is not None else o["x"]) / 100
             ey = frame_h * (o["y2"] if o.get("y2") is not None else o["y"]) / 100
             dx, dy = f"{ex - cx:.1f}*{glide}", f"{ey - cy:.1f}*{glide}"
+        if loop in ("float", "bob") and amt > 0:
+            ay = frame_h * 0.06 * amt
+            dy = f"({dy})+{ay:.1f}*sin(2*PI*t/{period:.3f})"
+            if loop == "float":
+                dx = f"({dx})+{ay * 0.4:.1f}*sin(PI*t/{period:.3f}+0.8)"
+        if swing:
+            # keep the card's top centre fixed: shift = v - R(theta)v for v = (0, -card_h/2),
+            # minus the same shift at rest so the card sits where it was placed.
+            base_a = o["rotation"] * math.pi / 180
+            half = card_h / 2
+            dx = f"({dx})-{half:.1f}*(sin({swing})-{math.sin(base_a):.5f})"
+            dy = f"({dy})+{half:.1f}*(cos({swing})-{math.cos(base_a):.5f})"
         dist_x, dist_y = frame_w * 0.35, frame_h * 0.35
         if o["anim_in"] == "slide_left":
             dx = f"({dx})+{dist_x:.1f}*(1-{p_in})"

@@ -18,6 +18,11 @@ from threading import Lock
 from app.security.secrets import reveal
 
 TIMEOUT = (10, 300)
+# Plain HTTPS model downloads: the Xet transfer backend is a separate native client
+# that proxies/antivirus on Windows often block, and symlinks need Developer Mode.
+os.environ.setdefault("HF_HUB_DISABLE_XET", "1")
+os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
+WHISPER_MODEL = "base"
 _LOCAL_LOCK = Lock()
 _LOCAL_MODEL = None
 
@@ -51,6 +56,76 @@ def _normalize_local_audio(path: str, work_dir: str) -> str:
     return str(target)
 
 
+def model_dir() -> Path:
+    return Path(os.environ.get("SCENEFORGE_MODEL_DIR", Path.home() / ".sceneforge" / "models" / "whisper"))
+
+
+def _load_local_model(WhisperModel):
+    """Load (downloading once) the local model, recovering from the usual Windows failures:
+    a half-downloaded cache from an interrupted first run, and CPUs or builds without int8."""
+    folder = model_dir()
+    folder.mkdir(parents=True, exist_ok=True)
+    errors = []
+    for attempt in ("int8", "reset", "float32"):
+        if attempt == "reset":
+            # A partial snapshot keeps failing forever; clear it and download again.
+            reset_model_cache()
+            folder.mkdir(parents=True, exist_ok=True)
+        try:
+            return WhisperModel(WHISPER_MODEL, device="cpu", compute_type="float32" if attempt == "float32" else "int8",
+                                download_root=str(folder))
+        except Exception as e:  # noqa: BLE001 - reported to the user below
+            errors.append(f"{attempt}: {type(e).__name__}: {e}")
+    raise TranscribeError("Could not download or start the local Whisper model. SceneForge needs internet access once "
+                          f"to download it (about 145 MB) into {folder}. Details: " + " | ".join(errors)[-900:])
+
+
+def reset_model_cache() -> bool:
+    """Delete the downloaded local Whisper model so the next caption run downloads it again."""
+    import shutil
+    global _LOCAL_MODEL
+    _LOCAL_MODEL = None
+    folder = model_dir()
+    if folder.exists():
+        shutil.rmtree(folder, ignore_errors=True)
+        return True
+    return False
+
+
+def diagnose() -> dict:
+    """What local captions need, checked without downloading anything."""
+    report: dict = {"model": WHISPER_MODEL, "model_dir": str(model_dir()), "checks": []}
+    def add(name, ok, detail=""):
+        report["checks"].append({"name": name, "ok": bool(ok), "detail": str(detail)[:400]})
+    try:
+        import ctranslate2
+        add("CTranslate2 engine", True, f"version {ctranslate2.__version__}; CPU compute types: {', '.join(sorted(ctranslate2.get_supported_compute_types('cpu')))}")
+    except Exception as e:  # noqa: BLE001
+        add("CTranslate2 engine", False, f"{type(e).__name__}: {e}. On Windows this usually means the Microsoft Visual C++ Redistributable (x64) is missing.")
+    try:
+        import faster_whisper
+        vad = Path(faster_whisper.__file__).parent / "assets"
+        add("Faster-Whisper", True, f"version {getattr(faster_whisper, '__version__', '?')}; VAD model {'present' if any(vad.glob('*.onnx')) else 'missing'}")
+    except Exception as e:  # noqa: BLE001
+        add("Faster-Whisper", False, f"{type(e).__name__}: {e}")
+    try:
+        import onnxruntime
+        add("Voice activity detection (onnxruntime)", True, f"version {onnxruntime.__version__}")
+    except Exception as e:  # noqa: BLE001
+        add("Voice activity detection (onnxruntime)", False, f"{type(e).__name__}: {e} (captions still work without it)")
+    folder = model_dir()
+    cached = any(folder.rglob("model.bin")) if folder.exists() else False
+    add("Model downloaded", cached, str(folder) if cached else f"Not yet. The first caption run downloads it into {folder}.")
+    try:
+        folder.mkdir(parents=True, exist_ok=True)
+        probe = folder / ".write-test"; probe.write_text("ok"); probe.unlink()
+        add("Model folder writable", True, str(folder))
+    except Exception as e:  # noqa: BLE001
+        add("Model folder writable", False, f"{e}")
+    report["ok"] = all(c["ok"] for c in report["checks"] if c["name"] in ("CTranslate2 engine", "Faster-Whisper", "Model folder writable"))
+    return report
+
+
 def _local(path: str, language: str | None) -> dict:
     """Run CPU int8 Whisper. The small multilingual model is fetched once and cached."""
     global _LOCAL_MODEL
@@ -61,12 +136,7 @@ def _local(path: str, language: str | None) -> dict:
     if _LOCAL_MODEL is None:
         with _LOCAL_LOCK:
             if _LOCAL_MODEL is None:
-                model_dir = Path(os.environ.get("SCENEFORGE_MODEL_DIR", Path.home() / ".sceneforge" / "models" / "whisper"))
-                model_dir.mkdir(parents=True, exist_ok=True)
-                try:
-                    _LOCAL_MODEL = WhisperModel("base", device="cpu", compute_type="int8", download_root=str(model_dir))
-                except Exception as e:
-                    raise TranscribeError(f"Could not download or start the local Whisper model: {e}") from e
+                _LOCAL_MODEL = _load_local_model(WhisperModel)
     # Normalize both video-extracted audio and narration uploads before local
     # inference. Quiet embedded dialogue and stereo/downmixed sources otherwise
     # behave differently from cloud transcription, even with a manual language.

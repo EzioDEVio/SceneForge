@@ -99,6 +99,14 @@ class EffectPreset(str, Enum):
     MONO_BLUE = "mono_blue"
     CHROMATIC_SPLIT = "chromatic_split"
     MOTION_TRAIL = "motion_trail"
+    # rc6 effects pack (FFmpeg filters, not AI)
+    FOCUS_BLUR = "focus_blur"
+    TILT_SHIFT = "tilt_shift"
+    MOSAIC = "mosaic"
+    HALATION = "halation"
+    PRINT_2383 = "print_2383"
+    TUNGSTEN_NIGHT = "tungsten_night"
+    CROSS_PROCESS = "cross_process"
 
 
 class TransitionType(str, Enum):

@@ -89,6 +89,13 @@ try:
     voice = step("upload narration", 15, lambda: request("POST", f"/api/scenes/{sid}/voice-takes/upload", files=("voice.wav", open(wav, "rb").read(), "audio/wav")))
     step("audio waveform", 15, lambda: request("GET", f"/api/assets/{voice['audio_asset']['id']}/waveform?points=300"))
     step("provider list", 5, lambda: request("GET", "/api/providers"))
+    def whisper_engine():
+        report = request("GET", "/api/local-speech/whisper/check")
+        bad = [f"{c['name']}: {c['detail']}" for c in report["checks"] if not c["ok"] and c["name"] in ("CTranslate2 engine", "Faster-Whisper", "Model folder writable")]
+        if bad:
+            raise AssertionError("Local Whisper cannot load in this build: " + "; ".join(bad))
+        return report
+    step("local Whisper engine loads in the packaged backend (no model download)", 30, whisper_engine)
     step("local image engine settings", 5, lambda: request("GET", "/api/local-image-settings"))
     step("add overlay + old film", 5, lambda: request("PATCH", f"/api/scenes/{sid}", {"timing_mode": "fixed", "requested_duration_ms": 3000,
          "overlays": [{"asset_id": asset["id"], "x": 70, "y": 30, "width": 30}],

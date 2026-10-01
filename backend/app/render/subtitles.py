@@ -147,6 +147,35 @@ def _entrance_tags(anim: str, a: int) -> str:
     }.get(anim, "")
 
 
+_REVEAL_MASKS = ('reveal-right', 'reveal-up', 'reveal-down', 'reveal-split')
+
+
+def _reveal_mask(animation: str, layer: dict, x: float, y: float, canvas_w: int, canvas_h: int, anim_ms: int) -> str:
+    """Rectangular wipe masks with ASS \\clip: the clip rectangle animates
+    across an estimate of the text's box during the entrance, then snaps to
+    the whole canvas so text outside the estimate is never cut off.
+    reveal-right = wipe from the right edge, reveal-up = from the bottom
+    upwards, reveal-down = from the top downwards, reveal-split = opens from
+    the centre outwards. Straight wipes only (no rotation)."""
+    size = float(layer.get('size', 64))
+    lines = str(layer.get('text', '')).split('\n') or ['']
+    tw = min(canvas_w, max(len(line) for line in lines) * size * 0.55 + size * 0.5)
+    th = min(canvas_h, len(lines) * size * 1.3 + size * 0.4)
+    align = layer.get('align', 'center')
+    x1 = x if align == 'left' else x - tw if align == 'right' else x - tw / 2
+    x1, x2 = max(0, x1), min(canvas_w, x1 + tw)
+    y1, y2 = max(0, y - th / 2), min(canvas_h, y + th / 2)
+    W, H = canvas_w, canvas_h
+    start, end = {
+        'reveal-right': ((x2, 0, W, H), (x1, 0, W, H)),
+        'reveal-up': ((0, y2, W, H), (0, y1, W, H)),
+        'reveal-down': ((0, 0, W, y1), (0, 0, W, y2)),
+        'reveal-split': (((x1 + x2) / 2, 0, (x1 + x2) / 2, H), (x1, 0, x2, H)),
+    }[animation]
+    c = lambda r: r'\clip(%d,%d,%d,%d)' % tuple(int(round(v)) for v in r)
+    return c(start) + r'\t(0,%d,%s)\t(%d,%d,%s)' % (anim_ms, c(end), anim_ms, anim_ms + 1, c((0, 0, W, H)))
+
+
 def write_ass_file(
     scene_id: str,
     text: str,
@@ -418,6 +447,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         if animation=='zoom': extra += r'\fscx30\fscy30\t(0,%d,\fscx100\fscy100)' % anim_ms
         if animation=='blur': extra += r'\blur12\t(0,%d,\blur0)' % anim_ms
         if animation=='reveal': extra += r'\clip(0,0,0,%d)\t(0,%d,\clip(0,0,%d,%d))' % (canvas_h,anim_ms,canvas_w,canvas_h)
+        if animation in _REVEAL_MASKS: extra += _reveal_mask(animation, layer, x, y, canvas_w, canvas_h, anim_ms)
         if animation=='glitch':
             extra += r'\fscx130\fax0.2\t(0,%d,\fscx85\fax-0.2)\t(%d,%d,\fscx100\fax0)' % (anim_ms//2,anim_ms//2,anim_ms)
         a = anim_ms

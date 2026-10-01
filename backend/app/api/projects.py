@@ -243,3 +243,60 @@ def beat_sync(project_id: str, db: Session = Depends(get_db)):
     project.revision += 1
     db.commit()
     return {"bpm": bpm, "beats": beats[:2000], "scenes_changed": changed, "scenes_kept": sum(not f for f in fixed)}
+
+
+@router.post("/{project_id}/music-fit", response_model=schemas.AssetOut)
+def music_fit(project_id: str, body: dict | None = None, db: Session = Depends(get_db)):
+    """Beat-aware re-edit of a music track to a target length (default: the
+    project's length). Removes or repeats whole bars on the beat grid with
+    short crossfades and ends with a fade-out. Creates a NEW audio asset; the
+    original file is untouched. Rule-based editing, not AI."""
+    import hashlib
+    import uuid
+    from pathlib import Path
+    from app.config import MEDIA_DIR, RENDERS_DIR
+    from app.db.models import Asset
+    from app.domain.constants import AssetOrigin, AssetType
+    from app.render.beats import detect_beats
+    from app.render.ffmpeg_utils import probe
+    from app.render.music_fit import MusicFitError, render_fit
+    project = db.get(Project, project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+    body = body or {}
+    if not isinstance(body, dict) or set(body) - {"asset_id", "target_ms"}:
+        raise HTTPException(400, "Music fit takes asset_id and target_ms.")
+    asset = db.get(Asset, body.get("asset_id")) if isinstance(body.get("asset_id"), str) else None
+    if not asset or asset.type != "audio" or asset.project_id != project_id:
+        raise HTTPException(400, "Choose a music file from this project.")
+    target = body.get("target_ms")
+    if target is None:
+        target = sum(scene_duration_ms(s) for s in project.scenes if s.shots)
+    if isinstance(target, bool) or not isinstance(target, (int, float)) or not 2000 <= target <= 4 * 3600 * 1000:
+        raise HTTPException(400, "Target length must be between 2 seconds and 4 hours (add scenes first if the video is empty).")
+    src = str(Path(RENDERS_DIR if asset.origin == "render_output" else MEDIA_DIR) / asset.storage_key)
+    dur_ms = asset.duration_ms or probe(src).duration_ms
+    if not dur_ms:
+        raise HTTPException(422, "The length of this music file could not be read.")
+    try:
+        bpm, beats = detect_beats(src)
+    except Exception:
+        raise HTTPException(422, "The music could not be analysed.")
+    if not beats:
+        raise HTTPException(422, "No steady beat was found in this music, so it cannot be re-edited on the beat.")
+    folder = Path(MEDIA_DIR) / project_id
+    folder.mkdir(parents=True, exist_ok=True)
+    out = folder / f"musicfit_{uuid.uuid4().hex[:10]}.wav"
+    try:
+        render_fit(src, str(out), dur_ms / 1000, target / 1000, beats)
+    except MusicFitError as e:
+        raise HTTPException(422, str(e))
+    stem = Path(asset.original_filename or "music").stem
+    new = Asset(project_id=project_id, type=AssetType.AUDIO, content_hash=hashlib.sha256(out.read_bytes()).hexdigest(),
+                storage_key=str(out.relative_to(MEDIA_DIR)), mime="audio/wav",
+                original_filename=f"{stem} (fit {target / 1000:.1f}s).wav", duration_ms=probe(str(out)).duration_ms or int(target),
+                origin=AssetOrigin.GENERATED, generation_metadata_json={"music_fit": {"source_asset_id": asset.id, "target_ms": int(target), "bpm": bpm}})
+    db.add(new)
+    db.commit()
+    db.refresh(new)
+    return new

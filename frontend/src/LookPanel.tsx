@@ -75,6 +75,15 @@ export function LookPanel({scene, disabled, onDraft, onSaveNow}: Props) {
   const lutFile = useRef<HTMLInputElement>(null);
   useEffect(() => {setFilm(scene.look_json?.film || null);}, [scene.id]);
   useEffect(() => {setAdjust(scene.look_json?.adjust || {}); setGlitch({speed: scene.look_json?.glitch?.speed ?? 1, block: scene.look_json?.glitch?.block ?? 'medium'});}, [scene.id]);
+  const [focus, setFocus] = useState(look.focus || {size: 40, blur: 50, x: 50, y: 50});
+  const [mosaic, setMosaic] = useState(look.mosaic || {block: 24});
+  const [rgb, setRgb] = useState(look.rgbsplit || {amount: 25});
+  useEffect(() => {const l = scene.look_json || {}; setFocus(l.focus || {size: 40, blur: 50, x: 50, y: 50}); setMosaic(l.mosaic || {block: 24}); setRgb(l.rgbsplit || {amount: 25});}, [scene.id]);
+  const packRow = (label: string, value: number, min: number, max: number, unit: string, onChange: (v: number) => void) =>
+    <div className="adjust-row changed"><label>{label}</label>
+      <input aria-label={label} type="range" min={min} max={max} value={value} disabled={disabled} onChange={e => onChange(Number(e.target.value))}/>
+      <input aria-label={`${label} value`} type="number" min={min} max={max} value={value} disabled={disabled} onChange={e => onChange(Math.max(min, Math.min(max, Math.round(Number(e.target.value) || min))))}/><span className="unit">{unit}</span></div>;
+  const setFocusOpt = (patch: Partial<typeof focus>) => {const next = {...focus, ...patch}; setFocus(next); onDraft({focus: next});};
   useEffect(() => {let live = true; api.listLuts(scene.project_id).then(l => {if (live) setLuts(l);}).catch(() => {}); return () => {live = false;};}, [scene.project_id]);
 
   function setOne(key: keyof Adjust, value: number) {
@@ -134,6 +143,25 @@ export function LookPanel({scene, disabled, onDraft, onSaveNow}: Props) {
       <div className="segmented" role="radiogroup" aria-label="Glitch block size">
         {BLOCKS.map(b => <button key={b.key} role="radio" aria-checked={glitch.block === b.key} className={glitch.block === b.key ? 'selected' : ''} disabled={disabled} onClick={() => setGlitchOpt({block: b.key})}>{b.label}</button>)}
       </div>
+    </section>}
+
+    {(scene.effect_preset === 'focus_blur' || scene.effect_preset === 'tilt_shift') && <section className="look-section" aria-label="Focus blur controls">
+      <h3><Zap size={15}/> {scene.effect_preset === 'tilt_shift' ? 'Tilt-shift' : 'Focus blur'}</h3>
+      <p className="hint">{scene.effect_preset === 'tilt_shift' ? 'A sharp horizontal band; everything above and below is blurred.' : 'A round sharp area; everything outside it is blurred.'} Render to see the exact result.</p>
+      {packRow('Sharp area', focus.size, 5, 95, '%', size => setFocusOpt({size}))}
+      {packRow('Blur', focus.blur, 1, 100, '%', blur => setFocusOpt({blur}))}
+      {scene.effect_preset === 'focus_blur' && packRow('Centre left–right', focus.x, 0, 100, '%', x => setFocusOpt({x}))}
+      {packRow('Centre up–down', focus.y, 0, 100, '%', y => setFocusOpt({y}))}
+    </section>}
+    {scene.effect_preset === 'mosaic' && <section className="look-section" aria-label="Mosaic controls">
+      <h3><Zap size={15}/> Mosaic</h3>
+      <p className="hint">Block size is in pixels at 1080p and scales with the video size.</p>
+      {packRow('Block size', mosaic.block, 2, 120, 'px', block => {const next = {block}; setMosaic(next); onDraft({mosaic: next});})}
+    </section>}
+    {scene.effect_preset === 'chromatic_split' && <section className="look-section" aria-label="RGB split controls">
+      <h3><Zap size={15}/> RGB split</h3>
+      <p className="hint">How far the red and blue channels are pushed apart (up to 40 px at 1080p).</p>
+      {packRow('Split amount', rgb.amount, 1, 100, '%', amount => {const next = {amount}; setRgb(next); onDraft({rgbsplit: next});})}
     </section>}
 
     <section className="look-section" aria-label="Old film">

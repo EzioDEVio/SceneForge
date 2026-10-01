@@ -225,6 +225,11 @@ def _apply_overlays(scene: Scene, project: Project, visual_path: str, total_ms: 
         g, base = fx.spotlight_graph(base, look["spotlight"], fx.spotlight_png(look["spotlight"], out_w, out_h, Path(PROXIES_DIR) / "scenefx"), fps, dur); graph_parts += g
     if look.get("leak") and look["leak"]["amount"] > 0:
         g, base = fx.leak_graph(base, look["leak"], fx.leak_clip(look["leak"]["color"], look["leak"]["speed"], Path(PROXIES_DIR) / "scenefx"), out_w, out_h, fps); graph_parts += g
+    if look.get("flare") and look["flare"]["amount"] > 0:
+        png, drift = fx.flare_png(look["flare"], out_w, out_h, Path(PROXIES_DIR) / "scenefx")
+        g, base = fx.flare_graph(base, look["flare"], png, drift, out_w, out_h, fps, dur); graph_parts += g
+    if look.get("wiggle") and look["wiggle"]["amount"] > 0:
+        g, base = fx.wiggle_graph(base, look["wiggle"], out_w, out_h, fps, dur); graph_parts += g
     if look.get("shake") and (look["shake"]["amount"] > 0 or look["shake"]["impact"]):
         g, base = fx.shake_graph(base, look["shake"], out_w, out_h, fps); graph_parts += g
     graph_parts.append(f"[{base}]format=yuv420p,setsar=1[vout]")

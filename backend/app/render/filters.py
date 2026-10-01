@@ -203,7 +203,105 @@ _EFFECT_FILTERS: dict[str, str] = {
     EffectPreset.CHROMATIC_SPLIT: "chromashift=cbh=10:crh=-10:edge=smear",
     # Blend adjacent frames for a soft movement trail, separate from color looks.
     EffectPreset.MOTION_TRAIL: "tmix=frames=4:weights='1 0.55 0.25 0.1'",
+    # Film-print style grades (named "-style": FFmpeg curve approximations,
+    # not measured emulations of any stock).
+    # 2383-style print: S-curve with rolled-off highlights, cool shadows,
+    # warm mids, slightly lower saturation.
+    EffectPreset.PRINT_2383: ("curves=r='0/0 0.25/0.20 0.5/0.53 0.75/0.81 1/0.96':g='0/0 0.25/0.21 0.5/0.50 0.75/0.78 1/0.95':"
+                              "b='0/0.03 0.25/0.25 0.5/0.48 0.75/0.72 1/0.90',eq=saturation=0.9:contrast=1.04"),
+    # Tungsten night: blue-cyan cast, lower exposure, deeper blacks.
+    EffectPreset.TUNGSTEN_NIGHT: ("curves=r='0/0 0.25/0.14 0.5/0.36 0.75/0.62 1/0.88':g='0/0 0.25/0.18 0.5/0.42 0.75/0.68 1/0.93':"
+                                  "b='0/0.04 0.25/0.28 0.5/0.55 0.75/0.79 1/1',eq=contrast=1.06:saturation=0.85"),
+    # Cross-processed slide film: crunchy contrast, yellow-green highlights, blue shadows.
+    EffectPreset.CROSS_PROCESS: ("curves=r='0/0 0.25/0.17 0.75/0.86 1/1':g='0/0 0.25/0.21 0.75/0.85 1/1':b='0/0.12 0.5/0.47 1/0.80',"
+                                 "eq=saturation=1.18:contrast=1.06"),
 }
+
+
+# ---------------------------------------------------------------------------
+# rc6 pack: focus blur / tilt-shift, mosaic, RGB split amount, halation.
+# Parameters live in scene.look_json (focus, mosaic, rgbsplit) and are
+# validated by the cleaners below (registered in scene_fx.CLEANERS).
+# ---------------------------------------------------------------------------
+FOCUS_DEFAULT = {"size": 40, "blur": 50, "x": 50, "y": 50}
+MOSAIC_DEFAULT = {"block": 24}
+RGBSPLIT_DEFAULT = {"amount": 25}
+
+
+def _num_param(d: dict, key: str, lo: float, hi: float, name: str) -> int:
+    v = d.get(key)
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or not lo <= v <= hi:
+        raise ValueError(f"{name} {key} must be between {lo} and {hi}.")
+    return int(round(v))
+
+
+def _only_params(d, defaults: dict, name: str) -> dict:
+    if not isinstance(d, dict) or set(d) - set(defaults):
+        raise ValueError(f"{name} settings may only contain: {', '.join(sorted(defaults))}.")
+    return {**defaults, **d}
+
+
+def clean_focus(d) -> dict:
+    """Focus blur / tilt-shift: size = sharp area (% of frame), blur 1-100,
+    x/y = centre of the sharp area (%; tilt-shift uses y only)."""
+    d = _only_params(d, FOCUS_DEFAULT, "Focus blur")
+    return {"size": _num_param(d, "size", 5, 95, "Focus blur"), "blur": _num_param(d, "blur", 1, 100, "Focus blur"),
+            "x": _num_param(d, "x", 0, 100, "Focus blur"), "y": _num_param(d, "y", 0, 100, "Focus blur")}
+
+
+def clean_mosaic(d) -> dict:
+    """Mosaic block size in pixels at 1080p (scaled with the render height)."""
+    d = _only_params(d, MOSAIC_DEFAULT, "Mosaic")
+    return {"block": _num_param(d, "block", 2, 120, "Mosaic")}
+
+
+def clean_rgbsplit(d) -> dict:
+    d = _only_params(d, RGBSPLIT_DEFAULT, "RGB split")
+    return {"amount": _num_param(d, "amount", 1, 100, "RGB split")}
+
+
+def build_focus_chain(focus: dict | None, width: int, height: int, tilt: bool) -> str:
+    """Sharp area in the middle, blurred outside: a blurred copy is laid over
+    the picture through a soft mask (computed on a 64x36 grid per frame, then
+    scaled up, so it costs almost nothing)."""
+    f = {**FOCUS_DEFAULT, **(focus or {})}
+    sigma = 1 + f["blur"] / 100 * width * 0.012
+    r0 = f["size"] / 100 * 0.5
+    feather = 0.12 + 0.18 * f["blur"] / 100
+    cy = f["y"] / 100
+    if tilt:
+        dist = f"abs(Y/H-{cy:.3f})"
+    else:
+        ar = width / max(1, height)
+        dist = f"hypot((X/W-{f['x'] / 100:.3f})*{ar:.4f},Y/H-{cy:.3f})"
+    alpha = f"255*clip(({dist}-{r0:.4f})/{feather:.4f},0,1)"
+    sat = ",eq=saturation=1.18:contrast=1.05" if tilt else ""
+    return (f"split=3[fcs][fcb][fcm];[fcb]gblur=sigma={sigma:.2f}{sat}[fcg];"
+            f"[fcm]scale=64:36,format=gray,geq=lum='{alpha}',scale={width}:{height}:flags=bicubic[fca];"
+            f"[fcg][fca]alphamerge[fcx];[fcs]{sat.lstrip(',') + ',' if sat else ''}format=yuv420p[fcy];"
+            f"[fcy][fcx]overlay=format=auto,format=yuv420p")
+
+
+def build_mosaic_chain(mosaic: dict | None, width: int, height: int) -> str:
+    block = max(2.0, (mosaic or MOSAIC_DEFAULT)["block"] * height / 1080)
+    bw, bh = max(2, int(round(width / block))), max(2, int(round(height / block)))
+    return f"scale={bw}:{bh}:flags=area,scale={width}:{height}:flags=neighbor"
+
+
+def build_rgbsplit_chain(rgb: dict | None, width: int) -> str:
+    px = max(1, int(round(rgb["amount"] / 100 * 40 * width / 1920)))
+    return f"rgbashift=rh={px}:bh=-{px}:edge=smear"
+
+
+def build_halation_chain(width: int) -> str:
+    """Highlight glow tinted red/orange, screen-blended (film halation look):
+    luminance above ~65 % is isolated, tinted, blurred and screened back."""
+    sigma = max(2.0, width * 0.012)
+    hi = "clip((val-165)*2.6,0,255)"
+    return ("format=gbrp,split[hlb][hlh];"
+            "[hlh]colorchannelmixer=rr=0.30:rg=0.59:rb=0.11:gr=0.30:gg=0.59:gb=0.11:br=0.30:bg=0.59:bb=0.11,"
+            f"lutrgb=r='{hi}':g='{hi}*0.38':b='{hi}*0.10',gblur=sigma={sigma:.2f}[hlg];"
+            "[hlb][hlg]blend=all_mode=screen:all_opacity=0.9,format=yuv420p")
 
 
 # ---------------------------------------------------------------------------
@@ -386,7 +484,8 @@ def build_grade_chain(grade_lut_path: str | None) -> str | None:
 
 
 
-def build_effect_chain(preset: str, intensity: int, glitch: dict | None = None, width: int = 1920) -> str | None:
+def build_effect_chain(preset: str, intensity: int, glitch: dict | None = None, width: int = 1920,
+                       look: dict | None = None, height: int | None = None) -> str | None:
     """Returns a filter fragment to append after label splitting, or None
     for 'original'/0 intensity (no-op — cheapest path, and Original always
     disables other looks per spec)."""
@@ -395,7 +494,18 @@ def build_effect_chain(preset: str, intensity: int, glitch: dict | None = None, 
     if preset == EffectPreset.GLITCH:
         g = glitch or {}
         return build_glitch_chain(intensity / 100, float(g.get("speed", 1.0)), str(g.get("block", "medium")), width)
-    effect = _EFFECT_FILTERS.get(preset)
+    look = look or {}
+    height = height or int(round(width * 9 / 16 / 2)) * 2
+    if preset in (EffectPreset.FOCUS_BLUR, EffectPreset.TILT_SHIFT):
+        effect = build_focus_chain(look.get("focus"), width, height, preset == EffectPreset.TILT_SHIFT)
+    elif preset == EffectPreset.MOSAIC:
+        effect = build_mosaic_chain(look.get("mosaic"), width, height)
+    elif preset == EffectPreset.HALATION:
+        effect = build_halation_chain(width)
+    elif preset == EffectPreset.CHROMATIC_SPLIT and look.get("rgbsplit"):
+        effect = build_rgbsplit_chain(look["rgbsplit"], width)
+    else:
+        effect = _EFFECT_FILTERS.get(preset)
     if not effect:
         return None
     if preset == EffectPreset.SOFT_GLOW:
@@ -459,7 +569,7 @@ def build_shot_video_chain(
     plan.easing = easing if easing in EASINGS else "ease_in_out"
     warning = overscan_warning(plan)
     look = look or {}
-    effect_chain = build_effect_chain(effect_preset, effect_intensity, look.get("glitch"), out_w)
+    effect_chain = build_effect_chain(effect_preset, effect_intensity, look.get("glitch"), out_w, look, out_h)
     primary, finishing = build_adjust_chain(look.get("adjust"))
     grade_chain = build_grade_chain(grade_lut_path)
 

@@ -352,3 +352,93 @@ def finish_export(export_path: str, project, cancel_check=None) -> str:
     run_ffmpeg([*inputs, "-filter_complex", ";".join(graph), *maps, "-c:a", "aac", "-b:a", "192k", "-ar", "48000",
                 "-movflags", "+faststart", out], cancel_check=cancel_check)
     return out
+
+
+# --------------------------------------------------------------------------
+# Scene preview mix: a rendered scene with the timeline audio (A3–A8) and the
+# music bed that play under it. The rendered part itself stays clean, because
+# full export mixes project audio once over the whole movie (no double mix).
+# --------------------------------------------------------------------------
+def scene_preview_plan(fin: dict, scene_start_ms: int, part_ms: int, project_ms: int) -> dict | None:
+    """What to mix into one scene render, in scene-relative time. None when nothing plays."""
+    fin = fin or {}
+    window_end = scene_start_ms + part_ms
+    clips = []
+    for clip in audible_clips(fin):
+        length = int(clip["source_out_ms"]) - int(clip["source_in_ms"])
+        rel = int(clip["start_ms"]) - scene_start_ms
+        if rel >= part_ms or rel + length <= 0:
+            continue
+        cut_head = max(0, -rel)
+        clips.append({"asset_id": clip["asset_id"], "name": clip.get("name"), "delay_ms": max(0, rel),
+                      "source_in_ms": int(clip["source_in_ms"]) + cut_head, "length_ms": length - cut_head,
+                      "volume": int(clip["volume"]),
+                      "fade_in_ms": 0 if cut_head else int(clip["fade_in_ms"]),
+                      "fade_out_ms": int(clip["fade_out_ms"]) if rel + length <= part_ms + 50 else 0})
+    music = fin.get("music")
+    music_plan = None
+    if music and window_end > 0:
+        fi, fo = music["fade_in_ms"], min(music["fade_out_ms"], project_ms // 2)
+        music_plan = {**music, "offset_ms": scene_start_ms,
+                      "fade_in_ms": max(0, fi - scene_start_ms),
+                      "fade_out_start_ms": project_ms - fo - scene_start_ms, "fade_out_ms": fo}
+    if not clips and not music_plan:
+        return None
+    return {"clips": clips, "music": music_plan, "part_ms": part_ms}
+
+
+def mix_scene_preview(part_path: str, plan: dict, out_path: str) -> str:
+    from app.db.database import SessionLocal
+    from app.db.models import Asset
+    part_s = plan["part_ms"] / 1000
+    inputs = ["-i", part_path]
+    graph = []
+    if probe(part_path).has_audio:
+        graph.append("[0:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo[main]")
+    else:
+        graph.append(f"anullsrc=r=48000:cl=stereo,atrim=duration={part_s:.3f}[main]")
+    label = "main"
+
+    def path_of(db, asset_id):
+        asset = db.get(Asset, asset_id)
+        if not asset:
+            raise FinishingError("A timeline audio file is missing. Remove it from the timeline and add it again.")
+        return str(Path(RENDERS_DIR if asset.origin == "render_output" else MEDIA_DIR) / asset.storage_key)
+
+    with SessionLocal() as db:
+        music = plan.get("music")
+        if music:
+            inputs += ["-stream_loop", "-1", "-ss", f"{music['offset_ms'] / 1000:.3f}", "-i", path_of(db, music["asset_id"])]
+            idx = inputs.count("-i") - 1
+            chain = [f"[{idx}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo",
+                     f"volume={music['volume'] / 100:.3f}", f"atrim=duration={part_s:.3f}"]
+            if music["fade_in_ms"]:
+                chain.append(f"afade=t=in:d={music['fade_in_ms'] / 1000:.3f}")
+            if music["fade_out_ms"] and music["fade_out_start_ms"] < plan["part_ms"]:
+                chain.append(f"afade=t=out:st={max(0, music['fade_out_start_ms']) / 1000:.3f}:d={music['fade_out_ms'] / 1000:.3f}")
+            if music["duck"]:
+                ratio = 2 + 18 * music["duck"] / 100
+                graph += ["[main]asplit=2[main1][side]", ",".join(chain) + "[mus]",
+                          f"[mus][side]sidechaincompress=threshold=0.015:ratio={ratio:.1f}:attack=40:release=600[musd]",
+                          "[main1][musd]amix=inputs=2:duration=first:normalize=0[mix]"]
+            else:
+                graph += [",".join(chain) + "[mus]", "[main][mus]amix=inputs=2:duration=first:normalize=0[mix]"]
+            label = "mix"
+        for i, clip in enumerate(plan["clips"]):
+            inputs += ["-i", path_of(db, clip["asset_id"])]
+            idx = inputs.count("-i") - 1
+            length = clip["length_ms"] / 1000
+            parts = [f"[{idx}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo",
+                     f"atrim=start={clip['source_in_ms'] / 1000:.3f}:duration={length:.3f}", "asetpts=PTS-STARTPTS",
+                     f"volume={clip['volume'] / 100:.3f}"]
+            if clip["fade_in_ms"]:
+                parts.append(f"afade=t=in:st=0:d={min(clip['fade_in_ms'] / 1000, length):.3f}")
+            if clip["fade_out_ms"]:
+                fo = min(clip["fade_out_ms"] / 1000, length)
+                parts.append(f"afade=t=out:st={max(0, length - fo):.3f}:d={fo:.3f}")
+            parts.append(f"adelay={clip['delay_ms']}|{clip['delay_ms']}")
+            graph += [",".join(parts) + f"[pc{i}]", f"[{label}][pc{i}]amix=inputs=2:duration=first:normalize=0[pm{i}]"]
+            label = f"pm{i}"
+    run_ffmpeg([*inputs, "-filter_complex", ";".join(graph), "-map", "0:v", "-map", f"[{label}]",
+                "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-movflags", "+faststart", out_path])
+    return out_path

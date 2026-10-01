@@ -1,3 +1,4 @@
+import {WhisperCheck} from './LocalServices';
 import React from 'react';
 import {Bold, Italic, Underline, Type, Palette, Square, Move, Rows3, Highlighter, Sparkles, Wand2} from 'lucide-react';
 import {api, type Scene} from './api';
@@ -235,5 +236,6 @@ export function AutoCaptions({scene, onDone, onStyle}: {scene: Scene; onDone: (s
     </div>
     {provider === 'local' && <p className="hint">Runs on this PC with no API key. The multilingual Whisper model downloads once on first use; after that, captions work offline.</p>}
     {msg && <p className="info-status" aria-live="polite">{msg}</p>}
+    {provider === 'local' && <WhisperCheck/>}
   </section>;
 }
