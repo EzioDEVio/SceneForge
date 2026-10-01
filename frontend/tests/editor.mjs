@@ -41,6 +41,8 @@ globalThis.fetch=async(path,init={})=>{
  else if(path==='/api/projects'&&method==='GET') result=[project];
  else if(path===`/api/projects/${project.id}`&&method==='GET') result=project;
  else if(/^\/api\/scenes\/[^/]+$/.test(path)&&method==='GET')result=project.scenes.find(s=>s.id===path.split('/').at(-1));
+ else if(path==='/api/cutout/status')result={folder:'',models:[{id:'isnet',label:'IS-Net',downloaded:false,approx_mb:170},{id:'u2netp',label:'U2',downloaded:true,approx_mb:4.6}]};
+ else if(path.endsWith('/textured-title')&&method==='POST')result={scene:project.scenes[0],asset:{id:'tt',type:'image',original_filename:'sticker-textured.png'}};
  else if(path.endsWith('/detach-audio')&&method==='POST')result={asset:{id:'detached-audio',type:'audio',original_filename:body.source==='shot'?'clip.mp4 sound.wav':'narration.wav',duration_ms:2000},offset_ms:body.source==='shot'?0:250};
  else if(path===`/api/projects/${project.id}`&&method==='PATCH'){Object.assign(project,body);if(body.finishing){project.finishing_json=body.finishing;delete project.finishing;}result=project;}
  else if(path===`/api/projects/${project.id}`&&method==='DELETE')result={ok:true};
@@ -455,6 +457,13 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await waitFor(()=>assert.ok(ovSave()?.some(o=>o.width===18&&o.asset_id.startsWith('up-'))));
  check('custom PNG sticker uploads to the project and is reusable from its sticker list',ovSave().some(o=>o.width===18&&o.asset_id.startsWith('up-')));
  await user.click(screen.getByRole('button',{name:/Delete overlay/}));await saved();
+ const ttButton=screen.getByRole('button',{name:'Add textured title'});
+ check('subject cutout and textured title tools appear in Overlays',!!screen.getByRole('region',{name:'Subject cutout'})&&!!screen.getByRole('combobox',{name:'Cutout model'})&&ttButton.disabled);
+ await user.type(screen.getByRole('textbox',{name:'Textured title text'}),'LAVA');
+ await user.selectOptions(screen.getByRole('combobox',{name:'Texture pattern'}),'neon');
+ await user.click(screen.getByRole('button',{name:'Add textured title'}));
+ await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/textured-title')&&r.body?.text==='LAVA'&&r.body?.texture?.preset==='neon')));
+ check('textured title sends the text and chosen pattern',true);
  await user.click(screen.getByRole('tab',{name:'Effects',exact:true}));
  await user.click(screen.getByRole('button',{name:'Original',exact:true}));await saved();
  const a3=screen.getByLabelText('Project audio timeline track');

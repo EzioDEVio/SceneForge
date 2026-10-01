@@ -188,14 +188,31 @@ def scene_preview_media(scene_id: str, db: Session = Depends(get_db)):
     folder = RENDERS_DIR / "scene_previews"
     folder.mkdir(parents=True, exist_ok=True)
     out = folder / f"{scene.id}_{key}.mp4"
-    if not out.exists():
-        for old in folder.glob(f"{scene.id}_*.mp4"):
-            old.unlink(missing_ok=True)
-        tmp = folder / f"{scene.id}_{key}.partial.mp4"
-        try:
-            finishing.mix_scene_preview(_resolve_asset_path(part), plan, str(tmp))
-            tmp.replace(out)
-        except finishing.FinishingError as e:
-            tmp.unlink(missing_ok=True)
-            raise HTTPException(400, str(e))
+    # One build per scene at a time: the player can request the same mix twice while a
+    # render finishes, and two writers on one file produced an unplayable (black) video.
+    with _preview_lock(scene.id):
+        if not out.exists():
+            import uuid as _uuid
+            tmp = folder / f"{scene.id}_{key}.{_uuid.uuid4().hex[:8]}.partial.mp4"
+            try:
+                finishing.mix_scene_preview(_resolve_asset_path(part), plan, str(tmp))
+                tmp.replace(out)
+            except finishing.FinishingError as e:
+                raise HTTPException(400, str(e))
+            finally:
+                tmp.unlink(missing_ok=True)
+            for stale in folder.glob(f"{scene.id}_*.mp4"):
+                if stale != out and ".partial." not in stale.name:
+                    try:
+                        stale.unlink()
+                    except OSError:
+                        pass  # still being streamed on Windows; removed next time
     return FileResponse(out, media_type="video/mp4")
+
+
+_PREVIEW_LOCKS: dict = {}
+
+
+def _preview_lock(scene_id: str):
+    import threading
+    return _PREVIEW_LOCKS.setdefault(scene_id, threading.Lock())

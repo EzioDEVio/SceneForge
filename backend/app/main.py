@@ -56,13 +56,15 @@ app.include_router(providers.router)
 app.include_router(images.router)
 app.include_router(local_speech.router)
 app.include_router(video_generation.router)
+from app.api import creative  # noqa: E402
+app.include_router(creative.router)
 
 
 # Must match BUILD_ID in frontend/src/api.ts. Bump on any API change so a
 # new interface connected to an old backend (e.g. a still-running old
 # start.bat window) shows "Backend update required" instead of silently
 # losing settings the old backend does not know.
-BUILD_ID = "v0.7.0-rc6"
+BUILD_ID = "v0.7.0-rc7"
 
 
 @app.get("/api/health")

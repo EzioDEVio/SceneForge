@@ -47,4 +47,6 @@ jobs:
             python tests/integration/test_local_transcribe.py
             python tests/integration/test_stale_jobs.py
             python tests/integration/test_rc6_timeline_audio.py
+            python tests/integration/test_cutout.py
+            python tests/integration/test_textured_title.py
           '

@@ -87,7 +87,7 @@ export type FontSettings = {
 };
 
 /** Must match BUILD_ID in backend/app/main.py. */
-export const BUILD_ID = "v0.7.0-rc6";
+export const BUILD_ID = "v0.7.0-rc7";
 
 export type Adjust = Partial<Record<'exposure'|'contrast'|'highlights'|'shadows'|'temperature'|'tint'|'saturation'|'vibrance'|'sharpen'|'vignette'|'grain', number>>;
 export type Look = {
@@ -301,6 +301,10 @@ export const api = {
 
   health: () => req<{status:string;build?:string;credential_warning?:string}>("/api/health"),
   closeStatus:()=>req<{ready:boolean}>("/api/close-status"),
+  cutoutStatus: () => req<{folder: string; models: {id: string; label: string; downloaded: boolean; approx_mb: number}[]}>(`/api/cutout/status`),
+  cutoutAsset: (assetId: string, body: {model?: string; edge?: string; feather?: number}) => req<Asset>(`/api/assets/${assetId}/cutout`, {method: "POST", body: JSON.stringify(body)}),
+  subjectLayer: (sceneId: string, body: {model?: string; edge?: string; feather?: number}) => req<{scene: Scene; notes: string[]}>(`/api/scenes/${sceneId}/subject-layer`, {method: "POST", body: JSON.stringify(body)}),
+  texturedTitle: (sceneId: string, body: Record<string, unknown>) => req<{scene: Scene; asset: Asset}>(`/api/scenes/${sceneId}/textured-title`, {method: "POST", body: JSON.stringify(body)}),
   whisperCheck: () => req<{ok: boolean; model_dir: string; checks: {name: string; ok: boolean; detail: string}[]}>(`/api/local-speech/whisper/check`),
   whisperReset: () => req<{removed: boolean; message: string}>(`/api/local-speech/whisper/reset`, {method: "POST"}),
   localEngineStatus: (engine: string) => req<{engine: string; reachable: boolean; state: string; docker: string; message: string; log: string; services_bundled: boolean}>(`/api/local-speech/${engine}/status`),

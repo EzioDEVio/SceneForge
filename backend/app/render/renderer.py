@@ -191,27 +191,51 @@ def render_scene_visual(
     return concat_out
 
 
-def _apply_overlays(scene: Scene, project: Project, visual_path: str, total_ms: int, work_dir, ctx: RenderContext) -> str:
-    """Composite picture-in-picture overlays onto the scene picture (before captions)."""
+def _overlay_assets(overlays: list[dict]) -> dict:
     from types import SimpleNamespace
-    from app.config import PROXIES_DIR
     from app.db.database import SessionLocal
-    from app.render.overlays import build_overlay_pass
-    out_w, out_h = _canvas(project)
     assets = {}
     with SessionLocal() as db:
-        for o in scene.overlays_json:
+        for o in overlays:
             a = db.get(Asset, o["asset_id"])
             if a is None or a.type not in ("image", "video"):
                 raise FFmpegError("An overlay's media file is missing. Choose it again in the Overlays tab.")
             assets[a.id] = SimpleNamespace(type=a.type, width=a.width, height=a.height, path=_resolve_asset_path(a))
+    return assets
+
+
+def _apply_overlays_above_text(scene: Scene, project: Project, final_path: str, total_ms: int, work_dir, ctx: RenderContext) -> str:
+    """Post-text pass: overlays flagged above_text (subject cutouts) are composited
+    over the captioned picture, so captions and titles sit behind the subject."""
+    from app.config import PROXIES_DIR
+    from app.render.overlays import build_overlay_pass
+    above = [o for o in scene.overlays_json or [] if o.get("above_text")]
+    if not above:
+        return final_path
+    out_w, out_h = _canvas(project)
+    inputs, graph = build_overlay_pass(above, _overlay_assets(above), out_w, out_h, project.fps, total_ms,
+                                       Path(PROXIES_DIR) / "overlays", base="0:v", first_input=1, final="ovt")
+    out = str(Path(work_dir) / "scene_above_text.mp4")
+    run_ffmpeg(["-i", final_path, *inputs, "-filter_complex", graph + ";[ovt]format=yuv420p,setsar=1[vout]", "-map", "[vout]",
+                "-map", "0:a?", "-t", f"{total_ms / 1000:.3f}", "-r", str(project.fps), "-pix_fmt", "yuv420p", "-c:v", "libx264",
+                "-preset", X264_PRESET, "-crf", X264_CRF, "-c:a", "copy", out], cancel_check=ctx.cancel_check)
+    return out
+
+
+def _apply_overlays(scene: Scene, project: Project, visual_path: str, total_ms: int, work_dir, ctx: RenderContext) -> str:
+    """Composite picture-in-picture overlays onto the scene picture (before captions)."""
+    from app.config import PROXIES_DIR
+    from app.render.overlays import build_overlay_pass
+    out_w, out_h = _canvas(project)
+    below = [o for o in scene.overlays_json or [] if not o.get("above_text")]
+    assets = _overlay_assets(below)
     from app.render import scene_fx as fx
     look, dur, fps = scene.look_json or {}, total_ms / 1000, project.fps
     graph_parts, base, inputs = [], "0:v", []
     if look.get("redact"):
         g, base = fx.redact_graph(base, look["redact"], out_w, out_h, dur); graph_parts += g
-    if scene.overlays_json:
-        inputs, og = build_overlay_pass(scene.overlays_json, assets, out_w, out_h, fps, total_ms, Path(PROXIES_DIR) / "overlays",
+    if below:
+        inputs, og = build_overlay_pass(below, assets, out_w, out_h, fps, total_ms, Path(PROXIES_DIR) / "overlays",
                                         base=base, first_input=1, final="ovl")
         graph_parts.append(og); base = "ovl"
     if look.get("route"):
@@ -546,7 +570,7 @@ def render_part(
             progress_cb("visual", 0)
         visual_path = render_scene_visual(scene, project, total_ms, ctx, work_dir, progress_cb)
         from app.render.scene_fx import has_scene_fx
-        if scene.overlays_json or has_scene_fx(scene.look_json):
+        if any(not o.get("above_text") for o in scene.overlays_json or []) or has_scene_fx(scene.look_json):
             visual_path = _apply_overlays(scene, project, visual_path, total_ms, work_dir, ctx)
         if progress_cb:
             progress_cb("captions_audio", 50)
@@ -561,6 +585,7 @@ def render_part(
         final_path = mux_audio_and_captions(
             scene, project, visual_path, total_ms, narration_path, lead_ms, work_dir, ctx, clip_audio_path=clip_path
         )
+        final_path = _apply_overlays_above_text(scene, project, final_path, total_ms, work_dir, ctx)
         film = (scene.look_json or {}).get("film")
         if film and int(film.get("sound", 0)) > 0:
             from app.render.finishing import add_projector_sound

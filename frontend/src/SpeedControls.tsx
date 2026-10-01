@@ -20,7 +20,7 @@ export function SpeedControls({shot, disabled, save}: {shot: Shot; disabled: boo
     <h3><Gauge size={15}/> Clip speed</h3>
     <label className="control-label">Speed · {sp.speed.toFixed(2)}×
       <input type="range" aria-label="Clip speed" min={0.25} max={4} step={0.05} value={sp.speed} disabled={disabled} onChange={e => setSp({...sp, speed: Number(e.target.value)})} onPointerUp={() => save(tidy(sp))} onKeyUp={() => save(tidy(sp))}/></label>
-    <div className="film-option"><span>Speed ramp</span><div className="segmented" role="radiogroup" aria-label="Speed ramp">
+    <div className="film-option"><span>Speed ramp</span><div className="segmented speed-ramp-options" role="radiogroup" aria-label="Speed ramp">
       {RAMP_OPTIONS.map(([v, l]) =>
         <button key={v} role="radio" aria-checked={sp.ramp === v} className={sp.ramp === v ? 'selected' : ''} disabled={disabled} onClick={() => set({ramp: v})}>{l}</button>)}
     </div></div>

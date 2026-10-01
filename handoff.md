@@ -12,6 +12,24 @@ This handoff preserves the earlier 0.5.3/0.6.0 review below and records the 0.7.
 
 Reviewed inputs in this workspace include the 0.5.3 source ZIP, the original 0.6.0 WIP ZIP, reviewed wip.2–wip.6 snapshots, their READMEs and handoffs, the SceneForge session handoff, chat notes, and the user screenshots. The 0.5.3 technical handoff predates the 0.5.3/0.6.0 work and should not be treated as a complete description of the present build.
 
+## 0.7.0 RC7: RC6 Windows test follow-up (2026-09-30)
+
+The user's RC6 test found three problems:
+- Local Whisper failed with `open() got an unexpected keyword argument 'metadata_errors'` (a PyAV change). Fixed by decoding the audio with FFmpeg and passing the samples to Whisper.
+- The first scene render showed a black screen. The renders were correct (verified by measuring frame brightness for halation, flare, wiggle, mosaic and shake); the player was the problem and is fixed.
+- The speed-ramp options were cramped. Fixed.
+
+Added: AI subject cutout and textured titles (see RELEASE_NOTES).
+
+Tests:
+- 245 component checks
+- 19 unit, 38 timeline, 2 video-generation and 6 share-dialog checks
+- 18 desktop checks
+- 25 integration scripts, including the new `test_cutout.py` (real U²-Net model, 25 checks) and `test_textured_title.py` (10 checks)
+- The packaged e2e test now runs real local Whisper and cutout.
+
+The next build should look at voice isolation and video cutout.
+
 ## 0.7.0 RC6: Windows test follow-up and effects pack (2026-09-30)
 
 The user tested the RC5 installer on Windows and reported five issues. Each is listed with its resolution:

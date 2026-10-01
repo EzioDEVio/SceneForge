@@ -126,6 +126,19 @@ def diagnose() -> dict:
     return report
 
 
+def _decode_pcm16k(path: str):
+    """Mono 16 kHz float32 samples via FFmpeg (no PyAV)."""
+    import numpy as np
+    from app.config import FFMPEG_BIN
+    flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0  # type: ignore[attr-defined]
+    proc = subprocess.run([FFMPEG_BIN, "-nostdin", "-hide_banner", "-loglevel", "error", "-i", path, "-map", "0:a:0",
+                           "-vn", "-ac", "1", "-ar", "16000", "-f", "s16le", "-acodec", "pcm_s16le", "-"],
+                          capture_output=True, timeout=600, creationflags=flags)
+    if proc.returncode != 0 or not proc.stdout:
+        raise TranscribeError("Local captions could not read the audio: " + proc.stderr.decode(errors="replace")[-300:])
+    return np.frombuffer(proc.stdout, np.int16).astype(np.float32) / 32768.0
+
+
 def _local(path: str, language: str | None) -> dict:
     """Run CPU int8 Whisper. The small multilingual model is fetched once and cached."""
     global _LOCAL_MODEL
@@ -149,8 +162,13 @@ def _local(path: str, language: str | None) -> dict:
             # is unavailable in a user's FFmpeg build.
             input_path = path
 
+        # Decode with SceneForge's own FFmpeg and hand Whisper the samples. Faster-Whisper's
+        # file decoder uses PyAV, whose newer releases rejected its arguments
+        # ("open() got an unexpected keyword argument 'metadata_errors'").
+        audio = _decode_pcm16k(input_path)
+
         def recognize(use_vad: bool) -> dict:
-            segments, info = _LOCAL_MODEL.transcribe(input_path, language=language or None,
+            segments, info = _LOCAL_MODEL.transcribe(audio, language=language or None,
                                                       word_timestamps=True, vad_filter=use_vad,
                                                       condition_on_previous_text=False)
             words = []

@@ -22,6 +22,8 @@ Overlay fields (all validated by clean_overlays):
   loop               none | float | pendulum | bob  (continuous idle motion)
   loop_amount        0..100 (float/bob: up to 6 % of frame height; pendulum: up to 25 degrees)
   loop_period_ms     300..10000, one full cycle
+  kind               media | sticker | subject (subject = AI cutout layer, see render/cutout.py)
+  above_text         true = composited after captions and titles (render_part's post-text pass)
     float    = sine drift on y plus a smaller, slower sine on x
     bob      = sine on y only
     pendulum = rotation oscillation (FFmpeg rotate with a t expression). The
@@ -46,7 +48,10 @@ DEFAULT_OVERLAY = {
     # extras: glide to an end position over the overlay's time, green screen, soft edges
     "x2": None, "y2": None, "chroma": None, "chroma_similarity": 30, "feather": 0,
     "loop": "none", "loop_amount": 30, "loop_period_ms": 2000,
+    # drawn after captions/titles (renderer.render_part); used by "text behind subject" cutouts
+    "above_text": False,
 }
+KINDS = ("media", "sticker", "subject")
 _RANGES = {"x": (-50, 150), "y": (-50, 150), "width": (3, 100), "rotation": (-180, 180), "opacity": (0, 100),
            "radius": (0, 50), "border": (0, 40), "shadow": (0, 100), "start_ms": (0, 3_600_000), "anim_ms": (0, 5000),
            "chroma_similarity": (1, 100), "feather": (0, 100), "loop_amount": (0, 100), "loop_period_ms": (300, 10000)}
@@ -73,8 +78,10 @@ def clean_overlays(raw, project_id: str, db) -> list[dict]:
             raise OverlayError(f"Overlay {i + 1}: choose an image or video from this project.")
         if "kind" not in item and asset.original_filename.lower().startswith("sticker-"):
             o["kind"] = "sticker"  # recognize stickers created by earlier versions
-        if o["kind"] not in ("media", "sticker"):
-            raise OverlayError(f"Overlay {i + 1}: kind must be media or sticker.")
+        if o["kind"] not in KINDS:
+            raise OverlayError(f"Overlay {i + 1}: kind must be media, sticker or subject.")
+        if not isinstance(o["above_text"], bool):
+            raise OverlayError(f"Overlay {i + 1}: above_text must be true or false.")
         for key, (lo, hi) in _RANGES.items():
             v = o[key]
             if isinstance(v, bool) or not isinstance(v, (int, float)) or not lo <= v <= hi:
@@ -182,7 +189,10 @@ def build_overlay_pass(overlays: list[dict], assets: dict, frame_w: int, frame_h
                       f"[ks{n}]alphaextract[ka{n}]", f"[ka{n}][m{n}]blend=all_mode=multiply[km{n}]",
                       f"[ck{n}][km{n}]alphamerge[cm{n}]"]
         else:
-            chain.append(f"[c{n}][m{n}]alphamerge[cm{n}]")
+            # Keep the media's own transparency (PNG/WebP stickers, cutouts): multiply
+            # its alpha with the rounded/feathered mask instead of replacing it.
+            chain += [f"[c{n}]split=2[cc{n}][cs{n}]", f"[cs{n}]alphaextract[ca{n}]",
+                      f"[ca{n}][m{n}]blend=all_mode=multiply[am{n}]", f"[cc{n}][am{n}]alphamerge[cm{n}]"]
         chain += [
                  f"[{b}:v]format=rgba[b{n}]",
                  f"[b{n}][cm{n}]overlay=x={pad + border}:y={pad + border}:format=auto"]

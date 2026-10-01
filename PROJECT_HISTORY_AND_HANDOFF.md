@@ -3,13 +3,15 @@
 **Prepared:** 2026-09-30  
 **Project:** [EzioDEVio/SceneForge](https://github.com/EzioDEVio/SceneForge)  
 **Latest published release:** 0.5.3  
-**Current candidate:** 0.7.0 RC6, unreleased (branch `claude/0.7.0-rc5-timeline`, RC5 plus RC6 fixes and effects)  
+**Current candidate:** 0.7.0 RC7, unreleased (branch `claude/0.7.0-rc5-timeline`, RC5 plus RC6 fixes and effects)  
 **Candidate branch:** `chatgpt/0.7.0-video-generation`  
 **Candidate commit:** `c9a8ee74831ab8ebc0a48aa0875e8139c98f568b` (tree `c813c8cdfe63446734c19e4031437ce531aedcea`)
 
 This is the single-document handoff: it combines current status and next steps, the session handoff, and cumulative release notes. Historical WIP/RC entries are development snapshots, not published releases. The earliest release notes present in this repository begin at 0.2.0 RC3; earlier prototype history is not reconstructed in the available records.
 
 ## Read this status first
+
+- **RC7 update (2026-09-30):** fixes local Whisper (PyAV `metadata_errors`; audio is now decoded with FFmpeg), the black first scene render (a player timing problem) and the speed-ramp layout. Adds AI subject cutout (text behind subject, background removal) and textured titles. Local Whisper inference and cutout now also run inside the packaged app in CI.
 
 - **RC6 update (2026-09-30):** fixes the RC5 Windows test findings (see RC6 in Appendix B): deleting only a cut audio piece, right-click timeline menus, detaching narration or clip sound to A3, scene renders with timeline audio and music, local Whisper resilience and diagnostics, and in-app Chatterbox/Kokoro start. Adds the FFmpeg effects pack. Local Whisper inference and Chatterbox still need Windows verification.
 
@@ -379,6 +381,35 @@ The accompanying full-source ZIP contains the complete tracked SceneForge projec
 ---
 
 ## Appendix B — Complete cumulative release notes
+
+## SceneForge Studio 0.7.0 RC7 (unreleased)
+
+RC7 fixes the issues found in the RC6 Windows test and adds two features from the CapCut list. It is on branch `claude/0.7.0-rc5-timeline`.
+
+### Fixes
+- **Local Whisper captions.** RC6 failed with "open() got an unexpected keyword argument 'metadata_errors'". Faster-Whisper's file decoder calls PyAV, and the PyAV release in the installer no longer accepts that argument.
+  - SceneForge now decodes the audio with its own FFmpeg (mono 16 kHz) and passes the samples to Whisper, so PyAV is no longer used for captions.
+  - The packaged-app CI test now downloads the real model and runs local Whisper inside the installed backend.
+- **Black screen after the first scene render.** The renders themselves were correct; the player opened before the new render had loaded.
+  - The player now waits for the project to reload before switching to the rendered scene, and retries once if the file isn't ready.
+  - Only one preview mix is built per scene at a time.
+- **Speed ramp options** wrap into readable buttons instead of a cramped single row.
+
+### New
+- **Subject cutout (AI, beta).** In Overlays → Subject cutout:
+  - **Put text behind subject:** captions and titles go behind the person or object.
+  - **Remove background → Media Pool:** saves a transparent PNG you can use as a sticker or overlay.
+  - It runs locally with onnxruntime. The model downloads once on first use: IS-Net general use (~170 MB, best) or U²-Net small (~5 MB, fast). Both are verified by checksum.
+  - It works on scenes with one still image and no camera movement. Video cutout is not included yet.
+- **Textured titles.** In Overlays → Textured title, big letters can be filled with:
+  - one of 9 built-in patterns: lava, neon, gold, chrome, marble, ice, fire, pixel blocks, galaxy;
+  - any Media Pool image;
+  - a texture generated from a prompt by your configured image engine (cloud engines may charge).
+
+  It supports glow, outline, 8 fonts and Arabic text. The title is added as a movable, animatable sticker.
+
+### Still to do from the request list
+AI voice isolation, video (moving) subject cutout, and a node-based compositor.
 
 ## SceneForge Studio 0.7.0 RC6 (unreleased)
 

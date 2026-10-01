@@ -673,3 +673,8 @@ html[data-theme="light"] .studio-shell .clip-menu button.danger{color:#b42318}
 .local-check-list li.ok b{color:#5fd08a}.local-check-list li.bad b{color:#ef6b6b}.local-check-list span{color:#aab3c4;word-break:break-word}
 .engine-starter{margin-top:6px}.engine-log{max-height:180px;overflow:auto;background:#15171c;color:#cbd1df;padding:8px;border-radius:6px;font-size:11px;white-space:pre-wrap}
 html[data-theme="light"] .studio-shell .engine-log{background:#f3f4f7;color:#30394a}
+.creative-card{margin-top:12px;padding:10px;border:1px solid #3a3f4b;border-radius:8px;display:flex;flex-direction:column;gap:8px}
+.creative-card header{display:flex;align-items:center;gap:6px}
+html[data-theme="light"] .studio-shell .creative-card{border-color:#d4d9e3}
+.segmented.speed-ramp-options{display:flex;flex-wrap:wrap;gap:4px;background:none;border:0;padding:0}
+.segmented.speed-ramp-options>button{flex:1 1 30%;min-width:96px;padding:6px 8px;border:1px solid #454a58;border-radius:6px;white-space:normal;line-height:1.25}

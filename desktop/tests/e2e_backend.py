@@ -139,6 +139,30 @@ try:
         if abs(dur - 3) > 0.25 or peak < -40:
             raise RuntimeError(f"video scene is {dur:.2f} s with peak {peak} dB (expected 3 s with sound)")
     step("video scene keeps its length and its own sound", 120, wait_video)
+
+    # Real local Whisper in the packaged backend: downloads the model once (network), decodes
+    # the clip's sound and runs inference. A tone has no words, so "No speech was recognised"
+    # is the expected answer; any load/decode/inference error fails the build.
+    def local_captions():
+        import urllib.error
+        try:
+            request("POST", f"/api/scenes/{vscene}/auto-captions", {"provider": "local", "language": "en", "source": "clips"}, timeout=600)
+            return "transcribed"
+        except urllib.error.HTTPError as e:
+            detail = e.read().decode(errors="replace")
+            if e.code == 400 and "No speech was recognised" in detail:
+                return "no speech in a test tone (engine ran)"
+            raise RuntimeError(f"local Whisper failed ({e.code}): {detail[:600]}")
+    step("local Whisper captions run in the packaged app (model download + inference)", 600, local_captions)
+
+    # AI background removal in the packaged backend: onnxruntime + the small U2-Net model
+    # (4.6 MB from GitHub releases), on the photo imported above.
+    def cutout_runs():
+        out = request("POST", f"/api/assets/{asset['id']}/cutout", {"model": "u2netp", "edge": "soft"}, timeout=300)
+        if out.get("mime") != "image/png":
+            raise RuntimeError(f"cutout did not return a PNG: {out}")
+        return out["original_filename"]
+    step("AI subject cutout runs in the packaged app (model download + onnxruntime)", 300, cutout_runs)
 finally:
     try:
         proc.stdin.close(); proc.wait(timeout=20)

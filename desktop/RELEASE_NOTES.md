@@ -1,3 +1,32 @@
+# SceneForge Studio 0.7.0 RC7 (unreleased)
+
+RC7 fixes the issues found in the RC6 Windows test and adds two features from the CapCut list. It is on branch `claude/0.7.0-rc5-timeline`.
+
+## Fixes
+- **Local Whisper captions.** RC6 failed with "open() got an unexpected keyword argument 'metadata_errors'". Faster-Whisper's file decoder calls PyAV, and the PyAV release in the installer no longer accepts that argument.
+  - SceneForge now decodes the audio with its own FFmpeg (mono 16 kHz) and passes the samples to Whisper, so PyAV is no longer used for captions.
+  - The packaged-app CI test now downloads the real model and runs local Whisper inside the installed backend.
+- **Black screen after the first scene render.** The renders themselves were correct; the player opened before the new render had loaded.
+  - The player now waits for the project to reload before switching to the rendered scene, and retries once if the file isn't ready.
+  - Only one preview mix is built per scene at a time.
+- **Speed ramp options** wrap into readable buttons instead of a cramped single row.
+
+## New
+- **Subject cutout (AI, beta).** In Overlays → Subject cutout:
+  - **Put text behind subject:** captions and titles go behind the person or object.
+  - **Remove background → Media Pool:** saves a transparent PNG you can use as a sticker or overlay.
+  - It runs locally with onnxruntime. The model downloads once on first use: IS-Net general use (~170 MB, best) or U²-Net small (~5 MB, fast). Both are verified by checksum.
+  - It works on scenes with one still image and no camera movement. Video cutout is not included yet.
+- **Textured titles.** In Overlays → Textured title, big letters can be filled with:
+  - one of 9 built-in patterns: lava, neon, gold, chrome, marble, ice, fire, pixel blocks, galaxy;
+  - any Media Pool image;
+  - a texture generated from a prompt by your configured image engine (cloud engines may charge).
+
+  It supports glow, outline, 8 fonts and Arabic text. The title is added as a movable, animatable sticker.
+
+## Still to do from the request list
+AI voice isolation, video (moving) subject cutout, and a node-based compositor.
+
 # SceneForge Studio 0.7.0 RC6 (unreleased)
 
 RC6 builds on RC5 and lives on the same local branch, `claude/0.7.0-rc5-timeline`. It fixes the issues found in the RC5 Windows test and adds an FFmpeg-rendered effects pack. The effects are procedural, not AI. No paid or live provider call was made.

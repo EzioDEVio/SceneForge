@@ -43,11 +43,11 @@ class FakeWhisper:
 fake_module = SimpleNamespace(WhisperModel=lambda *args, **kwargs: None)
 with patch.dict(sys.modules, {'faster_whisper': fake_module}):
     model = FakeWhisper(retry_empty=True, no_word_times=True)
-    with patch.object(transcribe, '_LOCAL_MODEL', model), patch.object(transcribe, '_normalize_local_audio', return_value='normalized.wav'):
+    with patch.object(transcribe, '_LOCAL_MODEL', model), patch.object(transcribe, '_normalize_local_audio', return_value='normalized.wav'), patch.object(transcribe, '_decode_pcm16k', side_effect=lambda p: {'decoded': p}):
         result = transcribe._local('speech.wav', 'en')
     check('manual language is passed through to local Whisper',
           len(model.calls) == 2 and all(call['language'] == 'en' for call in model.calls)
-          and all(call['path'] == 'normalized.wav' for call in model.calls)
+          and all(call['path'] == {'decoded': 'normalized.wav'} for call in model.calls)
           and all(call['condition_on_previous_text'] is False for call in model.calls))
     check('empty VAD pass retries clean audio without VAD',
           model.calls[0]['vad_filter'] is True and model.calls[1]['vad_filter'] is False and result['text'] == 'Clear speech here')
@@ -56,15 +56,25 @@ with patch.dict(sys.modules, {'faster_whisper': fake_module}):
           and result['words'][0][1] == 400 and result['words'][-1][2] == 1600)
 
     aligned = FakeWhisper()
-    with patch.object(transcribe, '_LOCAL_MODEL', aligned), patch.object(transcribe, '_normalize_local_audio', return_value='normalized.wav'):
+    with patch.object(transcribe, '_LOCAL_MODEL', aligned), patch.object(transcribe, '_normalize_local_audio', return_value='normalized.wav'), patch.object(transcribe, '_decode_pcm16k', side_effect=lambda p: {'decoded': p}):
         exact = transcribe._local('speech.wav', None)
     check('normal local word timestamps are preserved',
           exact['word_timing'] == 'whisper' and exact['words'] == [['Hello', 400, 800]])
 
     blank = FakeWhisper(no_word_times=True, blank_word=True)
-    with patch.object(transcribe, '_LOCAL_MODEL', blank), patch.object(transcribe, '_normalize_local_audio', return_value='normalized.wav'):
+    with patch.object(transcribe, '_LOCAL_MODEL', blank), patch.object(transcribe, '_normalize_local_audio', return_value='normalized.wav'), patch.object(transcribe, '_decode_pcm16k', side_effect=lambda p: {'decoded': p}):
         estimated = transcribe._local('speech.wav', 'en')
     check('blank word-alignment entries fall back to estimated phrase timing',
           estimated['word_timing'] == 'estimated' and len(estimated['words']) == 3)
 
+import subprocess, tempfile, os
+import numpy as np
+with tempfile.TemporaryDirectory() as d:
+    wav = os.path.join(d, 'tone.wav')
+    subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=f=440:d=1.5:r=44100', '-ac', '2', wav], check=True)
+    samples = transcribe._decode_pcm16k(wav)
+    check('audio is decoded with FFmpeg to mono 16 kHz float samples (no PyAV)',
+          isinstance(samples, np.ndarray) and samples.dtype == np.float32 and abs(len(samples) - 24000) < 400 and 0.05 < float(np.abs(samples).max()) <= 1.0)
+    src = pathlib.Path(transcribe.__file__).read_text()
+    check('local transcription passes samples, never a file path, to Faster-Whisper', '_LOCAL_MODEL.transcribe(audio,' in src)
 print(f'{checks} local-transcription checks passed')
