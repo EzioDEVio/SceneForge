@@ -1,4 +1,41 @@
-# SceneForge Studio 0.7.0 RC9 (unreleased)
+# SceneForge Studio 0.7.0
+
+The first public release since 0.5.3. It brings together release candidates RC1–RC9, which are listed below in full.
+
+**Highlights**
+- **Timeline:**
+  - six independent audio tracks (A3–A8) with mute, solo and lock;
+  - pro edit tools: select, ripple, roll, slip, slide, blade and Razor All;
+  - right-click menus; detach narration or clip sound so it can be cut;
+  - clip groups;
+  - colour, range, clip-attached and beat markers;
+  - volume envelopes.
+- **Captions:**
+  - 71 caption styles;
+  - free local Whisper captions, now reliable on Windows;
+  - clock, iris and directional text reveals;
+  - textured titles.
+- **Effects:**
+  - per-effect settings for 36 looks;
+  - film grades, halation, VHS, lens flare, camera shake and wiggle;
+  - effect stack ordering and bypass;
+  - drag-and-drop look preset packs.
+- **Library:** 400 stickers and emoji (Twemoji, CC-BY 4.0).
+- **AI on your PC (optional):**
+  - subject cutout for photos and moving video ("text behind subject");
+  - voice isolation;
+  - beat-aware music fit.
+- **AI generation (optional):**
+  - text-to-video with local ComfyUI or Google Veo / Runway, with cost estimates and confirmation;
+  - Image Studio.
+- **Local voices:** in-app start for Chatterbox and Kokoro (needs Docker Desktop).
+- **App:** themes and preferences, a safer close flow, scene renders that include the timeline audio and music, and many fixes.
+
+AI models download once, on first use, and are verified by checksum. The small cutout model is bundled. Provider API keys stay in your operating system's credential store.
+
+---
+
+## 0.7.0 RC9 (development history)
 
 ## Library
 - **400 stickers and emoji** in 14 categories, with search and a Recent tab.

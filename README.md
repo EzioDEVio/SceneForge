@@ -8,9 +8,9 @@
 
 ![The SceneForge editor: scene bin, rendered scene preview with an iris-reveal title and a two-tone caption, scene settings, and the timeline with text, picture, narration and colour/beat markers](docs/images/editor-overview.png)
 
-> **Release status.** The latest **published** release is **0.5.3**. Everything below that is marked *0.7.0* belongs to the **0.7.0 RC9** release candidate on the branch `claude/0.7.0-rc5-timeline`. It is **not published**. Its Windows installer exists only as a temporary GitHub Actions artifact, for testing. The full record is in [`desktop/RELEASE_NOTES.md`](desktop/RELEASE_NOTES.md) and [`PROJECT_HISTORY_AND_HANDOFF.md`](PROJECT_HISTORY_AND_HANDOFF.md).
+> **Release status.** **0.7.0** is the latest release. It is a large update over 0.5.3: a multitrack audio timeline with pro edit tools, 71 caption styles, 400 stickers and emoji, per-effect settings, AI subject cutout and voice isolation, and optional text-to-video. Items marked *(0.7.0)* are new in this version. The full record is in [`desktop/RELEASE_NOTES.md`](desktop/RELEASE_NOTES.md) and [`PROJECT_HISTORY_AND_HANDOFF.md`](PROJECT_HISTORY_AND_HANDOFF.md).
 
-The screenshots on this page come from the 0.7.0 RC9 build. They show a demo project made only from procedurally generated pictures, video and audio. [`scripts/capture_readme_screenshots.py`](scripts/capture_readme_screenshots.py) rebuilds the project and the screenshots.
+The screenshots on this page come from the 0.7.0 build. They show a demo project made only from procedurally generated pictures, video and audio. [`scripts/capture_readme_screenshots.py`](scripts/capture_readme_screenshots.py) rebuilds the project and the screenshots.
 
 ## Highlights
 
@@ -159,7 +159,7 @@ The screenshots on this page come from the 0.7.0 RC9 build. They show a demo pro
 
 ## Install
 
-Installers are on the **[Releases page](https://github.com/EzioDEVio/SceneForge/releases/latest)**. The current published version is **0.5.3**.
+Installers are on the **[Releases page](https://github.com/EzioDEVio/SceneForge/releases/latest)**. The current version is **0.7.0**.
 
 | System | File | First launch |
 |---|---|---|
@@ -167,7 +167,7 @@ Installers are on the **[Releases page](https://github.com/EzioDEVio/SceneForge/
 | **Linux** (64-bit) | `.AppImage` (any distribution) or `.deb` (Ubuntu/Debian) | AppImage: make it executable (`chmod +x`) and run it. Deb: `sudo apt install ./SceneForge-Studio-*.deb` |
 | **macOS** (Apple Silicon) | `.dmg` | Drag SceneForge to Applications. The first time, right-click the app and choose **Open**, then **Open** again. *macOS builds are experimental.* |
 
-**Testing the 0.7.0 candidate (Windows).** Every push to `claude/0.7.0-*` runs the **Release** workflow. That run builds a `SceneForge-Studio-Windows` installer as a **GitHub Actions artifact**. Download it from the workflow run's *Artifacts* section. Artifacts expire, and they are not public releases. GitHub Releases are created only for `v*` tags.
+**Testing builds.** Every push to `claude/0.7.0-*` (or a manual *Run workflow*) runs the **Release** workflow. That run produces test installers as temporary **GitHub Actions artifacts**. Public releases are created only from `v*` tags.
 
 **Updates.** On Windows and Linux (AppImage), SceneForge downloads new versions in the background and asks to restart. On macOS it tells you about a new version and opens the download page. **Help → Receive beta updates** opts you in to test versions.
 

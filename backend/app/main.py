@@ -72,7 +72,7 @@ app.include_router(effect_params_api.router)
 # new interface connected to an old backend (e.g. a still-running old
 # start.bat window) shows "Backend update required" instead of silently
 # losing settings the old backend does not know.
-BUILD_ID = "v0.7.0-rc9"
+BUILD_ID = "v0.7.0"
 
 
 @app.get("/api/health")
