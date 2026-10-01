@@ -427,3 +427,7 @@ CLEANERS['countdown'] = _clean_countdown
 from app.render.filters import clean_focus, clean_mosaic, clean_rgbsplit  # noqa: E402
 
 CLEANERS.update(focus=_wrap(clean_focus), mosaic=_wrap(clean_mosaic), rgbsplit=_wrap(clean_rgbsplit))
+
+from app.render.fx_stack import clean_fx_bypass, clean_fx_order  # noqa: E402  (effect stack order / bypass)
+
+CLEANERS.update(fx_order=_wrap(clean_fx_order), fx_bypass=_wrap(clean_fx_bypass))

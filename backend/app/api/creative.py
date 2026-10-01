@@ -26,9 +26,10 @@ router = APIRouter(tags=["creative"])
 
 
 class CutoutRequest(BaseModel):
-    model: Literal["isnet", "u2netp"] = "isnet"
+    model: Literal["human", "isnet", "u2netp"] = "isnet"
     edge: Literal["soft", "crisp"] = "soft"
     feather: int = Field(default=0, ge=0, le=20)
+    shift: int = Field(default=0, ge=-10, le=10)
 
 
 def _asset_file(asset: Asset) -> Path:
@@ -62,14 +63,14 @@ def _make_cutout(db: Session, src: Asset, body: CutoutRequest) -> Asset:
         raise HTTPException(400, "Background removal works on still images. Choose a PNG, JPEG or WebP image.")
     if not _asset_file(src).is_file():
         raise HTTPException(404, "This image is missing on disk.")
-    key = hashlib.sha256(f"{src.content_hash}|{body.model}|{body.edge}|{body.feather}".encode()).hexdigest()
+    key = hashlib.sha256(f"v2|{src.content_hash}|{body.model}|{body.edge}|{body.feather}|{body.shift}".encode()).hexdigest()
     hit = _cached(db, src.project_id, "cutout_key", key)
     if hit:
         return hit
     folder = Path(MEDIA_DIR) / src.project_id
     dest = folder / f"cutout_{uuid.uuid4().hex[:10]}.png"
     try:
-        cutout_file(str(_asset_file(src)), str(dest), body.model, body.edge, body.feather)
+        cutout_file(str(_asset_file(src)), str(dest), body.model, body.edge, body.feather, body.shift)
     except CutoutError as e:
         dest.unlink(missing_ok=True)
         raise HTTPException(503 if "download" in str(e) else 422, str(e))

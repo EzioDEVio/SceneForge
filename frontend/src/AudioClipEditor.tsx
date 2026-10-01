@@ -3,6 +3,7 @@ import {Play, Square, Trash2, RotateCcw, AudioLines} from 'lucide-react';
 import {api, AudioEdit, Scene, VoiceTake, Waveform} from './api';
 import {sceneDuration} from './duration';
 import {FeatureHelp} from './FeatureHelp';
+import {NarrationVoiceIsolation} from './VoiceIsolation';
 
 /** Take the audio off a scene without touching its picture. A scene that
  *  followed the audio keeps its current length (switches to fixed timing),
@@ -155,6 +156,7 @@ export function AudioClipEditor({scene, take, disabled, onChanged, onRemove}: Pr
     <label className="control-label">Voice effect<select aria-label="Voice effect" value={edit.voice_fx || 'none'} disabled={disabled} onChange={e => change({voice_fx: e.target.value})}>
       <option value="none">None</option><option value="clean">Clean up (less noise, even level)</option><option value="dialogue">Dialogue cleanup (noise reduction — not AI voice isolation)</option><option value="radio">1940s radio / newsreel</option><option value="telephone">Telephone</option>
     </select></label>
+    <NarrationVoiceIsolation scene={scene} take={take} disabled={disabled} onChanged={onChanged}/>
     {error && <p className="form-error" role="alert">{error}</p>}
     <div className="button-row audio-actions">
       <button className="text-btn" disabled={disabled || JSON.stringify(edit) === JSON.stringify(DEFAULTS)} onClick={() => change({...DEFAULTS})}><RotateCcw size={12}/> Reset edits</button>

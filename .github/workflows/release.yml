@@ -69,6 +69,8 @@ jobs:
           npm --prefix desktop test
       - name: Fetch and verify FFmpeg for this OS
         run: python desktop/scripts/fetch_ffmpeg.py
+      - name: Fetch and verify bundled AI models
+        run: python desktop/scripts/fetch_models.py
       - name: Bundle the Python backend
         run: python desktop/scripts/build_backend.py
       - name: Linux credential store for the smoke test

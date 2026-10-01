@@ -12,6 +12,21 @@ This handoff preserves the earlier 0.5.3/0.6.0 review below and records the 0.7.
 
 Reviewed inputs in this workspace include the 0.5.3 source ZIP, the original 0.6.0 WIP ZIP, reviewed wip.2–wip.6 snapshots, their READMEs and handoffs, the SceneForge session handoff, chat notes, and the user screenshots. The 0.5.3 technical handoff predates the 0.5.3/0.6.0 work and should not be treated as a complete description of the present build.
 
+## 0.7.0 RC8 (2026-10-01)
+
+The user said RC7's cutout worked but the edges were poor, and asked for more features from the original list. RC8 contents are in RELEASE_NOTES.
+
+Open items:
+- The licence of the Kim_Vocal_2 weights is not stated by the author; UVR, which hosts the model, is MIT. Confirm before a public release.
+- Video (moving) cutout, a full node compositor, compound clips and clip-attached markers are not done.
+
+New tests:
+- `test_voice_isolation.py` (19, real model)
+- `test_fx_stack_presets.py` (70)
+- `test_rc8_audio.py` (10)
+- the cutout tests continue
+- 252 frontend component checks
+
 ## 0.7.0 RC7: RC6 Windows test follow-up (2026-09-30)
 
 The user's RC6 test found three problems:

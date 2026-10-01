@@ -245,17 +245,10 @@ def _apply_overlays(scene: Scene, project: Project, visual_path: str, total_ms: 
         from app.render.annotations import annotation_clip, annotations_graph
         clips = [annotation_clip(a, out_w, out_h, fps, total_ms, Path(PROXIES_DIR) / "scenefx") for a in look["annotations"]]
         g, base = annotations_graph(base, look["annotations"], clips); graph_parts += g
-    if look.get("spotlight"):
-        g, base = fx.spotlight_graph(base, look["spotlight"], fx.spotlight_png(look["spotlight"], out_w, out_h, Path(PROXIES_DIR) / "scenefx"), fps, dur); graph_parts += g
-    if look.get("leak") and look["leak"]["amount"] > 0:
-        g, base = fx.leak_graph(base, look["leak"], fx.leak_clip(look["leak"]["color"], look["leak"]["speed"], Path(PROXIES_DIR) / "scenefx"), out_w, out_h, fps); graph_parts += g
-    if look.get("flare") and look["flare"]["amount"] > 0:
-        png, drift = fx.flare_png(look["flare"], out_w, out_h, Path(PROXIES_DIR) / "scenefx")
-        g, base = fx.flare_graph(base, look["flare"], png, drift, out_w, out_h, fps, dur); graph_parts += g
-    if look.get("wiggle") and look["wiggle"]["amount"] > 0:
-        g, base = fx.wiggle_graph(base, look["wiggle"], out_w, out_h, fps, dur); graph_parts += g
-    if look.get("shake") and (look["shake"]["amount"] > 0 or look["shake"]["impact"]):
-        g, base = fx.shake_graph(base, look["shake"], out_w, out_h, fps); graph_parts += g
+    # Effect stack (fx_stack.py): spotlight -> leak -> flare -> wiggle -> shake by default,
+    # reorderable / bypassable per scene via look_json fx_order / fx_bypass.
+    from app.render.fx_stack import stack_graph
+    g, base = stack_graph(base, look, out_w, out_h, fps, dur, Path(PROXIES_DIR) / "scenefx"); graph_parts += g
     graph_parts.append(f"[{base}]format=yuv420p,setsar=1[vout]")
     graph = ";".join(graph_parts)
     out = str(Path(work_dir) / "scene_overlays.mp4")

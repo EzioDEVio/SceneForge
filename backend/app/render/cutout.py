@@ -22,6 +22,9 @@ import threading
 from pathlib import Path
 
 MODELS = {
+    "human": {"file": "u2net_human_seg.onnx", "size": 320, "mean": (0.485, 0.456, 0.406), "std": (0.229, 0.224, 0.225),
+              "md5": "c09ddc2e0104f800e3e1bb4652583d1f", "approx_mb": 176, "label": "U²-Net people (whole person)",
+              "url": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/u2net_human_seg.onnx"},
     "isnet": {"file": "isnet-general-use.onnx", "size": 1024, "mean": (0.5, 0.5, 0.5), "std": (1.0, 1.0, 1.0),
               "md5": "fc16ebd8b0c10d971d3513d564d01e29", "approx_mb": 170, "label": "IS-Net general use (best quality)",
               "url": "https://github.com/danielgatis/rembg/releases/download/v0.0.0/isnet-general-use.onnx"},
@@ -47,6 +50,14 @@ def model_dir() -> Path:
 
 
 def model_path(model: str) -> Path:
+    # The installer ships the small U2-Net model so cutout works offline right away.
+    try:
+        from app.config import RESOURCE_DIR
+        bundled = Path(RESOURCE_DIR) / "models" / "cutout" / MODELS[model]["file"]
+        if bundled.is_file():
+            return bundled
+    except Exception:  # noqa: BLE001
+        pass
     return model_dir() / MODELS[model]["file"]
 
 
@@ -138,26 +149,76 @@ def predict_matte(img, model: str = DEFAULT_MODEL):
         x[:, :, c] = (arr[:, :, c] - m["mean"][c]) / m["std"][c]
     x = np.expand_dims(x.transpose((2, 0, 1)), 0).astype(np.float32)
     pred = sess.run(None, {sess.get_inputs()[0].name: x})[0][:, 0, :, :]
+    if m.get("sigmoid"):
+        pred = 1 / (1 + np.exp(-pred))
     hi, lo = float(pred.max()), float(pred.min())
     pred = np.squeeze((pred - lo) / (hi - lo if hi > lo else 1.0))
     mask = Image.fromarray((pred * 255).astype("uint8"), mode="L")
     return mask.resize(img.size, Image.Resampling.LANCZOS)
 
 
-def refine(mask, edge: str = "soft", feather: int = 0):
-    """'crisp' pushes the matte towards 0/255 (removes faint haze); feather blurs the edge (px)."""
+def _guided(guide, src, radius: int, eps: float):
+    """Edge-aware guided filter (He et al.): the matte follows the image's real edges,
+    which recovers hair and fine outlines that the low-resolution model blurs."""
+    import cv2
+    import numpy as np
+    k = (2 * radius + 1, 2 * radius + 1)
+    box = lambda a: cv2.boxFilter(a, cv2.CV_32F, k)
+    mean_i, mean_p = box(guide), box(src)
+    cov = box(guide * src) - mean_i * mean_p
+    var = box(guide * guide) - mean_i * mean_i
+    a = cov / (var + eps)
+    b = mean_p - a * mean_i
+    return np.clip(box(a) * guide + box(b), 0, 1)
+
+
+def _cleanup(a):
+    """Drop small detached specks and fill pinholes inside the subject."""
+    import cv2
+    import numpy as np
+    solid = (a > 0.5).astype(np.uint8)
+    n, labels, stats, _ = cv2.connectedComponentsWithStats(solid, 8)
+    if n > 1:
+        areas = stats[1:, cv2.CC_STAT_AREA]
+        keep = np.zeros(n, bool)
+        keep[1:] = areas >= max(64, 0.02 * areas.max())
+        specks = (solid == 1) & ~keep[labels]
+        a = np.where(specks, 0, a)
+    holes = cv2.morphologyEx((a > 0.5).astype(np.uint8), cv2.MORPH_CLOSE, cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (5, 5)))
+    return np.where((holes == 1) & (a < 0.5), np.maximum(a, 0.85), a)
+
+
+def refine(mask, edge: str = "soft", feather: int = 0, image=None, shift: int = 0):
+    """Matte post-processing.
+    soft  = guided-filter refinement against the photo (keeps hair), speck/hole cleanup
+    crisp = the same, then pushed towards 0/255 (products, hard objects)
+    shift = grow (+) or shrink (-) the edge by up to 10 px (removes halos when negative)
+    feather blurs the final edge (px)."""
     import numpy as np
     from PIL import Image, ImageFilter
+    a = np.asarray(mask).astype(np.float32) / 255
+    if image is not None:
+        try:
+            guide = np.asarray(image.convert("L").resize(mask.size)).astype(np.float32) / 255
+            r = max(2, round(min(mask.size) / 300))
+            a = 0.35 * a + 0.65 * _guided(guide, a, r, 1e-3)
+            a = _cleanup(a)
+        except Exception:  # noqa: BLE001 - refinement is best-effort; keep the model matte
+            pass
+    if shift:
+        import cv2
+        k = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (2 * abs(shift) + 1, 2 * abs(shift) + 1))
+        a = (cv2.dilate if shift > 0 else cv2.erode)(a, k)
     if edge == "crisp":
-        a = np.asarray(mask).astype(np.float32) / 255
         a = np.clip((a - 0.35) / 0.3, 0, 1)
-        mask = Image.fromarray((a * a * (3 - 2 * a) * 255).astype("uint8"), mode="L")
+        a = a * a * (3 - 2 * a)
+    mask = Image.fromarray((np.clip(a, 0, 1) * 255).astype("uint8"), mode="L")
     if feather:
         mask = mask.filter(ImageFilter.GaussianBlur(feather))
     return mask
 
 
-def cutout_file(src: str, dest: str, model: str = DEFAULT_MODEL, edge: str = "soft", feather: int = 0) -> tuple[int, int]:
+def cutout_file(src: str, dest: str, model: str = DEFAULT_MODEL, edge: str = "soft", feather: int = 0, shift: int = 0) -> tuple[int, int]:
     """Write an RGBA PNG of the subject (background transparent). Returns (w, h)."""
     from PIL import Image, ImageChops
     if edge not in EDGES:
@@ -173,7 +234,9 @@ def cutout_file(src: str, dest: str, model: str = DEFAULT_MODEL, edge: str = "so
         raise CutoutError("This image is larger than 40 megapixels. Use a smaller copy for background removal.")
     alpha = img.getchannel("A") if "A" in img.getbands() else None
     rgb = img.convert("RGB")
-    mask = refine(predict_matte(rgb, model), edge, int(feather))
+    if not -10 <= int(shift) <= 10:
+        raise CutoutError("Edge shift must be between -10 and 10 px.")
+    mask = refine(predict_matte(rgb, model), edge, int(feather), image=rgb, shift=int(shift))
     if alpha is not None:
         mask = ImageChops.darker(mask, alpha)
     out = rgb.convert("RGBA")

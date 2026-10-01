@@ -87,7 +87,7 @@ export type FontSettings = {
 };
 
 /** Must match BUILD_ID in backend/app/main.py. */
-export const BUILD_ID = "v0.7.0-rc7";
+export const BUILD_ID = "v0.7.0-rc8";
 
 export type Adjust = Partial<Record<'exposure'|'contrast'|'highlights'|'shadows'|'temperature'|'tint'|'saturation'|'vibrance'|'sharpen'|'vignette'|'grain', number>>;
 export type Look = {
@@ -101,13 +101,16 @@ export type Look = {
   rgbsplit?: {amount: number} | null;
   flare?: {x: number; y: number; color: string; blend: 'screen' | 'add'; amount: number; drift: number} | null;
   wiggle?: {amount: number; speed: number; size: number} | null;
+  /** Effect stack (backend render/fx_stack.py): scene-FX render order and bypassed ids. */
+  fx_order?: string[] | null;
+  fx_bypass?: string[] | null;
 };
 export type Overlay = {id: string; asset_id: string; kind?: 'media'|'sticker'; x: number; y: number; width: number; rotation: number; opacity: number;
   radius: number; border: number; border_color: string; shadow: number; start_ms: number; end_ms: number | null;
   anim_in: 'none' | 'fade' | 'slide_left' | 'slide_up' | 'zoom'; anim_out: 'none' | 'fade' | 'slide_left' | 'slide_up' | 'zoom'; anim_ms: number;
   x2?: number | null; y2?: number | null; chroma?: string | null; chroma_similarity?: number; feather?: number;
   loop?: 'none' | 'float' | 'pendulum' | 'bob'; loop_amount?: number; loop_period_ms?: number};
-export type ProjectAudioClip = {id: string; asset_id: string; name: string; start_ms: number; source_in_ms: number; source_out_ms: number; source_duration_ms: number; volume: number; fade_in_ms: number; fade_out_ms: number; mute: boolean; track?: import('./timeline/timeline.types').AudioTrackId};
+export type ProjectAudioClip = {id: string; asset_id: string; name: string; start_ms: number; source_in_ms: number; source_out_ms: number; source_duration_ms: number; volume: number; fade_in_ms: number; fade_out_ms: number; mute: boolean; track?: import('./timeline/timeline.types').AudioTrackId; /** volume envelope: [source time ms, dB] */ gain?: [number, number][]};
 export type Finishing = {music?: {asset_id: string; volume: number; duck: number; fade_in_ms: number; fade_out_ms: number} | null; audio_clips?: ProjectAudioClip[]; loudnorm?: boolean; leader?: boolean; timeline?: import('./timeline/timeline.types').TimelineSettings};
 export type FilmLook = {scratches: number; dust: number; flicker: number; weave: number; sound: number; fps: 0 | 16 | 18 | 24; tone: 'color' | 'faded' | 'sepia' | 'bw'};
 
@@ -175,6 +178,7 @@ export type ProviderProfile = {
   masked_key: string;
   configured: boolean;
 };
+export type VoiceIsolationStatus = {folder: string; file: string; label: string; url: string; approx_mb: number; bytes: number; downloaded: boolean; download?: {done: number; total: number} | null; license: string; running: {job_id: string; asset_id: string; progress: number}[]};
 export type VoiceOption = { id: string; name: string; language?: string; accent?: string; gender?: string; age?: string; description?: string; preview_url?: string };
 
 const BASE = "";
@@ -302,9 +306,13 @@ export const api = {
   health: () => req<{status:string;build?:string;credential_warning?:string}>("/api/health"),
   closeStatus:()=>req<{ready:boolean}>("/api/close-status"),
   cutoutStatus: () => req<{folder: string; models: {id: string; label: string; downloaded: boolean; approx_mb: number}[]}>(`/api/cutout/status`),
-  cutoutAsset: (assetId: string, body: {model?: string; edge?: string; feather?: number}) => req<Asset>(`/api/assets/${assetId}/cutout`, {method: "POST", body: JSON.stringify(body)}),
-  subjectLayer: (sceneId: string, body: {model?: string; edge?: string; feather?: number}) => req<{scene: Scene; notes: string[]}>(`/api/scenes/${sceneId}/subject-layer`, {method: "POST", body: JSON.stringify(body)}),
+  cutoutAsset: (assetId: string, body: {model?: string; edge?: string; feather?: number; shift?: number}) => req<Asset>(`/api/assets/${assetId}/cutout`, {method: "POST", body: JSON.stringify(body)}),
+  voiceIsolationStatus: () => req<VoiceIsolationStatus>(`/api/voice-isolation/status`),
+  isolateVoice: (assetId: string, strength = 100) => req<{status: 'done' | 'running'; cached?: boolean; asset?: Asset; job_id?: string; progress?: number}>(`/api/assets/${assetId}/isolate-voice`, {method: "POST", body: JSON.stringify({strength})}),
+  voiceIsolationJob: (jobId: string) => req<{status: 'running' | 'done' | 'error'; progress: number; stage: string; asset?: Asset; error?: string}>(`/api/voice-isolation/jobs/${jobId}`),
+  subjectLayer: (sceneId: string, body: {model?: string; edge?: string; feather?: number; shift?: number}) => req<{scene: Scene; notes: string[]}>(`/api/scenes/${sceneId}/subject-layer`, {method: "POST", body: JSON.stringify(body)}),
   texturedTitle: (sceneId: string, body: Record<string, unknown>) => req<{scene: Scene; asset: Asset}>(`/api/scenes/${sceneId}/textured-title`, {method: "POST", body: JSON.stringify(body)}),
+  beatMarkers: (projectId: string, body: {clip_id?: string; every?: number}) => req<{bpm: number; markers: {time_ms: number; downbeat: boolean}[]; truncated: boolean}>(`/api/projects/${projectId}/beat-markers`, {method: "POST", body: JSON.stringify(body)}),
   whisperCheck: () => req<{ok: boolean; model_dir: string; checks: {name: string; ok: boolean; detail: string}[]}>(`/api/local-speech/whisper/check`),
   whisperReset: () => req<{removed: boolean; message: string}>(`/api/local-speech/whisper/reset`, {method: "POST"}),
   localEngineStatus: (engine: string) => req<{engine: string; reachable: boolean; state: string; docker: string; message: string; log: string; services_bundled: boolean}>(`/api/local-speech/${engine}/status`),
@@ -336,6 +344,18 @@ export const api = {
   },
   generateVideo: (projectId:string, body:VideoGenerationRequest) =>
     req<{job_id:string}>("/api/video-generation/projects/"+projectId+"/generate",{method:'POST',body:JSON.stringify(body)}),
+};
+
+/** Look preset packs (backend api/look_presets.py). */
+export type LookPreset = {id?: string; name: string; description?: string; effect_preset: string; effect_intensity: number; look: Record<string, any>; builtin?: boolean};
+export type LookPack = {format: 'sceneforge-look-pack'; version: 1; presets: LookPreset[]};
+export const lookPresetApi = {
+  list: () => req<{presets: LookPreset[]; builtin: LookPreset[]; look_keys: string[]}>('/api/look-presets'),
+  validate: (pack: unknown) => req<{ok: boolean; presets: LookPreset[]}>('/api/look-presets/validate', {method: 'POST', body: JSON.stringify(pack)}),
+  importPack: (pack: unknown) => req<{added: LookPreset[]; presets: LookPreset[]}>('/api/look-presets', {method: 'POST', body: JSON.stringify(pack)}),
+  remove: (id: string) => req<{presets: LookPreset[]}>(`/api/look-presets/${encodeURIComponent(id)}`, {method: 'DELETE'}),
+  fromScene: (sceneId: string, name: string) => req<LookPack>(`/api/look-presets/scene/${sceneId}?name=${encodeURIComponent(name)}`),
+  exportPack: () => req<LookPack>('/api/look-presets/export'),
 };
 
 export function subscribeJob(jobId: string, onEvent: (e: any) => void): () => void {

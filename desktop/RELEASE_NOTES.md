@@ -1,3 +1,37 @@
+# SceneForge Studio 0.7.0 RC8 (unreleased)
+
+## Better subject cutout
+- **Edge refinement.** An edge-aware guided filter makes the matte follow the photo's real edges, which recovers hair and fine outlines. Small stray specks are removed and pinholes inside the subject are filled.
+- **Edge grow/shrink slider (±10 px).** Shrinking by 1–3 px removes halos of background.
+- **New "People (whole body)" model** (U²-Net human segmentation, ~176 MB, downloads once).
+- **Result preview** on a checkerboard, so you can judge the edges before rendering.
+- **The small fast model is now included in the installer,** so cutout works offline right after install.
+- BiRefNet was evaluated and left out: it needs more than 7.5 GB of RAM per photo on the CPU and would crash on typical PCs.
+
+## AI voice isolation (DaVinci-style)
+- Uses the local MDX-Net vocal model (Kim_Vocal_2, ~67 MB, downloads once and is checked by checksum).
+- In a synthetic test it improved the voice from 0 dB to 7.75 dB SDR (signal-to-distortion ratio) and suppressed music by 42–48 dB.
+- **Where it appears:**
+  - the narration editor (creates a new take; select the old take to compare);
+  - timeline audio clips;
+  - video clip sound ("Isolate voice → timeline audio").
+- **Strength slider.** Originals are never changed.
+
+## Timeline
+- **Beat markers.** "♪ Beats…" detects the beat of the music bed, or of the selected timeline audio clip. It can mark every beat, every 2nd beat, or every bar, with the first beat of each bar in red. Cuts and clips snap to these markers. They can be removed in one click and undone.
+- **Volume envelopes (keyframed gain)** on A3–A8 clips: up to 32 points from −60 to +12 dB, with presets (dip under a voice, swell, fade down).
+  - The envelope line is drawn on the clip.
+  - Points follow the sound when you move, trim, slip or split the clip.
+  - The envelope applies in both scene renders and the full export.
+
+## Effects
+- **Effect stack (Fusion-style node order)** for spotlight, light leak, lens flare, wiggle and camera shake. You can reorder them (order changes the look, e.g. shake before or after flare) or bypass any of them. Scenes without an order render exactly as before.
+- **Look preset packs (Premiere-style drag-and-drop).**
+  - Save the current look as a preset.
+  - Import a `.json` or `.sflook` pack by dragging it onto the Effects tab or with Import pack.
+  - Export your presets as a pack.
+  - Ships with an 8-preset Starter pack: music-video punch, dreamy film, retro VHS, noir, teal & orange, summer haze, night drive, handheld doc.
+
 # SceneForge Studio 0.7.0 RC7 (unreleased)
 
 RC7 fixes the issues found in the RC6 Windows test and adds two features from the CapCut list. It is on branch `claude/0.7.0-rc5-timeline`.

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 
 from app.db.database import get_db
-from app.db.models import Project, Scene, RenderJob
+from app.db.models import Asset, Project, Scene, RenderJob
 from app.domain import schemas
 from app.domain.constants import ASPECT_DIMENSIONS, AspectRatio
 from app.domain.import_parser import parse_script
@@ -300,3 +300,58 @@ def music_fit(project_id: str, body: dict | None = None, db: Session = Depends(g
     db.commit()
     db.refresh(new)
     return new
+
+
+@router.post("/{project_id}/beat-markers")
+def beat_markers(project_id: str, body: dict | None = None, db: Session = Depends(get_db)):
+    """Beat times on the timeline, for markers that cuts and clips snap to.
+
+    Source: a timeline audio clip (A3–A8, placed at its sequence time and trimmed), or
+    the music bed (which starts at 0 and loops). every=1 marks each beat, 2/4 every
+    2nd/4th (bars), with downbeats labelled. Nothing is changed here; the editor adds
+    the returned markers as one undoable edit.
+    """
+    from app.render.beats import detect_beats
+    from app.render.renderer import _resolve_asset_path
+    project = db.get(Project, project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+    body = body or {}
+    every = body.get("every", 1)
+    if every not in (1, 2, 4):
+        raise HTTPException(400, "every must be 1, 2 or 4.")
+    fin = project.finishing_json or {}
+    clip_id = body.get("clip_id")
+    if clip_id:
+        clip = next((c for c in fin.get("audio_clips") or [] if c.get("id") == clip_id), None)
+        if not clip:
+            raise HTTPException(400, "That timeline audio clip was not found.")
+        asset_id, offset, start, end = clip["asset_id"], int(clip["start_ms"]) - int(clip["source_in_ms"]), int(clip["source_in_ms"]), int(clip["source_out_ms"])
+        loop = False
+    elif fin.get("music"):
+        asset_id, offset, start, end, loop = fin["music"]["asset_id"], 0, 0, None, True
+    else:
+        raise HTTPException(400, "Add a music bed or select a timeline audio clip first.")
+    asset = db.get(Asset, asset_id)
+    if not asset:
+        raise HTTPException(400, "The audio file is missing.")
+    try:
+        bpm, beats = detect_beats(_resolve_asset_path(asset))
+    except Exception as e:  # noqa: BLE001
+        raise HTTPException(400, f"Could not analyse the beat: {e}")
+    if not beats or bpm <= 0:
+        raise HTTPException(400, "No steady beat was found in this audio.")
+    times = [round(b * 1000) for b in beats]
+    if loop and asset.duration_ms:
+        scene_total = sum(scene_duration_ms(s) for s in project.scenes)
+        length = scene_total
+        reps, base = [], list(times)
+        k = 1
+        while base and base[-1] + k * asset.duration_ms < length and len(reps) < 2000:
+            reps += [t + k * int(asset.duration_ms) for t in base]
+            k += 1
+        times = [t for t in base + reps if t < scene_total]
+    else:
+        times = [t for t in times if start <= t <= (end if end is not None else t)]
+    out = [{"time_ms": t + offset, "downbeat": i % 4 == 0} for i, t in enumerate(times) if i % every == 0 and t + offset >= 0]
+    return {"bpm": round(bpm, 1), "markers": out[:200], "truncated": len(out) > 200}

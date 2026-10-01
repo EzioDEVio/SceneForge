@@ -47,7 +47,7 @@ export function SpeedControls({shot, disabled, save}: {shot: Shot; disabled: boo
 
 /** Sound of a video clip: volume, mute, and lowering it under narration (so the voice stays clear). */
 type ClipAudioSettings={volume:number;mute:boolean;duck:boolean;fade_in_ms:number;fade_out_ms:number};
-export function ClipSoundControls({shot, save}: {shot: Shot; save: (a: ClipAudioSettings) => void}) {
+export function ClipSoundControls({shot, save, children}: {shot: Shot; save: (a: ClipAudioSettings) => void; children?: React.ReactNode}) {
   const audio = ((shot as any).audio_json || {}) as {volume?: number; mute?: boolean; duck?: boolean; fade_in_ms?:number; fade_out_ms?:number};
   const [a, setA] = React.useState({volume: audio.volume ?? 100, mute: !!audio.mute, duck: audio.duck ?? true, fade_in_ms: audio.fade_in_ms ?? 0, fade_out_ms: audio.fade_out_ms ?? 0});
   const editing = React.useRef(false);
@@ -67,5 +67,6 @@ export function ClipSoundControls({shot, save}: {shot: Shot; save: (a: ClipAudio
     <label className="switch-label finishing-toggle"><input type="checkbox" aria-label="Lower clip sound under narration" checked={a.duck} disabled={a.mute} onChange={e => commit({duck: e.target.checked})}/> Lower it under narration (voice stays clear)</label>
     <div className="clip-audio-fades" aria-label="Clip audio fades"><label>Fade in · {(a.fade_in_ms/1000).toFixed(1)} s<input aria-label="Clip audio fade in" type="range" min={0} max={10000} step={100} value={a.fade_in_ms} disabled={a.mute} onPointerDown={()=>{editing.current=true;}} onKeyDown={()=>{editing.current=true;}} onChange={e=>fadeChange('fade_in_ms',Number(e.target.value))} onPointerUp={e=>{fadeSave('fade_in_ms',Number(e.currentTarget.value));editing.current=false;}} onKeyUp={e=>{fadeSave('fade_in_ms',Number(e.currentTarget.value));editing.current=false;}} onBlur={e=>{fadeSave('fade_in_ms',Number(e.currentTarget.value));editing.current=false;}} onPointerCancel={()=>{editing.current=false;}}/></label><label>Fade out · {(a.fade_out_ms/1000).toFixed(1)} s<input aria-label="Clip audio fade out" type="range" min={0} max={10000} step={100} value={a.fade_out_ms} disabled={a.mute} onPointerDown={()=>{editing.current=true;}} onKeyDown={()=>{editing.current=true;}} onChange={e=>fadeChange('fade_out_ms',Number(e.target.value))} onPointerUp={e=>{fadeSave('fade_out_ms',Number(e.currentTarget.value));editing.current=false;}} onKeyUp={e=>{fadeSave('fade_out_ms',Number(e.currentTarget.value));editing.current=false;}} onBlur={e=>{fadeSave('fade_out_ms',Number(e.currentTarget.value));editing.current=false;}} onPointerCancel={()=>{editing.current=false;}}/></label></div>
     <p className="hint">The clip's own sound plays with it in the render. With narration, it drops to about a third so the voice is heard clearly. Fade durations are limited to each clip's actual length at render time.</p>
+    {children}
   </section>;
 }

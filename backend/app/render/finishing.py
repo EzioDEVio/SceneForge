@@ -82,7 +82,7 @@ def clean_finishing(raw: dict, project_id: str, db) -> dict:
         raise FinishingError("The timeline supports up to 64 project audio clips.")
     clean_clips = []
     for index, clip in enumerate(clips):
-        allowed = {"id", "asset_id", "name", "start_ms", "source_in_ms", "source_out_ms", "source_duration_ms", "volume", "fade_in_ms", "fade_out_ms", "mute", "track"}
+        allowed = {"id", "asset_id", "name", "start_ms", "source_in_ms", "source_out_ms", "source_duration_ms", "volume", "fade_in_ms", "fade_out_ms", "mute", "track", "gain"}
         if not isinstance(clip, dict) or set(clip) - allowed:
             raise FinishingError(f"Project audio clip {index + 1} has unsupported settings.")
         asset = db.get(Asset, clip.get("asset_id")) if clip.get("asset_id") else None
@@ -112,6 +112,17 @@ def clean_finishing(raw: dict, project_id: str, db) -> dict:
         cleaned = {"id": str(clip.get("id") or uuid.uuid4()), "asset_id": asset.id, "name": name, "source_duration_ms": source_ms,
                    "start_ms": start, "source_in_ms": source_in, "source_out_ms": source_out,
                    "volume": volume, "fade_in_ms": fade_in, "fade_out_ms": fade_out, "mute": mute}
+        gain = clip.get("gain")
+        if gain:
+            if not isinstance(gain, list) or len(gain) > 32:
+                raise FinishingError(f"Project audio clip {index + 1} volume envelope supports up to 32 points.")
+            pts = []
+            for point in gain:
+                if (not isinstance(point, (list, tuple)) or len(point) != 2 or any(isinstance(v, bool) or not isinstance(v, (int, float)) for v in point)
+                        or not 0 <= point[0] <= source_ms or not -60 <= point[1] <= 12):
+                    raise FinishingError(f"Project audio clip {index + 1} envelope points are [source time ms, -60..12 dB].")
+                pts.append([int(point[0]), round(float(point[1]), 1)])
+            cleaned["gain"] = sorted(pts)
         if track != "A3":   # A3 stays implicit so projects remain readable by pre-timeline-v1 builds
             cleaned["track"] = track
         clean_clips.append(cleaned)
@@ -324,6 +335,9 @@ def finish_export(export_path: str, project, cancel_check=None) -> str:
                 parts = [f"[{input_index}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo",
                          f"atrim=start={int(clip['source_in_ms'])/1000:.3f}:end={int(clip['source_out_ms'])/1000:.3f}",
                          "asetpts=PTS-STARTPTS", f"volume={int(clip['volume'])/100:.3f}"]
+                envelope = gain_filter(clip.get("gain"), int(clip["source_in_ms"]))
+                if envelope:
+                    parts.append(envelope)
                 if fade_in:
                     parts.append(f"afade=t=in:st=0:d={fade_in:.3f}")
                 if fade_out:
@@ -372,7 +386,7 @@ def scene_preview_plan(fin: dict, scene_start_ms: int, part_ms: int, project_ms:
         cut_head = max(0, -rel)
         clips.append({"asset_id": clip["asset_id"], "name": clip.get("name"), "delay_ms": max(0, rel),
                       "source_in_ms": int(clip["source_in_ms"]) + cut_head, "length_ms": length - cut_head,
-                      "volume": int(clip["volume"]),
+                      "volume": int(clip["volume"]), "gain": clip.get("gain"),
                       "fade_in_ms": 0 if cut_head else int(clip["fade_in_ms"]),
                       "fade_out_ms": int(clip["fade_out_ms"]) if rel + length <= part_ms + 50 else 0})
     music = fin.get("music")
@@ -431,6 +445,9 @@ def mix_scene_preview(part_path: str, plan: dict, out_path: str) -> str:
             parts = [f"[{idx}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo",
                      f"atrim=start={clip['source_in_ms'] / 1000:.3f}:duration={length:.3f}", "asetpts=PTS-STARTPTS",
                      f"volume={clip['volume'] / 100:.3f}"]
+            envelope = gain_filter(clip.get("gain"), clip["source_in_ms"])
+            if envelope:
+                parts.append(envelope)
             if clip["fade_in_ms"]:
                 parts.append(f"afade=t=in:st=0:d={min(clip['fade_in_ms'] / 1000, length):.3f}")
             if clip["fade_out_ms"]:
@@ -442,3 +459,21 @@ def mix_scene_preview(part_path: str, plan: dict, out_path: str) -> str:
     run_ffmpeg([*inputs, "-filter_complex", ";".join(graph), "-map", "0:v", "-map", f"[{label}]",
                 "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-movflags", "+faststart", out_path])
     return out_path
+
+
+def gain_filter(points, source_in_ms: int) -> str | None:
+    """volume filter for a clip's envelope. Points are [source time ms, dB], so they stay on
+    the same sound when the clip is moved, trimmed, slipped or split. Linear in dB between
+    points, flat before the first and after the last. t is clip-local after asetpts."""
+    if not points:
+        return None
+    pts = sorted((int(t), float(g)) for t, g in points)
+    T = f"(t+{source_in_ms / 1000:.4f})"
+    expr = f"{pts[-1][1]:.2f}"
+    for (t0, g0), (t1, g1) in reversed(list(zip(pts, pts[1:]))):
+        if t1 == t0:
+            continue
+        seg = f"{g0:.2f}+({g1 - g0:.2f})*({T}-{t0 / 1000:.4f})/{(t1 - t0) / 1000:.4f}"
+        expr = f"if(lt({T},{t1 / 1000:.4f}),{seg},{expr})"
+    expr = f"if(lt({T},{pts[0][0] / 1000:.4f}),{pts[0][1]:.2f},{expr})"
+    return f"volume='pow(10,({expr})/20)':eval=frame"

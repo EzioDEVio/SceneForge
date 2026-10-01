@@ -9,7 +9,9 @@ const PRESETS: [string, string][] = [['lava', 'Lava'], ['neon', 'Neon'], ['gold'
 const FONTS = ['Anton', 'Bebas Neue', 'Poppins', 'Noto Sans', 'Pacifico', 'Lalezar', 'Tajawal', 'Noto Naskh Arabic'];
 
 export function SubjectCutoutPanel({scene, disabled, onDone}: {scene: Scene; disabled: boolean; onDone: () => void | Promise<void>}) {
-  const [model, setModel] = React.useState<'isnet' | 'u2netp'>('isnet');
+  const [model, setModel] = React.useState<'human' | 'isnet' | 'u2netp'>('isnet');
+  const [shift, setShift] = React.useState(0);
+  const [previewId, setPreviewId] = React.useState('');
   const [edge, setEdge] = React.useState<'soft' | 'crisp'>('soft');
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState('');
@@ -24,10 +26,12 @@ export function SubjectCutoutPanel({scene, disabled, onDone}: {scene: Scene; dis
     setBusy(true); setMsg(needsDownload ? `Downloading the background-removal model (~${needsDownload.approx_mb} MB, once)… then cutting out the subject.` : 'Cutting out the subject…');
     try {
       if (kind === 'layer') {
-        const r = await api.subjectLayer(scene.id, {model, edge});
+        const r = await api.subjectLayer(scene.id, {model, edge, shift});
+        if ((r as any).cutout_asset?.id) setPreviewId((r as any).cutout_asset.id);
         setMsg(['Subject layer added above captions and titles. Render the scene to see text behind the subject.', ...(r.notes || [])].join(' '));
       } else {
-        const a = await api.cutoutAsset(shot.asset_id, {model, edge});
+        const a = await api.cutoutAsset(shot.asset_id, {model, edge, shift});
+        setPreviewId(a.id);
         setMsg(`Saved “${a.original_filename}” (transparent PNG) to the Media Pool. Use it as a sticker or overlay.`);
       }
       await onDone();
@@ -38,15 +42,17 @@ export function SubjectCutoutPanel({scene, disabled, onDone}: {scene: Scene; dis
     <header><Scissors size={15}/><strong>Subject cutout · AI beta</strong></header>
     <p className="hint">Removes the background on this computer with a local AI model. “Text behind subject” keeps captions and titles behind the person or object. Works on scenes with one still image and no camera movement.</p>
     <div className="acc-grid">
-      <label className="control-label">Model<select aria-label="Cutout model" value={model} disabled={busy} onChange={e => setModel(e.target.value as any)}><option value="isnet">Best quality · IS-Net (~170 MB)</option><option value="u2netp">Fast · U²-Net small (~5 MB)</option></select></label>
+      <label className="control-label">Model<select aria-label="Cutout model" value={model} disabled={busy} onChange={e => setModel(e.target.value as any)}><option value="isnet">Best general · IS-Net (~170 MB)</option><option value="human">People (whole body) · U²-Net human (~176 MB)</option><option value="u2netp">Fast · U²-Net small (included)</option></select></label>
       <label className="control-label">Edges<select aria-label="Cutout edges" value={edge} disabled={busy} onChange={e => setEdge(e.target.value as any)}><option value="soft">Soft (hair, fur)</option><option value="crisp">Crisp (objects, products)</option></select></label>
     </div>
+    <label className="control-label">Edge {shift > 0 ? `grow ${shift}px` : shift < 0 ? `shrink ${-shift}px (removes halos)` : 'as detected'}<input aria-label="Cutout edge shift" type="range" min={-10} max={10} value={shift} disabled={busy} onChange={e => setShift(Number(e.target.value))}/></label>
     <div className="button-row">
       <button className="btn btn-primary" disabled={disabled || busy || !isImage} onClick={() => void run('layer')}>{hasSubject ? 'Update text behind subject' : 'Put text behind subject'}</button>
       <button className="btn" disabled={disabled || busy || !isImage} onClick={() => void run('asset')}>Remove background → Media Pool</button>
     </div>
     {!isImage && <p className="hint">Add a still image to this scene to use subject cutout. Video cutout is not available yet.</p>}
     {msg && <p className="info-status" role="status">{msg}</p>}
+    {previewId && <figure className="cutout-preview"><img alt="Cutout result on a checkerboard" src={api.assetStreamUrl(previewId)}/><figcaption>Result: check the edges. For people try the People model; if a halo of background remains, shrink the edge 1–3 px.</figcaption></figure>}
   </section>;
 }
 

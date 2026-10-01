@@ -1,0 +1,88 @@
+{
+  "format": "sceneforge-look-pack",
+  "version": 1,
+  "presets": [
+    {
+      "name": "Music video punch",
+      "description": "Chromatic RGB split, an impact camera punch and extra contrast. Glitch is its own preset, so this pack uses the RGB split.",
+      "effect_preset": "chromatic_split",
+      "effect_intensity": 100,
+      "look": {
+        "rgbsplit": {"amount": 40},
+        "shake": {"preset": "impact", "amount": 55, "speed": 70, "impact": true},
+        "adjust": {"contrast": 22, "saturation": 18, "vignette": 20}
+      }
+    },
+    {
+      "name": "Dreamy film",
+      "description": "Red-orange halation glow, soft highlights, warm light leaks and fine grain.",
+      "effect_preset": "halation",
+      "effect_intensity": 70,
+      "look": {
+        "leak": {"amount": 40, "speed": 30, "color": "warm"},
+        "adjust": {"contrast": -10, "highlights": -12, "grain": 22}
+      }
+    },
+    {
+      "name": "Retro VHS",
+      "description": "VHS colour bleed with a gentle tape wobble and a soft handheld drift.",
+      "effect_preset": "vhs",
+      "effect_intensity": 85,
+      "look": {
+        "wiggle": {"amount": 10, "speed": 65, "size": 20},
+        "shake": {"preset": "handheld", "amount": 25, "speed": 40, "impact": false},
+        "adjust": {"saturation": -12, "grain": 30}
+      }
+    },
+    {
+      "name": "Noir",
+      "description": "High-contrast black and white with a heavy vignette and film grain.",
+      "effect_preset": "noir",
+      "effect_intensity": 100,
+      "look": {
+        "adjust": {"contrast": 25, "vignette": 45, "grain": 30}
+      }
+    },
+    {
+      "name": "Teal & orange blockbuster",
+      "description": "Teal shadows, amber highlights and a punchy contrast curve.",
+      "effect_preset": "teal_amber",
+      "effect_intensity": 80,
+      "look": {
+        "tone": {"shadow": "#1E5A8C", "highlight": "#F2A541", "amount": 35, "balance": 0},
+        "adjust": {"contrast": 15, "vibrance": 10, "vignette": 20}
+      }
+    },
+    {
+      "name": "Summer haze",
+      "description": "Golden-hour warmth, a drifting sun flare and soft warm leaks.",
+      "effect_preset": "golden_hour",
+      "effect_intensity": 70,
+      "look": {
+        "flare": {"x": 82, "y": 18, "color": "#FFC870", "blend": "screen", "amount": 45, "drift": 15},
+        "leak": {"amount": 30, "speed": 25, "color": "warm"},
+        "adjust": {"highlights": -15, "saturation": 10}
+      }
+    },
+    {
+      "name": "Night drive",
+      "description": "Tungsten night grade with a cool streetlight flare passing across the frame.",
+      "effect_preset": "tungsten_night",
+      "effect_intensity": 85,
+      "look": {
+        "flare": {"x": 30, "y": 40, "color": "#80B0FF", "blend": "add", "amount": 50, "drift": 40},
+        "adjust": {"contrast": 10, "grain": 15}
+      }
+    },
+    {
+      "name": "Handheld doc",
+      "description": "2383-style print grade with a walking camera sway.",
+      "effect_preset": "print_2383",
+      "effect_intensity": 90,
+      "look": {
+        "shake": {"preset": "walk", "amount": 35, "speed": 45, "impact": false},
+        "adjust": {"grain": 12}
+      }
+    }
+  ]
+}

@@ -88,6 +88,12 @@ try:
     step("colour-graded preview frame", 20, lambda: request("GET", f"/api/scenes/{sid}/graded-frame?w=1280"))
     voice = step("upload narration", 15, lambda: request("POST", f"/api/scenes/{sid}/voice-takes/upload", files=("voice.wav", open(wav, "rb").read(), "audio/wav")))
     step("audio waveform", 15, lambda: request("GET", f"/api/assets/{voice['audio_asset']['id']}/waveform?points=300"))
+    def isolate_voice():  # AI voice isolation: onnxruntime + MDX-Net model (downloads ~67 MB once)
+        out = request("POST", f"/api/assets/{voice['audio_asset']['id']}/isolate-voice", {"strength": 100, "wait": True}, timeout=600)
+        if out.get("status") != "done" or out["asset"]["type"] != "audio":
+            raise AssertionError(f"voice isolation did not return an audio asset: {out}")
+        return out
+    step("AI voice isolation on the narration (model download + onnxruntime)", 600, isolate_voice)
     step("provider list", 5, lambda: request("GET", "/api/providers"))
     def whisper_engine():
         report = request("GET", "/api/local-speech/whisper/check")

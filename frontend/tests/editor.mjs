@@ -6,7 +6,7 @@ import {createRequire} from 'node:module';
 import {readFileSync} from 'node:fs';
 import assert from 'node:assert/strict';
 const dom=new JSDOM('<!doctype html><html><body></body></html>',{url:'http://localhost'});
-for(const k of ['window','document','navigator','HTMLElement','HTMLInputElement','HTMLTextAreaElement','Event','MouseEvent','CustomEvent','KeyboardEvent','File','FormData']) Object.defineProperty(globalThis,k,{value:dom.window[k],configurable:true});
+for(const k of ['window','document','navigator','HTMLElement','HTMLInputElement','HTMLTextAreaElement','Event','MouseEvent','CustomEvent','KeyboardEvent','File','FileReader','FormData']) Object.defineProperty(globalThis,k,{value:dom.window[k],configurable:true});
 Object.defineProperty(globalThis,'localStorage',{value:dom.window.localStorage,configurable:true});
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
 dom.window.HTMLCanvasElement.prototype.getContext=()=>null; // jsdom has no canvas; FilmPreview handles null
@@ -31,6 +31,7 @@ let profiles=[];
 let healthBuild="v0.6.0-wip.10";let oldBackend=false;
 let failLocal=true;
 let closeReady=true;
+let lookPresets=[];
 const clone=x=>structuredClone(x);
 globalThis.fetch=async(path,init={})=>{
  const method=init.method||'GET'; const body=typeof init.body==='string'?JSON.parse(init.body):init.body;
@@ -84,6 +85,8 @@ globalThis.fetch=async(path,init={})=>{
  }
  else if(path.startsWith('/api/scenes/')&&path.endsWith('/restore')&&method==='POST'){const id=path.split('/').at(-2),at=project.scenes.findIndex(s=>s.id===id);if(at>=0)project.scenes[at]=clone(body);else project.scenes.splice(Math.max(0,Math.min(body.order_index??project.scenes.length,project.scenes.length)),0,clone(body));result=body;}
  else if(path.startsWith('/api/scenes/')&&method==='DELETE'){project.scenes=project.scenes.filter(s=>s.id!==path.split('/').at(-1));project.scenes.forEach((s,i)=>s.order_index=i);result={ok:true};}
+ else if(path==='/api/look-presets'&&method==='GET')result={presets:lookPresets,builtin:[{id:'builtin-0',builtin:true,name:'Noir',description:'High-contrast black and white',effect_preset:'noir',effect_intensity:100,look:{adjust:{contrast:25,vignette:45}}}],look_keys:['adjust','tone','shake','leak','flare','wiggle','fx_order','fx_bypass']};
+ else if(path==='/api/look-presets'&&method==='POST'){if(body.format!=='sceneforge-look-pack')return {ok:false,status:400,statusText:'Bad',json:async()=>({detail:'This file is not a SceneForge look pack (format must be "sceneforge-look-pack").'})};const added=body.presets.map((p,i)=>({...p,id:'lp-'+(next++)+i}));lookPresets=[...lookPresets,...added];result={added,presets:lookPresets};}
  else throw Error(`Unhandled test API: ${method} ${path}`);
  return {ok:true,status:200,json:async()=>clone(result)};
 };
@@ -353,6 +356,27 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getByRole('switch',{name:'Spotlight'}));await saved();
  check('turning an effect off removes it',lk().some(l=>'spotlight' in l&&l.spotlight===null)&&!document.querySelector('.scenefx-preview .fx-layer:not(.fx-leak)'));
  check('VHS look is offered',!!screen.getByRole('button',{name:'VHS',exact:true}));
+ // Effect stack: active scene FX as reorderable / bypassable nodes
+ const stack=()=>within(screen.getByRole('list',{name:'Effect order, from input to output'})).getAllByRole('listitem').map(li=>li.getAttribute('aria-label')).filter(Boolean);
+ await waitFor(()=>assert.deepEqual(stack(),['1. Light leaks','2. Camera shake']));
+ check('effect stack lists the active scene effects in render order');
+ await user.click(screen.getByRole('button',{name:'Move Camera shake earlier'}));await saved();
+ check('moving a node saves the new effect order',lk().some(l=>JSON.stringify(l.fx_order)==='["shake","leak"]')&&stack()[0]==='1. Camera shake');
+ await user.click(screen.getByRole('checkbox',{name:'Bypass Light leaks'}));await saved();
+ check('bypassing a node saves fx_bypass and keeps its settings',lk().some(l=>JSON.stringify(l.fx_bypass)==='["leak"]')&&!!project.scenes[0].look_json.leak);
+ await user.click(screen.getByRole('button',{name:/Reset effect order/}));await saved();
+ check('reset clears the effect order and bypass',lk().some(l=>l.fx_order===null&&l.fx_bypass===null));
+ // Look presets: built-in tile applies through the scene update; packs import from a file
+ const noir=await screen.findByRole('button',{name:/Apply look preset Noir/});
+ await user.click(noir);
+ await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.body?.effect_preset==='noir')));
+ const applied=requests.filter(r=>r.method==='PATCH'&&r.body?.effect_preset==='noir').at(-1).body;
+ check('applying a look preset sets the effect and replaces the portable look keys',applied.effect_intensity===100&&applied.look.adjust.contrast===25&&applied.look.shake===null&&applied.look.leak===null&&!('redact' in applied.look));
+ const packFile=new File([JSON.stringify({format:'sceneforge-look-pack',version:1,presets:[{name:'Shared warm',effect_preset:'warm',effect_intensity:60,look:{}}]})],'shared.sflook',{type:''});
+ await user.upload(screen.getByLabelText('Import look pack file'),packFile);
+ check('importing a pack file adds its presets to My presets',!!(await screen.findByRole('button',{name:/Apply look preset Shared warm/})));
+ await user.upload(screen.getByLabelText('Import look pack file'),new File(['{"presets":[]}'],'bad.json',{type:'application/json'}));
+ check('an invalid pack shows the reason',!!(await screen.findByText(/Couldn't import “bad.json”: This file is not a SceneForge look pack/)));
  check('no Insert countdown button on the timeline side any more',!screen.queryByRole('button',{name:/Insert countdown/}));
  await user.click(screen.getByRole('switch',{name:'Countdown intro'}));
  await user.click(within(screen.getByRole('radiogroup',{name:'Countdown style'})).getByRole('radio',{name:'Modern'}));await saved();
