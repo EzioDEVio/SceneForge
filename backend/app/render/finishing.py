@@ -82,7 +82,7 @@ def clean_finishing(raw: dict, project_id: str, db) -> dict:
         raise FinishingError("The timeline supports up to 64 project audio clips.")
     clean_clips = []
     for index, clip in enumerate(clips):
-        allowed = {"id", "asset_id", "name", "start_ms", "source_in_ms", "source_out_ms", "source_duration_ms", "volume", "fade_in_ms", "fade_out_ms", "mute", "track", "gain"}
+        allowed = {"id", "asset_id", "name", "start_ms", "source_in_ms", "source_out_ms", "source_duration_ms", "volume", "fade_in_ms", "fade_out_ms", "mute", "track", "gain", "group"}
         if not isinstance(clip, dict) or set(clip) - allowed:
             raise FinishingError(f"Project audio clip {index + 1} has unsupported settings.")
         asset = db.get(Asset, clip.get("asset_id")) if clip.get("asset_id") else None
@@ -123,6 +123,11 @@ def clean_finishing(raw: dict, project_id: str, db) -> dict:
                     raise FinishingError(f"Project audio clip {index + 1} envelope points are [source time ms, -60..12 dB].")
                 pts.append([int(point[0]), round(float(point[1]), 1)])
             cleaned["gain"] = sorted(pts)
+        group = clip.get("group")
+        if group is not None:
+            if not isinstance(group, str) or not 0 < len(group) <= 40:
+                raise FinishingError(f"Project audio clip {index + 1} group must be a short id.")
+            cleaned["group"] = group
         if track != "A3":   # A3 stays implicit so projects remain readable by pre-timeline-v1 builds
             cleaned["track"] = track
         clean_clips.append(cleaned)
@@ -171,7 +176,7 @@ def clean_timeline(raw) -> dict:
         raise FinishingError(f"A timeline supports up to {MAX_MARKERS} markers.")
     markers = []
     for i, m in enumerate(markers_in):
-        if not isinstance(m, dict) or set(m) - {"id", "time_ms", "duration_ms", "label", "color"}:
+        if not isinstance(m, dict) or set(m) - {"id", "time_ms", "duration_ms", "label", "color", "clip_id", "offset_ms"}:
             raise FinishingError(f"Marker {i + 1} has unsupported settings.")
         t, d = m.get("time_ms"), m.get("duration_ms", 0)
         for name, v in (("time", t), ("length", d)):
@@ -180,8 +185,14 @@ def clean_timeline(raw) -> dict:
         color = m.get("color", "amber")
         if color not in MARKER_COLORS:
             raise FinishingError(f"Marker {i + 1} colour must be one of " + ", ".join(MARKER_COLORS) + ".")
-        markers.append({"id": str(m.get("id") or uuid.uuid4())[:64], "time_ms": int(t), "duration_ms": int(d),
-                        "label": str(m.get("label") or f"Marker {i + 1}")[:120], "color": color})
+        item = {"id": str(m.get("id") or uuid.uuid4())[:64], "time_ms": int(t), "duration_ms": int(d),
+                "label": str(m.get("label") or f"Marker {i + 1}")[:120], "color": color}
+        if m.get("clip_id") is not None:
+            off = m.get("offset_ms", 0)
+            if not isinstance(m["clip_id"], str) or not m["clip_id"] or isinstance(off, bool) or not isinstance(off, (int, float)) or not 0 <= off <= 86_400_000:
+                raise FinishingError(f"Marker {i + 1} clip attachment is invalid.")
+            item["clip_id"], item["offset_ms"] = m["clip_id"][:64], int(off)
+        markers.append(item)
     markers.sort(key=lambda m: m["time_ms"])
     return {"version": TIMELINE_VERSION, "tracks": tracks,
             "audio_tracks": [t for t in AUDIO_TRACKS if t == "A3" or t in shown], "markers": markers}

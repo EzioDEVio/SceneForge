@@ -3,13 +3,15 @@
 **Prepared:** 2026-09-30  
 **Project:** [EzioDEVio/SceneForge](https://github.com/EzioDEVio/SceneForge)  
 **Latest published release:** 0.5.3  
-**Current candidate:** 0.7.0 RC8, unreleased (branch `claude/0.7.0-rc5-timeline`, RC5 plus RC6 fixes and effects)  
+**Current candidate:** 0.7.0 RC9, unreleased (branch `claude/0.7.0-rc5-timeline`, RC5 plus RC6 fixes and effects)  
 **Candidate branch:** `chatgpt/0.7.0-video-generation`  
 **Candidate commit:** `c9a8ee74831ab8ebc0a48aa0875e8139c98f568b` (tree `c813c8cdfe63446734c19e4031437ce531aedcea`)
 
 This is the single-document handoff: it combines current status and next steps, the session handoff, and cumulative release notes. Historical WIP/RC entries are development snapshots, not published releases. The earliest release notes present in this repository begin at 0.2.0 RC3; earlier prototype history is not reconstructed in the available records.
 
 ## Read this status first
+
+- **RC9 update (2026-10-01):** adds 400 stickers and emoji (Twemoji), 71 caption styles, settings for 36 effects, clock and iris text reveals, moving-video subject cutout, clip groups and clip-attached markers.
 
 - **RC8 update (2026-10-01):** improves cutout quality (edge refinement, people model, edge shift, preview; the small model is bundled). Adds AI voice isolation (MDX-Net), beat markers, volume envelopes, the effect stack (node order and bypass) and look preset packs. Still not done: video (moving) cutout, a full node compositor, compound clips and clip-attached markers.
 
@@ -383,6 +385,36 @@ The accompanying full-source ZIP contains the complete tracked SceneForge projec
 ---
 
 ## Appendix B — Complete cumulative release notes
+
+## SceneForge Studio 0.7.0 RC9 (unreleased)
+
+### Library
+- **400 stickers and emoji** in 14 categories, with search and a Recent tab.
+  - 322 colour emoji come from **Twemoji** (graphics CC-BY 4.0; credited in THIRD_PARTY.md and About).
+  - 78 crisp graphics: subscribe/like buttons, badges, stamps, arrows, callout circles, shapes and speech bubbles.
+  - All 66 earlier stickers keep their names and ids. Stickers are bundled, so they look the same on every PC.
+- **71 caption styles** (31 earlier plus 40 new), grouped as Social, Cinematic, Karaoke, Fun, Minimal and Arabic, with search.
+  - Fixed: karaoke "colour" highlighting in phrase mode never coloured the spoken word. This affected 4 existing styles.
+
+### Effects
+- **Per-effect settings.** 36 presets now have their own controls, 132 settings in total. For example:
+  - colour looks: warmth, tint, contrast, saturation, fade;
+  - VHS: colour bleed, noise, scanlines, tracking;
+  - halation: threshold, radius, colour;
+  - sepia and duotone: tone colours.
+
+  Settings are remembered per effect, and there's a reset button. Default settings render byte-identically to before.
+- **Text reveals:** Clock wipe, Clock wipe (counter-clockwise) and Iris (circle) reveals.
+
+### AI
+- **Moving-video subject cutout:** "Put text behind moving subject" works on a scene with one video clip of up to 20 s.
+  - Per-frame AI matte with temporal smoothing and edge refinement, rendered as a VP9 alpha layer above captions and titles.
+  - Runs in the background with progress, a time estimate and Cancel.
+  - About 0.4–0.8 s per frame at 1080p with the fast model on a 2-CPU machine.
+
+### Timeline
+- **Clip groups:** select clips, then Ctrl+G or right-click → Group. Grouped clips select and move together; Ctrl+Shift+G ungroups.
+- **Markers attached to a clip:** right-click → "Add marker on this clip". The marker moves when the clip moves.
 
 ## SceneForge Studio 0.7.0 RC8 (unreleased)
 

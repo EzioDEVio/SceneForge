@@ -431,3 +431,7 @@ CLEANERS.update(focus=_wrap(clean_focus), mosaic=_wrap(clean_mosaic), rgbsplit=_
 from app.render.fx_stack import clean_fx_bypass, clean_fx_order  # noqa: E402  (effect stack order / bypass)
 
 CLEANERS.update(fx_order=_wrap(clean_fx_order), fx_bypass=_wrap(clean_fx_bypass))
+
+from app.render.effect_params import clean_fx_params  # noqa: E402  (per-effect settings, look.fx_params)
+
+CLEANERS["fx_params"] = _wrap(clean_fx_params)

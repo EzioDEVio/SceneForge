@@ -2,7 +2,7 @@
 // textured text titles (procedural presets, a Media Pool image, or a generated texture).
 import React from 'react';
 import {Scissors, Type, Sparkles} from 'lucide-react';
-import {api, Asset, ProviderProfile, Scene} from './api';
+import {api, Asset, ProviderProfile, Scene, SubjectVideoEstimate, SubjectVideoJob} from './api';
 
 const PRESETS: [string, string][] = [['lava', 'Lava'], ['neon', 'Neon'], ['gold', 'Gold'], ['chrome', 'Chrome'], ['marble', 'Marble'],
   ['ice', 'Ice'], ['fire', 'Fire'], ['pixel', 'Pixel blocks'], ['galaxy', 'Galaxy']];
@@ -21,6 +21,53 @@ export function SubjectCutoutPanel({scene, disabled, onDone}: {scene: Scene; dis
   const isImage = shot?.asset?.type === 'image';
   const hasSubject = (scene.overlays_json || []).some(o => (o as any).kind === 'subject');
   const needsDownload = status?.models.find(m => m.id === model && !m.downloaded);
+  // Video: "text behind a moving subject" runs as a background job with frame progress.
+  const isVideo = shot?.asset?.type === 'video';
+  const [estimate, setEstimate] = React.useState<SubjectVideoEstimate | null>(null);
+  const [vjob, setVjob] = React.useState<SubjectVideoJob | null>(null);
+  const vjobId = React.useRef('');
+  React.useEffect(() => {if (isVideo) setModel('u2netp');}, [isVideo, shot?.id]);
+  React.useEffect(() => {
+    if (!isVideo) {setEstimate(null); return;}
+    let live = true;
+    api.subjectVideoEstimate(scene.id, model).then(e => {if (live) setEstimate(e);}).catch(() => live && setEstimate(null));
+    return () => {live = false;};
+  }, [isVideo, scene.id, model, shot?.id, shot?.source_in_ms, shot?.source_out_ms, scene.revision]);
+  React.useEffect(() => () => {vjobId.current = '';}, []);
+  async function followVideoJob(jobId: string) {
+    vjobId.current = jobId;
+    while (vjobId.current === jobId) {
+      let j: SubjectVideoJob;
+      try {j = await api.subjectVideoJob(jobId);} catch (e: any) {setMsg(e.message || String(e)); break;}
+      setVjob(j);
+      if (j.status === 'succeeded') {
+        setMsg(['Moving subject layer added above captions and titles. Render the scene to see text behind the subject.', ...(j.notes || [])].join(' '));
+        await onDone(); break;
+      }
+      if (j.status === 'failed' || j.status === 'cancelled') {setMsg(j.status === 'cancelled' ? 'Cutout cancelled. Nothing was changed.' : (j.error || 'The cutout failed.')); break;}
+      await new Promise(r => setTimeout(r, 700));
+    }
+    if (vjobId.current === jobId) vjobId.current = '';
+    setVjob(null); setBusy(false);
+  }
+  React.useEffect(() => {
+    if (estimate?.running_job_id && !vjobId.current) {setBusy(true); void followVideoJob(estimate.running_job_id);}
+  }, [estimate?.running_job_id]);
+  async function runVideo() {
+    setBusy(true);
+    setMsg(needsDownload ? `Downloading the background-removal model (~${needsDownload.approx_mb} MB, once)… then cutting out the moving subject.` : 'Cutting out the moving subject frame by frame…');
+    try {
+      const r = await api.subjectVideoLayer(scene.id, {model, edge, shift});
+      if (r.status === 'done') {
+        setMsg(['Moving subject layer added (reused the earlier cutout). Render the scene to see text behind the subject.', ...(r.notes || [])].join(' '));
+        await onDone(); setBusy(false); return;
+      }
+      await followVideoJob(r.job_id!);
+      setStatus(await api.cutoutStatus().catch(() => status));
+    } catch (e: any) {setMsg(e.message || String(e)); setBusy(false);}
+  }
+  const fmtTime = (s: number) => s < 90 ? `~${Math.max(1, Math.round(s))} s` : `~${Math.round(s / 60)} min`;
+  const videoLeft = vjob && vjob.ms_per_frame ? (vjob.frames_total - vjob.frames_done) * vjob.ms_per_frame / 1000 : null;
   async function run(kind: 'layer' | 'asset') {
     if (!shot) return;
     setBusy(true); setMsg(needsDownload ? `Downloading the background-removal model (~${needsDownload.approx_mb} MB, once)… then cutting out the subject.` : 'Cutting out the subject…');
@@ -40,17 +87,25 @@ export function SubjectCutoutPanel({scene, disabled, onDone}: {scene: Scene; dis
   }
   return <section className="creative-card" aria-label="Subject cutout">
     <header><Scissors size={15}/><strong>Subject cutout · AI beta</strong></header>
-    <p className="hint">Removes the background on this computer with a local AI model. “Text behind subject” keeps captions and titles behind the person or object. Works on scenes with one still image and no camera movement.</p>
+    <p className="hint">Removes the background on this computer with a local AI model. “Text behind subject” keeps captions and titles behind the person or object. Works on scenes with one still image or one video clip (up to 20 s, normal speed) and no camera movement.</p>
     <div className="acc-grid">
       <label className="control-label">Model<select aria-label="Cutout model" value={model} disabled={busy} onChange={e => setModel(e.target.value as any)}><option value="isnet">Best general · IS-Net (~170 MB)</option><option value="human">People (whole body) · U²-Net human (~176 MB)</option><option value="u2netp">Fast · U²-Net small (included)</option></select></label>
       <label className="control-label">Edges<select aria-label="Cutout edges" value={edge} disabled={busy} onChange={e => setEdge(e.target.value as any)}><option value="soft">Soft (hair, fur)</option><option value="crisp">Crisp (objects, products)</option></select></label>
     </div>
     <label className="control-label">Edge {shift > 0 ? `grow ${shift}px` : shift < 0 ? `shrink ${-shift}px (removes halos)` : 'as detected'}<input aria-label="Cutout edge shift" type="range" min={-10} max={10} value={shift} disabled={busy} onChange={e => setShift(Number(e.target.value))}/></label>
-    <div className="button-row">
+    {isVideo ? <>
+      <div className="button-row">
+        <button className="btn btn-primary" disabled={disabled || busy || !estimate?.ok} onClick={() => void runVideo()}>{hasSubject ? 'Update text behind moving subject' : 'Put text behind moving subject'}{estimate?.ok && !busy ? ` (${fmtTime(estimate.estimate_s || 0)})` : ''}</button>
+        {vjob && <button className="btn" onClick={() => void api.cancelJob(vjob.job_id).catch(() => {})}>Cancel</button>}
+      </div>
+      {estimate?.ok && !busy && <p className="hint">{estimate.frames} frames ({estimate.seconds_of_video} s) at {Math.round(estimate.ms_per_frame || 0)} ms per frame{estimate.measured ? ' (measured on this computer)' : ' (estimate)'}.{model !== 'u2netp' ? ' This model is much slower on video; Fast · U²-Net small is recommended.' : ''}</p>}
+      {estimate && !estimate.ok && <p className="hint">{estimate.reason}</p>}
+      {vjob && <div className="cutout-progress"><progress aria-label="Cutout progress" max={vjob.frames_total || 1} value={vjob.frames_done}/><span>Frame {vjob.frames_done} of {vjob.frames_total}{videoLeft != null ? ` · ${fmtTime(videoLeft)} left` : ''}</span></div>}
+    </> : <div className="button-row">
       <button className="btn btn-primary" disabled={disabled || busy || !isImage} onClick={() => void run('layer')}>{hasSubject ? 'Update text behind subject' : 'Put text behind subject'}</button>
       <button className="btn" disabled={disabled || busy || !isImage} onClick={() => void run('asset')}>Remove background → Media Pool</button>
-    </div>
-    {!isImage && <p className="hint">Add a still image to this scene to use subject cutout. Video cutout is not available yet.</p>}
+    </div>}
+    {!isImage && !isVideo && <p className="hint">Add a still image or a video to this scene to use subject cutout.</p>}
     {msg && <p className="info-status" role="status">{msg}</p>}
     {previewId && <figure className="cutout-preview"><img alt="Cutout result on a checkerboard" src={api.assetStreamUrl(previewId)}/><figcaption>Result: check the edges. For people try the People model; if a halo of background remains, shrink the edge 1–3 px.</figcaption></figure>}
   </section>;

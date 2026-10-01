@@ -20,6 +20,8 @@ the build scripts that fetch these components, is at https://github.com/EzioDEVi
 | Noto Sans, Noto Naskh Arabic, Noto Sans Arabic | SIL Open Font License 1.1 | `assets/fonts/OFL-LICENSE.txt` |
 | Poppins, Bebas Neue, Anton, Pacifico, Amiri, Tajawal, Lalezar (from github.com/google/fonts) | SIL Open Font License 1.1 | `assets/fonts/licenses/OFL-*.txt` |
 | Synthetic typewriter sound | Generated for SceneForge | `assets/sfx/SOURCE.md` |
+| Twemoji emoji graphics (322 emoji in `assets/stickers/emoji/`, rasterised to PNG from Twemoji v17.0.3 SVGs) | CC-BY 4.0 — Copyright Twitter, Inc. and other contributors; https://github.com/jdecked/twemoji | `assets/stickers/LICENSE-TWEMOJI-GRAPHICS.txt`. Fetched and rasterised by `scripts/build_sticker_library.py`. |
+| Graphic stickers (badges, arrows, speech bubbles, shapes, social buttons in `assets/stickers/graphics/`) | Drawn for SceneForge (GPL-3.0-or-later) with the bundled OFL fonts | `scripts/build_sticker_library.py` |
 
 ## Not bundled
 AI models and engines are **not** included in the installers. Optional local engines (Stable Diffusion

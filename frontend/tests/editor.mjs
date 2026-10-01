@@ -43,6 +43,7 @@ globalThis.fetch=async(path,init={})=>{
  else if(path===`/api/projects/${project.id}`&&method==='GET') result=project;
  else if(/^\/api\/scenes\/[^/]+$/.test(path)&&method==='GET')result=project.scenes.find(s=>s.id===path.split('/').at(-1));
  else if(path==='/api/cutout/status')result={folder:'',models:[{id:'isnet',label:'IS-Net',downloaded:false,approx_mb:170},{id:'u2netp',label:'U2',downloaded:true,approx_mb:4.6}]};
+ else if(/^\/api\/projects\/[^/]+\/stickers\/[^/]+$/.test(path)&&method==='POST')result={id:'stk-'+next++,type:'image',original_filename:`sticker-${path.split('/').at(-1)}.png`,width:420,height:200};
  else if(path.endsWith('/textured-title')&&method==='POST')result={scene:project.scenes[0],asset:{id:'tt',type:'image',original_filename:'sticker-textured.png'}};
  else if(path.endsWith('/detach-audio')&&method==='POST')result={asset:{id:'detached-audio',type:'audio',original_filename:body.source==='shot'?'clip.mp4 sound.wav':'narration.wav',duration_ms:2000},offset_ms:body.source==='shot'?0:250};
  else if(path===`/api/projects/${project.id}`&&method==='PATCH'){Object.assign(project,body);if(body.finishing){project.finishing_json=body.finishing;delete project.finishing;}result=project;}
@@ -85,6 +86,7 @@ globalThis.fetch=async(path,init={})=>{
  }
  else if(path.startsWith('/api/scenes/')&&path.endsWith('/restore')&&method==='POST'){const id=path.split('/').at(-2),at=project.scenes.findIndex(s=>s.id===id);if(at>=0)project.scenes[at]=clone(body);else project.scenes.splice(Math.max(0,Math.min(body.order_index??project.scenes.length,project.scenes.length)),0,clone(body));result=body;}
  else if(path.startsWith('/api/scenes/')&&method==='DELETE'){project.scenes=project.scenes.filter(s=>s.id!==path.split('/').at(-1));project.scenes.forEach((s,i)=>s.order_index=i);result={ok:true};}
+ else if(path==='/api/effects/schema')result={version:1,look_key:'fx_params',presets:{warm:{params:[{name:'warmth',label:'Warmth',kind:'number',min:0,max:100,step:1,default:50,css:{fn:'warmth',k:0.004}},{name:'tint',label:'Tint',kind:'number',min:-100,max:100,step:1,default:0},{name:'saturation',label:'Saturation',kind:'number',min:0,max:200,step:1,default:108,unit:'%',css:{fn:'saturate'}}]},duotone:{params:[{name:'shadow',label:'Shadow colour',kind:'color',default:'#1B2A6B'},{name:'highlight',label:'Highlight colour',kind:'color',default:'#F2C94C'}]},mosaic:{managed_by:'mosaic',params:[{name:'block',label:'Block size',kind:'number',min:2,max:120,step:1,default:24}]}}};
  else if(path==='/api/look-presets'&&method==='GET')result={presets:lookPresets,builtin:[{id:'builtin-0',builtin:true,name:'Noir',description:'High-contrast black and white',effect_preset:'noir',effect_intensity:100,look:{adjust:{contrast:25,vignette:45}}}],look_keys:['adjust','tone','shake','leak','flare','wiggle','fx_order','fx_bypass']};
  else if(path==='/api/look-presets'&&method==='POST'){if(body.format!=='sceneforge-look-pack')return {ok:false,status:400,statusText:'Bad',json:async()=>({detail:'This file is not a SceneForge look pack (format must be "sceneforge-look-pack").'})};const added=body.presets.map((p,i)=>({...p,id:'lp-'+(next++)+i}));lookPresets=[...lookPresets,...added];result={added,presets:lookPresets};}
  else throw Error(`Unhandled test API: ${method} ${path}`);
@@ -203,6 +205,14 @@ try{
  await user.click(screen.getByRole('button',{name:'Warm',exact:true}));await saved();
  check('effect selection persists',project.scenes.find(s=>s.id===firstId).effect_preset==='warm');
  check('effect appears on main preview',visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('saturate'));
+ const fxPanel=await screen.findByRole('region',{name:'Effect settings'});
+ check('Effect settings panel is generated from the schema for the active effect',!!within(fxPanel).getByRole('slider',{name:'Effect warmth'})&&!!within(fxPanel).getByRole('slider',{name:'Effect saturation'})&&within(fxPanel).getByRole('button',{name:/Reset to default/}).disabled);
+ fireEvent.change(within(fxPanel).getByRole('slider',{name:'Effect warmth'}),{target:{value:'85'}});
+ check('changing an effect setting updates the live preview before saving',visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('sepia('));
+ await saved();
+ check('saving an effect setting sends look.fx_params for that preset',requests.some(r=>r.method==='PATCH'&&r.body?.look?.fx_params?.warm?.warmth===85)&&project.scenes.find(s=>s.id===firstId).look_json.fx_params.warm.warmth===85);
+ await user.click(within(fxPanel).getByRole('button',{name:/Reset to default/}));await saved();
+ check('Reset to default clears the preset settings',!project.scenes.find(s=>s.id===firstId).look_json.fx_params);
  await user.clear(screen.getByRole('textbox',{name:'Search effects'}));
  const filterHeading=screen.getByRole('heading',{name:'Color filters · 8 additions'});
  const creativeHeading=screen.getByRole('heading',{name:'Creative effects · 2 additions'});
@@ -217,6 +227,7 @@ try{
  check('new color filters apply as their own render preset',project.scenes.find(s=>s.id===firstId).effect_preset==='golden_hour');
  await user.clear(screen.getByRole('textbox',{name:'Search effects'}));
  await user.click(screen.getByRole('button',{name:'Original',exact:true}));await saved();
+ check('Original has no Effect settings panel',!screen.queryByRole('region',{name:'Effect settings'}));
  fireEvent.change(screen.getByRole('slider',{name:'Exposure'}),{target:{value:'35'}});
  fireEvent.change(screen.getByRole('slider',{name:'Temperature'}),{target:{value:'-40'}});
  check('adjustment preview updates before saving',visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('brightness')&&visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('url(#sf-wb-'));
@@ -274,7 +285,14 @@ try{
  const captionStyleGrid=screen.getAllByRole('group',{name:'Caption styles'}).find(el=>el.classList.contains('caption-presets'));
  const textLayers=screen.getByText('Text overlays').closest('.text-layers');
  check('text layer editor sits directly after Auto Captions and before manual captions',!!textLayers&&screen.getByRole('region',{name:'Auto captions'}).compareDocumentPosition(textLayers)&4&&textLayers.compareDocumentPosition(screen.getByRole('textbox',{name:'On-screen captions'}))&4);
- check('caption library includes the added creator and Arabic styles',!!captionStyleGrid&&captionStyleGrid.querySelectorAll('button').length>=31&&!!screen.getByRole('button',{name:'Apply Arabic clean caption style'}));
+ check('caption library includes the added creator and Arabic styles',!!captionStyleGrid&&captionStyleGrid.querySelectorAll('button').length===71&&!!screen.getByRole('button',{name:'Apply Arabic clean caption style'}));
+ const capGrid=()=>screen.getAllByRole('group',{name:'Caption styles'}).find(el=>el.classList.contains('caption-presets'));
+ await user.type(screen.getByRole('textbox',{name:'Search caption styles'}),'arabic');
+ check('caption style search finds every Arabic-friendly style',capGrid().querySelectorAll('button').length===8&&!!screen.getByRole('button',{name:'Apply Arabic Lalezar bold caption style'})&&!screen.queryByRole('button',{name:'Apply Viral bold caption style'}));
+ await user.clear(screen.getByRole('textbox',{name:'Search caption styles'}));
+ await user.click(within(screen.getByRole('group',{name:'Caption style groups'})).getByRole('button',{name:/^Karaoke/}));
+ check('caption style groups filter the picker (Karaoke)',capGrid().querySelectorAll('button').length===14&&!!screen.getByRole('button',{name:'Apply Karaoke pink box caption style'})&&!screen.queryByRole('button',{name:'Apply Classic caption style'}));
+ await user.click(within(screen.getByRole('group',{name:'Caption style groups'})).getByRole('button',{name:/^All/}));
  await user.click(screen.getByRole('button',{name:'Apply Viral bold caption style'}));await saved();
  check('a caption style preset applies font, case, phrases and box highlight',requests.some(r=>r.body?.font?.family==='Anton'&&r.body.font.case==='upper'&&r.body.font.split==='phrases'&&r.body.font.karaoke_style==='box'));
  await user.click(screen.getByRole('button',{name:'Italic'}));await saved();
@@ -437,10 +455,19 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  // Picture-in-picture overlays
  await user.click(screen.getByRole('tab',{name:'Overlays',exact:true}));
  await waitFor(()=>assert.ok(within(screen.getByRole('combobox',{name:'Add overlay from media'})).getAllByRole('option').length===3));
- check('searchable sticker and emoji library includes all 66 emoji and graphic badges',screen.getByRole('group',{name:'Sticker choices'}).querySelectorAll('button').length===66&&!!screen.getByRole('button',{name:'Add Subscribe pill sticker'}));
+ check('searchable sticker and emoji library includes all 400 emoji and graphic stickers',screen.getByRole('group',{name:'Sticker choices'}).querySelectorAll('button').length===400&&!!screen.getByRole('button',{name:'Add Subscribe pill sticker'}));
  await user.type(screen.getByRole('textbox',{name:'Search stickers and emoji'}),'heart');
- check('sticker search filters the curated emoji choices',screen.getByRole('button',{name:'Add Heart sticker'})&&screen.getByRole('button',{name:'Add Heart eyes sticker'}));
+ check('sticker search filters the curated emoji choices',screen.getByRole('button',{name:'Add Heart sticker'})&&screen.getByRole('button',{name:'Add Heart eyes sticker'})&&!screen.queryByRole('button',{name:'Add Pizza sticker'}));
  await user.clear(screen.getByRole('textbox',{name:'Search stickers and emoji'}));
+ const stickerTabs=()=>within(screen.getByRole('group',{name:'Sticker categories'}));
+ await user.click(stickerTabs().getByRole('button',{name:/^Hearts/}));
+ check('sticker category tab shows only that category',screen.getByRole('group',{name:'Sticker choices'}).querySelectorAll('button').length===21&&!!screen.getByRole('button',{name:'Add Pink heart sticker'})&&!screen.queryByRole('button',{name:'Add Pizza sticker'}));
+ await user.type(screen.getByRole('textbox',{name:'Search stickers and emoji'}),'broken');
+ check('sticker search combines with the category filter',screen.getByRole('group',{name:'Sticker choices'}).querySelectorAll('button').length===1&&!!screen.getByRole('button',{name:'Add Broken heart sticker'}));
+ await user.clear(screen.getByRole('textbox',{name:'Search stickers and emoji'}));
+ await user.click(stickerTabs().getByRole('button',{name:/^Speech bubbles/}));
+ check('graphic sticker categories list the drawn speech bubbles',!!screen.getByRole('button',{name:'Add Thinking cloud sticker'})&&!screen.queryByRole('button',{name:'Add Heart sticker'}));
+ await user.click(stickerTabs().getByRole('button',{name:/^All/}));
  await user.selectOptions(screen.getByRole('combobox',{name:'Add overlay from media'}),'pool-img');await saved();
  const ovSave=()=>requests.filter(r=>r.method==='PATCH'&&r.body?.overlays).at(-1)?.body.overlays;
  check('adding a media layer saves its role and default placement',ovSave()?.length===1&&ovSave()[0].asset_id==='pool-img'&&ovSave()[0].kind==='media'&&ovSave()[0].width===34&&ovSave()[0].anim_in==='fade');
@@ -468,6 +495,10 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getByRole('button',{name:'Add Subscribe pill sticker'}));
  await waitFor(()=>assert.ok(ovSave()?.length===1&&ovSave()[0].width===19));await saved();
  check('built-in stickers start at a compact size',ovSave().length===1&&ovSave()[0].width===19&&ovSave()[0].border===0);
+ check('library stickers are imported from the bundled PNG library into the project',requests.some(r=>r.method==='POST'&&r.path===`/api/projects/${project.id}/stickers/subscribe-pill`)&&ovSave()[0].asset_id.startsWith('stk-')&&ovSave()[0].kind==='sticker');
+ await user.click(stickerTabs().getByRole('button',{name:'Recent'}));
+ check('recently used stickers are listed under Recent',screen.getByRole('group',{name:'Sticker choices'}).querySelectorAll('button').length===1&&!!screen.getByRole('button',{name:'Add Subscribe pill sticker'}));
+ await user.click(stickerTabs().getByRole('button',{name:/^All/}));
  const stickerPosition={x:ovSave()[0].x,y:ovSave()[0].y,width:ovSave()[0].width};
  await user.selectOptions(screen.getByRole('combobox',{name:'Add overlay from media'}),'pool-img');await saved();
  await user.selectOptions(screen.getByRole('combobox',{name:'Add overlay from media'}),'pool-img');await saved();

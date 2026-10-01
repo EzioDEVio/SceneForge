@@ -1,11 +1,11 @@
 import React,{useState} from 'react';
 import {previewFontFamily} from './fonts';
 import {TextLayer} from './api';
-export const ANIMATIONS=['none','fade','slide','slide-right','slide-up','slide-down','zoom','reveal','reveal-right','reveal-up','reveal-down','reveal-split','typewriter','blur','glitch',
+export const ANIMATIONS=['none','fade','slide','slide-right','slide-up','slide-down','zoom','reveal','reveal-right','reveal-up','reveal-down','reveal-split','reveal-clock','reveal-clock-ccw','reveal-iris','typewriter','blur','glitch',
   'letters-pop','letters-fade','letters-flip','letters-blur','words-pop','words-fade','words-flip','shine','bounce','neon','wobble'];
 /** Friendly names; Arabic text animates by word in the letter animations (joined letters). */
 export const ANIMATION_LABELS:Record<string,string>={none:'None',fade:'Fade',slide:'Slide in from left','slide-right':'Slide in from right','slide-up':'Rise up','slide-down':'Drop down',
-  zoom:'Zoom in',reveal:'Wipe reveal','reveal-right':'Reveal from right','reveal-up':'Reveal upward','reveal-down':'Reveal downward','reveal-split':'Split reveal (centre out)',typewriter:'Typewriter',blur:'Blur in',glitch:'Glitch',
+  zoom:'Zoom in',reveal:'Wipe reveal','reveal-right':'Reveal from right','reveal-up':'Reveal upward','reveal-down':'Reveal downward','reveal-split':'Split reveal (centre out)','reveal-clock':'Clock wipe reveal','reveal-clock-ccw':'Clock wipe (counter-clockwise)','reveal-iris':'Iris reveal (circle)',typewriter:'Typewriter',blur:'Blur in',glitch:'Glitch',
   'letters-pop':'Letters pop ✦','letters-fade':'Letters fade ✦','letters-flip':'Letters flip ✦','letters-blur':'Letters blur in ✦',
   'words-pop':'Words pop ✦','words-fade':'Words fade ✦','words-flip':'Words flip ✦',shine:'Shine sweep ✦',bounce:'Bounce ✦',neon:'Neon flicker ✦',wobble:'Wobble ✦'};
 /** One-click text styles (colour, outline, shadow, font, animation). */

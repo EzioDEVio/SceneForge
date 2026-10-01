@@ -81,4 +81,7 @@ check('trimming clamps fades to the new length',faded.ok&&faded.clips[0].fade_in
 check('trim in cannot push a clip before the timeline start',T.trim([clip('s',100,500,1000)],'s','in',-400).clips[0].start_ms===0);
 const rows=T.packRows([clip('a',0,0,1000),clip('b',1000,0,1000),clip('c',500,0,1000)]);
 check('touching clips share a row; overlapping clips stack',rows.a===0&&rows.b===0&&rows.c===1);
+const clipM={id:'cm',time_ms:100,duration_ms:0,label:'x',color:'green',clip_id:'a',offset_ms:250};
+check('an attached marker follows its clip; a detached one keeps its time',T.markerTime(clipM,[{id:'a',start_ms:4000}])===4250&&T.markerTime(clipM,[])===100&&T.markerTime({...clipM,clip_id:undefined},[{id:'a',start_ms:4000}])===100);
+check('clip attachment survives normalization',T.normalizeTimeline({version:1,markers:[clipM]},[]).markers[0].clip_id==='a'&&T.normalizeTimeline({version:1,markers:[clipM]},[]).markers[0].offset_ms===250);
 console.log(`${passed} timeline checks passed`);

@@ -6,7 +6,7 @@ import {FeatureHelp} from './FeatureHelp';
 
 const PACK_EXT = /\.(json|sflook)$/i;
 const MAX_PACK_BYTES = 1024 * 1024;
-const FALLBACK_KEYS = ['adjust', 'tone', 'wheels', 'film', 'glitch', 'focus', 'mosaic', 'rgbsplit', 'leak', 'flare', 'wiggle', 'shake', 'fx_order', 'fx_bypass'];
+const FALLBACK_KEYS = ['adjust', 'tone', 'wheels', 'film', 'glitch', 'focus', 'mosaic', 'rgbsplit', 'leak', 'flare', 'wiggle', 'shake', 'fx_order', 'fx_bypass', 'fx_params'];
 
 /** JSON with sorted object keys, so server echoes compare equal regardless of key order. */
 function stable(v: unknown): string {

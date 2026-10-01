@@ -130,7 +130,7 @@ def subject_layer(scene_id: str, body: CutoutRequest | None = None, db: Session 
         raise HTTPException(400, "Add an image to this scene first.")
     shot, look = shots[0], scene.look_json or {}
     if shot.asset.type != "image":
-        raise HTTPException(400, "Text behind subject works on still images. This scene's media is a video.")
+        raise HTTPException(400, "Text behind subject works on still images. This scene's media is a video: use “Put text behind moving subject”.")
     if len(shots) > 1 or look.get("layout"):
         raise HTTPException(400, f"Text behind subject needs a scene with one image; this scene shows {len(shots)} media items. Move the others to their own scenes first.")
     if shot.fit == "cover" and not is_static_plan(resolve_motion(shot.motion_json or {})):
@@ -255,3 +255,8 @@ def textured_title(scene_id: str, body: TexturedTitleRequest, db: Session = Depe
     db.refresh(scene)
     return {"scene": _scene_out(scene), "overlay": cleaned[-1], "asset": schemas.AssetOut.model_validate(asset),
             "texture_asset": schemas.AssetOut.model_validate(texture_asset) if texture_asset else None}
+
+
+# Video subject cutout ("text behind a moving subject") routes live in api/video_cutout.py.
+from app.api.video_cutout import router as _video_cutout_router  # noqa: E402
+router.include_router(_video_cutout_router)

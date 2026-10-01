@@ -129,7 +129,7 @@ export function AboutPanel({onClose}: {onClose: () => void}) {
     </section>}
     <section className="info-card">
       <h3>License</h3>
-      <p>SceneForge Studio is free software under the <b>GNU General Public License v3.0 or later</b>: you may use, study, share and change it. It comes with <b>no warranty</b>. Bundled components (FFmpeg, Electron, Python libraries, Noto fonts) keep their own licenses.</p>
+      <p>SceneForge Studio is free software under the <b>GNU General Public License v3.0 or later</b>: you may use, study, share and change it. It comes with <b>no warranty</b>. Bundled components (FFmpeg, Electron, Python libraries, Noto fonts) keep their own licenses. Emoji stickers are Twemoji graphics by Twitter, Inc. and contributors, licensed CC-BY 4.0.</p>
       <div className="button-row">
         <button className="text-btn" onClick={() => openLink(`${REPO}/blob/main/LICENSE`)}><FileText size={12}/> License</button>
         <button className="text-btn" onClick={() => openLink(`${REPO}/blob/main/desktop/THIRD_PARTY.md`)}><FileText size={12}/> Third-party notices</button>

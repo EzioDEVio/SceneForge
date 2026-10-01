@@ -169,6 +169,25 @@ try:
             raise RuntimeError(f"cutout did not return a PNG: {out}")
         return out["original_filename"]
     step("AI subject cutout runs in the packaged app (model download + onnxruntime)", 300, cutout_runs)
+
+    # Text behind a moving subject: 1 s of the clip (30 frames) -> VP9-alpha layer job -> render
+    # with the packaged FFmpeg (libvpx-vp9 alpha decode in the overlay pass).
+    def video_cutout_runs():
+        global job
+        vshot = [x for x in request("GET", f"/api/projects/{pid}")["scenes"] if x["id"] == vscene][0]["shots"][0]
+        request("PATCH", f"/api/scenes/shots/{vshot['id']}", {"source_in_ms": 0, "source_out_ms": 1000})
+        started, st = request("POST", f"/api/scenes/{vscene}/subject-video-layer", {"model": "u2netp"}), {}
+        while started.get("status") == "running":
+            st = request("GET", f"/api/cutout/video-jobs/{started['job_id']}")
+            if st["status"] in ("succeeded", "failed", "cancelled"):
+                if st["status"] != "succeeded":
+                    raise RuntimeError(f"video cutout {st['status']}: {st.get('error')}")
+                break
+            time.sleep(1)
+        job = request("POST", f"/api/scenes/{vscene}/render")
+        wait()
+        return f"{st.get('frames_done')} frames at {st.get('ms_per_frame')} ms/frame ({st.get('codec')})"
+    step("text behind a moving subject (video cutout job + render)", 120, video_cutout_runs)
 finally:
     try:
         proc.stdin.close(); proc.wait(timeout=20)

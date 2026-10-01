@@ -19,7 +19,8 @@ export type TrackState = {locked?: boolean; mute?: boolean; solo?: boolean};
 export const MARKER_COLORS = ['amber', 'red', 'green', 'blue', 'purple'] as const;
 export type MarkerColor = typeof MARKER_COLORS[number];
 /** duration_ms > 0 makes a range marker (e.g. a section or a music cue). */
-export type TimelineMarker = {id: string; time_ms: number; duration_ms: number; label: string; color: MarkerColor};
+/** clip_id + offset_ms attach a marker to a timeline audio clip: it moves with the clip. */
+export type TimelineMarker = {id: string; time_ms: number; duration_ms: number; label: string; color: MarkerColor; clip_id?: string; offset_ms?: number};
 export type TimelineSettings = {
   version: number;
   tracks: Partial<Record<TrackId, TrackState>>;
@@ -61,6 +62,7 @@ function cleanMarker(raw: any, index: number): TimelineMarker | null {
     duration_ms: Number.isFinite(duration) && duration > 0 ? Math.round(duration) : 0,
     label: String(raw.label ?? `Marker ${index + 1}`).slice(0, 120),
     color: (MARKER_COLORS as readonly string[]).includes(raw.color) ? raw.color : 'amber',
+    ...(typeof raw.clip_id === 'string' && raw.clip_id ? {clip_id: raw.clip_id.slice(0, 64), offset_ms: Math.max(0, Math.round(Number(raw.offset_ms) || 0))} : {}),
   };
 }
 
@@ -117,4 +119,11 @@ export function isAudioTrackAudible(t: TimelineSettings, track: AudioTrackId) {
 
 export function nextAudioTrack(t: TimelineSettings): AudioTrackId | null {
   return AUDIO_TRACKS.find(id => !t.audio_tracks.includes(id)) ?? null;
+}
+
+/** Where a marker sits now: attached markers follow their clip; others keep their time. */
+export function markerTime(m: TimelineMarker, clips: {id: string; start_ms: number}[]) {
+  if (!m.clip_id) return m.time_ms;
+  const c = clips.find(x => x.id === m.clip_id);
+  return c ? c.start_ms + (m.offset_ms || 0) : m.time_ms;
 }

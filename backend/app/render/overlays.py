@@ -171,7 +171,9 @@ def build_overlay_pass(overlays: list[dict], assets: dict, frame_w: int, frame_h
         if asset.type == "image":
             inputs += ["-loop", "1", "-framerate", str(fps), "-t", f"{dur:.3f}", "-i", src]
         else:
-            inputs += ["-stream_loop", "-1", "-t", f"{dur:.3f}", "-i", src]
+            # Moving-subject cutout layers are VP9 with alpha: only libvpx-vp9 decodes the alpha plane.
+            vp9a = ["-c:v", "libvpx-vp9"] if o.get("kind") == "subject" and str(src).lower().endswith(".webm") else []
+            inputs += ["-stream_loop", "-1", "-t", f"{dur:.3f}", *vp9a, "-i", src]
         inputs += ["-loop", "1", "-framerate", str(fps), "-t", f"{dur:.3f}", "-i", mask,
                    "-loop", "1", "-framerate", str(fps), "-t", f"{dur:.3f}", "-i", bg]
         m, k, b = idx, idx + 1, idx + 2

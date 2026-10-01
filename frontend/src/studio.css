@@ -680,8 +680,10 @@ html[data-theme="light"] .studio-shell .creative-card{border-color:#d4d9e3}
 .segmented.speed-ramp-options>button{flex:1 1 30%;min-width:96px;padding:6px 8px;border:1px solid #454a58;border-radius:6px;white-space:normal;line-height:1.25}
 .cutout-preview{margin:0}.cutout-preview img{max-width:100%;border-radius:6px;background-color:#ddd;background-image:linear-gradient(45deg,#bbb 25%,transparent 25%),linear-gradient(-45deg,#bbb 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#bbb 75%),linear-gradient(-45deg,transparent 75%,#bbb 75%);background-size:16px 16px;background-position:0 0,0 8px,8px -8px,-8px 0}
 .cutout-preview figcaption{font-size:11px;color:#aab3c4;margin-top:4px}
+.cutout-progress{display:flex;flex-direction:column;gap:4px;font-size:12px}.cutout-progress progress{width:100%;height:8px}
 .beat-marker-select{height:26px;padding:0 6px;background:#292d36;border:1px solid #454a58;border-radius:6px;color:#cbd1df;font-size:11px}
 html[data-theme="light"] .studio-shell .beat-marker-select{background:#fff;color:#344054;border-color:#cbd2de}
 .gain-envelope{border:1px solid #3a3f4b;border-radius:6px;padding:6px 8px;margin:6px 0}.gain-envelope legend{font-size:12px;padding:0 4px}
 .gain-point{display:flex;align-items:center;gap:8px;font-size:12px}.gain-point input[type=number]{width:64px}.gain-point input[type=range]{width:110px}
 .project-audio-body{position:relative}.gain-line{position:absolute;inset:2px 0;width:100%;height:calc(100% - 4px);pointer-events:none}.gain-line polyline{fill:none;stroke:#ffd25a;stroke-width:2;vector-effect:non-scaling-stroke}
+.project-audio-row.grouped .project-audio-body{box-shadow:inset 0 -3px 0 #5fd08a}

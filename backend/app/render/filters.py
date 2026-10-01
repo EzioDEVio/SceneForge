@@ -500,12 +500,13 @@ def build_effect_chain(preset: str, intensity: int, glitch: dict | None = None, 
         effect = build_focus_chain(look.get("focus"), width, height, preset == EffectPreset.TILT_SHIFT)
     elif preset == EffectPreset.MOSAIC:
         effect = build_mosaic_chain(look.get("mosaic"), width, height)
-    elif preset == EffectPreset.HALATION:
-        effect = build_halation_chain(width)
     elif preset == EffectPreset.CHROMATIC_SPLIT and look.get("rgbsplit"):
         effect = build_rgbsplit_chain(look["rgbsplit"], width)
     else:
-        effect = _EFFECT_FILTERS.get(preset)
+        # Per-effect settings (look.fx_params); defaults reproduce the
+        # original strings exactly. See render/effect_params.py.
+        from app.render.effect_params import effect_filter
+        effect = effect_filter(preset, look.get("fx_params"), width, height) or _EFFECT_FILTERS.get(preset)
     if not effect:
         return None
     if preset == EffectPreset.SOFT_GLOW:

@@ -5,6 +5,7 @@ import {api, type Scene} from './api';
 import {previewFontFamily} from './fonts';
 import {ANIMATION_LABELS} from './TitleDesigner';
 import {FeatureHelp} from './FeatureHelp';
+import {CaptionStylePicker, EXTRA_CAPTION_PRESETS, captionStyleOptions} from './CaptionStylePicker';
 
 type F = Record<string, any>;
 const FAMILIES = ['Noto Sans', 'Poppins', 'Bebas Neue', 'Anton', 'Pacifico', 'Noto Naskh Arabic', 'Noto Sans Arabic', 'Amiri', 'Tajawal', 'Lalezar',
@@ -44,6 +45,7 @@ export const CAPTION_PRESETS: {name: string; sample: string; values: F}[] = [
   {name: 'Creator highlight', sample: 'Creator', values: {family: 'Anton', size: 68, bold: true, case: 'upper', color: '#FFFFFF', outline_color: '#25121B', outline_width: 5, background: 'none', split: 'phrases', phrase_words: 3, karaoke: true, karaoke_style: 'box', highlight_color: '#FF3E78', caption_animation: 'bounce', caption_animation_ms: 260}},
   {name: 'Arabic clean', sample: 'مرحبا', values: {family: 'Noto Sans Arabic', size: 48, bold: true, case: 'none', color: '#FFFFFF', outline_color: '#171717', outline_width: 3, shadow: 1, split: 'phrases', phrase_words: 4, karaoke: false, caption_animation: 'fade', caption_animation_ms: 300}},
   {name: 'Neon lime karaoke', sample: 'LIME', values: {family: 'Bebas Neue', size: 70, bold: true, case: 'upper', color: '#F7FFF2', outline_color: '#142610', outline_width: 4, shadow: 3, background: 'none', split: 'phrases', phrase_words: 3, karaoke: true, karaoke_style: 'glow', highlight_color: '#78FF39', caption_animation: 'neon', caption_animation_ms: 520}},
+  ...EXTRA_CAPTION_PRESETS,
 ];
 
 /** CSS approximation of a caption style (used by the presets and the live preview). */
@@ -52,7 +54,7 @@ export function captionCss(f: F, scale = 1): React.CSSProperties {
   const oc = f.outline_color || '#000000';
   const shadows: string[] = [];
   if (ow > 0) for (let a = 0; a < 16; a++) {const r = ow * scale * 0.6; shadows.push(`${(Math.cos(a / 8 * Math.PI) * r).toFixed(1)}px ${(Math.sin(a / 8 * Math.PI) * r).toFixed(1)}px 0 ${oc}`);}
-  if (Number(f.shadow) > 0) {const d = Number(f.shadow) * scale; const op = (Number(f.shadow_opacity ?? 60) / 100).toFixed(2); shadows.push(`${d}px ${d}px ${d}px rgba(0,0,0,${op})`);}
+  if (Number(f.shadow) > 0) {const d = Number(f.shadow) * scale; const op = (Number(f.shadow_opacity ?? 60) / 100).toFixed(2); const sc = /^#[0-9a-f]{6}$/i.test(f.shadow_color || '') ? f.shadow_color : '#000000'; shadows.push(`${d}px ${d}px ${d}px rgba(${parseInt(sc.slice(1, 3), 16)},${parseInt(sc.slice(3, 5), 16)},${parseInt(sc.slice(5, 7), 16)},${op})`);}
   const hex = (h: string, o: number) => `rgba(${parseInt(h.slice(1, 3), 16)},${parseInt(h.slice(3, 5), 16)},${parseInt(h.slice(5, 7), 16)},${o})`;
   return {
     fontFamily: previewFontFamily(f.family), fontWeight: f.bold ? 700 : 400, fontStyle: f.italic ? 'italic' : 'normal',
@@ -125,13 +127,7 @@ export function CaptionStylePanel({scene, onChange}: {scene: Scene; onChange: (f
   const busyAnim = f.typewriter;
   return <div className="caption-pro">
     <Group title="Caption styles" Icon={Wand2}>
-      <div className="caption-presets" role="group" aria-label="Caption styles">
-        {CAPTION_PRESETS.map(p => <button key={p.name} className="caption-preset" title={p.name} aria-label={`Apply ${p.name} caption style`}
-          onClick={() => set({...p.values, captions_enabled: true, typewriter: false})}>
-          <span className="caption-preset-sample" style={{...captionCss({...p.values}, 0.55), fontSize: 20}}>{p.values.karaoke
-            ? <>{p.sample.slice(0, Math.ceil(p.sample.length / 2))}<span style={{color: p.values.highlight_color, ...(p.values.karaoke_style === 'box' ? {background: p.values.highlight_color, color: '#fff', borderRadius: 3, padding: '0 2px'} : {})}}>{p.sample.slice(Math.ceil(p.sample.length / 2))}</span></> : p.sample}</span>
-          <small>{p.name}</small></button>)}
-      </div>
+      <CaptionStylePicker presets={CAPTION_PRESETS} css={captionCss} onApply={p => set({...p.values, captions_enabled: true, typewriter: false})}/>
     </Group>
     <label className="switch-label finishing-toggle"><input type="checkbox" checked={!!f.captions_enabled} onChange={e => set({captions_enabled: e.target.checked})}/> Captions enabled</label>
     <Group title="Font" Icon={Type}>
@@ -229,7 +225,7 @@ export function AutoCaptions({scene, onDone, onStyle}: {scene: Scene; onDone: (s
     <div className="acc-grid">
       <label className="control-label">Language<select aria-label="Speech language" value={lang} disabled={disabled} onChange={e => setLang(e.target.value)}>{LANGS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
       {hasNarr && hasVideo && <label className="control-label">Audio source<select aria-label="Caption audio source" value={source} disabled={disabled} onChange={e=>setSource(e.target.value)}><option value="auto">Auto · narration first</option><option value="narration">Scene narration</option><option value="clips">Video clip sound</option></select></label>}
-      <label className="control-label">Caption style<select aria-label="Auto caption style" value={style} disabled={disabled} onChange={e => {setStyle(e.target.value);const p=CAPTION_PRESETS.find(x=>x.name===e.target.value);if(p)setWordsPerClip(Number(p.values.phrase_words||3));}}><option value="">Keep current style</option>{CAPTION_PRESETS.map(p => <option key={p.name} value={p.name}>{p.name}</option>)}</select></label>
+      <label className="control-label">Caption style<select aria-label="Auto caption style" value={style} disabled={disabled} onChange={e => {setStyle(e.target.value);const p=CAPTION_PRESETS.find(x=>x.name===e.target.value);if(p)setWordsPerClip(Number(p.values.phrase_words||3));}}><option value="">Keep current style</option>{captionStyleOptions(CAPTION_PRESETS)}</select></label>
       <label className="control-label">Service<select aria-label="Transcription service" value={provider} disabled={disabled} onChange={e => setProvider(e.target.value)}><option value="local">Local Whisper · free</option><option value="elevenlabs">ElevenLabs Scribe · cloud</option><option value="openai">OpenAI Whisper · cloud</option></select></label>
       <label className="control-label">Words per caption clip<select aria-label="Words per caption clip" value={wordsPerClip} disabled={disabled} onChange={e=>setWordsPerClip(Math.max(1,Math.min(8,Number(e.target.value)||3)))}>{Array.from({length:8},(_,i)=>i+1).map(n=><option key={n} value={n}>{n} {n===1?'word':'words'}</option>)}</select></label>
       <button className="btn btn-primary acc-go" disabled={busy || disabled} onClick={() => void go()}><Sparkles size={14}/> {busy ? 'Transcribing…' : hasTranscript ? 'Regenerate captions' : 'Generate captions'}</button>

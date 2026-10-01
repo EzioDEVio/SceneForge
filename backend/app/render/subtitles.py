@@ -112,6 +112,8 @@ def _phrase_events(text, font_json, duration_ms, family, primary, outline, outli
                         parts.append(f"{{\\fn{first}\\1c{hi}\\u1}}{tagged}{{\\u0}}")
                     elif cur and style == "glow":
                         parts.append(f"{{\\fn{first}\\1c{hi}\\3c{hi}\\bord3\\blur4}}{tagged}{{\\3c{outline}\\bord{outline_w}\\blur0}}")
+                    elif cur and style == "color":  # only the word being spoken takes the highlight colour
+                        parts.append(f"{{\\fn{first}\\1c{hi}}}{tagged}")
                     else:
                         color = hi if (style == "fill" and j < k) else primary
                         parts.append(f"{{\\fn{first}\\1c{color}}}{tagged}")
@@ -174,6 +176,30 @@ def _reveal_mask(animation: str, layer: dict, x: float, y: float, canvas_w: int,
     }[animation]
     c = lambda r: r'\clip(%d,%d,%d,%d)' % tuple(int(round(v)) for v in r)
     return c(start) + r'\t(0,%d,%s)\t(%d,%d,%s)' % (anim_ms, c(end), anim_ms, anim_ms + 1, c((0, 0, W, H)))
+
+
+_CLOCK_REVEALS = ('reveal-clock', 'reveal-clock-ccw', 'reveal-iris')
+
+
+def _clock_steps(animation: str, x: float, y: float, canvas_w: int, canvas_h: int, steps: int = 24, iris_radius: float | None = None) -> list[str]:
+    """Vector \\clip shapes for a rotational wipe around the text's anchor point.
+    ASS cannot animate a vector clip, so the entrance is split into short events, each
+    with a wedge (clock / counter-clockwise) or a circle (iris) that grows step by step."""
+    import math
+    R = math.hypot(canvas_w, canvas_h)
+    shapes = []
+    for i in range(1, steps + 1):
+        f = i / steps
+        if animation == 'reveal-iris':
+            r = (iris_radius or R) * f
+            pts = [(x + r * math.cos(a / 24 * 2 * math.pi), y + r * math.sin(a / 24 * 2 * math.pi)) for a in range(24)]
+        else:
+            sign = -1 if animation == 'reveal-clock-ccw' else 1
+            sweep = 2 * math.pi * f
+            n = max(2, int(36 * f))
+            pts = [(x, y)] + [(x + R * math.sin(sign * sweep * k / n), y - R * math.cos(sign * sweep * k / n)) for k in range(n + 1)]
+        shapes.append(r'\clip(m %d %d %s)' % (round(pts[0][0]), round(pts[0][1]), 'l ' + ' '.join(f'{round(px)} {round(py)}' for px, py in pts[1:])))
+    return shapes
 
 
 def write_ass_file(
@@ -483,6 +509,17 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             halo = overrides.replace('}', r'\1a&HFF&\3c%s\bord%d\blur10\shad0}' % (hi_color, max(4, int(layer.get('size',64)) // 10)), 1)
             events.append(f"{event_prefix}{halo}{runs(layer['text'], family)}\n")
             events.append(f"{event_prefix}{overrides}{runs(layer['text'], family)}\n")
+        elif animation in _CLOCK_REVEALS:
+            size_px = float(layer.get('size', 64)); text_lines = str(layer.get('text', '')).split('\n') or ['']
+            tw, th = max(len(l) for l in text_lines) * size_px * 0.55 + size_px * 0.5, len(text_lines) * size_px * 1.3
+            shapes = _clock_steps(animation, x, y, canvas_w, canvas_h, iris_radius=1.1 * (tw * tw + th * th) ** 0.5 / 2)
+            step_ms = anim_ms / len(shapes)
+            plain = overrides.replace(r'\fad(0,%d)' % exit_ms, '')
+            for j, shape in enumerate(shapes[:-1]):
+                a0, a1 = start + round(j * step_ms), start + round((j + 1) * step_ms)
+                if a1 > a0:
+                    events.append(f"Dialogue: {index+1},{ts(a0)},{ts(a1)},Default,,{side_margin},{side_margin},0,,{plain.replace('}', shape + '}', 1)}{runs(layer['text'], family)}\n")
+            events.append(f"Dialogue: {index+1},{ts(start + round((len(shapes) - 1) * step_ms))},{ts(end)},Default,,{side_margin},{side_margin},0,,{overrides}{runs(layer['text'], family)}\n")
         else:
             events.append(f"{event_prefix}{overrides}{runs(layer['text'], family)}\n")
 

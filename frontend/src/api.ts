@@ -87,7 +87,7 @@ export type FontSettings = {
 };
 
 /** Must match BUILD_ID in backend/app/main.py. */
-export const BUILD_ID = "v0.7.0-rc8";
+export const BUILD_ID = "v0.7.0-rc9";
 
 export type Adjust = Partial<Record<'exposure'|'contrast'|'highlights'|'shadows'|'temperature'|'tint'|'saturation'|'vibrance'|'sharpen'|'vignette'|'grain', number>>;
 export type Look = {
@@ -103,6 +103,8 @@ export type Look = {
   wiggle?: {amount: number; speed: number; size: number} | null;
   /** Effect stack (backend render/fx_stack.py): scene-FX render order and bypassed ids. */
   fx_order?: string[] | null;
+  /** Per-effect settings, kept per preset: {<preset>: {<param>: value}} (backend render/effect_params.py). */
+  fx_params?: Record<string, Record<string, number | string>> | null;
   fx_bypass?: string[] | null;
 };
 export type Overlay = {id: string; asset_id: string; kind?: 'media'|'sticker'; x: number; y: number; width: number; rotation: number; opacity: number;
@@ -110,7 +112,7 @@ export type Overlay = {id: string; asset_id: string; kind?: 'media'|'sticker'; x
   anim_in: 'none' | 'fade' | 'slide_left' | 'slide_up' | 'zoom'; anim_out: 'none' | 'fade' | 'slide_left' | 'slide_up' | 'zoom'; anim_ms: number;
   x2?: number | null; y2?: number | null; chroma?: string | null; chroma_similarity?: number; feather?: number;
   loop?: 'none' | 'float' | 'pendulum' | 'bob'; loop_amount?: number; loop_period_ms?: number};
-export type ProjectAudioClip = {id: string; asset_id: string; name: string; start_ms: number; source_in_ms: number; source_out_ms: number; source_duration_ms: number; volume: number; fade_in_ms: number; fade_out_ms: number; mute: boolean; track?: import('./timeline/timeline.types').AudioTrackId; /** volume envelope: [source time ms, dB] */ gain?: [number, number][]};
+export type ProjectAudioClip = {id: string; asset_id: string; name: string; start_ms: number; source_in_ms: number; source_out_ms: number; source_duration_ms: number; volume: number; fade_in_ms: number; fade_out_ms: number; mute: boolean; track?: import('./timeline/timeline.types').AudioTrackId; /** volume envelope: [source time ms, dB] */ gain?: [number, number][]; /** clips sharing a group id select and move together */ group?: string};
 export type Finishing = {music?: {asset_id: string; volume: number; duck: number; fade_in_ms: number; fade_out_ms: number} | null; audio_clips?: ProjectAudioClip[]; loudnorm?: boolean; leader?: boolean; timeline?: import('./timeline/timeline.types').TimelineSettings};
 export type FilmLook = {scratches: number; dust: number; flicker: number; weave: number; sound: number; fps: 0 | 16 | 18 | 24; tone: 'color' | 'faded' | 'sepia' | 'bw'};
 
@@ -178,6 +180,8 @@ export type ProviderProfile = {
   masked_key: string;
   configured: boolean;
 };
+export type SubjectVideoEstimate = {ok: boolean; reason?: string; frames?: number; seconds_of_video?: number; ms_per_frame?: number; estimate_s?: number; measured?: boolean; running_job_id?: string | null; notes?: string[]};
+export type SubjectVideoJob = {job_id: string; status: 'queued' | 'running' | 'cancelling' | 'succeeded' | 'failed' | 'cancelled'; frames_done: number; frames_total: number; ms_per_frame: number | null; stage: string; error: string | null; notes: string[]};
 export type VoiceIsolationStatus = {folder: string; file: string; label: string; url: string; approx_mb: number; bytes: number; downloaded: boolean; download?: {done: number; total: number} | null; license: string; running: {job_id: string; asset_id: string; progress: number}[]};
 export type VoiceOption = { id: string; name: string; language?: string; accent?: string; gender?: string; age?: string; description?: string; preview_url?: string };
 
@@ -215,6 +219,8 @@ export const api = {
   listProjects: () => req<Project[]>("/api/projects"),
   getProject: (id: string) => req<Project>(`/api/projects/${id}`),
   getScene: (id:string)=>req<Scene>(`/api/scenes/${id}`),
+  /** Per-effect settings schema (backend render/effect_params.py; see EffectControls.tsx). */
+  effectsSchema: () => req<any>('/api/effects/schema'),
   updateProject: (id: string, body: Partial<{ title: string; aspect: string; fps: number; finishing: Finishing }>) =>
     req<Project>(`/api/projects/${id}`, { method: "PATCH", body: JSON.stringify(body) }),
   addScene: (projectId: string) =>
@@ -307,10 +313,16 @@ export const api = {
   closeStatus:()=>req<{ready:boolean}>("/api/close-status"),
   cutoutStatus: () => req<{folder: string; models: {id: string; label: string; downloaded: boolean; approx_mb: number}[]}>(`/api/cutout/status`),
   cutoutAsset: (assetId: string, body: {model?: string; edge?: string; feather?: number; shift?: number}) => req<Asset>(`/api/assets/${assetId}/cutout`, {method: "POST", body: JSON.stringify(body)}),
+  subjectVideoEstimate: (sceneId: string, model: string) => req<SubjectVideoEstimate>(`/api/scenes/${sceneId}/subject-video-layer?model=${encodeURIComponent(model)}`),
+  subjectVideoLayer: (sceneId: string, body: {model?: string; edge?: string; shift?: number}) => req<{status: 'running' | 'done'; job_id?: string; cached?: boolean; frames?: number; estimate_s?: number; notes?: string[]}>(`/api/scenes/${sceneId}/subject-video-layer`, {method: "POST", body: JSON.stringify(body)}),
+  subjectVideoJob: (jobId: string) => req<SubjectVideoJob>(`/api/cutout/video-jobs/${jobId}`),
   voiceIsolationStatus: () => req<VoiceIsolationStatus>(`/api/voice-isolation/status`),
   isolateVoice: (assetId: string, strength = 100) => req<{status: 'done' | 'running'; cached?: boolean; asset?: Asset; job_id?: string; progress?: number}>(`/api/assets/${assetId}/isolate-voice`, {method: "POST", body: JSON.stringify({strength})}),
   voiceIsolationJob: (jobId: string) => req<{status: 'running' | 'done' | 'error'; progress: number; stage: string; asset?: Asset; error?: string}>(`/api/voice-isolation/jobs/${jobId}`),
   subjectLayer: (sceneId: string, body: {model?: string; edge?: string; feather?: number; shift?: number}) => req<{scene: Scene; notes: string[]}>(`/api/scenes/${sceneId}/subject-layer`, {method: "POST", body: JSON.stringify(body)}),
+  /** Copy a bundled library sticker into the project's Media Pool (re-used when already imported). */
+  importSticker: (projectId: string, stickerId: string) => req<Asset>(`/api/projects/${projectId}/stickers/${encodeURIComponent(stickerId)}`, {method: "POST"}),
+  stickerImageUrl: (stickerId: string) => `/api/stickers/${encodeURIComponent(stickerId)}/image`,
   texturedTitle: (sceneId: string, body: Record<string, unknown>) => req<{scene: Scene; asset: Asset}>(`/api/scenes/${sceneId}/textured-title`, {method: "POST", body: JSON.stringify(body)}),
   beatMarkers: (projectId: string, body: {clip_id?: string; every?: number}) => req<{bpm: number; markers: {time_ms: number; downbeat: boolean}[]; truncated: boolean}>(`/api/projects/${projectId}/beat-markers`, {method: "POST", body: JSON.stringify(body)}),
   whisperCheck: () => req<{ok: boolean; model_dir: string; checks: {name: string; ok: boolean; detail: string}[]}>(`/api/local-speech/whisper/check`),

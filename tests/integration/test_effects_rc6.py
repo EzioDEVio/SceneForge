@@ -241,7 +241,8 @@ check('valid pack settings save', look({'flare': {'x': 20, 'drift': 30}, 'wiggle
 check('effect presets are accepted', all(client.patch(f'/api/scenes/{sid}', json={'effect_preset': k}).status_code == 200 for k in ('focus_blur', 'tilt_shift', 'mosaic', 'halation', 'print_2383', 'tungsten_night', 'cross_process')))
 TL = lambda a: {'font': {'layers': [L(animation=a)]}}
 check('text reveal animations are accepted', all(client.patch(f'/api/scenes/{sid}', json=TL(a)).status_code == 200 for a in ('reveal-right', 'reveal-up', 'reveal-down', 'reveal-split')))
-check('rotational wipe is not offered', client.patch(f'/api/scenes/{sid}', json=TL('reveal-clock')).status_code in (400, 422))
+check('rotational clock wipe is offered (added in RC9)', client.patch(f'/api/scenes/{sid}', json=TL('reveal-clock')).status_code == 200)
+check('unknown reveal names are still rejected', client.patch(f'/api/scenes/{sid}', json=TL('reveal-spiral')).status_code in (400, 422))
 client.patch(f'/api/scenes/{sid}', json={'font': {'layers': []}})
 tex_asset = up('tex.png'); red_asset = up('red.png')
 client.post(f'/api/scenes/{sid}/shots', json={'asset_id': tex_asset['id']})

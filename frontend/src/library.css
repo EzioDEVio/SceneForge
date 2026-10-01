@@ -1,0 +1,14 @@
+/* Sticker library tabs/grid and grouped caption-style picker (0.7.0 RC9). */
+.sticker-tabs,.caption-style-tabs{display:flex;gap:4px;overflow-x:auto;padding:2px 0 6px;margin-bottom:4px;scrollbar-width:thin}
+.sticker-tab{flex:0 0 auto;display:inline-flex;align-items:center;gap:4px;padding:3px 8px;border:1px solid #414653;border-radius:999px;background:#262a33;color:#cfd4df;font-size:10px;cursor:pointer;white-space:nowrap}
+.sticker-tab small{font-size:9px;color:#8f96a6}
+.sticker-tab:hover{border-color:#9a87e4}
+.sticker-tab.selected{background:#4b3fa8;border-color:#9a87e4;color:#fff}
+.sticker-tab.selected small{color:#ddd8ff}
+.sticker-library .sticker-grid{max-height:300px}
+.sticker-choice.library-sticker-choice span img{display:block;width:30px;height:28px;object-fit:contain}
+.sticker-credit{margin:6px 0 0;font-size:9px;color:#8f96a6;text-align:right}
+.caption-style-picker .search-control{margin:2px 0 6px}
+.caption-style-picker .caption-presets{max-height:340px;overflow:auto;padding-right:2px}
+html[data-theme="light"] .sticker-tab{background:#fff;color:#344054;border-color:#cbd2de}
+html[data-theme="light"] .sticker-tab.selected{background:#eeecfb;color:#38298e;border-color:var(--blue)}

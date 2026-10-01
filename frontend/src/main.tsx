@@ -4,6 +4,7 @@ import App from "./App";
 import "./styles.css";
 import "./studio.css";
 import "./preferences.css";
+import "./library.css";
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
   constructor(props: { children: React.ReactNode }) {

@@ -62,13 +62,17 @@ from app.api import voice_isolation  # noqa: E402
 app.include_router(voice_isolation.router)
 from app.api import look_presets  # noqa: E402
 app.include_router(look_presets.router)
+from app.api import stickers  # noqa: E402
+app.include_router(stickers.router)
+from app.api import effect_params as effect_params_api  # noqa: E402
+app.include_router(effect_params_api.router)
 
 
 # Must match BUILD_ID in frontend/src/api.ts. Bump on any API change so a
 # new interface connected to an old backend (e.g. a still-running old
 # start.bat window) shows "Backend update required" instead of silently
 # losing settings the old backend does not know.
-BUILD_ID = "v0.7.0-rc8"
+BUILD_ID = "v0.7.0-rc9"
 
 
 @app.get("/api/health")

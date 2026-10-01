@@ -1,0 +1,3548 @@
+{
+ "format": "sceneforge-sticker-library",
+ "version": 1,
+ "categories": [
+  "Smileys",
+  "Gestures",
+  "Hearts",
+  "Animals & nature",
+  "Food",
+  "Travel & places",
+  "Objects",
+  "Symbols",
+  "Arrows & callouts",
+  "Badges & labels",
+  "Social",
+  "Shapes",
+  "Speech bubbles",
+  "Seasonal"
+ ],
+ "items": [
+  {
+   "id": "grinning-face",
+   "name": "Grinning face",
+   "category": "Smileys",
+   "tags": "reaction happy smile",
+   "emoji": "😀",
+   "file": "emoji/grinning-face.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "laughing",
+   "name": "Laughing",
+   "category": "Smileys",
+   "tags": "reaction funny tears",
+   "emoji": "😂",
+   "file": "emoji/laughing.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "party",
+   "name": "Party",
+   "category": "Smileys",
+   "tags": "celebration confetti",
+   "emoji": "🥳",
+   "file": "emoji/party.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "heart-eyes",
+   "name": "Heart eyes",
+   "category": "Smileys",
+   "tags": "reaction love",
+   "emoji": "😍",
+   "file": "emoji/heart-eyes.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "wow",
+   "name": "Wow",
+   "category": "Smileys",
+   "tags": "reaction surprised",
+   "emoji": "😮",
+   "file": "emoji/wow.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "thinking",
+   "name": "Thinking",
+   "category": "Smileys",
+   "tags": "reaction question",
+   "emoji": "🤔",
+   "file": "emoji/thinking.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "cool",
+   "name": "Cool",
+   "category": "Smileys",
+   "tags": "reaction sunglasses",
+   "emoji": "😎",
+   "file": "emoji/cool.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "crying",
+   "name": "Crying",
+   "category": "Smileys",
+   "tags": "reaction sad",
+   "emoji": "😭",
+   "file": "emoji/crying.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "starstruck",
+   "name": "Starstruck",
+   "category": "Smileys",
+   "tags": "reaction amazed wow",
+   "emoji": "🤩",
+   "file": "emoji/starstruck.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "pleading",
+   "name": "Pleading",
+   "category": "Smileys",
+   "tags": "reaction emotional please",
+   "emoji": "🥹",
+   "file": "emoji/pleading.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "big-smile",
+   "name": "Big smile",
+   "category": "Smileys",
+   "tags": "happy grin joy",
+   "emoji": "😃",
+   "file": "emoji/big-smile.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "smiling-eyes",
+   "name": "Smiling eyes",
+   "category": "Smileys",
+   "tags": "happy laugh joy",
+   "emoji": "😄",
+   "file": "emoji/smiling-eyes.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "beaming",
+   "name": "Beaming",
+   "category": "Smileys",
+   "tags": "grin happy teeth",
+   "emoji": "😁",
+   "file": "emoji/beaming.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "squinting-laugh",
+   "name": "Squinting laugh",
+   "category": "Smileys",
+   "tags": "laugh funny lol",
+   "emoji": "😆",
+   "file": "emoji/squinting-laugh.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "sweat-smile",
+   "name": "Sweat smile",
+   "category": "Smileys",
+   "tags": "nervous relief phew",
+   "emoji": "😅",
+   "file": "emoji/sweat-smile.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "rolling-laughing",
+   "name": "Rolling laughing",
+   "category": "Smileys",
+   "tags": "lol rofl funny",
+   "emoji": "🤣",
+   "file": "emoji/rolling-laughing.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "slight-smile",
+   "name": "Slight smile",
+   "category": "Smileys",
+   "tags": "calm okay friendly",
+   "emoji": "🙂",
+   "file": "emoji/slight-smile.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "wink",
+   "name": "Wink",
+   "category": "Smileys",
+   "tags": "flirt joke wink",
+   "emoji": "😉",
+   "file": "emoji/wink.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "blush",
+   "name": "Blush",
+   "category": "Smileys",
+   "tags": "shy happy warm",
+   "emoji": "😊",
+   "file": "emoji/blush.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "halo",
+   "name": "Halo",
+   "category": "Smileys",
+   "tags": "angel innocent good",
+   "emoji": "😇",
+   "file": "emoji/halo.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "smiling-hearts",
+   "name": "Smiling hearts",
+   "category": "Smileys",
+   "tags": "love adore crush",
+   "emoji": "🥰",
+   "file": "emoji/smiling-hearts.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "blow-kiss",
+   "name": "Blow kiss",
+   "category": "Smileys",
+   "tags": "kiss love",
+   "emoji": "😘",
+   "file": "emoji/blow-kiss.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "yum",
+   "name": "Yum",
+   "category": "Smileys",
+   "tags": "tasty food delicious",
+   "emoji": "😋",
+   "file": "emoji/yum.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "tongue-out",
+   "name": "Tongue out",
+   "category": "Smileys",
+   "tags": "silly playful",
+   "emoji": "😛",
+   "file": "emoji/tongue-out.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "winking-tongue",
+   "name": "Winking tongue",
+   "category": "Smileys",
+   "tags": "silly crazy joke",
+   "emoji": "😜",
+   "file": "emoji/winking-tongue.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "zany",
+   "name": "Zany",
+   "category": "Smileys",
+   "tags": "crazy silly wild",
+   "emoji": "🤪",
+   "file": "emoji/zany.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "hug",
+   "name": "Hug",
+   "category": "Smileys",
+   "tags": "hugging welcome warm",
+   "emoji": "🤗",
+   "file": "emoji/hug.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "hand-over-mouth",
+   "name": "Hand over mouth",
+   "category": "Smileys",
+   "tags": "oops giggle secret",
+   "emoji": "🤭",
+   "file": "emoji/hand-over-mouth.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "shush",
+   "name": "Shush",
+   "category": "Smileys",
+   "tags": "quiet secret silence",
+   "emoji": "🤫",
+   "file": "emoji/shush.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "raised-eyebrow",
+   "name": "Raised eyebrow",
+   "category": "Smileys",
+   "tags": "suspicious doubt skeptical",
+   "emoji": "🤨",
+   "file": "emoji/raised-eyebrow.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "neutral",
+   "name": "Neutral",
+   "category": "Smileys",
+   "tags": "meh blank",
+   "emoji": "😐",
+   "file": "emoji/neutral.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "expressionless",
+   "name": "Expressionless",
+   "category": "Smileys",
+   "tags": "unimpressed meh",
+   "emoji": "😑",
+   "file": "emoji/expressionless.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "no-mouth",
+   "name": "No mouth",
+   "category": "Smileys",
+   "tags": "speechless silent",
+   "emoji": "😶",
+   "file": "emoji/no-mouth.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "eye-roll",
+   "name": "Eye roll",
+   "category": "Smileys",
+   "tags": "annoyed whatever",
+   "emoji": "🙄",
+   "file": "emoji/eye-roll.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "smirk",
+   "name": "Smirk",
+   "category": "Smileys",
+   "tags": "smug sly",
+   "emoji": "😏",
+   "file": "emoji/smirk.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "grimace",
+   "name": "Grimace",
+   "category": "Smileys",
+   "tags": "awkward oops cringe",
+   "emoji": "😬",
+   "file": "emoji/grimace.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "sleeping",
+   "name": "Sleeping",
+   "category": "Smileys",
+   "tags": "tired sleep bored zzz",
+   "emoji": "😴",
+   "file": "emoji/sleeping.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "drool",
+   "name": "Drool",
+   "category": "Smileys",
+   "tags": "hungry want",
+   "emoji": "🤤",
+   "file": "emoji/drool.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "mask",
+   "name": "Mask",
+   "category": "Smileys",
+   "tags": "sick health",
+   "emoji": "😷",
+   "file": "emoji/mask.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "mind-blown",
+   "name": "Mind blown",
+   "category": "Smileys",
+   "tags": "shock amazing explode",
+   "emoji": "🤯",
+   "file": "emoji/mind-blown.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "cowboy",
+   "name": "Cowboy",
+   "category": "Smileys",
+   "tags": "yeehaw western",
+   "emoji": "🤠",
+   "file": "emoji/cowboy.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "nerd",
+   "name": "Nerd",
+   "category": "Smileys",
+   "tags": "smart geek glasses",
+   "emoji": "🤓",
+   "file": "emoji/nerd.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "monocle",
+   "name": "Monocle",
+   "category": "Smileys",
+   "tags": "inspect curious detective",
+   "emoji": "🧐",
+   "file": "emoji/monocle.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "confused",
+   "name": "Confused",
+   "category": "Smileys",
+   "tags": "unsure puzzled",
+   "emoji": "😕",
+   "file": "emoji/confused.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "worried",
+   "name": "Worried",
+   "category": "Smileys",
+   "tags": "concern anxious",
+   "emoji": "😟",
+   "file": "emoji/worried.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "tear",
+   "name": "Tear",
+   "category": "Smileys",
+   "tags": "sad cry",
+   "emoji": "😢",
+   "file": "emoji/tear.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "scream",
+   "name": "Scream",
+   "category": "Smileys",
+   "tags": "shock horror scared",
+   "emoji": "😱",
+   "file": "emoji/scream.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "flushed",
+   "name": "Flushed",
+   "category": "Smileys",
+   "tags": "embarrassed shock",
+   "emoji": "😳",
+   "file": "emoji/flushed.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "angry",
+   "name": "Angry",
+   "category": "Smileys",
+   "tags": "mad rage",
+   "emoji": "😡",
+   "file": "emoji/angry.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "cursing",
+   "name": "Cursing",
+   "category": "Smileys",
+   "tags": "angry swear rage",
+   "emoji": "🤬",
+   "file": "emoji/cursing.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "devil-smile",
+   "name": "Devil smile",
+   "category": "Smileys",
+   "tags": "mischief evil",
+   "emoji": "😈",
+   "file": "emoji/devil-smile.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "skull",
+   "name": "Skull",
+   "category": "Smileys",
+   "tags": "dead lol dying",
+   "emoji": "💀",
+   "file": "emoji/skull.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "ghost",
+   "name": "Ghost",
+   "category": "Smileys",
+   "tags": "boo spooky halloween",
+   "emoji": "👻",
+   "file": "emoji/ghost.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "robot",
+   "name": "Robot",
+   "category": "Smileys",
+   "tags": "ai bot tech",
+   "emoji": "🤖",
+   "file": "emoji/robot.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "poop",
+   "name": "Poop",
+   "category": "Smileys",
+   "tags": "funny silly",
+   "emoji": "💩",
+   "file": "emoji/poop.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "clown",
+   "name": "Clown",
+   "category": "Smileys",
+   "tags": "joke silly",
+   "emoji": "🤡",
+   "file": "emoji/clown.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "puppy-eyes",
+   "name": "Puppy eyes",
+   "category": "Smileys",
+   "tags": "please beg cute",
+   "emoji": "🥺",
+   "file": "emoji/puppy-eyes.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "melting",
+   "name": "Melting",
+   "category": "Smileys",
+   "tags": "embarrassed hot awkward",
+   "emoji": "🫠",
+   "file": "emoji/melting.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "huff",
+   "name": "Huff",
+   "category": "Smileys",
+   "tags": "determined frustrated",
+   "emoji": "😤",
+   "file": "emoji/huff.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "cold-face",
+   "name": "Cold face",
+   "category": "Smileys",
+   "tags": "freezing winter",
+   "emoji": "🥶",
+   "file": "emoji/cold-face.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "hot-face",
+   "name": "Hot face",
+   "category": "Smileys",
+   "tags": "heat summer spicy",
+   "emoji": "🥵",
+   "file": "emoji/hot-face.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "money-face",
+   "name": "Money face",
+   "category": "Smileys",
+   "tags": "rich cash",
+   "emoji": "🤑",
+   "file": "emoji/money-face.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "salute",
+   "name": "Salute",
+   "category": "Smileys",
+   "tags": "respect yes sir",
+   "emoji": "🫡",
+   "file": "emoji/salute.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "clap",
+   "name": "Clap",
+   "category": "Gestures",
+   "tags": "hands applause",
+   "emoji": "👏",
+   "file": "emoji/clap.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "thumbs-up",
+   "name": "Thumbs up",
+   "category": "Gestures",
+   "tags": "hands approve",
+   "emoji": "👍",
+   "file": "emoji/thumbs-up.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "thumbs-down",
+   "name": "Thumbs down",
+   "category": "Gestures",
+   "tags": "hands dislike",
+   "emoji": "👎",
+   "file": "emoji/thumbs-down.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "thanks",
+   "name": "Thanks",
+   "category": "Gestures",
+   "tags": "please hands",
+   "emoji": "🙏",
+   "file": "emoji/thanks.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "strong",
+   "name": "Strong",
+   "category": "Gestures",
+   "tags": "muscle power",
+   "emoji": "💪",
+   "file": "emoji/strong.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "raise-hands",
+   "name": "Raise hands",
+   "category": "Gestures",
+   "tags": "hands celebrate success",
+   "emoji": "🙌",
+   "file": "emoji/raise-hands.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "wave-hello",
+   "name": "Wave hello",
+   "category": "Gestures",
+   "tags": "hands greeting",
+   "emoji": "👋",
+   "file": "emoji/wave-hello.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "heart-hands",
+   "name": "Heart hands",
+   "category": "Gestures",
+   "tags": "hands love support",
+   "emoji": "🫶",
+   "file": "emoji/heart-hands.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "eyes",
+   "name": "Eyes",
+   "category": "Gestures",
+   "tags": "look watch",
+   "emoji": "👀",
+   "file": "emoji/eyes.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "ok-hand",
+   "name": "OK hand",
+   "category": "Gestures",
+   "tags": "perfect fine okay",
+   "emoji": "👌",
+   "file": "emoji/ok-hand.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "victory",
+   "name": "Victory",
+   "category": "Gestures",
+   "tags": "peace two",
+   "emoji": "✌️",
+   "file": "emoji/victory.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "fingers-crossed",
+   "name": "Fingers crossed",
+   "category": "Gestures",
+   "tags": "luck hope",
+   "emoji": "🤞",
+   "file": "emoji/fingers-crossed.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "love-you-gesture",
+   "name": "Love you gesture",
+   "category": "Gestures",
+   "tags": "ily hand",
+   "emoji": "🤟",
+   "file": "emoji/love-you-gesture.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "rock-on",
+   "name": "Rock on",
+   "category": "Gestures",
+   "tags": "metal music",
+   "emoji": "🤘",
+   "file": "emoji/rock-on.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "call-me",
+   "name": "Call me",
+   "category": "Gestures",
+   "tags": "phone shaka",
+   "emoji": "🤙",
+   "file": "emoji/call-me.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "point-left",
+   "name": "Point left",
+   "category": "Gestures",
+   "tags": "direction hand",
+   "emoji": "👈",
+   "file": "emoji/point-left.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "point-right",
+   "name": "Point right",
+   "category": "Gestures",
+   "tags": "direction hand",
+   "emoji": "👉",
+   "file": "emoji/point-right.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "point-up",
+   "name": "Point up",
+   "category": "Gestures",
+   "tags": "direction hand above",
+   "emoji": "👆",
+   "file": "emoji/point-up.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "point-down",
+   "name": "Point down",
+   "category": "Gestures",
+   "tags": "direction hand below link",
+   "emoji": "👇",
+   "file": "emoji/point-down.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "index-up",
+   "name": "Index up",
+   "category": "Gestures",
+   "tags": "one attention",
+   "emoji": "☝️",
+   "file": "emoji/index-up.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "raised-hand",
+   "name": "Raised hand",
+   "category": "Gestures",
+   "tags": "stop high five",
+   "emoji": "✋",
+   "file": "emoji/raised-hand.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "hand-splayed",
+   "name": "Hand splayed",
+   "category": "Gestures",
+   "tags": "five hand",
+   "emoji": "🖐️",
+   "file": "emoji/hand-splayed.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "vulcan-salute",
+   "name": "Vulcan salute",
+   "category": "Gestures",
+   "tags": "sci-fi greeting",
+   "emoji": "🖖",
+   "file": "emoji/vulcan-salute.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "fist-bump",
+   "name": "Fist bump",
+   "category": "Gestures",
+   "tags": "punch bro",
+   "emoji": "👊",
+   "file": "emoji/fist-bump.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "raised-fist",
+   "name": "Raised fist",
+   "category": "Gestures",
+   "tags": "power solidarity",
+   "emoji": "✊",
+   "file": "emoji/raised-fist.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "handshake",
+   "name": "Handshake",
+   "category": "Gestures",
+   "tags": "deal agreement partner",
+   "emoji": "🤝",
+   "file": "emoji/handshake.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "finger-heart",
+   "name": "Finger heart",
+   "category": "Gestures",
+   "tags": "love korean",
+   "emoji": "🫰",
+   "file": "emoji/finger-heart.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "pinched-fingers",
+   "name": "Pinched fingers",
+   "category": "Gestures",
+   "tags": "italian what",
+   "emoji": "🤌",
+   "file": "emoji/pinched-fingers.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "writing-hand",
+   "name": "Writing hand",
+   "category": "Gestures",
+   "tags": "write sign note",
+   "emoji": "✍️",
+   "file": "emoji/writing-hand.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "point-at-you",
+   "name": "Point at you",
+   "category": "Gestures",
+   "tags": "you viewer",
+   "emoji": "🫵",
+   "file": "emoji/point-at-you.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "heart",
+   "name": "Heart",
+   "category": "Hearts",
+   "tags": "love symbol red",
+   "emoji": "❤️",
+   "file": "emoji/heart.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "sparkling-heart",
+   "name": "Sparkling heart",
+   "category": "Hearts",
+   "tags": "love heart",
+   "emoji": "💖",
+   "file": "emoji/sparkling-heart.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "orange-heart",
+   "name": "Orange heart",
+   "category": "Hearts",
+   "tags": "love",
+   "emoji": "🧡",
+   "file": "emoji/orange-heart.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "yellow-heart",
+   "name": "Yellow heart",
+   "category": "Hearts",
+   "tags": "love friendship",
+   "emoji": "💛",
+   "file": "emoji/yellow-heart.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "green-heart",
+   "name": "Green heart",
+   "category": "Hearts",
+   "tags": "love nature",
+   "emoji": "💚",
+   "file": "emoji/green-heart.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "blue-heart",
+   "name": "Blue heart",
+   "category": "Hearts",
+   "tags": "love trust",
+   "emoji": "💙",
+   "file": "emoji/blue-heart.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "purple-heart",
+   "name": "Purple heart",
+   "category": "Hearts",
+   "tags": "love",
+   "emoji": "💜",
+   "file": "emoji/purple-heart.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "black-heart",
+   "name": "Black heart",
+   "category": "Hearts",
+   "tags": "love dark",
+   "emoji": "🖤",
+   "file": "emoji/black-heart.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "white-heart",
+   "name": "White heart",
+   "category": "Hearts",
+   "tags": "love pure",
+   "emoji": "🤍",
+   "file": "emoji/white-heart.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "brown-heart",
+   "name": "Brown heart",
+   "category": "Hearts",
+   "tags": "love",
+   "emoji": "🤎",
+   "file": "emoji/brown-heart.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "pink-heart",
+   "name": "Pink heart",
+   "category": "Hearts",
+   "tags": "love cute",
+   "emoji": "🩷",
+   "file": "emoji/pink-heart.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "broken-heart",
+   "name": "Broken heart",
+   "category": "Hearts",
+   "tags": "sad breakup",
+   "emoji": "💔",
+   "file": "emoji/broken-heart.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "two-hearts",
+   "name": "Two hearts",
+   "category": "Hearts",
+   "tags": "love couple",
+   "emoji": "💕",
+   "file": "emoji/two-hearts.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "revolving-hearts",
+   "name": "Revolving hearts",
+   "category": "Hearts",
+   "tags": "love romance",
+   "emoji": "💞",
+   "file": "emoji/revolving-hearts.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "beating-heart",
+   "name": "Beating heart",
+   "category": "Hearts",
+   "tags": "love pulse",
+   "emoji": "💓",
+   "file": "emoji/beating-heart.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "growing-heart",
+   "name": "Growing heart",
+   "category": "Hearts",
+   "tags": "love excited",
+   "emoji": "💗",
+   "file": "emoji/growing-heart.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "heart-arrow",
+   "name": "Heart arrow",
+   "category": "Hearts",
+   "tags": "cupid valentine",
+   "emoji": "💘",
+   "file": "emoji/heart-arrow.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "heart-gift",
+   "name": "Heart gift",
+   "category": "Hearts",
+   "tags": "valentine present",
+   "emoji": "💝",
+   "file": "emoji/heart-gift.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "heart-exclamation",
+   "name": "Heart exclamation",
+   "category": "Hearts",
+   "tags": "love emphasis",
+   "emoji": "❣️",
+   "file": "emoji/heart-exclamation.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "love-letter",
+   "name": "Love letter",
+   "category": "Hearts",
+   "tags": "mail valentine",
+   "emoji": "💌",
+   "file": "emoji/love-letter.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "heart-on-fire",
+   "name": "Heart on fire",
+   "category": "Hearts",
+   "tags": "passion love hot",
+   "emoji": "❤️‍🔥",
+   "file": "emoji/heart-on-fire.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "cat",
+   "name": "Cat",
+   "category": "Animals & nature",
+   "tags": "animal pet",
+   "emoji": "🐱",
+   "file": "emoji/cat.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "dog",
+   "name": "Dog",
+   "category": "Animals & nature",
+   "tags": "animal pet",
+   "emoji": "🐶",
+   "file": "emoji/dog.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "butterfly",
+   "name": "Butterfly",
+   "category": "Animals & nature",
+   "tags": "nature",
+   "emoji": "🦋",
+   "file": "emoji/butterfly.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "blossom",
+   "name": "Blossom",
+   "category": "Animals & nature",
+   "tags": "flower spring",
+   "emoji": "🌸",
+   "file": "emoji/blossom.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "fox",
+   "name": "Fox",
+   "category": "Animals & nature",
+   "tags": "animal clever",
+   "emoji": "🦊",
+   "file": "emoji/fox.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "panda",
+   "name": "Panda",
+   "category": "Animals & nature",
+   "tags": "animal cute",
+   "emoji": "🐼",
+   "file": "emoji/panda.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "bear",
+   "name": "Bear",
+   "category": "Animals & nature",
+   "tags": "animal",
+   "emoji": "🐻",
+   "file": "emoji/bear.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "koala",
+   "name": "Koala",
+   "category": "Animals & nature",
+   "tags": "animal australia",
+   "emoji": "🐨",
+   "file": "emoji/koala.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "tiger",
+   "name": "Tiger",
+   "category": "Animals & nature",
+   "tags": "animal wild",
+   "emoji": "🐯",
+   "file": "emoji/tiger.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "lion",
+   "name": "Lion",
+   "category": "Animals & nature",
+   "tags": "animal king brave",
+   "emoji": "🦁",
+   "file": "emoji/lion.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "frog",
+   "name": "Frog",
+   "category": "Animals & nature",
+   "tags": "animal",
+   "emoji": "🐸",
+   "file": "emoji/frog.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "monkey",
+   "name": "Monkey",
+   "category": "Animals & nature",
+   "tags": "animal",
+   "emoji": "🐵",
+   "file": "emoji/monkey.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "see-no-evil",
+   "name": "See no evil",
+   "category": "Animals & nature",
+   "tags": "monkey shy oops",
+   "emoji": "🙈",
+   "file": "emoji/see-no-evil.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "penguin",
+   "name": "Penguin",
+   "category": "Animals & nature",
+   "tags": "animal cold",
+   "emoji": "🐧",
+   "file": "emoji/penguin.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "bird",
+   "name": "Bird",
+   "category": "Animals & nature",
+   "tags": "animal tweet",
+   "emoji": "🐦",
+   "file": "emoji/bird.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "unicorn",
+   "name": "Unicorn",
+   "category": "Animals & nature",
+   "tags": "magic fantasy",
+   "emoji": "🦄",
+   "file": "emoji/unicorn.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "bee",
+   "name": "Bee",
+   "category": "Animals & nature",
+   "tags": "insect honey busy",
+   "emoji": "🐝",
+   "file": "emoji/bee.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "turtle",
+   "name": "Turtle",
+   "category": "Animals & nature",
+   "tags": "slow animal",
+   "emoji": "🐢",
+   "file": "emoji/turtle.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "octopus",
+   "name": "Octopus",
+   "category": "Animals & nature",
+   "tags": "sea animal",
+   "emoji": "🐙",
+   "file": "emoji/octopus.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "dolphin",
+   "name": "Dolphin",
+   "category": "Animals & nature",
+   "tags": "sea animal",
+   "emoji": "🐬",
+   "file": "emoji/dolphin.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "whale",
+   "name": "Whale",
+   "category": "Animals & nature",
+   "tags": "sea animal",
+   "emoji": "🐳",
+   "file": "emoji/whale.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "shark",
+   "name": "Shark",
+   "category": "Animals & nature",
+   "tags": "sea danger",
+   "emoji": "🦈",
+   "file": "emoji/shark.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "owl",
+   "name": "Owl",
+   "category": "Animals & nature",
+   "tags": "wise night bird",
+   "emoji": "🦉",
+   "file": "emoji/owl.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "bunny",
+   "name": "Bunny",
+   "category": "Animals & nature",
+   "tags": "rabbit easter cute",
+   "emoji": "🐰",
+   "file": "emoji/bunny.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "pig",
+   "name": "Pig",
+   "category": "Animals & nature",
+   "tags": "animal farm",
+   "emoji": "🐷",
+   "file": "emoji/pig.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "cow",
+   "name": "Cow",
+   "category": "Animals & nature",
+   "tags": "animal farm",
+   "emoji": "🐮",
+   "file": "emoji/cow.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "t-rex",
+   "name": "T-rex",
+   "category": "Animals & nature",
+   "tags": "dinosaur",
+   "emoji": "🦖",
+   "file": "emoji/t-rex.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "snake",
+   "name": "Snake",
+   "category": "Animals & nature",
+   "tags": "animal",
+   "emoji": "🐍",
+   "file": "emoji/snake.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "ladybug",
+   "name": "Ladybug",
+   "category": "Animals & nature",
+   "tags": "insect luck",
+   "emoji": "🐞",
+   "file": "emoji/ladybug.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "sunflower",
+   "name": "Sunflower",
+   "category": "Animals & nature",
+   "tags": "flower summer",
+   "emoji": "🌻",
+   "file": "emoji/sunflower.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "rose",
+   "name": "Rose",
+   "category": "Animals & nature",
+   "tags": "flower love",
+   "emoji": "🌹",
+   "file": "emoji/rose.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "cactus",
+   "name": "Cactus",
+   "category": "Animals & nature",
+   "tags": "desert plant",
+   "emoji": "🌵",
+   "file": "emoji/cactus.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "palm-tree",
+   "name": "Palm tree",
+   "category": "Animals & nature",
+   "tags": "tropical beach",
+   "emoji": "🌴",
+   "file": "emoji/palm-tree.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "four-leaf-clover",
+   "name": "Four-leaf clover",
+   "category": "Animals & nature",
+   "tags": "luck",
+   "emoji": "🍀",
+   "file": "emoji/four-leaf-clover.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "seedling",
+   "name": "Seedling",
+   "category": "Animals & nature",
+   "tags": "growth plant start",
+   "emoji": "🌱",
+   "file": "emoji/seedling.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "tulip",
+   "name": "Tulip",
+   "category": "Animals & nature",
+   "tags": "flower spring",
+   "emoji": "🌷",
+   "file": "emoji/tulip.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "coffee",
+   "name": "Coffee",
+   "category": "Food",
+   "tags": "drink break",
+   "emoji": "☕",
+   "file": "emoji/coffee.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "popcorn",
+   "name": "Popcorn",
+   "category": "Food",
+   "tags": "movie snack",
+   "emoji": "🍿",
+   "file": "emoji/popcorn.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "pizza",
+   "name": "Pizza",
+   "category": "Food",
+   "tags": "food",
+   "emoji": "🍕",
+   "file": "emoji/pizza.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "burger",
+   "name": "Burger",
+   "category": "Food",
+   "tags": "food fast",
+   "emoji": "🍔",
+   "file": "emoji/burger.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "fries",
+   "name": "Fries",
+   "category": "Food",
+   "tags": "food fast",
+   "emoji": "🍟",
+   "file": "emoji/fries.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "taco",
+   "name": "Taco",
+   "category": "Food",
+   "tags": "food mexican",
+   "emoji": "🌮",
+   "file": "emoji/taco.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "sushi",
+   "name": "Sushi",
+   "category": "Food",
+   "tags": "food japanese",
+   "emoji": "🍣",
+   "file": "emoji/sushi.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "noodles",
+   "name": "Noodles",
+   "category": "Food",
+   "tags": "ramen food",
+   "emoji": "🍜",
+   "file": "emoji/noodles.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "donut",
+   "name": "Donut",
+   "category": "Food",
+   "tags": "sweet dessert",
+   "emoji": "🍩",
+   "file": "emoji/donut.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "cookie",
+   "name": "Cookie",
+   "category": "Food",
+   "tags": "sweet snack",
+   "emoji": "🍪",
+   "file": "emoji/cookie.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "birthday-cake",
+   "name": "Birthday cake",
+   "category": "Food",
+   "tags": "party celebration",
+   "emoji": "🎂",
+   "file": "emoji/birthday-cake.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "cake-slice",
+   "name": "Cake slice",
+   "category": "Food",
+   "tags": "dessert sweet",
+   "emoji": "🍰",
+   "file": "emoji/cake-slice.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "ice-cream",
+   "name": "Ice cream",
+   "category": "Food",
+   "tags": "dessert summer",
+   "emoji": "🍦",
+   "file": "emoji/ice-cream.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "chocolate",
+   "name": "Chocolate",
+   "category": "Food",
+   "tags": "sweet",
+   "emoji": "🍫",
+   "file": "emoji/chocolate.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "strawberry",
+   "name": "Strawberry",
+   "category": "Food",
+   "tags": "fruit",
+   "emoji": "🍓",
+   "file": "emoji/strawberry.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "watermelon",
+   "name": "Watermelon",
+   "category": "Food",
+   "tags": "fruit summer",
+   "emoji": "🍉",
+   "file": "emoji/watermelon.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "apple",
+   "name": "Apple",
+   "category": "Food",
+   "tags": "fruit",
+   "emoji": "🍎",
+   "file": "emoji/apple.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "banana",
+   "name": "Banana",
+   "category": "Food",
+   "tags": "fruit",
+   "emoji": "🍌",
+   "file": "emoji/banana.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "avocado",
+   "name": "Avocado",
+   "category": "Food",
+   "tags": "food healthy",
+   "emoji": "🥑",
+   "file": "emoji/avocado.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "hot-pepper",
+   "name": "Hot pepper",
+   "category": "Food",
+   "tags": "spicy chili",
+   "emoji": "🌶️",
+   "file": "emoji/hot-pepper.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "croissant",
+   "name": "Croissant",
+   "category": "Food",
+   "tags": "breakfast bakery",
+   "emoji": "🥐",
+   "file": "emoji/croissant.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "bubble-tea",
+   "name": "Bubble tea",
+   "category": "Food",
+   "tags": "drink boba",
+   "emoji": "🧋",
+   "file": "emoji/bubble-tea.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "tropical-drink",
+   "name": "Tropical drink",
+   "category": "Food",
+   "tags": "cocktail summer",
+   "emoji": "🍹",
+   "file": "emoji/tropical-drink.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "soda-cup",
+   "name": "Soda cup",
+   "category": "Food",
+   "tags": "drink",
+   "emoji": "🥤",
+   "file": "emoji/soda-cup.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "tea",
+   "name": "Tea",
+   "category": "Food",
+   "tags": "drink green",
+   "emoji": "🍵",
+   "file": "emoji/tea.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "salad",
+   "name": "Salad",
+   "category": "Food",
+   "tags": "healthy food",
+   "emoji": "🥗",
+   "file": "emoji/salad.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "pin",
+   "name": "Pin",
+   "category": "Travel & places",
+   "tags": "location map",
+   "emoji": "📍",
+   "file": "emoji/pin.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "rocket",
+   "name": "Rocket",
+   "category": "Travel & places",
+   "tags": "launch fast",
+   "emoji": "🚀",
+   "file": "emoji/rocket.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "sun",
+   "name": "Sun",
+   "category": "Travel & places",
+   "tags": "weather bright",
+   "emoji": "☀️",
+   "file": "emoji/sun.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "rainbow",
+   "name": "Rainbow",
+   "category": "Travel & places",
+   "tags": "color pride",
+   "emoji": "🌈",
+   "file": "emoji/rainbow.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "airplane",
+   "name": "Airplane",
+   "category": "Travel & places",
+   "tags": "flight travel",
+   "emoji": "✈️",
+   "file": "emoji/airplane.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "car",
+   "name": "Car",
+   "category": "Travel & places",
+   "tags": "drive road trip",
+   "emoji": "🚗",
+   "file": "emoji/car.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "bicycle",
+   "name": "Bicycle",
+   "category": "Travel & places",
+   "tags": "bike ride",
+   "emoji": "🚲",
+   "file": "emoji/bicycle.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "train",
+   "name": "Train",
+   "category": "Travel & places",
+   "tags": "railway travel",
+   "emoji": "🚂",
+   "file": "emoji/train.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "ship",
+   "name": "Ship",
+   "category": "Travel & places",
+   "tags": "cruise sea",
+   "emoji": "🚢",
+   "file": "emoji/ship.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "beach",
+   "name": "Beach",
+   "category": "Travel & places",
+   "tags": "vacation summer",
+   "emoji": "🏖️",
+   "file": "emoji/beach.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "mountain",
+   "name": "Mountain",
+   "category": "Travel & places",
+   "tags": "snow peak hike",
+   "emoji": "🏔️",
+   "file": "emoji/mountain.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "camping",
+   "name": "Camping",
+   "category": "Travel & places",
+   "tags": "outdoor tent",
+   "emoji": "🏕️",
+   "file": "emoji/camping.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "world-map",
+   "name": "World map",
+   "category": "Travel & places",
+   "tags": "travel location",
+   "emoji": "🗺️",
+   "file": "emoji/world-map.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "globe",
+   "name": "Globe",
+   "category": "Travel & places",
+   "tags": "world earth",
+   "emoji": "🌍",
+   "file": "emoji/globe.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "compass",
+   "name": "Compass",
+   "category": "Travel & places",
+   "tags": "direction explore",
+   "emoji": "🧭",
+   "file": "emoji/compass.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "house",
+   "name": "House",
+   "category": "Travel & places",
+   "tags": "home",
+   "emoji": "🏠",
+   "file": "emoji/house.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "city",
+   "name": "City",
+   "category": "Travel & places",
+   "tags": "skyline urban",
+   "emoji": "🏙️",
+   "file": "emoji/city.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "statue-of-liberty",
+   "name": "Statue of Liberty",
+   "category": "Travel & places",
+   "tags": "new york usa",
+   "emoji": "🗽",
+   "file": "emoji/statue-of-liberty.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "mosque",
+   "name": "Mosque",
+   "category": "Travel & places",
+   "tags": "islam ramadan",
+   "emoji": "🕌",
+   "file": "emoji/mosque.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "ferris-wheel",
+   "name": "Ferris wheel",
+   "category": "Travel & places",
+   "tags": "fun fair",
+   "emoji": "🎡",
+   "file": "emoji/ferris-wheel.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "crescent-moon",
+   "name": "Crescent moon",
+   "category": "Travel & places",
+   "tags": "night ramadan",
+   "emoji": "🌙",
+   "file": "emoji/crescent-moon.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "cloudy-sun",
+   "name": "Cloudy sun",
+   "category": "Travel & places",
+   "tags": "weather",
+   "emoji": "⛅",
+   "file": "emoji/cloudy-sun.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "rain",
+   "name": "Rain",
+   "category": "Travel & places",
+   "tags": "weather",
+   "emoji": "🌧️",
+   "file": "emoji/rain.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "wave",
+   "name": "Wave",
+   "category": "Travel & places",
+   "tags": "sea surf ocean",
+   "emoji": "🌊",
+   "file": "emoji/wave.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "luggage",
+   "name": "Luggage",
+   "category": "Travel & places",
+   "tags": "travel trip",
+   "emoji": "🧳",
+   "file": "emoji/luggage.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "museum",
+   "name": "Museum",
+   "category": "Travel & places",
+   "tags": "history classical building",
+   "emoji": "🏛️",
+   "file": "emoji/museum.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "movie",
+   "name": "Movie",
+   "category": "Objects",
+   "tags": "film video",
+   "emoji": "🎬",
+   "file": "emoji/movie.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "idea",
+   "name": "Idea",
+   "category": "Objects",
+   "tags": "light bulb tip",
+   "emoji": "💡",
+   "file": "emoji/idea.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "puzzle-piece",
+   "name": "Puzzle piece",
+   "category": "Objects",
+   "tags": "idea problem solve",
+   "emoji": "🧩",
+   "file": "emoji/puzzle-piece.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "growth-chart",
+   "name": "Growth chart",
+   "category": "Objects",
+   "tags": "business growth up",
+   "emoji": "📈",
+   "file": "emoji/growth-chart.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "microphone",
+   "name": "Microphone",
+   "category": "Objects",
+   "tags": "creator speech music",
+   "emoji": "🎤",
+   "file": "emoji/microphone.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "headphones",
+   "name": "Headphones",
+   "category": "Objects",
+   "tags": "audio podcast music",
+   "emoji": "🎧",
+   "file": "emoji/headphones.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "crown",
+   "name": "Crown",
+   "category": "Objects",
+   "tags": "winner best creator",
+   "emoji": "👑",
+   "file": "emoji/crown.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "money",
+   "name": "Money",
+   "category": "Objects",
+   "tags": "cash finance",
+   "emoji": "💰",
+   "file": "emoji/money.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "trophy",
+   "name": "Trophy",
+   "category": "Objects",
+   "tags": "winner award",
+   "emoji": "🏆",
+   "file": "emoji/trophy.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "target",
+   "name": "Target",
+   "category": "Objects",
+   "tags": "goal focus",
+   "emoji": "🎯",
+   "file": "emoji/target.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "brain",
+   "name": "Brain",
+   "category": "Objects",
+   "tags": "think smart",
+   "emoji": "🧠",
+   "file": "emoji/brain.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "camera",
+   "name": "Camera",
+   "category": "Objects",
+   "tags": "photo",
+   "emoji": "📷",
+   "file": "emoji/camera.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "video-camera",
+   "name": "Video camera",
+   "category": "Objects",
+   "tags": "film record",
+   "emoji": "🎥",
+   "file": "emoji/video-camera.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "phone",
+   "name": "Phone",
+   "category": "Objects",
+   "tags": "mobile smartphone",
+   "emoji": "📱",
+   "file": "emoji/phone.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "laptop",
+   "name": "Laptop",
+   "category": "Objects",
+   "tags": "computer work",
+   "emoji": "💻",
+   "file": "emoji/laptop.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "keyboard",
+   "name": "Keyboard",
+   "category": "Objects",
+   "tags": "typing computer",
+   "emoji": "⌨️",
+   "file": "emoji/keyboard.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "game-controller",
+   "name": "Game controller",
+   "category": "Objects",
+   "tags": "gaming play",
+   "emoji": "🎮",
+   "file": "emoji/game-controller.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "books",
+   "name": "Books",
+   "category": "Objects",
+   "tags": "study read learn",
+   "emoji": "📚",
+   "file": "emoji/books.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "pencil",
+   "name": "Pencil",
+   "category": "Objects",
+   "tags": "write edit",
+   "emoji": "✏️",
+   "file": "emoji/pencil.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "pushpin",
+   "name": "Pushpin",
+   "category": "Objects",
+   "tags": "pin note",
+   "emoji": "📌",
+   "file": "emoji/pushpin.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "paperclip",
+   "name": "Paperclip",
+   "category": "Objects",
+   "tags": "attach",
+   "emoji": "📎",
+   "file": "emoji/paperclip.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "key",
+   "name": "Key",
+   "category": "Objects",
+   "tags": "secret unlock",
+   "emoji": "🔑",
+   "file": "emoji/key.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "lock",
+   "name": "Lock",
+   "category": "Objects",
+   "tags": "secure private",
+   "emoji": "🔒",
+   "file": "emoji/lock.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "bell",
+   "name": "Bell",
+   "category": "Objects",
+   "tags": "notification alert",
+   "emoji": "🔔",
+   "file": "emoji/bell.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "megaphone",
+   "name": "Megaphone",
+   "category": "Objects",
+   "tags": "announce loud",
+   "emoji": "📣",
+   "file": "emoji/megaphone.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "loudspeaker",
+   "name": "Loudspeaker",
+   "category": "Objects",
+   "tags": "announcement",
+   "emoji": "📢",
+   "file": "emoji/loudspeaker.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "alarm-clock",
+   "name": "Alarm clock",
+   "category": "Objects",
+   "tags": "time wake",
+   "emoji": "⏰",
+   "file": "emoji/alarm-clock.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "hourglass",
+   "name": "Hourglass",
+   "category": "Objects",
+   "tags": "time wait",
+   "emoji": "⌛",
+   "file": "emoji/hourglass.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "gem",
+   "name": "Gem",
+   "category": "Objects",
+   "tags": "diamond premium",
+   "emoji": "💎",
+   "file": "emoji/gem.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "gift",
+   "name": "Gift",
+   "category": "Objects",
+   "tags": "present giveaway",
+   "emoji": "🎁",
+   "file": "emoji/gift.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "shopping-cart",
+   "name": "Shopping cart",
+   "category": "Objects",
+   "tags": "shop buy",
+   "emoji": "🛒",
+   "file": "emoji/shopping-cart.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "credit-card",
+   "name": "Credit card",
+   "category": "Objects",
+   "tags": "pay shop",
+   "emoji": "💳",
+   "file": "emoji/credit-card.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "magnet",
+   "name": "Magnet",
+   "category": "Objects",
+   "tags": "attract",
+   "emoji": "🧲",
+   "file": "emoji/magnet.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "magnifier",
+   "name": "Magnifier",
+   "category": "Objects",
+   "tags": "search zoom find",
+   "emoji": "🔍",
+   "file": "emoji/magnifier.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "tools",
+   "name": "Tools",
+   "category": "Objects",
+   "tags": "fix build settings",
+   "emoji": "🛠️",
+   "file": "emoji/tools.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "package",
+   "name": "Package",
+   "category": "Objects",
+   "tags": "delivery box unboxing",
+   "emoji": "📦",
+   "file": "emoji/package.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "calendar",
+   "name": "Calendar",
+   "category": "Objects",
+   "tags": "date schedule",
+   "emoji": "🗓️",
+   "file": "emoji/calendar.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "bar-chart",
+   "name": "Bar chart",
+   "category": "Objects",
+   "tags": "stats data",
+   "emoji": "📊",
+   "file": "emoji/bar-chart.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "falling-chart",
+   "name": "Falling chart",
+   "category": "Objects",
+   "tags": "down loss",
+   "emoji": "📉",
+   "file": "emoji/falling-chart.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "battery",
+   "name": "Battery",
+   "category": "Objects",
+   "tags": "energy power",
+   "emoji": "🔋",
+   "file": "emoji/battery.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "studio-mic",
+   "name": "Studio mic",
+   "category": "Objects",
+   "tags": "podcast record",
+   "emoji": "🎙️",
+   "file": "emoji/studio-mic.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "camera-flash",
+   "name": "Camera flash",
+   "category": "Objects",
+   "tags": "photo snap",
+   "emoji": "📸",
+   "file": "emoji/camera-flash.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "fire",
+   "name": "Fire",
+   "category": "Symbols",
+   "tags": "trending hot",
+   "emoji": "🔥",
+   "file": "emoji/fire.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "sparkles",
+   "name": "Sparkles",
+   "category": "Symbols",
+   "tags": "magic shine",
+   "emoji": "✨",
+   "file": "emoji/sparkles.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "star",
+   "name": "Star",
+   "category": "Symbols",
+   "tags": "rating favorite",
+   "emoji": "⭐",
+   "file": "emoji/star.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "100",
+   "name": "100",
+   "category": "Symbols",
+   "tags": "perfect score",
+   "emoji": "💯",
+   "file": "emoji/100.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "check",
+   "name": "Check",
+   "category": "Symbols",
+   "tags": "done correct",
+   "emoji": "✅",
+   "file": "emoji/check.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "cross",
+   "name": "Cross",
+   "category": "Symbols",
+   "tags": "wrong no",
+   "emoji": "❌",
+   "file": "emoji/cross.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "warning",
+   "name": "Warning",
+   "category": "Symbols",
+   "tags": "alert caution",
+   "emoji": "⚠️",
+   "file": "emoji/warning.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "question",
+   "name": "Question",
+   "category": "Symbols",
+   "tags": "help ask",
+   "emoji": "❓",
+   "file": "emoji/question.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "music",
+   "name": "Music",
+   "category": "Symbols",
+   "tags": "sound audio",
+   "emoji": "🎵",
+   "file": "emoji/music.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "speech-bubble",
+   "name": "Speech bubble",
+   "category": "Symbols",
+   "tags": "comment message",
+   "emoji": "💬",
+   "file": "emoji/speech-bubble.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "glow-star",
+   "name": "Glow star",
+   "category": "Symbols",
+   "tags": "star shine",
+   "emoji": "🌟",
+   "file": "emoji/glow-star.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "siren",
+   "name": "Siren",
+   "category": "Symbols",
+   "tags": "alert urgent",
+   "emoji": "🚨",
+   "file": "emoji/siren.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "stop",
+   "name": "Stop",
+   "category": "Symbols",
+   "tags": "halt",
+   "emoji": "🛑",
+   "file": "emoji/stop.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "play",
+   "name": "Play",
+   "category": "Symbols",
+   "tags": "video start",
+   "emoji": "▶️",
+   "file": "emoji/play.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "pause",
+   "name": "Pause",
+   "category": "Symbols",
+   "tags": "video stop",
+   "emoji": "⏸️",
+   "file": "emoji/pause.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "lightning",
+   "name": "Lightning",
+   "category": "Symbols",
+   "tags": "energy fast power",
+   "emoji": "⚡",
+   "file": "emoji/lightning.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "impact",
+   "name": "Impact",
+   "category": "Symbols",
+   "tags": "comic boom action",
+   "emoji": "💥",
+   "file": "emoji/impact.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "exclamation",
+   "name": "Exclamation",
+   "category": "Symbols",
+   "tags": "important alert",
+   "emoji": "❗",
+   "file": "emoji/exclamation.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "double-exclamation",
+   "name": "Double exclamation",
+   "category": "Symbols",
+   "tags": "important wow",
+   "emoji": "‼️",
+   "file": "emoji/double-exclamation.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "interrobang",
+   "name": "Interrobang",
+   "category": "Symbols",
+   "tags": "what surprise",
+   "emoji": "⁉️",
+   "file": "emoji/interrobang.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "zzz",
+   "name": "Zzz",
+   "category": "Symbols",
+   "tags": "sleep bored",
+   "emoji": "💤",
+   "file": "emoji/zzz.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "anger-symbol",
+   "name": "Anger symbol",
+   "category": "Symbols",
+   "tags": "mad comic",
+   "emoji": "💢",
+   "file": "emoji/anger-symbol.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "sweat-drops",
+   "name": "Sweat drops",
+   "category": "Symbols",
+   "tags": "water splash",
+   "emoji": "💦",
+   "file": "emoji/sweat-drops.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "dash",
+   "name": "Dash",
+   "category": "Symbols",
+   "tags": "fast speed wind",
+   "emoji": "💨",
+   "file": "emoji/dash.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "new-button",
+   "name": "New button",
+   "category": "Symbols",
+   "tags": "new label",
+   "emoji": "🆕",
+   "file": "emoji/new-button.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "cool-button",
+   "name": "Cool button",
+   "category": "Symbols",
+   "tags": "cool label",
+   "emoji": "🆒",
+   "file": "emoji/cool-button.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "free-button",
+   "name": "Free button",
+   "category": "Symbols",
+   "tags": "free label",
+   "emoji": "🆓",
+   "file": "emoji/free-button.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "top",
+   "name": "Top",
+   "category": "Symbols",
+   "tags": "best top arrow",
+   "emoji": "🔝",
+   "file": "emoji/top.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "recycle",
+   "name": "Recycle",
+   "category": "Symbols",
+   "tags": "eco green",
+   "emoji": "♻️",
+   "file": "emoji/recycle.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "no-entry",
+   "name": "No entry",
+   "category": "Symbols",
+   "tags": "forbidden stop",
+   "emoji": "⛔",
+   "file": "emoji/no-entry.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "prohibited",
+   "name": "Prohibited",
+   "category": "Symbols",
+   "tags": "no ban",
+   "emoji": "🚫",
+   "file": "emoji/prohibited.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "plus",
+   "name": "Plus",
+   "category": "Symbols",
+   "tags": "add more",
+   "emoji": "➕",
+   "file": "emoji/plus.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "minus",
+   "name": "Minus",
+   "category": "Symbols",
+   "tags": "less remove",
+   "emoji": "➖",
+   "file": "emoji/minus.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "check-mark",
+   "name": "Check mark",
+   "category": "Symbols",
+   "tags": "done yes tick",
+   "emoji": "✔️",
+   "file": "emoji/check-mark.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "red-circle",
+   "name": "Red circle",
+   "category": "Symbols",
+   "tags": "record live dot",
+   "emoji": "🔴",
+   "file": "emoji/red-circle.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "green-circle",
+   "name": "Green circle",
+   "category": "Symbols",
+   "tags": "online go dot",
+   "emoji": "🟢",
+   "file": "emoji/green-circle.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "blue-circle",
+   "name": "Blue circle",
+   "category": "Symbols",
+   "tags": "dot",
+   "emoji": "🔵",
+   "file": "emoji/blue-circle.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "yellow-circle",
+   "name": "Yellow circle",
+   "category": "Symbols",
+   "tags": "dot",
+   "emoji": "🟡",
+   "file": "emoji/yellow-circle.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "fast-forward",
+   "name": "Fast forward",
+   "category": "Symbols",
+   "tags": "skip video",
+   "emoji": "⏩",
+   "file": "emoji/fast-forward.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "rewind",
+   "name": "Rewind",
+   "category": "Symbols",
+   "tags": "back video",
+   "emoji": "⏪",
+   "file": "emoji/rewind.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "repeat",
+   "name": "Repeat",
+   "category": "Symbols",
+   "tags": "loop again",
+   "emoji": "🔁",
+   "file": "emoji/repeat.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "sound-on",
+   "name": "Sound on",
+   "category": "Symbols",
+   "tags": "volume audio loud",
+   "emoji": "🔊",
+   "file": "emoji/sound-on.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "mute",
+   "name": "Mute",
+   "category": "Symbols",
+   "tags": "silent no sound",
+   "emoji": "🔇",
+   "file": "emoji/mute.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "thought-bubble",
+   "name": "Thought bubble",
+   "category": "Symbols",
+   "tags": "thinking idea",
+   "emoji": "💭",
+   "file": "emoji/thought-bubble.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "anger-bubble",
+   "name": "Anger bubble",
+   "category": "Symbols",
+   "tags": "shout comic",
+   "emoji": "🗯️",
+   "file": "emoji/anger-bubble.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "notes",
+   "name": "Notes",
+   "category": "Symbols",
+   "tags": "music song",
+   "emoji": "🎶",
+   "file": "emoji/notes.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "infinity",
+   "name": "Infinity",
+   "category": "Symbols",
+   "tags": "forever loop",
+   "emoji": "♾️",
+   "file": "emoji/infinity.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "up-arrow",
+   "name": "Up arrow",
+   "category": "Arrows & callouts",
+   "tags": "direction up",
+   "emoji": "⬆️",
+   "file": "emoji/up-arrow.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "down-arrow",
+   "name": "Down arrow",
+   "category": "Arrows & callouts",
+   "tags": "direction down",
+   "emoji": "⬇️",
+   "file": "emoji/down-arrow.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "left-arrow",
+   "name": "Left arrow",
+   "category": "Arrows & callouts",
+   "tags": "direction left back",
+   "emoji": "⬅️",
+   "file": "emoji/left-arrow.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "right-arrow",
+   "name": "Right arrow",
+   "category": "Arrows & callouts",
+   "tags": "direction right next",
+   "emoji": "➡️",
+   "file": "emoji/right-arrow.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "up-right-arrow",
+   "name": "Up-right arrow",
+   "category": "Arrows & callouts",
+   "tags": "direction diagonal",
+   "emoji": "↗️",
+   "file": "emoji/up-right-arrow.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "refresh-arrows",
+   "name": "Refresh arrows",
+   "category": "Arrows & callouts",
+   "tags": "reload cycle",
+   "emoji": "🔄",
+   "file": "emoji/refresh-arrows.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "return-arrow",
+   "name": "Return arrow",
+   "category": "Arrows & callouts",
+   "tags": "back undo",
+   "emoji": "↩️",
+   "file": "emoji/return-arrow.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "bold-arrow-right",
+   "name": "Bold arrow right",
+   "category": "Arrows & callouts",
+   "tags": "arrow direction next point",
+   "file": "graphics/bold-arrow-right.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "bold-arrow-left",
+   "name": "Bold arrow left",
+   "category": "Arrows & callouts",
+   "tags": "arrow direction back point",
+   "file": "graphics/bold-arrow-left.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "bold-arrow-up",
+   "name": "Bold arrow up",
+   "category": "Arrows & callouts",
+   "tags": "arrow direction up point",
+   "file": "graphics/bold-arrow-up.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "bold-arrow-down",
+   "name": "Bold arrow down",
+   "category": "Arrows & callouts",
+   "tags": "arrow direction down point",
+   "file": "graphics/bold-arrow-down.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "curved-arrow",
+   "name": "Curved arrow",
+   "category": "Arrows & callouts",
+   "tags": "arrow curve point look",
+   "file": "graphics/curved-arrow.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "curved-arrow-white",
+   "name": "Curved arrow white",
+   "category": "Arrows & callouts",
+   "tags": "arrow curve point look",
+   "file": "graphics/curved-arrow-white.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "circle-callout-red",
+   "name": "Circle callout red",
+   "category": "Arrows & callouts",
+   "tags": "circle highlight ring look here",
+   "file": "graphics/circle-callout-red.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "circle-callout-yellow",
+   "name": "Circle callout yellow",
+   "category": "Arrows & callouts",
+   "tags": "circle highlight ring look here",
+   "file": "graphics/circle-callout-yellow.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "click-here",
+   "name": "Click here",
+   "category": "Arrows & callouts",
+   "tags": "click here cta arrow",
+   "file": "graphics/click-here.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "look-here",
+   "name": "Look here",
+   "category": "Arrows & callouts",
+   "tags": "look here callout arrow",
+   "file": "graphics/look-here.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "marker-underline",
+   "name": "Marker underline",
+   "category": "Arrows & callouts",
+   "tags": "underline swoosh highlight",
+   "file": "graphics/marker-underline.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "exclamation-callout",
+   "name": "Exclamation callout",
+   "category": "Arrows & callouts",
+   "tags": "alert attention important",
+   "file": "graphics/exclamation-callout.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "info-callout",
+   "name": "Info callout",
+   "category": "Arrows & callouts",
+   "tags": "info note explain",
+   "file": "graphics/info-callout.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "new-badge",
+   "name": "New badge",
+   "category": "Badges & labels",
+   "tags": "label announcement latest",
+   "file": "graphics/new-badge.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "quick-tip",
+   "name": "Quick tip",
+   "category": "Badges & labels",
+   "tags": "label advice idea tutorial",
+   "file": "graphics/quick-tip.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "sale-badge",
+   "name": "Sale badge",
+   "category": "Badges & labels",
+   "tags": "label price promotion",
+   "file": "graphics/sale-badge.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "hot-badge",
+   "name": "Hot badge",
+   "category": "Badges & labels",
+   "tags": "hot trending label fire",
+   "file": "graphics/hot-badge.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "free-badge",
+   "name": "Free badge",
+   "category": "Badges & labels",
+   "tags": "free label price",
+   "file": "graphics/free-badge.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "live-badge",
+   "name": "Live badge",
+   "category": "Badges & labels",
+   "tags": "live stream record",
+   "file": "graphics/live-badge.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "breaking-news",
+   "name": "Breaking news",
+   "category": "Badges & labels",
+   "tags": "news breaking label lower third",
+   "file": "graphics/breaking-news.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "limited-offer",
+   "name": "Limited offer",
+   "category": "Badges & labels",
+   "tags": "sale limited offer promotion",
+   "file": "graphics/limited-offer.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "best-seller",
+   "name": "Best seller",
+   "category": "Badges & labels",
+   "tags": "best seller award",
+   "file": "graphics/best-seller.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "top-10",
+   "name": "Top 10",
+   "category": "Badges & labels",
+   "tags": "top ten list ranking",
+   "file": "graphics/top-10.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "50-off",
+   "name": "50% off",
+   "category": "Badges & labels",
+   "tags": "sale discount half price",
+   "file": "graphics/50-off.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "coming-soon",
+   "name": "Coming soon",
+   "category": "Badges & labels",
+   "tags": "soon upcoming teaser",
+   "file": "graphics/coming-soon.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "update-badge",
+   "name": "Update badge",
+   "category": "Badges & labels",
+   "tags": "update new version",
+   "file": "graphics/update-badge.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "pro-tip",
+   "name": "Pro tip",
+   "category": "Badges & labels",
+   "tags": "tip advice expert",
+   "file": "graphics/pro-tip.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "verified-badge",
+   "name": "Verified badge",
+   "category": "Badges & labels",
+   "tags": "verified check trust",
+   "file": "graphics/verified-badge.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "sold-out-stamp",
+   "name": "Sold out stamp",
+   "category": "Badges & labels",
+   "tags": "sold out stamp",
+   "file": "graphics/sold-out-stamp.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "approved-stamp",
+   "name": "Approved stamp",
+   "category": "Badges & labels",
+   "tags": "approved stamp ok",
+   "file": "graphics/approved-stamp.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "bonus-badge",
+   "name": "Bonus badge",
+   "category": "Badges & labels",
+   "tags": "bonus extra gift",
+   "file": "graphics/bonus-badge.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "must-see",
+   "name": "Must see",
+   "category": "Badges & labels",
+   "tags": "must see important",
+   "file": "graphics/must-see.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "step-1",
+   "name": "Step 1",
+   "category": "Badges & labels",
+   "tags": "step number one tutorial",
+   "file": "graphics/step-1.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "step-2",
+   "name": "Step 2",
+   "category": "Badges & labels",
+   "tags": "step number two tutorial",
+   "file": "graphics/step-2.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "step-3",
+   "name": "Step 3",
+   "category": "Badges & labels",
+   "tags": "step number three tutorial",
+   "file": "graphics/step-3.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "step-4",
+   "name": "Step 4",
+   "category": "Badges & labels",
+   "tags": "step number four tutorial",
+   "file": "graphics/step-4.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "step-5",
+   "name": "Step 5",
+   "category": "Badges & labels",
+   "tags": "step number five tutorial",
+   "file": "graphics/step-5.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "subscribe-pill",
+   "name": "Subscribe pill",
+   "category": "Social",
+   "tags": "creator channel call to action",
+   "file": "graphics/subscribe-pill.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "follow-banner",
+   "name": "Follow banner",
+   "category": "Social",
+   "tags": "creator social call to action",
+   "file": "graphics/follow-banner.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "subscribe-button",
+   "name": "Subscribe button",
+   "category": "Social",
+   "tags": "subscribe channel youtube cta red",
+   "file": "graphics/subscribe-button.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "subscribed-grey",
+   "name": "Subscribed grey",
+   "category": "Social",
+   "tags": "subscribed done channel",
+   "file": "graphics/subscribed-grey.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "like-button",
+   "name": "Like button",
+   "category": "Social",
+   "tags": "like heart love cta",
+   "file": "graphics/like-button.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "share-button",
+   "name": "Share button",
+   "category": "Social",
+   "tags": "share send cta",
+   "file": "graphics/share-button.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "comment-button",
+   "name": "Comment button",
+   "category": "Social",
+   "tags": "comment reply cta",
+   "file": "graphics/comment-button.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "notification-bell",
+   "name": "Notification bell",
+   "category": "Social",
+   "tags": "bell notify alerts",
+   "file": "graphics/notification-bell.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "follow-plus",
+   "name": "Follow plus",
+   "category": "Social",
+   "tags": "follow add plus",
+   "file": "graphics/follow-plus.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "link-in-bio",
+   "name": "Link in bio",
+   "category": "Social",
+   "tags": "link bio profile",
+   "file": "graphics/link-in-bio.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "swipe-up",
+   "name": "Swipe up",
+   "category": "Social",
+   "tags": "swipe up story more",
+   "file": "graphics/swipe-up.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "turn-on-notifications",
+   "name": "Turn on notifications",
+   "category": "Social",
+   "tags": "bell notify alerts cta",
+   "file": "graphics/turn-on-notifications.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "join-now",
+   "name": "Join now",
+   "category": "Social",
+   "tags": "join cta member",
+   "file": "graphics/join-now.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "tag-a-friend",
+   "name": "Tag a friend",
+   "category": "Social",
+   "tags": "tag friend share",
+   "file": "graphics/tag-a-friend.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "save-for-later",
+   "name": "Save for later",
+   "category": "Social",
+   "tags": "save bookmark",
+   "file": "graphics/save-for-later.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "watch-till-end",
+   "name": "Watch till end",
+   "category": "Social",
+   "tags": "watch end wait",
+   "file": "graphics/watch-till-end.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "circle-shape",
+   "name": "Circle shape",
+   "category": "Shapes",
+   "tags": "circle dot shape",
+   "file": "graphics/circle-shape.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "rounded-square",
+   "name": "Rounded square",
+   "category": "Shapes",
+   "tags": "square shape box",
+   "file": "graphics/rounded-square.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "star-shape",
+   "name": "Star shape",
+   "category": "Shapes",
+   "tags": "star shape",
+   "file": "graphics/star-shape.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "heart-shape",
+   "name": "Heart shape",
+   "category": "Shapes",
+   "tags": "heart shape love",
+   "file": "graphics/heart-shape.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "triangle-shape",
+   "name": "Triangle shape",
+   "category": "Shapes",
+   "tags": "triangle shape",
+   "file": "graphics/triangle-shape.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "hexagon-shape",
+   "name": "Hexagon shape",
+   "category": "Shapes",
+   "tags": "hexagon shape",
+   "file": "graphics/hexagon-shape.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "diamond-shape",
+   "name": "Diamond shape",
+   "category": "Shapes",
+   "tags": "diamond rhombus shape",
+   "file": "graphics/diamond-shape.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "ring-outline",
+   "name": "Ring outline",
+   "category": "Shapes",
+   "tags": "ring outline circle frame",
+   "file": "graphics/ring-outline.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "lower-third-bar",
+   "name": "Lower third bar",
+   "category": "Shapes",
+   "tags": "bar plate lower third name",
+   "file": "graphics/lower-third-bar.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "gradient-blob",
+   "name": "Gradient blob",
+   "category": "Shapes",
+   "tags": "blob organic gradient",
+   "file": "graphics/gradient-blob.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "sparkle-shape",
+   "name": "Sparkle shape",
+   "category": "Shapes",
+   "tags": "sparkle twinkle shine",
+   "file": "graphics/sparkle-shape.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "cloud-shape",
+   "name": "Cloud shape",
+   "category": "Shapes",
+   "tags": "cloud weather soft",
+   "file": "graphics/cloud-shape.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "wow-burst",
+   "name": "Wow burst",
+   "category": "Speech bubbles",
+   "tags": "comic reaction impact",
+   "file": "graphics/wow-burst.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "speech-bubble-round",
+   "name": "Speech bubble round",
+   "category": "Speech bubbles",
+   "tags": "talk say bubble comic",
+   "file": "graphics/speech-bubble-round.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "speech-bubble-right",
+   "name": "Speech bubble right",
+   "category": "Speech bubbles",
+   "tags": "talk say bubble comic",
+   "file": "graphics/speech-bubble-right.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "thinking-cloud",
+   "name": "Thinking cloud",
+   "category": "Speech bubbles",
+   "tags": "think thought cloud bubble",
+   "file": "graphics/thinking-cloud.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "shout-bubble",
+   "name": "Shout bubble",
+   "category": "Speech bubbles",
+   "tags": "shout yell comic spiky",
+   "file": "graphics/shout-bubble.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "chat-bubble-blue",
+   "name": "Chat bubble blue",
+   "category": "Speech bubbles",
+   "tags": "message text chat imessage",
+   "file": "graphics/chat-bubble-blue.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "chat-bubble-grey",
+   "name": "Chat bubble grey",
+   "category": "Speech bubbles",
+   "tags": "message text chat reply",
+   "file": "graphics/chat-bubble-grey.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "hello-bubble",
+   "name": "Hello bubble",
+   "category": "Speech bubbles",
+   "tags": "hello hi greeting bubble",
+   "file": "graphics/hello-bubble.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "hmm-bubble",
+   "name": "Hmm bubble",
+   "category": "Speech bubbles",
+   "tags": "hmm thinking bubble",
+   "file": "graphics/hmm-bubble.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "omg-bubble",
+   "name": "OMG bubble",
+   "category": "Speech bubbles",
+   "tags": "omg shock bubble",
+   "file": "graphics/omg-bubble.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "lol-bubble",
+   "name": "LOL bubble",
+   "category": "Speech bubbles",
+   "tags": "lol funny laugh bubble",
+   "file": "graphics/lol-bubble.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "boom-comic",
+   "name": "Boom comic",
+   "category": "Speech bubbles",
+   "tags": "boom comic explosion impact",
+   "file": "graphics/boom-comic.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "pow-comic",
+   "name": "Pow comic",
+   "category": "Speech bubbles",
+   "tags": "pow comic punch impact",
+   "file": "graphics/pow-comic.png",
+   "source": "sceneforge"
+  },
+  {
+   "id": "confetti",
+   "name": "Confetti",
+   "category": "Seasonal",
+   "tags": "party celebration",
+   "emoji": "🎉",
+   "file": "emoji/confetti.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "christmas-tree",
+   "name": "Christmas tree",
+   "category": "Seasonal",
+   "tags": "xmas holiday winter",
+   "emoji": "🎄",
+   "file": "emoji/christmas-tree.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "santa",
+   "name": "Santa",
+   "category": "Seasonal",
+   "tags": "christmas xmas",
+   "emoji": "🎅",
+   "file": "emoji/santa.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "snowman",
+   "name": "Snowman",
+   "category": "Seasonal",
+   "tags": "winter snow",
+   "emoji": "⛄",
+   "file": "emoji/snowman.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "snowflake",
+   "name": "Snowflake",
+   "category": "Seasonal",
+   "tags": "winter cold",
+   "emoji": "❄️",
+   "file": "emoji/snowflake.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "pumpkin",
+   "name": "Pumpkin",
+   "category": "Seasonal",
+   "tags": "halloween autumn",
+   "emoji": "🎃",
+   "file": "emoji/pumpkin.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "bat",
+   "name": "Bat",
+   "category": "Seasonal",
+   "tags": "halloween night",
+   "emoji": "🦇",
+   "file": "emoji/bat.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "spider-web",
+   "name": "Spider web",
+   "category": "Seasonal",
+   "tags": "halloween spooky",
+   "emoji": "🕸️",
+   "file": "emoji/spider-web.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "fireworks",
+   "name": "Fireworks",
+   "category": "Seasonal",
+   "tags": "new year celebration",
+   "emoji": "🎆",
+   "file": "emoji/fireworks.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "sparkler",
+   "name": "Sparkler",
+   "category": "Seasonal",
+   "tags": "new year celebration",
+   "emoji": "🎇",
+   "file": "emoji/sparkler.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "red-envelope",
+   "name": "Red envelope",
+   "category": "Seasonal",
+   "tags": "lunar new year",
+   "emoji": "🧧",
+   "file": "emoji/red-envelope.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "lantern",
+   "name": "Lantern",
+   "category": "Seasonal",
+   "tags": "ramadan lunar festival",
+   "emoji": "🏮",
+   "file": "emoji/lantern.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "hatching-chick",
+   "name": "Hatching chick",
+   "category": "Seasonal",
+   "tags": "easter spring",
+   "emoji": "🐣",
+   "file": "emoji/hatching-chick.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "fallen-leaves",
+   "name": "Fallen leaves",
+   "category": "Seasonal",
+   "tags": "autumn fall",
+   "emoji": "🍂",
+   "file": "emoji/fallen-leaves.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "maple-leaf",
+   "name": "Maple leaf",
+   "category": "Seasonal",
+   "tags": "autumn canada",
+   "emoji": "🍁",
+   "file": "emoji/maple-leaf.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "confetti-ball",
+   "name": "Confetti ball",
+   "category": "Seasonal",
+   "tags": "party celebrate",
+   "emoji": "🎊",
+   "file": "emoji/confetti-ball.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "balloon",
+   "name": "Balloon",
+   "category": "Seasonal",
+   "tags": "party birthday",
+   "emoji": "🎈",
+   "file": "emoji/balloon.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "ribbon",
+   "name": "Ribbon",
+   "category": "Seasonal",
+   "tags": "gift cute",
+   "emoji": "🎀",
+   "file": "emoji/ribbon.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "bouquet",
+   "name": "Bouquet",
+   "category": "Seasonal",
+   "tags": "flowers gift mother",
+   "emoji": "💐",
+   "file": "emoji/bouquet.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "graduation-cap",
+   "name": "Graduation cap",
+   "category": "Seasonal",
+   "tags": "school graduate",
+   "emoji": "🎓",
+   "file": "emoji/graduation-cap.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "diya-lamp",
+   "name": "Diya lamp",
+   "category": "Seasonal",
+   "tags": "diwali festival",
+   "emoji": "🪔",
+   "file": "emoji/diya-lamp.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "candle",
+   "name": "Candle",
+   "category": "Seasonal",
+   "tags": "light memorial",
+   "emoji": "🕯️",
+   "file": "emoji/candle.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "sun-face",
+   "name": "Sun face",
+   "category": "Seasonal",
+   "tags": "summer happy",
+   "emoji": "🌞",
+   "file": "emoji/sun-face.png",
+   "source": "twemoji"
+  },
+  {
+   "id": "full-moon",
+   "name": "Full moon",
+   "category": "Seasonal",
+   "tags": "night eid",
+   "emoji": "🌕",
+   "file": "emoji/full-moon.png",
+   "source": "twemoji"
+  }
+ ],
+ "attribution": {
+  "twemoji": "Emoji graphics: Twemoji v17.0.3 by Twitter, Inc. and other contributors (https://github.com/jdecked/twemoji), licensed CC-BY 4.0.",
+  "sceneforge": "Drawn for SceneForge Studio (GPL-3.0-or-later) with bundled OFL fonts."
+ }
+}

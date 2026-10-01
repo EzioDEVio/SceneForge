@@ -1,3 +1,33 @@
+# SceneForge Studio 0.7.0 RC9 (unreleased)
+
+## Library
+- **400 stickers and emoji** in 14 categories, with search and a Recent tab.
+  - 322 colour emoji come from **Twemoji** (graphics CC-BY 4.0; credited in THIRD_PARTY.md and About).
+  - 78 crisp graphics: subscribe/like buttons, badges, stamps, arrows, callout circles, shapes and speech bubbles.
+  - All 66 earlier stickers keep their names and ids. Stickers are bundled, so they look the same on every PC.
+- **71 caption styles** (31 earlier plus 40 new), grouped as Social, Cinematic, Karaoke, Fun, Minimal and Arabic, with search.
+  - Fixed: karaoke "colour" highlighting in phrase mode never coloured the spoken word. This affected 4 existing styles.
+
+## Effects
+- **Per-effect settings.** 36 presets now have their own controls, 132 settings in total. For example:
+  - colour looks: warmth, tint, contrast, saturation, fade;
+  - VHS: colour bleed, noise, scanlines, tracking;
+  - halation: threshold, radius, colour;
+  - sepia and duotone: tone colours.
+
+  Settings are remembered per effect, and there's a reset button. Default settings render byte-identically to before.
+- **Text reveals:** Clock wipe, Clock wipe (counter-clockwise) and Iris (circle) reveals.
+
+## AI
+- **Moving-video subject cutout:** "Put text behind moving subject" works on a scene with one video clip of up to 20 s.
+  - Per-frame AI matte with temporal smoothing and edge refinement, rendered as a VP9 alpha layer above captions and titles.
+  - Runs in the background with progress, a time estimate and Cancel.
+  - About 0.4–0.8 s per frame at 1080p with the fast model on a 2-CPU machine.
+
+## Timeline
+- **Clip groups:** select clips, then Ctrl+G or right-click → Group. Grouped clips select and move together; Ctrl+Shift+G ungroups.
+- **Markers attached to a clip:** right-click → "Add marker on this clip". The marker moves when the clip moves.
+
 # SceneForge Studio 0.7.0 RC8 (unreleased)
 
 ## Better subject cutout

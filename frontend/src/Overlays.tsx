@@ -2,6 +2,7 @@ import React, {useEffect, useRef, useState} from 'react';
 import {Plus, Trash2, Copy, ArrowUp, ArrowDown, Upload, PictureInPicture2, Search, Sticker} from 'lucide-react';
 import {api, Asset, Overlay, Scene} from './api';
 import {FeatureHelp} from './FeatureHelp';
+import {StickerLibraryGrid, STICKER_LIBRARY, type LibrarySticker} from './StickerLibrary';
 
 export const OVERLAY_DEFAULTS: Omit<Overlay, 'id' | 'asset_id'> = {
   kind: 'media', x: 72, y: 30, width: 34, rotation: 0, opacity: 100, radius: 6, border: 6, border_color: '#FFFFFF', shadow: 60, feather: 0, chroma: null, chroma_similarity: 30, x2: null, y2: null,
@@ -145,6 +146,17 @@ export function OverlayPanel({scene, overlays, selected, onSelect, onChange, dis
     catch (e: any) {setError(e.message || 'Upload failed.');}
     finally {if (file.current) file.current.value = '';}
   }
+  /** Bundled library sticker: the backend copies its PNG into the Media Pool. */
+  async function addLibrarySticker(s:LibrarySticker){
+    if(overlays.length>=8){setError('A scene can have at most 8 overlays. Remove one before adding another.');return;}
+    setStickerBusy(s.id);setError('');
+    let fallback=false;
+    try{const asset=await api.importSticker(scene.project_id,s.id);setMedia(m=>m.some(x=>x.id===asset.id)?m:[...m,asset]);add(asset.id,{kind:'sticker',width:19,border:0,radius:0,shadow:0});}  // library art carries its own soft shadow; the overlay shadow is a rectangular card shadow
+    catch(e:any){fallback=!!(STICKERS.some(x=>x.name===s.name)||s.emoji);if(!fallback)setError(e?.message||'Could not add this sticker.');}
+    finally{setStickerBusy('');}
+    // An older backend without the library: draw it in the browser as RC8 did.
+    if(fallback)await addSticker(STICKERS.find(x=>x.name===s.name)||{emoji:s.emoji||s.name,name:s.name,tags:s.tags});
+  }
   async function addSticker(sticker:StickerPreset) {
     if(overlays.length>=8){setError('A scene can have at most 8 overlays. Remove one before adding another.');return;}
     setStickerBusy(sticker.name);setError('');
@@ -198,12 +210,13 @@ export function OverlayPanel({scene, overlays, selected, onSelect, onChange, dis
     </section>
     {error && <p className="form-error" role="alert">{error}</p>}
     <section className="sticker-library" aria-label="Stickers and emoji">
-      <div className="section-heading"><h3><Sticker size={15}/> Stickers & emoji</h3><span>{STICKERS.length+customStickerIds.length}</span><FeatureHelp compact title="Stickers and emoji" description="Add a reusable graphic or emoji as a normal image overlay on the scene." steps="Search or browse the sticker grid, click an item, then select it in the overlay list or preview to resize, position, animate, or delete it. Upload PNG or WebP files to keep transparent backgrounds; JPEG images are supported without transparency. Your uploads are saved in this project's Media Pool and listed here on this device."/></div>
+      <div className="section-heading"><h3><Sticker size={15}/> Stickers & emoji</h3><span>{STICKER_LIBRARY.length+customStickerIds.length}</span><FeatureHelp compact title="Stickers and emoji" description="Add a reusable graphic or emoji as a normal image overlay on the scene." steps="Search or browse the sticker grid, click an item, then select it in the overlay list or preview to resize, position, animate, or delete it. Upload PNG or WebP files to keep transparent backgrounds; JPEG images are supported without transparency. Your uploads are saved in this project's Media Pool and listed here on this device."/></div>
       <p className="hint">Choose a sticker, or upload a PNG/WebP (transparent) or JPEG (solid background). Added stickers start at a compact size.</p>
       <label className="search-control"><Search size={14}/><input aria-label="Search stickers and emoji" placeholder="Search stickers…" value={stickerQuery} onChange={e=>setStickerQuery(e.target.value)}/></label>
       <div className="sticker-upload-row"><button className="btn" disabled={disabled||overlays.length>=8} onClick={()=>stickerFile.current?.click()}><Upload size={13}/> Upload sticker</button><input ref={stickerFile} type="file" accept=".png,.webp,.jpg,.jpeg,image/png,image/webp,image/jpeg" hidden aria-label="Upload custom sticker" onChange={e=>void uploadCustomSticker(e.target.files?.[0])}/></div>
-      <div className="sticker-grid" role="group" aria-label="Sticker choices">{STICKERS.filter(s=>`${s.name} ${s.tags} ${s.emoji}`.toLowerCase().includes(stickerQuery.toLowerCase())).map(s=><button key={s.name} className="sticker-choice" title={s.name} aria-label={`Add ${s.name} sticker`} disabled={disabled||!!stickerBusy||overlays.length>=8} onClick={()=>void addSticker(s)}><span aria-hidden="true">{stickerBusy===s.name?'…':s.emoji}</span><small>{s.name}</small></button>)}{media.filter(asset=>asset.type==='image'&&customStickerIds.includes(asset.id)&&`${asset.original_filename} upload custom`.toLowerCase().includes(stickerQuery.toLowerCase())).map(asset=><button key={asset.id} className="sticker-choice custom-sticker-choice" title={asset.original_filename} aria-label={`Add uploaded sticker ${asset.original_filename}`} disabled={disabled||overlays.length>=8} onClick={()=>add(asset.id,{width:18,border:0,radius:0,shadow:25})}><img src={api.assetThumbUrl(asset.id,160)} alt=""/><small>{asset.original_filename}</small></button>)}</div>
-      {!STICKERS.some(s=>`${s.name} ${s.tags} ${s.emoji}`.toLowerCase().includes(stickerQuery.toLowerCase()))&&!media.some(asset=>asset.type==='image'&&customStickerIds.includes(asset.id)&&`${asset.original_filename} upload custom`.toLowerCase().includes(stickerQuery.toLowerCase()))&&<p className="hint">No stickers match that search.</p>}
+      <StickerLibraryGrid query={stickerQuery} disabled={disabled||overlays.length>=8} busyId={stickerBusy} onPick={s=>void addLibrarySticker(s)}
+        extraMatches={media.some(asset=>asset.type==='image'&&customStickerIds.includes(asset.id)&&`${asset.original_filename} upload custom`.toLowerCase().includes(stickerQuery.toLowerCase()))}
+        extra={<>{media.filter(asset=>asset.type==='image'&&customStickerIds.includes(asset.id)&&`${asset.original_filename} upload custom`.toLowerCase().includes(stickerQuery.toLowerCase())).map(asset=><button key={asset.id} className="sticker-choice custom-sticker-choice" title={asset.original_filename} aria-label={`Add uploaded sticker ${asset.original_filename}`} disabled={disabled||overlays.length>=8} onClick={()=>add(asset.id,{width:18,border:0,radius:0,shadow:25})}><img src={api.assetThumbUrl(asset.id,160)} alt=""/><small>{asset.original_filename}</small></button>)}</>}/>
       {overlays.length>=8&&<p className="hint">This scene has reached the 8 overlay limit.</p>}
     </section>
     {overlays.length > 0 && <ul className="overlay-list" aria-label="Overlays (top of list is drawn on top)">
