@@ -23,9 +23,25 @@ const CLOUD: {name: string; match: RegExp; what: string; url: string}[] = [
   {name: 'Hugging Face', match: /hugging/i, what: 'Image generation with free models.', url: 'https://huggingface.co/settings/tokens'},
 ];
 
-function Modal({title, icon, onClose, children, wide}: {title: string; icon: React.ReactNode; onClose: () => void; children: React.ReactNode; wide?: boolean}) {
+export function Modal({title, icon, onClose, children, wide}: {title: string; icon: React.ReactNode; onClose: () => void; children: React.ReactNode; wide?: boolean}) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => {ref.current?.focus(); const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose(); window.addEventListener('keydown', esc); return () => window.removeEventListener('keydown', esc);}, [onClose]);
+  // Keep Tab inside the dialog while it is open.
+  useEffect(() => {
+    const trap = (e: KeyboardEvent) => {
+      const panel = ref.current;
+      if (e.key !== 'Tab' || !panel) return;
+      const active = document.activeElement as HTMLElement | null;
+      if (active && !panel.contains(active) && active.closest('dialog,[role="dialog"]')) return;   // a confirm opened on top
+      const controls = Array.from(panel.querySelectorAll<HTMLElement>('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea:not(:disabled), a[href]'));
+      if (!controls.length) {e.preventDefault(); panel.focus(); return;}
+      const first = controls[0], last = controls[controls.length - 1];
+      if (e.shiftKey && (document.activeElement === first || document.activeElement === panel)) {e.preventDefault(); last.focus();}
+      else if (!e.shiftKey && document.activeElement === last) {e.preventDefault(); first.focus();}
+    };
+    document.addEventListener('keydown', trap);
+    return () => document.removeEventListener('keydown', trap);
+  }, []);
   return <div className="info-backdrop" onMouseDown={e => e.target === e.currentTarget && onClose()}>
     <div ref={ref} tabIndex={-1} className={`info-panel ${wide ? 'wide' : ''}`} role="dialog" aria-modal="true" aria-label={title}>
       <header><span className="info-title">{icon}{title}</span><button className="icon-reset info-close" aria-label="Close" onClick={onClose}><X size={16}/></button></header>

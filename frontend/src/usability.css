@@ -1,0 +1,110 @@
+/* 0.7.1 usability pack: inspector tab bar, workspace switcher, collapsible/compact tracks,
+   keyboard shortcut sheet, AI model manager and the first-run tour. Loaded last. */
+
+/* ---------- Scene settings tab bar: one row, scrolls sideways, overflow in "More" ---------- */
+.studio-shell .inspector-tabbar{flex:0 0 auto;display:flex;align-items:stretch;min-width:0;border-bottom:1px solid var(--line)}
+.studio-shell .inspector-tabbar .inspector-tabs{flex:1 1 auto;min-width:0;height:50px;display:flex;flex-wrap:nowrap;gap:2px;overflow-x:auto;overflow-y:hidden;position:relative;padding:0 4px;border-bottom:0;max-width:none;scrollbar-width:thin;scroll-behavior:smooth}
+.studio-shell .inspector-tabbar .inspector-tabs::-webkit-scrollbar{height:4px}
+.studio-shell .inspector-tabbar .inspector-tabs::-webkit-scrollbar-thumb{background:#4a5060;border-radius:2px}
+.studio-shell .inspector-tabbar .inspector-tabs button{flex:0 0 auto;min-width:54px;height:100%;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;padding:0 8px;white-space:nowrap;line-height:1;font-size:10px;border:0;border-bottom:2px solid transparent;border-radius:0;background:transparent}
+.studio-shell .inspector-tabbar .inspector-tabs button svg{flex:0 0 16px;width:16px;height:16px}
+.studio-shell .inspector-tabbar .inspector-tabs button span{white-space:nowrap}
+.studio-shell .inspector-tabbar .inspector-tabs button[aria-selected=true]{color:#e6ddff;background:#373342;border-bottom-color:var(--blue);font-weight:600}
+.studio-shell .inspector-tabbar .inspector-tabs button:focus-visible,.inspector-tabs-more-button:focus-visible,.inspector-tabs-menu button:focus-visible{outline:2px solid var(--blue);outline-offset:-2px}
+.inspector-tabs-more{flex:0 0 auto;position:relative;display:flex;align-items:center;padding:0 5px;border-left:1px solid var(--line)}
+.inspector-tabs-more-button{display:inline-flex;align-items:center;gap:3px;height:30px;padding:0 8px;border:1px solid #484e5b;border-radius:5px;background:#30343d;color:#d6dbe6;font-size:11px;white-space:nowrap}
+.inspector-tabs-more-button.active{border-color:var(--blue);color:#e6ddff}
+.inspector-tabs-menu{position:absolute;right:5px;top:calc(100% - 4px);z-index:60;min-width:160px;padding:4px;background:#30343d;border:1px solid #586070;border-radius:6px;box-shadow:0 10px 28px #0009}
+.inspector-tabs-menu button{display:flex;align-items:center;gap:8px;width:100%;padding:7px 9px;border:0;border-radius:4px;background:transparent;font-size:12px;text-align:left;white-space:nowrap}
+.inspector-tabs-menu button:hover{background:#514866}
+.inspector-tabs-menu button[aria-checked=true]{color:#e6ddff;background:#3d3753}
+
+/* ---------- workspace switcher (top bar) and menu extras ---------- */
+.workspace-switcher{display:inline-flex;align-items:center;gap:6px;min-height:30px;padding:0 4px 0 8px;border:1px solid #484e5b;border-radius:5px;background:#30343d;color:#e4e7ee;font-size:11px;white-space:nowrap}
+.workspace-switcher select{border:0;background:transparent;padding:4px 2px;font-size:11px;color:inherit}
+.menu-section-label{padding:8px 8px 3px;margin-top:4px;border-top:1px solid #4a5060;font-size:9px;letter-spacing:1.2px;text-transform:uppercase;color:#98a2b5}
+.editor-menu-items a.menu-link{display:block;padding:8px;font-size:12px;color:inherit;text-decoration:none;border-radius:2px}
+.editor-menu-items a.menu-link:hover{background:#514866}
+.editor-menu-items button kbd{float:right;opacity:.75}
+@media(max-width:1150px){.workspace-switcher>span{display:none}}
+
+/* ---------- collapsible / compact timeline tracks ---------- */
+.track-collapse-button{flex:0 0 18px;width:18px;height:18px;display:grid;place-items:center;padding:0;margin-right:-4px;border:0;border-radius:3px;background:transparent;color:#aeb6c8;cursor:pointer}
+.track-collapse-button:hover{background:#3c4150;color:#fff}
+.track-collapse-button:focus-visible{outline:2px solid var(--blue)}
+.track-headers>div.track-collapsed{gap:6px;overflow:hidden}
+.track-headers>div.track-collapsed b{padding:1px 4px;font-size:9px}
+.track-headers>div.track-collapsed svg:not(.lucide-chevron-right),.track-headers>div.track-collapsed>span,.track-headers>div.track-collapsed small{display:none}
+.track-headers>div.track-collapsed .track-lock-button{width:16px;height:16px;flex-basis:16px;display:grid}
+.track-headers>div.track-collapsed .track-lock-button svg{display:block;width:10px;height:10px}
+.sequence-dock .track-collapsed{overflow:hidden}
+.sequence-dock .track-collapsed :is(.picture-clip,.narration-clip,.title-clip,.source-audio-clip-shell,.project-audio-row){top:3px!important;height:12px!important;min-height:0;padding:0 4px;font-size:0;border-radius:3px}
+.sequence-dock .track-collapsed :is(.picture-clip,.narration-clip,.title-clip,.source-audio-clip-shell,.project-audio-row) *:not(.project-audio-body):not(.source-audio-clip){display:none}
+/* The clickable part of each clip fills the thin bar, so collapsed clips stay selectable. */
+.sequence-dock .track-collapsed .project-audio-row .project-audio-body,.sequence-dock .track-collapsed .source-audio-clip-shell .source-audio-clip{display:block;position:absolute;inset:0;width:100%;height:100%;padding:0;font-size:0;border:0;background:transparent}
+.sequence-dock .track-collapsed :is(.project-audio-body,.source-audio-clip) *{display:none}
+.sequence-dock .track-collapsed :is(.clip-duration-handle,.clip-video-trim-handle,.clip-transition,.project-audio-empty){display:none}
+/* Compact: every lane at half height. */
+.sequence-tracks.compact-tracks{--picture-h:42px;--audio-h:24px;--source-audio-h:18px;--text-h:27px}
+.sequence-dock .compact-tracks .titles-track{height:var(--text-h)}
+.sequence-dock .compact-tracks .narration-clip{top:3px;height:18px;padding:1px 6px}
+.sequence-dock .compact-tracks .title-clip{top:3px;height:20px;padding:1px 6px}
+.sequence-dock .compact-tracks .title-clip.text-edit-clip{height:12px;padding:0 5px;font-size:9px}
+.sequence-dock .compact-tracks .source-audio-clip-shell{top:2px;height:14px}
+.sequence-dock .compact-tracks .project-audio-row{height:14px}
+.compact-tracks .project-audio-track,.compact-tracks .track-project-audio-label{min-height:20px}
+.compact-tracks .picture-clip .filmstrip{opacity:.8}
+.compact-tracks .track-headers>div:not(.track-ruler-label){gap:6px}
+.compact-tracks .track-headers small{display:none}
+.compact-tracks .track-headers .track-lock-button{width:18px;height:18px;flex-basis:18px}
+.sequence-tools button.active{border-color:var(--blue);color:#e6ddff;background:#3c3655}
+
+/* ---------- keyboard shortcut sheet ---------- */
+.shortcut-groups{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:14px 22px}
+.shortcut-group h3{margin:0 0 6px;font-size:12px;letter-spacing:.6px;text-transform:uppercase;color:#c9bdff}
+.shortcut-group .hint{margin:0 0 6px}
+.shortcut-group dl{margin:0;display:flex;flex-direction:column;gap:2px}
+.shortcut-row{display:grid;grid-template-columns:minmax(118px,auto) 1fr;gap:10px;align-items:baseline;padding:4px 0;border-bottom:1px solid #30343d}
+.shortcut-row dt{display:flex;flex-wrap:wrap;gap:3px;align-items:center}
+.shortcut-row dd{margin:0;font-size:12px;color:#c7ccd8;line-height:1.4}
+.shortcut-row kbd,.info-panel kbd{display:inline-block;min-width:20px;padding:2px 6px;border:1px solid #545b6a;border-bottom-width:2px;border-radius:4px;background:#2d3139;font:11px/1.3 ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;color:#eef0f5;text-align:center}
+.kbd-sep{color:#7c8495;font-size:11px}
+
+/* ---------- AI model manager ---------- */
+.model-summary{display:flex;align-items:center;gap:10px;margin:0 0 10px;font-size:12.5px;color:#c7ccd8}
+.model-summary .text-btn{margin-left:auto;display:inline-flex;align-items:center;gap:4px}
+.model-list{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:8px}
+.model-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:12px;align-items:center;padding:10px 12px;border:1px solid #3a3f4b;border-radius:8px;background:#272a32}
+.model-main strong{font-size:13px;color:#eef0f5;margin-right:8px}
+.model-kind{font-size:10.5px;color:#a9a0e8}
+.model-main .hint{margin:3px 0 4px}
+.model-folder code{display:block;max-width:100%;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:10.5px;color:#98a2b5}
+.model-error{margin:4px 0 0;font-size:11px;color:#ffb3bd}
+.model-state{display:flex;flex-direction:column;align-items:flex-end;gap:4px;min-width:110px}
+.model-size{font-size:11px;color:#c7ccd8;font-variant-numeric:tabular-nums}
+.model-state progress{width:110px;height:6px}
+.model-actions{display:flex;flex-direction:column;gap:5px}
+.model-actions .btn{display:inline-flex;align-items:center;gap:5px;justify-content:center;font-size:11px;padding:5px 9px;white-space:nowrap}
+@media(max-width:700px){.model-row{grid-template-columns:1fr}.model-state{align-items:flex-start}.model-actions{flex-direction:row;flex-wrap:wrap}}
+
+/* ---------- first-run tour ---------- */
+.tour-overlay{position:fixed;inset:0;z-index:1100;pointer-events:none}
+.tour-dim{position:absolute;inset:0;background:#05070bb0;pointer-events:auto}
+.tour-spot{position:absolute;border-radius:8px;border:2px solid var(--blue,#9783ff);box-shadow:0 0 0 9999px #05070bb0;pointer-events:none;transition:all .25s ease}
+.tour-card{position:absolute;pointer-events:auto;padding:14px 16px 12px;border:1px solid #4a4466;border-radius:10px;background:#262a33;color:#e6e9f0;box-shadow:0 18px 50px #000a}
+.tour-count{font-size:10px;letter-spacing:1px;text-transform:uppercase;color:#a99cf0}
+.tour-card h2{margin:4px 0 6px;font-size:15px}
+.tour-card p{margin:0 0 10px;font-size:12.5px;line-height:1.5;color:#c7ccd8}
+.tour-dots{display:flex;gap:5px;margin-bottom:10px}.tour-dots i{width:6px;height:6px;border-radius:50%;background:#4a5060}.tour-dots i.on{background:var(--blue,#9783ff)}
+.tour-card footer{display:flex;align-items:center;gap:6px}.tour-card footer>span{flex:1}
+.tour-card footer .btn{font-size:12px;padding:5px 12px}
+html[data-reduce-motion="true"] .tour-spot{transition:none}
+
+/* ---------- light theme ---------- */
+html[data-theme="light"] .studio-shell .inspector-tabbar{border-color:#d5d9e2}
+html[data-theme="light"] .studio-shell .inspector-tabbar .inspector-tabs button[aria-selected=true]{color:#3c2b9e;background:#ebe8fb}
+html[data-theme="light"] .inspector-tabs-more,html[data-theme="light"] .studio-shell .inspector-tabbar{border-color:#d5d9e2}
+html[data-theme="light"] :is(.inspector-tabs-more-button,.workspace-switcher){background:#fff;color:#30394a;border-color:#cfd5df}
+html[data-theme="light"] .inspector-tabs-menu{background:#fff;border-color:#cfd5df;color:#30394a}
+html[data-theme="light"] .inspector-tabs-menu button:hover{background:#ebe8fb}
+html[data-theme="light"] .track-collapse-button{color:#5e697c}

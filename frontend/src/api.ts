@@ -87,7 +87,7 @@ export type FontSettings = {
 };
 
 /** Must match BUILD_ID in backend/app/main.py. */
-export const BUILD_ID = "v0.7.0";
+export const BUILD_ID = "v0.7.1";
 
 export type Adjust = Partial<Record<'exposure'|'contrast'|'highlights'|'shadows'|'temperature'|'tint'|'saturation'|'vibrance'|'sharpen'|'vignette'|'grain', number>>;
 export type Look = {
@@ -184,6 +184,11 @@ export type SubjectVideoEstimate = {ok: boolean; reason?: string; frames?: numbe
 export type SubjectVideoJob = {job_id: string; status: 'queued' | 'running' | 'cancelling' | 'succeeded' | 'failed' | 'cancelled'; frames_done: number; frames_total: number; ms_per_frame: number | null; stage: string; error: string | null; notes: string[]};
 export type VoiceIsolationStatus = {folder: string; file: string; label: string; url: string; approx_mb: number; bytes: number; downloaded: boolean; download?: {done: number; total: number} | null; license: string; running: {job_id: string; asset_id: string; progress: number}[]};
 export type VoiceOption = { id: string; name: string; language?: string; accent?: string; gender?: string; age?: string; description?: string; preview_url?: string };
+
+export type ModelDownload = {status: 'running' | 'done' | 'error' | 'idle'; done: number; total: number; error?: string | null};
+export type ManagedModel = {kind: 'whisper' | 'cutout' | 'voice'; id: string; name: string; purpose: string; bytes: number; approx_mb: number;
+  downloaded: boolean; bundled: boolean; folder: string; path: string; source: string; download: ModelDownload | null; in_use: boolean};
+export type ModelListing = {models: ManagedModel[]; total_bytes: number; downloaded_bytes: number; folders: string[]};
 
 const BASE = "";
 
@@ -325,6 +330,10 @@ export const api = {
   stickerImageUrl: (stickerId: string) => `/api/stickers/${encodeURIComponent(stickerId)}/image`,
   texturedTitle: (sceneId: string, body: Record<string, unknown>) => req<{scene: Scene; asset: Asset}>(`/api/scenes/${sceneId}/textured-title`, {method: "POST", body: JSON.stringify(body)}),
   beatMarkers: (projectId: string, body: {clip_id?: string; every?: number}) => req<{bpm: number; markers: {time_ms: number; downbeat: boolean}[]; truncated: boolean}>(`/api/projects/${projectId}/beat-markers`, {method: "POST", body: JSON.stringify(body)}),
+  listModels: () => req<ModelListing>(`/api/models`),
+  deleteModel: (kind: string, id: string) => req<{removed: boolean; freed_bytes: number; message: string}>(`/api/models/${encodeURIComponent(kind)}/${encodeURIComponent(id)}`, {method: "DELETE"}),
+  downloadModel: (kind: string, id: string) => req<{status: string; message?: string}>(`/api/models/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/download`, {method: "POST"}),
+  diagnosticsUrl: () => `/api/diagnostics.zip`,
   whisperCheck: () => req<{ok: boolean; model_dir: string; checks: {name: string; ok: boolean; detail: string}[]}>(`/api/local-speech/whisper/check`),
   whisperReset: () => req<{removed: boolean; message: string}>(`/api/local-speech/whisper/reset`, {method: "POST"}),
   localEngineStatus: (engine: string) => req<{engine: string; reachable: boolean; state: string; docker: string; message: string; log: string; services_bundled: boolean}>(`/api/local-speech/${engine}/status`),

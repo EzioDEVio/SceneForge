@@ -13,14 +13,23 @@ function apply(width: number | null) {
 function stored(): number | null {
   try {const v = Number(localStorage.getItem(KEY)); return v >= MIN ? v : null;} catch {return null;}
 }
+const shell = () => document.querySelector<HTMLElement>('.studio-shell');
+/** Width set by the active workspace preset (Color), if any. */
+const presetWidth = (): number | null => Number(shell()?.dataset.inspectorPreset) || null;
 function remember(width: number | null) {
+  // A manual resize replaces the workspace preset width.
+  if (shell()) delete shell()!.dataset.inspectorPreset;
   try {width === null ? localStorage.removeItem(KEY) : localStorage.setItem(KEY, String(Math.round(width)));} catch {/* storage unavailable */}
 }
+
+/** Used by workspace presets: a preset width (not remembered), or null to go back to the
+ *  width the user last chose by dragging. */
+export function applyInspectorWidth(width: number | null) {apply(width ?? stored());}
 
 /** Drag handle on the left edge of Scene settings. Drag to widen, double-click
  *  to reset, arrow keys for fine steps. The width is remembered. */
 export function InspectorResizer() {
-  useEffect(() => {apply(stored());}, []);
+  useEffect(() => {apply(presetWidth() ?? stored());}, []);
   const current = () => document.querySelector<HTMLElement>('.inspector')?.getBoundingClientRect().width || 300;
   function drag(e: React.PointerEvent) {
     e.preventDefault();

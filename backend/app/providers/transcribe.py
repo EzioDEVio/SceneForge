@@ -139,7 +139,25 @@ def _decode_pcm16k(path: str):
     return np.frombuffer(proc.stdout, np.int16).astype(np.float32) / 32768.0
 
 
+_ACTIVE_RUNS = 0   # local transcriptions in progress (the model manager will not delete the model meanwhile)
+
+
+def local_busy() -> bool:
+    return _ACTIVE_RUNS > 0 or _LOCAL_LOCK.locked()
+
+
 def _local(path: str, language: str | None) -> dict:
+    global _ACTIVE_RUNS
+    with _LOCAL_LOCK:
+        _ACTIVE_RUNS += 1
+    try:
+        return _local_run(path, language)
+    finally:
+        with _LOCAL_LOCK:
+            _ACTIVE_RUNS -= 1
+
+
+def _local_run(path: str, language: str | None) -> dict:
     """Run CPU int8 Whisper. The small multilingual model is fetched once and cached."""
     global _LOCAL_MODEL
     try:

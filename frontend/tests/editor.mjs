@@ -32,6 +32,11 @@ let healthBuild="v0.6.0-wip.10";let oldBackend=false;
 let failLocal=true;
 let closeReady=true;
 let lookPresets=[];
+const managedModels=[
+ {kind:'whisper',id:'base',name:'Whisper base (faster-whisper)',purpose:'Local speech-to-text for automatic captions.',bytes:145000000,approx_mb:145,downloaded:true,bundled:false,folder:'/home/u/.sceneforge/models/whisper',path:'',source:'',download:null,in_use:false},
+ {kind:'cutout',id:'u2netp',name:'U²-Net small (fast)',purpose:'Background removal.',bytes:4600000,approx_mb:4.6,downloaded:true,bundled:true,folder:'/app/models/cutout',path:'',source:'',download:null,in_use:false},
+ {kind:'voice',id:'kim_vocal_2',name:'MDX-Net Kim Vocal 2',purpose:'Voice isolation.',bytes:0,approx_mb:67,downloaded:false,bundled:false,folder:'/home/u/.sceneforge/models/voice',path:'',source:'',download:null,in_use:false},
+];
 const clone=x=>structuredClone(x);
 globalThis.fetch=async(path,init={})=>{
  const method=init.method||'GET'; const body=typeof init.body==='string'?JSON.parse(init.body):init.body;
@@ -42,6 +47,9 @@ globalThis.fetch=async(path,init={})=>{
  else if(path==='/api/projects'&&method==='GET') result=[project];
  else if(path===`/api/projects/${project.id}`&&method==='GET') result=project;
  else if(/^\/api\/scenes\/[^/]+$/.test(path)&&method==='GET')result=project.scenes.find(s=>s.id===path.split('/').at(-1));
+ else if(path==='/api/models'&&method==='GET')result={models:managedModels,total_bytes:managedModels.reduce((a,m)=>a+m.bytes,0),downloaded_bytes:managedModels.filter(m=>!m.bundled).reduce((a,m)=>a+m.bytes,0),folders:[]};
+ else if(/^\/api\/models\/[^/]+\/[^/]+$/.test(path)&&method==='DELETE'){const [,,,kind,id]=path.split('/');const m=managedModels.find(x=>x.kind===kind&&x.id===id);if(m.bundled)return {ok:false,status:409,json:async()=>({detail:'bundled'})};m.downloaded=false;m.bytes=0;result={removed:true,freed_bytes:1,message:`${m.name} was deleted.`};}
+ else if(/^\/api\/models\/[^/]+\/[^/]+\/download$/.test(path)&&method==='POST'){const [,,,kind,id]=path.split('/');const m=managedModels.find(x=>x.kind===kind&&x.id===id);m.downloaded=true;m.bytes=Math.round(m.approx_mb*1e6);result={status:'running'};}
  else if(path==='/api/cutout/status')result={folder:'',models:[{id:'isnet',label:'IS-Net',downloaded:false,approx_mb:170},{id:'u2netp',label:'U2',downloaded:true,approx_mb:4.6}]};
  else if(/^\/api\/projects\/[^/]+\/stickers\/[^/]+$/.test(path)&&method==='POST')result={id:'stk-'+next++,type:'image',original_filename:`sticker-${path.split('/').at(-1)}.png`,width:420,height:200};
  else if(path.endsWith('/textured-title')&&method==='POST')result={scene:project.scenes[0],asset:{id:'tt',type:'image',original_filename:'sticker-textured.png'}};
@@ -114,6 +122,14 @@ try{
  globalThis.confirm=()=>true;
  await user.click(await screen.findByRole('button',{name:/Editor MVP1 regression Open project/}));
  await screen.findByRole('region',{name:/Edit /});
+ {const tour=await screen.findByRole('dialog',{name:'Scenes bin'});
+  check('first-run tour opens on the first project with 5 steps, starting at the Scenes bin',!!within(tour).getByText('Step 1 of 5')&&document.activeElement===within(tour).getByRole('button',{name:'Next'}));
+  await user.click(within(tour).getByRole('button',{name:'Next'}));
+  check('tour moves to the Preview step and Back is available',!!screen.getByRole('dialog',{name:'Preview'})&&!within(screen.getByRole('dialog',{name:'Preview'})).getByRole('button',{name:'Back'}).disabled);
+  await user.tab();await user.tab();await user.tab();await user.tab();
+  check('tour keeps keyboard focus inside its card',screen.getByRole('dialog',{name:'Preview'}).contains(document.activeElement));
+  await user.keyboard('{Escape}');
+  check('Esc dismisses the tour and remembers it',!screen.queryByRole('dialog',{name:/Preview|Scenes bin/})&&localStorage.getItem('sceneforge.tour.v1')==='done');}
  check('project opens and only selected scene is visible',screen.getAllByRole('region',{name:/Edit /}).length===1);
  const firstId=project.scenes[0].id, secondId=project.scenes[1].id;
  check('timeline automatically includes every scene',screen.getAllByRole('button',{name:/Storyboard scene/}).length===project.scenes.length);
@@ -874,6 +890,98 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  // restore the mock project for the checks that follow
  project.scenes=project.scenes.filter(x=>!x.id.startsWith('dup-')&&!x.id.startsWith('cd-'));
  for(const x of project.scenes){x.voice_takes=x.voice_takes.filter(v=>!v.id.startsWith('pt-'));x.voice_takes.forEach(v=>v.accepted=v.id===acceptedBefore[x.id]);}
+
+ // ---------------------------------------------------------------- 0.7.1 usability pack
+ {const css=readFileSync('src/usability.css','utf8');
+  check('Scene settings tab bar is a single non-wrapping row that scrolls sideways',/\.inspector-tabbar \.inspector-tabs\{[^}]*flex-wrap:nowrap[^}]*overflow-x:auto/.test(css)&&/\.inspector-tabs button span\{white-space:nowrap\}/.test(css));
+  const list=screen.getByRole('tablist',{name:'Scene tools'});const tabs=within(list).getAllByRole('tab');
+  check('the tab bar keeps icon + label tabs inside the overflow-aware bar',!!list.closest('.inspector-tabbar')&&tabs.every(t=>t.querySelector('svg')&&t.querySelector('span')));
+  check('no More menu while every tab fits',!screen.queryByRole('button',{name:/More scene tools/}));
+  Object.defineProperty(list,'clientWidth',{configurable:true,value:150});tabs.forEach((t,i)=>{Object.defineProperty(t,'offsetLeft',{configurable:true,value:i*60});Object.defineProperty(t,'offsetWidth',{configurable:true,value:60});});
+  await act(async()=>{window.dispatchEvent(new window.Event('resize'));});
+  const more=await screen.findByRole('button',{name:`More scene tools (${tabs.length-2} hidden)`});
+  check('a narrow inspector moves tabs that do not fit into a More menu',more.getAttribute('aria-haspopup')==='menu');
+  await user.click(more);
+  const menu=screen.getByRole('menu',{name:'More scene tools'});
+  check('the More menu lists exactly the hidden tabs',within(menu).getAllByRole('menuitemradio').map(b=>b.textContent).join()===tabs.slice(2).map(t=>t.textContent).join());
+  await waitFor(()=>assert.equal(document.activeElement,within(menu).getAllByRole('menuitemradio')[0]));
+  await user.keyboard('{ArrowDown}');
+  check('arrow keys move through the More menu',document.activeElement===within(menu).getAllByRole('menuitemradio')[1]);
+  await user.keyboard('{Escape}');
+  check('Esc closes the More menu and returns focus to its button',!screen.queryByRole('menu',{name:'More scene tools'})&&document.activeElement===more);
+  await user.click(more);await user.click(within(screen.getByRole('menu',{name:'More scene tools'})).getByRole('menuitemradio',{name:'Text'}));
+  check('choosing a hidden tab from More opens it and marks it active',screen.getByRole('tab',{name:'Text',exact:true}).getAttribute('aria-selected')==='true'&&screen.getByRole('button',{name:/More scene tools/}).classList.contains('active'));
+  screen.getByRole('tab',{name:'Text',exact:true}).focus();await user.keyboard('{Home}');
+  check('Home moves to the first tab (keyboard accessible tab bar)',screen.getByRole('tab',{name:'Media',exact:true}).getAttribute('aria-selected')==='true'&&document.activeElement===screen.getByRole('tab',{name:'Media',exact:true}));
+  delete list.clientWidth;tabs.forEach(t=>{delete t.offsetLeft;delete t.offsetWidth;});
+  await act(async()=>{window.dispatchEvent(new window.Event('resize'));});
+  check('the More menu disappears again when the inspector is wide enough',!screen.queryByRole('button',{name:/More scene tools/}));}
+ {const ws=screen.getByRole('combobox',{name:'Workspace'});const shell=document.querySelector('.studio-shell');const dock=screen.getByRole('region',{name:'Video timeline'});const h0=parseFloat(dock.style.height);
+  check('the top bar has a workspace switcher (Edit, Color, Audio, Review) set to Edit',[...ws.options].map(o=>o.textContent).join()==='Edit,Color,Audio,Review'&&ws.value==='edit');
+  await user.selectOptions(ws,'color');
+  await waitFor(()=>assert.equal(screen.getByRole('tab',{name:'Effects',exact:true}).getAttribute('aria-selected'),'true'));
+  check('Color workspace opens Effects, widens the inspector and shortens the timeline',shell.dataset.workspace==='color'&&shell.style.getPropertyValue('--inspector-width')==='440px'&&parseFloat(dock.style.height)<=h0);
+  check('the workspace choice is saved with the preferences',JSON.parse(localStorage.getItem('sceneforge.preferences.v1')).workspace==='color');
+  await user.selectOptions(ws,'audio');
+  await waitFor(()=>assert.equal(screen.getByRole('tab',{name:'Audio',exact:true}).getAttribute('aria-selected'),'true'));
+  check('Audio workspace opens the Audio tab and makes the timeline taller (smaller preview)',parseFloat(dock.style.height)>h0&&shell.dataset.workspace==='audio'&&!shell.style.getPropertyValue('--inspector-width').startsWith('440'));
+  await user.click(screen.getByRole('button',{name:'View',exact:true}));
+  check('View menu lists the workspaces with the current one marked',screen.getByRole('button',{name:/Audio workspace/}).getAttribute('aria-pressed')==='true'&&!!screen.getByRole('button',{name:/Review workspace/}));
+  await user.click(screen.getByRole('button',{name:/Review workspace/}));
+  check('Review workspace hides the inspector for a large preview',shell.classList.contains('inspector-hidden')&&ws.value==='review');
+  await user.selectOptions(ws,'edit');
+  check('Edit workspace restores the standard layout',!shell.classList.contains('inspector-hidden')&&shell.dataset.workspace==='edit'&&Math.round(parseFloat(dock.style.height))===Math.round(h0)&&JSON.parse(localStorage.getItem('sceneforge.preferences.v1')).workspace==='edit');
+  await user.click(screen.getByRole('tab',{name:'Media',exact:true}));}
+ {const pic=screen.getByLabelText('Scene track');const clipsBefore=pic.querySelectorAll('.picture-clip').length;
+  await user.click(screen.getByRole('button',{name:'Collapse V1 picture track'}));
+  const hdr=document.querySelector('.track-video-label');
+  check('collapsing a track shrinks its lane and header to a thin strip',pic.classList.contains('track-collapsed')&&hdr.classList.contains('track-collapsed')&&pic.style.height==='18px'&&hdr.style.height==='18px');
+  check('collapsed clips stay on the lane and selectable',pic.querySelectorAll('.picture-clip').length===clipsBefore&&clipsBefore>0&&[...pic.querySelectorAll('.picture-clip')].every(b=>!b.disabled));
+  check('the collapse state is remembered per project in this browser',JSON.parse(localStorage.getItem(`sceneforge.timelineView.${project.id}`)).collapsed.V1===true);
+  await user.click(screen.getByRole('button',{name:'Collapse A1 narration track'}));
+  check('each track has its own collapse toggle',screen.getByLabelText('Narration track').classList.contains('track-collapsed')&&screen.getByRole('button',{name:'Expand A1 narration track'}).getAttribute('aria-expanded')==='false');
+  await user.click(screen.getByRole('button',{name:'Expand V1 picture track'}));await user.click(screen.getByRole('button',{name:'Expand A1 narration track'}));
+  check('expanding restores the full lane',!pic.classList.contains('track-collapsed')&&!pic.style.height);
+  const compact=screen.getByRole('button',{name:'Compact tracks'});await user.click(compact);
+  check('Compact tracks halves the lane heights',compact.getAttribute('aria-pressed')==='true'&&document.querySelector('.sequence-tracks').classList.contains('compact-tracks')&&/compact-tracks\{--picture-h:42px;--audio-h:24px;--source-audio-h:18px;--text-h:27px\}/.test(readFileSync('src/usability.css','utf8')));
+  await user.click(compact);
+  check('Compact tracks can be switched off',!document.querySelector('.sequence-tracks').classList.contains('compact-tracks')&&JSON.parse(localStorage.getItem(`sceneforge.timelineView.${project.id}`)).compact===false);}
+ {await user.click(screen.getByRole('button',{name:'Help',exact:true}));
+  const diag=screen.getByRole('link',{name:'Export diagnostics (.zip)'});
+  check('Help menu has Keyboard shortcuts, Show tour, AI models and Export diagnostics',!!screen.getByRole('button',{name:/Keyboard shortcuts/})&&!!screen.getByRole('button',{name:'Show tour'})&&!!screen.getByRole('button',{name:'AI models…'})&&diag.getAttribute('href')==='/api/diagnostics.zip'&&diag.hasAttribute('download'));
+  await user.click(screen.getByRole('button',{name:'AI models…'}));
+  const dlg=await screen.findByRole('dialog',{name:'AI models'});await within(dlg).findByRole('listitem',{name:/Whisper base/});
+  check('AI models lists each model with status, size and total disk use',!!within(dlg).getByText(/Total disk used/)&&within(dlg).getByRole('listitem',{name:/U²-Net small/}).textContent.includes('Bundled')&&within(dlg).getByRole('listitem',{name:/Kim Vocal/}).textContent.includes('Not downloaded')&&within(dlg).getByRole('listitem',{name:/Whisper base/}).textContent.includes('145.0 MB'));
+  check('bundled models offer no Delete button',!within(dlg).queryByRole('button',{name:/Delete U²-Net small/}));
+  check('without the desktop bridge each model offers its folder path to copy',!!within(dlg).getByRole('button',{name:'Copy folder path for MDX-Net Kim Vocal 2'}));
+  await user.click(within(dlg).getByRole('button',{name:/Delete Whisper base/}));
+  await waitFor(()=>assert.ok(requests.some(r=>r.method==='DELETE'&&r.path==='/api/models/whisper/base')));
+  await within(dlg).findByText(/was deleted/);
+  check('Delete removes a downloaded model through the API and refreshes the list',within(dlg).getByRole('listitem',{name:/Whisper base/}).textContent.includes('Not downloaded'));
+  await user.click(within(dlg).getByRole('button',{name:'Download MDX-Net Kim Vocal 2'}));
+  await waitFor(()=>assert.ok(requests.some(r=>r.method==='POST'&&r.path==='/api/models/voice/kim_vocal_2/download')));
+  await waitFor(()=>assert.ok(within(dlg).getByRole('listitem',{name:/Kim Vocal/}).textContent.includes('Downloaded')));
+  check('Download starts the model download through the API and the list shows the result',within(dlg).getByRole('listitem',{name:/Kim Vocal/}).textContent.includes('67.0 MB'));
+  await user.click(within(dlg).getByRole('button',{name:'Close'}));}
+ {fireEvent.keyDown(document.body,{key:'?'});
+  const sheet=await screen.findByRole('dialog',{name:'Keyboard shortcuts'});
+  const row=k=>[...sheet.querySelectorAll('.shortcut-row')].find(r=>[...r.querySelectorAll('kbd')].map(x=>x.textContent).join(' ')===k);
+  check('"?" opens the keyboard shortcut sheet',!!sheet);
+  check('the sheet lists Blade (C) and Razor All (Shift+C) with the other timeline tools',row('C')?.textContent.includes('Blade')&&row('Shift+C')?.textContent.includes('Razor All')&&['V','A','B','N','Y','U'].every(k=>row(k)));
+  check('the sheet groups Playback, Timeline tools, Edit and Projects shortcuts',['Playback','Timeline tools','Edit','Projects and app'].every(g=>within(sheet).getByRole('region',{name:g}))&&row('Ctrl+Z')&&row('Ctrl+N')&&row('Space')&&row('Home End')&&row('Shift+Delete'));
+  await user.keyboard('{Escape}');
+  check('Esc closes the shortcut sheet',!screen.queryByRole('dialog',{name:'Keyboard shortcuts'}));
+  const script=visibleEditor().getByRole('textbox',{name:'Narration script'});fireEvent.keyDown(script,{key:'?'});
+  check('"?" while typing does not open the sheet',!screen.queryByRole('dialog',{name:'Keyboard shortcuts'}));
+  await user.click(screen.getByRole('button',{name:'Help',exact:true}));await user.click(screen.getByRole('button',{name:/Keyboard shortcuts/}));
+  check('Help → Keyboard shortcuts opens the same sheet',!!await screen.findByRole('dialog',{name:'Keyboard shortcuts'}));
+  await user.click(screen.getByRole('button',{name:'Close'}));
+  await user.click(screen.getByRole('button',{name:'Help',exact:true}));await user.click(screen.getByRole('button',{name:'Show tour'}));
+  const tour=await screen.findByRole('dialog',{name:'Scenes bin'});
+  for(let i=0;i<4;i++)await user.click(within(screen.getByRole('dialog',{name:/Scenes bin|Preview|Scene settings|Timeline tools/})).getByRole('button',{name:'Next'}));
+  check('Help → Show tour restarts the tour and reaches the Export step',!!tour&&!!screen.getByRole('dialog',{name:'Export'})&&!!within(screen.getByRole('dialog',{name:'Export'})).getByText('Step 5 of 5'));
+  await user.click(within(screen.getByRole('dialog',{name:'Export'})).getByRole('button',{name:'Finish'}));
+  check('Finish closes the tour',!screen.queryByRole('dialog',{name:'Export'}));}
  fireEvent.keyDown(document.body,{key:'n',ctrlKey:true});
  const newName=await screen.findByRole('textbox',{name:'New project name'});
  check('Ctrl+N (File → New project) returns to the project page ready to type a name',document.activeElement===newName);

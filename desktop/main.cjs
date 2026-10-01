@@ -91,7 +91,7 @@ async function boot(){
  const fromApp=e=>{try{return new URL(e.senderFrame.url).origin===origin;}catch{return false;}};
  const guard=fn=>async(e,...a)=>{if(!fromApp(e))throw Error('Not allowed');return fn(...a);};
  const openPanel=(panel)=>window.webContents.executeJavaScript(`window.dispatchEvent(new CustomEvent('sceneforge-open-panel',{detail:${JSON.stringify(panel)}}))`);
- for(const ch of ['sf:info','sf:check-updates','sf:set-beta','sf:set-workspace-mode','sf:choose-sd-folder','sf:open-external','sf:open-logs','sf:diagnostics','sf:reveal-export'])ipcMain.removeHandler(ch);
+ for(const ch of ['sf:info','sf:check-updates','sf:set-beta','sf:set-workspace-mode','sf:choose-sd-folder','sf:open-external','sf:open-logs','sf:diagnostics','sf:reveal-export','sf:open-model-folder'])ipcMain.removeHandler(ch);
  ipcMain.handle('sf:info',guard(async()=>({version:app.getVersion(),electron:process.versions.electron,chrome:process.versions.chrome,platform:process.platform,arch:process.arch,
   packaged:app.isPackaged,beta:updater.beta(),workspace:dataDir})));
  ipcMain.handle('sf:check-updates',guard(async()=>app.isPackaged?updater.check(false):{status:'error',kind:'dev',message:'Updates are only available in the installed app.'}));
@@ -107,6 +107,14 @@ async function boot(){
  }));
  ipcMain.handle('sf:open-logs',guard(async()=>{fs.mkdirSync(path.join(dataDir,'logs'),{recursive:true});return shell.openPath(path.join(dataDir,'logs'));}));
  ipcMain.handle('sf:diagnostics',guard(async()=>{await collectDiagnostics();return true;}));
+ // Help → AI models: open a model's folder. The folder comes from the backend's own model listing.
+ ipcMain.handle('sf:open-model-folder',guard(async(kind,id)=>{
+  const list=await api('/api/models');
+  const m=(list.models||[]).find(x=>x.kind===String(kind)&&x.id===String(id));
+  if(!m||!m.folder)throw Error('Unknown model');
+  fs.mkdirSync(m.folder,{recursive:true});
+  const err=await shell.openPath(m.folder);if(err)throw Error(err);return true;
+ }));
  const rebuildMenu=()=>Menu.setApplicationMenu(Menu.buildFromTemplate(menuTemplate()));
  ipcMain.handle('sf:set-workspace-mode',guard(mode=>{workspaceMode=mode==='editor'?'editor':'home';rebuildMenu();return true;}));
  const menuTemplate=()=>{
@@ -128,7 +136,11 @@ async function boot(){
   {label:'Help',submenu:[
    {label:'Check for updates…',enabled:app.isPackaged,click:()=>updater.check(true)},
    {label:'Receive beta updates',type:'checkbox',checked:updater.beta(),enabled:app.isPackaged,click:item=>{const r=updater.setBeta(item.checked);dialog.showMessageBox(window,{type:'info',message:item.checked?'Beta updates on':'Beta updates off',detail:r.message});if(item.checked)updater.check(false);}},
+   ...(workspaceMode==='editor'?[{label:'Keyboard shortcuts',click:()=>openPanel({panel:'shortcuts'})},{label:'Show tour',click:()=>openPanel({panel:'tour'})}]:[]),
+   {label:'AI models…',click:()=>openPanel({panel:'models'})},
+   {type:'separator'},
    {label:'Collect diagnostics for a bug report…',click:()=>collectDiagnostics()},
+   {label:'Export diagnostics (.zip)…',click:()=>window.webContents.downloadURL(origin+'/api/diagnostics.zip')},
    {label:'Open project backups',click:()=>{fs.mkdirSync(path.join(dataDir,'backups'),{recursive:true});shell.openPath(path.join(dataDir,'backups'));}},
    {type:'separator'},
    {label:'SceneForge on GitHub',click:()=>shell.openExternal('https://github.com/EzioDEVio/SceneForge')},

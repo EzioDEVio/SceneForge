@@ -8,7 +8,7 @@
 
 ![The SceneForge editor: scene bin, rendered scene preview with an iris-reveal title and a two-tone caption, scene settings, and the timeline with text, picture, narration and colour/beat markers](docs/images/editor-overview.png)
 
-> **Release status.** **0.7.0** is the latest release. It is a large update over 0.5.3: a multitrack audio timeline with pro edit tools, 71 caption styles, 400 stickers and emoji, per-effect settings, AI subject cutout and voice isolation, and optional text-to-video. Items marked *(0.7.0)* are new in this version. The full record is in [`desktop/RELEASE_NOTES.md`](desktop/RELEASE_NOTES.md) and [`PROJECT_HISTORY_AND_HANDOFF.md`](PROJECT_HISTORY_AND_HANDOFF.md).
+> **Release status.** **0.7.1** is the latest release, a maintenance update (security and usability) to **0.7.0**. 0.7.0 was a large update over 0.5.3: a multitrack audio timeline with pro edit tools, 71 caption styles, 400 stickers and emoji, per-effect settings, AI subject cutout and voice isolation, and optional text-to-video. Items marked *(0.7.0)* are new in this version. The full record is in [`desktop/RELEASE_NOTES.md`](desktop/RELEASE_NOTES.md) and [`PROJECT_HISTORY_AND_HANDOFF.md`](PROJECT_HISTORY_AND_HANDOFF.md).
 
 The screenshots on this page come from the 0.7.0 build. They show a demo project made only from procedurally generated pictures, video and audio. [`scripts/capture_readme_screenshots.py`](scripts/capture_readme_screenshots.py) rebuilds the project and the screenshots.
 
@@ -159,7 +159,7 @@ The screenshots on this page come from the 0.7.0 build. They show a demo project
 
 ## Install
 
-Installers are on the **[Releases page](https://github.com/EzioDEVio/SceneForge/releases/latest)**. The current version is **0.7.0**.
+Installers are on the **[Releases page](https://github.com/EzioDEVio/SceneForge/releases/latest)**. The current version is **0.7.1**.
 
 | System | File | First launch |
 |---|---|---|
@@ -325,6 +325,7 @@ The table summarizes the documented history. Versions marked WIP or RC were deve
 | **0.7.0 RC6** | Fixes from the Windows test: Delete removes only the cut audio, right-click menus, detach narration or clip sound to A3, timeline audio in scene renders, Whisper diagnostics, and in-app Chatterbox/Kokoro start. Adds the FFmpeg effects pack. Unreleased. |
 | **0.7.0 RC7** | Local Whisper fixed (FFmpeg decodes the audio, without PyAV), black first render fixed, AI subject cutout and textured titles. Unreleased. |
 | **0.7.0 RC8** | Better cutout (edge refinement, People model, preview, bundled small model), AI voice isolation, beat markers, volume envelopes, effect stack and look preset packs. Unreleased. |
+| **0.7.1** | Security updates (urllib3 2.8.0, Vite 7), inspector tab bar fix, workspaces, collapsible/compact tracks, keyboard shortcut sheet and tour, AI model manager, diagnostics export. |
 | **0.7.0 RC9** | 400 stickers and emoji, 71 caption styles, settings for 36 effects, clock and iris reveals, moving-video subject cutout, clip groups and clip-attached markers. **Current candidate**, unreleased. |
 
 ### Releasing (maintainers)

@@ -1,12 +1,16 @@
+import {WorkspaceId, isWorkspaceId} from './workspaces';
+
 export type AppPreferences = {
   theme: 'graphite'|'light'|'midnight'|'warm';
   accent: 'violet'|'blue'|'teal';
   density: 'compact'|'comfortable';
   reduceMotion: boolean;
+  /** Workspace preset (View → Workspace, or the switcher in the top bar). */
+  workspace: WorkspaceId;
 };
 
 export const DEFAULT_PREFERENCES: AppPreferences = {
-  theme:'graphite',accent:'violet',density:'compact',reduceMotion:false,
+  theme:'graphite',accent:'violet',density:'compact',reduceMotion:false,workspace:'edit',
 };
 const STORAGE_KEY='sceneforge.preferences.v1';
 const ACCENT:Record<AppPreferences['accent'],string>={violet:'#9783ff',blue:'#62a8ff',teal:'#43c8b5'};
@@ -19,6 +23,7 @@ export function readPreferences(storage:Pick<Storage,'getItem'>|undefined=typeof
       accent:parsed.accent==='blue'||parsed.accent==='teal'?parsed.accent:'violet',
       density:parsed.density==='comfortable'?'comfortable':'compact',
       reduceMotion:parsed.reduceMotion===true,
+      workspace:isWorkspaceId(parsed.workspace)?parsed.workspace:'edit',
     };
   } catch {return {...DEFAULT_PREFERENCES};}
 }

@@ -1,3 +1,20 @@
+# SceneForge Studio 0.7.1
+
+A maintenance and usability update to 0.7.0.
+
+**Security**
+- `urllib3` 2.7.0 → 2.8.0. It ships inside the app and fixes three high-severity and three moderate-severity advisories.
+- Vite 5 → 7 for the developer build tools; this also brings patched esbuild and launch-editor. These tools are not part of the installer.
+- `npm audit` now reports 0 vulnerabilities for both the frontend and the desktop app.
+
+**Usability**
+- **Inspector tabs:** one tidy row that scrolls, with a **More ▾** menu, so tabs no longer wrap.
+- **Workspaces:** Edit, Color, Audio and Review, from View → Workspace or the top bar.
+- **Timeline tracks:** collapse a track with its chevron, or use **Compact tracks** to halve every lane's height.
+- **Keyboard shortcuts:** press `?` for the list, or use Help → Keyboard shortcuts. A short tour shows on first run and can be restarted from Help → Show tour.
+- **Help → AI models:** see, download or delete the Whisper, background-removal and voice-isolation models, with their sizes and folders.
+- **Help → Export diagnostics:** creates one zip of versions, logs and settings to attach to a bug report. API keys and secrets are never included.
+
 # SceneForge Studio 0.7.0
 
 The first public release since 0.5.3. It brings together release candidates RC1–RC9, which are listed below in full.

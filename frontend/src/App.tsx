@@ -10,7 +10,10 @@ import {AudioClipEditor, removeSceneAudio} from "./AudioClipEditor";
 import {FilmPreview, filmToneFilter} from "./FilmPreview";
 import {FinishingPanel} from "./FinishingPanel";
 import {OverlayCanvas, OverlayPanel} from "./Overlays";
-import {InspectorResizer} from "./InspectorResizer";
+import {InspectorResizer, applyInspectorWidth} from "./InspectorResizer";
+import {InspectorTabs} from "./InspectorTabs";
+import {FirstRunTour, ModelManager, ShortcutSheet, tourSeen} from "./HelpPanels";
+import {WORKSPACES, WORKSPACE_EVENT, workspacePreset, type WorkspaceId, type WorkspacePreset} from "./workspaces";
 import {AIEnginesPanel, AboutPanel} from "./InfoPanels";
 import {CaptionStylePanel, CaptionPreview, AutoCaptions} from "./CaptionsPro";
 import {ProgressCard} from "./ProgressCard";
@@ -38,7 +41,7 @@ import {
   ArrowLeft, ArrowRight, ArrowUp, ArrowDown,
   Download, Play, Loader2, Trash2, X, Plus, Upload, Sparkles, Volume2,
   FileText, ImageIcon, Clock, Palette, Type, Wand2, Film, Settings, Key, Check,
-  ChevronRight, ChevronDown, Layers, Copy, PanelLeftClose, PanelLeftOpen, Search, CheckCircle2, Timer, Clapperboard, Moon, Sun,
+  LayoutDashboard, ChevronRight, ChevronDown, Layers, Copy, PanelLeftClose, PanelLeftOpen, Search, CheckCircle2, Timer, Clapperboard, Moon, Sun,
 } from "lucide-react";
 import { api, subscribeJob, Project, Scene, Shot, Job, VoiceTake, ProviderProfile, Asset, VoiceOption } from "./api";
 
@@ -594,7 +597,8 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
   refresh: () => Promise<void>; onMove: (dir: -1 | 1) => void; onDelete: () => void;
   onOpenSettings: () => void; onSaveState: (id: string, state: string) => void; onRecord:(label:string,undo:()=>Promise<unknown>,redo:()=>Promise<unknown>)=>void; removeNarration:(scene:Scene)=>Promise<void>;
 }) {
-  const [tab, setTab] = useState<InspectorTab>("Media");
+  const [tab, setTab] = useState<InspectorTab>(() => workspacePreset(readPreferences().workspace).tab || "Media");
+  useEffect(() => {const onWorkspace = (e: Event) => {const preset = (e as CustomEvent<WorkspacePreset>).detail; if (preset?.tab) setTab(preset.tab);}; window.addEventListener(WORKSPACE_EVENT, onWorkspace); return () => window.removeEventListener(WORKSPACE_EVENT, onWorkspace);}, []);
   const [textFocus,setTextFocus]=useState<string|null>(null);
   const [chatOpen, setChatOpen] = useState(false);
   const [text, setText] = useState(scene.spoken_text || scene.original_text);
@@ -872,12 +876,7 @@ function PartRow({scene, project, index, total, active, refresh, onMove, onDelet
       <aside className="inspector" aria-label="Scene inspector">
         <InspectorResizer/>
         <div className="inspector-heading"><span className="eyebrow">SCENE SETTINGS · {tab.toUpperCase()}</span><span className="subtle">{durationLabel(scene)}</span><FeatureHelp title={tab} description={INSPECTOR_GUIDE[tab].description} steps={INSPECTOR_GUIDE[tab].steps}/></div>
-        <div className="inspector-tabs" role="tablist" aria-label="Scene tools">
-          {INSPECTOR_TABS.filter(({name})=>name!=="Clip Audio"||shot?.asset?.type==="video").map(({name, Icon}) => <button key={name} role="tab" id={`${scene.id}-${name}-tab`} aria-controls={`${scene.id}-panel`} aria-selected={tab === name} onClick={() => setTab(name)} onKeyDown={e => {
-            const offset = e.key === "ArrowRight" ? 1 : e.key === "ArrowLeft" ? -1 : 0;
-            if (offset) {e.preventDefault(); const next = INSPECTOR_TABS[(INSPECTOR_TABS.findIndex(t => t.name === name) + offset + INSPECTOR_TABS.length) % INSPECTOR_TABS.length].name; setTab(next); document.getElementById(`${scene.id}-${next}-tab`)?.focus();}
-          }} tabIndex={tab === name ? 0 : -1}><Icon size={18}/><span>{name}</span></button>)}
-        </div>
+        <InspectorTabs tabs={INSPECTOR_TABS.filter(({name})=>name!=="Clip Audio"||shot?.asset?.type==="video")} active={tab} onSelect={setTab} idPrefix={scene.id} panelId={`${scene.id}-panel`}/>
         <div className="inspector-body" role="tabpanel" id={`${scene.id}-panel`} aria-labelledby={`${scene.id}-${tab}-tab`}>
           {tab === "Media" && <>
             <div className="section-heading"><h3>Scene media</h3><span className="count-badge">{scene.shots.length}</span></div>
@@ -952,6 +951,27 @@ export default function App() {
   function updatePreferences(patch:Partial<AppPreferences>) {
     setPreferences(current=>{const next={...current,...patch};writePreferences(next);return next;});
   }
+  /** Workspace presets drive the existing layout state: the inspector width and hidden
+   *  class here, and (through WORKSPACE_EVENT) the inspector tab and the timeline height. */
+  function applyWorkspaceLayout(preset:WorkspacePreset){
+    const shell=document.querySelector<HTMLElement>('.studio-shell');if(!shell)return;
+    shell.dataset.workspace=preset.id;
+    if(preset.inspectorWidth)shell.dataset.inspectorPreset=String(preset.inspectorWidth);else delete shell.dataset.inspectorPreset;
+    shell.classList.toggle('inspector-hidden',preset.inspectorHidden);
+    applyInspectorWidth(preset.inspectorWidth);
+  }
+  function switchWorkspace(id:WorkspaceId){
+    const preset=workspacePreset(id);
+    updatePreferences({workspace:preset.id});
+    applyWorkspaceLayout(preset);
+    window.dispatchEvent(new CustomEvent(WORKSPACE_EVENT,{detail:preset}));
+  }
+  useEffect(()=>{if(!project)return;const t=setTimeout(()=>applyWorkspaceLayout(workspacePreset(readPreferences().workspace)),0);return()=>clearTimeout(t);},[project?.id]);
+  const [tourOpen,setTourOpen]=useState(false);
+  useEffect(()=>{if(project&&!tourSeen())setTourOpen(true);},[project?.id]);
+  const editorOpen=useRef(false);editorOpen.current=!!project;
+  // "?" opens the keyboard shortcut sheet (not while typing or while another dialog is open).
+  useEffect(()=>{const onKey=(e:KeyboardEvent)=>{if(e.key!=='?'||e.ctrlKey||e.metaKey||e.altKey||e.defaultPrevented)return;const t=e.target as HTMLElement|null;if(t&&(t.isContentEditable||/^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName)))return;if(!editorOpen.current||document.querySelector('[role="dialog"]'))return;e.preventDefault();setInfoPanel({panel:'shortcuts'});};window.addEventListener('keydown',onKey);return()=>window.removeEventListener('keydown',onKey);},[]);
   const [titleDraft, setTitleDraft] = useState("");
   const [exportPanel,setExportPanel]=useState(true);
   const [exportExpanded,setExportExpanded]=useState(false);
@@ -1129,7 +1149,7 @@ export default function App() {
   const [settingsInitialTab,setSettingsInitialTab]=useState<'preferences'|'providers'>('preferences');
   function openSettings(tab:'preferences'|'providers'='preferences') {setSettingsInitialTab(tab);setSettingsOpen(true);}
   const [infoPanel, setInfoPanel] = useState<{panel:string;section?:string}|null>(null);
-  useEffect(()=>{const open=(e:Event)=>{const detail=(e as CustomEvent).detail;if(detail?.panel==='preferences'){openSettings('preferences');return;}if(detail?.panel==='projects')return;setInfoPanel(detail||null);};window.addEventListener('sceneforge-open-panel',open);return()=>window.removeEventListener('sceneforge-open-panel',open);},[]);
+  useEffect(()=>{const open=(e:Event)=>{const detail=(e as CustomEvent).detail;if(detail?.panel==='preferences'){openSettings('preferences');return;}if(detail?.panel==='projects')return;if(detail?.panel==='tour'){setTourOpen(true);return;}setInfoPanel(detail||null);};window.addEventListener('sceneforge-open-panel',open);return()=>window.removeEventListener('sceneforge-open-panel',open);},[]);
   useEffect(()=>{const open=()=>openSettings('providers');window.addEventListener('sceneforge-open-settings',open);return()=>window.removeEventListener('sceneforge-open-settings',open);},[]);
   const [sidebar, setSidebar] = useState(true);
   const [libraryTab,setLibraryTab] = useState<'Scenes'|'Media Pool'|'Transitions'>('Scenes');
@@ -1291,13 +1311,14 @@ export default function App() {
     <label className="search-control"><Search size={16}/><input aria-label="Search projects" placeholder="Find a project…" value={projectSearch} onChange={e=>setProjectSearch(e.target.value)}/></label>
     {loading ? <p role="status">Loading projects…</p> : <div className="project-grid">{projects.filter(p=>p.title.toLowerCase().includes(projectSearch.toLowerCase())).map(p=><article className="project-tile" key={p.id}><button className="project-open-button" disabled={busy} onClick={()=>openProject(p.id)}><div className="project-cover"><Film size={30}/><span>{p.aspect}</span></div><strong>{p.title}</strong><span className="project-open">Open project <ArrowRight size={15}/></span></button><button className="text-btn project-delete" aria-label={`Delete project ${p.title}`} disabled={busy} onClick={()=>removeProject(p)}><Trash2 size={14}/> Delete</button></article>)}{!projects.filter(p=>p.title.toLowerCase().includes(projectSearch.toLowerCase())).length&&<p className="hint">{projects.length?"No matching projects.":"Your saved projects will appear here."}</p>}</div>}
     {settingsOpen&&<SettingsPanel key={settingsInitialTab} initialTab={settingsInitialTab} onClose={()=>setSettingsOpen(false)} preferences={preferences} onPreferencesChange={updatePreferences}/>}
+    {infoPanel?.panel==='models'&&<ModelManager onClose={()=>setInfoPanel(null)}/>}
   </main>;
   return <div className="studio-shell"><BuildNotice/>
     <header className="studio-toolbar">
       <div className="brand"><span className="brand-mark"><Film size={19}/></span><span>SceneForge</span></div>
       <span className="toolbar-divider"/>
       <div className="project-identity"><input aria-label="Project name" value={titleDraft} onChange={e=>{setTitleDraft(e.target.value); setStates(prev=>({...prev,title:"Unsaved changes"}));}} onBlur={()=>void saveTitle()}/><span role="status" className={`save-status ${failed ? "save-error" : ""}`}>{busy ? "Saving…" : status}</span></div>
-      <div className="toolbar-end"><button className="btn back-projects" disabled={busy} onClick={()=>void goToProjects('open')} title="Save current changes and return to your projects"><ArrowLeft size={14}/> Projects</button><select aria-label="Project aspect ratio" value={project.aspect} disabled={busy||exporting} onChange={e=>action(async()=>{await api.updateProject(project.id,{aspect:e.target.value}); await refresh();})}>{ASPECTS.map(a=><option key={a}>{a}</option>)}</select><div className="theme-control"><button className="theme-toggle" aria-label={`Theme: ${THEMES.find(x=>x.id===preferences.theme)?.label}`} aria-haspopup="menu" aria-expanded={themeMenuOpen} title="Choose editor theme" onClick={()=>setThemeMenuOpen(open=>!open)}>{preferences.theme==='light'?<Sun size={16}/>:<Moon size={16}/>}<span>Theme</span><ChevronDown size={13}/></button>{themeMenuOpen&&<div className="theme-popover" role="menu" aria-label="Editor theme">{THEMES.map(item=><button key={item.id} role="menuitemradio" aria-checked={preferences.theme===item.id} onClick={()=>{updatePreferences({theme:item.id});setThemeMenuOpen(false);}}><i className={`theme-swatch ${item.id}`}/>{item.label}{preferences.theme===item.id&&<CheckCircle2 size={14}/>}</button>)}</div>}</div><button className="btn video-gen-launch" disabled={busy||exporting} onClick={()=>setVideoGenOpen(true)}><Clapperboard size={15}/>Generate video</button><button className="btn btn-primary" disabled={exporting||dirty||busy||!project.scenes.length} onClick={()=>setExportOpen(true)}><Upload size={15}/>{exporting ? `Exporting ${Math.round(exportJob?.progress||0)}%` : "Export video"}</button></div>
+      <div className="toolbar-end"><button className="btn back-projects" disabled={busy} onClick={()=>void goToProjects('open')} title="Save current changes and return to your projects"><ArrowLeft size={14}/> Projects</button><select aria-label="Project aspect ratio" value={project.aspect} disabled={busy||exporting} onChange={e=>action(async()=>{await api.updateProject(project.id,{aspect:e.target.value}); await refresh();})}>{ASPECTS.map(a=><option key={a}>{a}</option>)}</select><label className="workspace-switcher" title={workspacePreset(preferences.workspace).description}><LayoutDashboard size={14}/><span>Workspace</span><select aria-label="Workspace" value={preferences.workspace} onChange={e=>switchWorkspace(e.target.value as WorkspaceId)}>{WORKSPACES.map(w=><option key={w.id} value={w.id}>{w.label}</option>)}</select></label><div className="theme-control"><button className="theme-toggle" aria-label={`Theme: ${THEMES.find(x=>x.id===preferences.theme)?.label}`} aria-haspopup="menu" aria-expanded={themeMenuOpen} title="Choose editor theme" onClick={()=>setThemeMenuOpen(open=>!open)}>{preferences.theme==='light'?<Sun size={16}/>:<Moon size={16}/>}<span>Theme</span><ChevronDown size={13}/></button>{themeMenuOpen&&<div className="theme-popover" role="menu" aria-label="Editor theme">{THEMES.map(item=><button key={item.id} role="menuitemradio" aria-checked={preferences.theme===item.id} onClick={()=>{updatePreferences({theme:item.id});setThemeMenuOpen(false);}}><i className={`theme-swatch ${item.id}`}/>{item.label}{preferences.theme===item.id&&<CheckCircle2 size={14}/>}</button>)}</div>}</div><button className="btn video-gen-launch" disabled={busy||exporting} onClick={()=>setVideoGenOpen(true)}><Clapperboard size={15}/>Generate video</button><button className="btn btn-primary export-launch" disabled={exporting||dirty||busy||!project.scenes.length} onClick={()=>setExportOpen(true)}><Upload size={15}/>{exporting ? `Exporting ${Math.round(exportJob?.progress||0)}%` : "Export video"}</button></div>
     </header>
     {titleCard&&<TitleDesigner width={project.width} height={project.height} busy={busy} onClose={()=>setTitleCard(false)} onCreate={d=>void addTitleCard(d)}/>}
     {project&&multi.length>1&&selected&&<BatchBar source={selected} scenes={project.scenes.filter(x=>multi.includes(x.id))} onClear={()=>setMulti([])} onDone={()=>void refresh()}/>}
@@ -1309,8 +1330,8 @@ export default function App() {
       {['File','AI Engines','Edit','View','Help'].map(name=><div className="editor-menu" key={name}><button aria-expanded={menu===name} onClick={()=>{if(name==='AI Engines'){setInfoPanel({panel:'ai'});setMenu('');}else setMenu(menu===name?'':name);}}>{name}</button>{menu===name&&<div className="editor-menu-items">
        {name==='File'&&<><button disabled={busy||exporting} onClick={()=>{setMenu('');void goToProjects('new');}}>New project… <kbd>Ctrl+N</kbd></button><button disabled={busy||exporting} onClick={()=>{setMenu('');void goToProjects('open');}}>Open project… <kbd>Ctrl+O</kbd></button><button onClick={()=>{setMenu('');openSettings('preferences');}}>Preferences… <kbd>Ctrl+,</kbd></button><button disabled={busy||exporting} onClick={()=>{setMenu('');void addPart();}}>New scene</button><button disabled={busy||exporting} onClick={()=>{setMenu('');setVideoGenOpen(true);}}>Generate video from text…</button><button disabled={busy||exporting} onClick={()=>importRef.current?.click()}>Import files to Media Pool…</button><button disabled={busy||exporting} onClick={()=>folderRef.current?.click()}>Import folder to Media Pool…</button><button disabled={!selected||busy||exporting} onClick={()=>audioImportRef.current?.click()}>Import audio to selected scene…</button></>}
        {name==='Edit'&&<><button disabled={!history.length||busy||dirty||exporting} onClick={()=>{setMenu('');void undoTimeline();}}>Undo {history[history.length-1]?.label||'timeline edit'}</button><button disabled={!future.length||busy||dirty||exporting} onClick={()=>{setMenu('');void redoTimeline();}}>Redo {future[future.length-1]?.label||'timeline edit'}</button><button disabled={!selected||busy||exporting} onClick={()=>{setMenu('');if(selected)void deleteScene(selected.id);}}>Delete selected scene…</button></>}
-       {name==='View'&&<><button onClick={()=>{setSidebar(!sidebar);setMenu('');}}>Toggle scene library</button><button onClick={()=>{document.querySelector('.studio-shell')?.classList.toggle('inspector-hidden');setMenu('');}}>Toggle inspector</button><button onClick={()=>{setExportPanel(!exportPanel);setMenu('');}}>Show / hide export result</button><button onClick={()=>{setMenu('');if(document.fullscreenElement)void document.exitFullscreen();else void document.documentElement.requestFullscreen();}}>Fullscreen / restore</button></>}
-       {name==='Help'&&<button onClick={()=>{setMenu('');setInfoPanel({panel:'about'});}}>About SceneForge</button>}
+       {name==='View'&&<><button onClick={()=>{setSidebar(!sidebar);setMenu('');}}>Toggle scene library</button><button onClick={()=>{document.querySelector('.studio-shell')?.classList.toggle('inspector-hidden');setMenu('');}}>Toggle inspector</button><button onClick={()=>{setExportPanel(!exportPanel);setMenu('');}}>Show / hide export result</button><button onClick={()=>{setMenu('');if(document.fullscreenElement)void document.exitFullscreen();else void document.documentElement.requestFullscreen();}}>Fullscreen / restore</button><div className="menu-section-label" role="presentation">Workspace</div>{WORKSPACES.map(w=><button key={w.id} aria-pressed={preferences.workspace===w.id} title={w.description} onClick={()=>{setMenu('');switchWorkspace(w.id);}}>{preferences.workspace===w.id?'✓ ':''}{w.label} workspace</button>)}</>}
+       {name==='Help'&&<><button onClick={()=>{setMenu('');setInfoPanel({panel:'shortcuts'});}}>Keyboard shortcuts <kbd>?</kbd></button><button onClick={()=>{setMenu('');setTourOpen(true);}}>Show tour</button><button onClick={()=>{setMenu('');setInfoPanel({panel:'models'});}}>AI models…</button><a className="menu-link" href={api.diagnosticsUrl()} download onClick={()=>setMenu('')} title="Download a zip with versions, settings (no API keys), model status and recent logs for a bug report">Export diagnostics (.zip)</a><button onClick={()=>{setMenu('');setInfoPanel({panel:'about'});}}>About SceneForge</button></>}
       </div>}</div>)}<span className="menu-help">Import audio into A1 · Scissors: choose a cut position · Render complex scenes before cutting</span>
     </div>
     <input hidden ref={importRef} type="file" accept="image/*,video/*,audio/*" multiple onChange={e=>{void importMedia(e.target.files);e.target.value='';}}/>
@@ -1338,6 +1359,9 @@ export default function App() {
 
     {infoPanel?.panel==='ai'&&<AIEnginesPanel section={infoPanel.section} onClose={()=>setInfoPanel(null)} onOpenSettings={()=>{setInfoPanel(null);openSettings('providers');}}/>}
     {infoPanel?.panel==='about'&&<AboutPanel onClose={()=>setInfoPanel(null)}/>}
+    {infoPanel?.panel==='shortcuts'&&<ShortcutSheet onClose={()=>setInfoPanel(null)}/>}
+    {infoPanel?.panel==='models'&&<ModelManager onClose={()=>setInfoPanel(null)}/>}
+    {tourOpen&&<FirstRunTour onClose={()=>setTourOpen(false)}/>}
     {shareOpen&&exportJob?.status==='succeeded'&&exportJob.artifact_asset_id&&<ShareDialog assetId={exportJob.artifact_asset_id} fileName={`${project.title||'SceneForge'}-export.mp4`} onClose={()=>setShareOpen(false)} onReveal={(window as any).sceneforgeDesktop?.revealExport?id=>(window as any).sceneforgeDesktop.revealExport(id):undefined}/>}
   </div>;
 }

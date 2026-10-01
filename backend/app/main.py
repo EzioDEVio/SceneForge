@@ -32,6 +32,7 @@ app.add_middleware(DesktopSessionMiddleware,token=os.environ.get("SCENEFORGE_DES
 
 @app.on_event("startup")
 def on_startup():
+    logbuffer.install()   # again: uvicorn may have reconfigured logging after import
     init_db()
     # In-process render/generation threads cannot survive an app restart. Mark
     # their durable rows interrupted so stale jobs do not block project deletion.
@@ -66,13 +67,18 @@ from app.api import stickers  # noqa: E402
 app.include_router(stickers.router)
 from app.api import effect_params as effect_params_api  # noqa: E402
 app.include_router(effect_params_api.router)
+from app.api import models_admin, diagnostics  # noqa: E402
+app.include_router(models_admin.router)
+app.include_router(diagnostics.router)
+from app import logbuffer  # noqa: E402
+logbuffer.install()
 
 
 # Must match BUILD_ID in frontend/src/api.ts. Bump on any API change so a
 # new interface connected to an old backend (e.g. a still-running old
 # start.bat window) shows "Backend update required" instead of silently
 # losing settings the old backend does not know.
-BUILD_ID = "v0.7.0"
+BUILD_ID = "v0.7.1"
 
 
 @app.get("/api/health")
