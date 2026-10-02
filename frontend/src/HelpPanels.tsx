@@ -13,7 +13,8 @@ type Shortcut = {keys: string[]; action: string};
 const TOOL_ROWS: Shortcut[] = Object.entries(TOOL_KEYS).map(([key, tool]) => ({keys: [key.toUpperCase()], action: `${TOOL_LABELS[tool][0]} tool`}));
 export const SHORTCUT_GROUPS: {title: string; note?: string; items: Shortcut[]}[] = [
   {title: 'Playback', items: [
-    {keys: ['Space'], action: 'Play or pause the full video (renders first if needed)'},
+    {keys: ['Space'], action: 'Play or pause the timeline live from the scene renders (Preview last export plays the exported movie)'},
+    {keys: ['J', 'K', 'L'], action: 'Timeline playback: back 5 s, pause, play (press L again for 2× and 4×)'},
     {keys: ['←', '→'], action: 'Previous / next frame'},
     {keys: ['Shift+←', 'Shift+→'], action: 'Previous / next scene'},
     {keys: ['Home', 'End'], action: 'Go to the timeline start / end'},

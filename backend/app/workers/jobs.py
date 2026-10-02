@@ -288,7 +288,11 @@ def _run_export_job(job_id: str, project_id: str, selected_ids: list[str] | None
         _settings = _delivery.clean(settings)
         _emit(job_id, {"stage": "delivery", "progress": 92})
         master = out_path
-        out_path = _delivery.deliver(master, _settings, project.width, project.height, project.fps, RENDERS_DIR, _FF, cancel_check=lambda: ctx.cancel_requested)
+        _delivery_warnings: list[str] = []   # e.g. GPU encode failed -> CPU fallback (render/gpu.py)
+        out_path = _delivery.deliver(master, _settings, project.width, project.height, project.fps, RENDERS_DIR, _FF, cancel_check=lambda: ctx.cancel_requested,
+                                     warnings=_delivery_warnings)
+        for _w in _delivery_warnings:
+            _emit(job_id, {"warning": _w})
         if out_path != master:
             try:
                 _os.remove(master)

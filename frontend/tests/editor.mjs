@@ -54,6 +54,9 @@ globalThis.fetch=async(path,init={})=>{
  else if(/^\/api\/projects\/[^/]+\/stickers\/[^/]+$/.test(path)&&method==='POST')result={id:'stk-'+next++,type:'image',original_filename:`sticker-${path.split('/').at(-1)}.png`,width:420,height:200};
  else if(path.endsWith('/textured-title')&&method==='POST')result={scene:project.scenes[0],asset:{id:'tt',type:'image',original_filename:'sticker-textured.png'}};
  else if(path.endsWith('/detach-audio')&&method==='POST')result={asset:{id:'detached-audio',type:'audio',original_filename:body.source==='shot'?'clip.mp4 sound.wav':'narration.wav',duration_ms:2000},offset_ms:body.source==='shot'?0:250};
+ else if(path==='/api/silence/detect'){const ranges=[[100,300],...(body.threshold_db>-30?[[600,700]]:[])],off=body.source==='narration'?250:0;result={asset_id:body.asset_id||'scene-audio',duration_ms:2000,threshold_db:body.threshold_db,min_silence_ms:body.min_silence_ms,padding_ms:body.padding_ms,ranges,cuts:ranges.length,total_removable_ms:ranges.reduce((s,[a,b])=>s+b-a,0),...(body.scene_id?{scene_ranges:ranges.map(([a,b])=>[a+off,b+off]),scene_offset_ms:off}:{})};}
+ else if(path==='/api/fillers/detect')result={scene_id:body.scene_id,source:body.source,terms:body.words,scene_offset_ms:250,total_removable_ms:280,matches:[{index:1,text:'um',prev:'hello',next:'from speech',word_start_ms:400,word_end_ms:600,start_ms:360,end_ms:640,source_start_ms:110,source_end_ms:390}]};
+ else if(/^\/api\/cleanup\/scenes\/[^/]+\/jump-cut$/.test(path))result={scenes:[project.scenes.find(s=>s.id===path.split('/')[4])],kept_ms:1000,removed_ms:200,segments:1};
  else if(path===`/api/projects/${project.id}`&&method==='PATCH'){Object.assign(project,body);if(body.finishing){project.finishing_json=body.finishing;delete project.finishing;}result=project;}
  else if(path===`/api/projects/${project.id}`&&method==='DELETE')result={ok:true};
  else if(path==='/api/providers'&&method==='GET') result=profiles;
@@ -85,6 +88,10 @@ globalThis.fetch=async(path,init={})=>{
  else if(path===`/api/projects/${project.id}/scenes`&&method==='POST') {
   const s=clone(fixture.scenes[1]);s.id='new-'+next++;s.title='New scene';project.scenes.push(s);result=s;
  }
+ else if(/^\/api\/shots\/[^/]+\/reframe$/.test(path)&&method==='PUT'){const id=path.split('/')[3];const shot=project.scenes.flatMap(s=>s.shots).find(s=>s.id===id);shot.crop_json={...(shot.crop_json||{x:0,y:0,width:1,height:1}),reframe:body.mode==='follow'?{mode:'follow',x:.3,track:[[0,.3],[2000,.6]],method:'matte'}:{mode:body.mode,x:body.x??.5}};shot.fit='cover';result=shot;}
+ else if(path==='/api/system/encoders')result={gpu:{available:true,vendor:'nvidia',name:'NVIDIA Test GPU',h264:'h264_nvenc',hevc:'hevc_nvenc'},encoders:{},notes:[],choices:['auto','cpu','gpu'],default:'auto'};
+ else if(path===`/api/projects/${project.id}/reframe`&&method==='POST')result={job_id:'rf-1',project_id:project.id,total:2};
+ else if(path==='/api/reframe/jobs/rf-1')result={job_id:'rf-1',project_id:project.id,source_project_id:project.id,status:'succeeded',stage:'done',progress:100,done:2,total:2,warnings:['clip.mp4: no clear subject found; the frame stays centred.'],error:null};
  else if(path.startsWith('/api/scenes/shots/')&&method==='PATCH') {const id=path.split('/').at(-1);const shot=project.scenes.flatMap(s=>s.shots).find(s=>s.id===id);Object.assign(shot,body);if(body.motion)shot.motion_json=body.motion;if(body.audio)shot.audio_json=body.audio;result=shot;}
  else if(path.startsWith('/api/scenes/')&&method==='PATCH') {
   await new Promise(r=>setTimeout(r,25));
@@ -97,6 +104,8 @@ globalThis.fetch=async(path,init={})=>{
  else if(path==='/api/effects/schema')result={version:1,look_key:'fx_params',presets:{warm:{params:[{name:'warmth',label:'Warmth',kind:'number',min:0,max:100,step:1,default:50,css:{fn:'warmth',k:0.004}},{name:'tint',label:'Tint',kind:'number',min:-100,max:100,step:1,default:0},{name:'saturation',label:'Saturation',kind:'number',min:0,max:200,step:1,default:108,unit:'%',css:{fn:'saturate'}}]},duotone:{params:[{name:'shadow',label:'Shadow colour',kind:'color',default:'#1B2A6B'},{name:'highlight',label:'Highlight colour',kind:'color',default:'#F2C94C'}]},mosaic:{managed_by:'mosaic',params:[{name:'block',label:'Block size',kind:'number',min:2,max:120,step:1,default:24}]}}};
  else if(path==='/api/look-presets'&&method==='GET')result={presets:lookPresets,builtin:[{id:'builtin-0',builtin:true,name:'Noir',description:'High-contrast black and white',effect_preset:'noir',effect_intensity:100,look:{adjust:{contrast:25,vignette:45}}}],look_keys:['adjust','tone','shake','leak','flare','wiggle','fx_order','fx_bypass']};
  else if(path==='/api/look-presets'&&method==='POST'){if(body.format!=='sceneforge-look-pack')return {ok:false,status:400,statusText:'Bad',json:async()=>({detail:'This file is not a SceneForge look pack (format must be "sceneforge-look-pack").'})};const added=body.presets.map((p,i)=>({...p,id:'lp-'+(next++)+i}));lookPresets=[...lookPresets,...added];result={added,presets:lookPresets};}
+ else if(/^\/api\/scenes\/[^/]+\/render$/.test(path)&&method==='POST'){const sc=project.scenes.find(s=>s.id===path.split('/')[3]);sc.rendered_asset_id='render-'+sc.id;sc.is_stale=false;result={job_id:'job-'+sc.id};}
+ else if(/^\/api\/jobs\/[^/]+$/.test(path)&&method==='GET')result={id:path.split('/')[3],project_id:project.id,scene_id:null,scope:'part',status:'succeeded',stage:'Done',progress:100,error:null,artifact_asset_id:null};
  else throw Error(`Unhandled test API: ${method} ${path}`);
  return {ok:true,status:200,json:async()=>clone(result)};
 };
@@ -296,6 +305,11 @@ try{
  const curve=screen.queryByRole('combobox',{name:'Motion speed curve'});
  if(curve){fireEvent.change(curve,{target:{value:'ease_out'}});await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.body?.motion?.easing==='ease_out')),{timeout:2000});await saved();}
  check('motion speed curve saves with the shot motion',!!curve&&requests.some(r=>r.method==='PATCH'&&r.body?.motion?.easing==='ease_out'));
+ await user.click(within(screen.getByRole('radiogroup',{name:'Reframe mode'})).getByRole('radio',{name:'Follow subject'}));
+ await waitFor(()=>assert.ok(requests.some(r=>r.method==='PUT'&&/\/api\/shots\/[^/]+\/reframe$/.test(r.path)&&r.body.mode==='follow')));await saved();
+ await waitFor(()=>assert.ok(/Following the subject \(cutout matte\)/.test(screen.getByRole('group',{name:'Reframe'}).textContent)));
+ await user.click(within(screen.getByRole('radiogroup',{name:'Reframe mode'})).getByRole('radio',{name:'Manual'}));await saved();
+ check('per-clip Reframe: Follow subject analyses the clip, Manual offers a position slider',requests.some(r=>r.method==='PUT'&&r.body?.mode==='manual'&&r.body.x===0.3)&&!!await screen.findByRole('slider',{name:'Reframe position slider'}));
  await user.click(screen.getByRole('tab',{name:'Text',exact:true}));
  // Captions Pro
  const captionStyleGrid=screen.getAllByRole('group',{name:'Caption styles'}).find(el=>el.classList.contains('caption-presets'));
@@ -651,6 +665,48 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getByRole('button',{name:'Undo timeline edit'}));
  await waitFor(()=>assert.equal(project.scenes.flatMap(s=>s.shots).find(x=>x.asset?.original_filename==='clip.mp4')?.audio_json?.mute,false));
  check('undo restores the clip sound and removes the detached audio clip',!project.finishing_json.audio_clips.some(c=>c.asset_id==='detached-audio'));
+ {// Clean up: remove silences / filler words (mock detection; the real detector is covered by test_cleanup.py)
+  const all=project.finishing_json.audio_clips,target=all.find(c=>all.filter(x=>x.name===c.name).length===1&&c.source_out_ms-c.source_in_ms>800&&c.source_in_ms===0);
+  const tname=target.name.replace(/[.*+?^${}()|[\]\\]/g,'\\$&');
+  fireEvent.contextMenu(screen.getByRole('button',{name:'Select audio clip '+target.name}),{clientX:40,clientY:40});
+  await user.click(within(screen.getByRole('menu',{name:'Timeline clip actions'})).getByRole('menuitem',{name:'Remove silences…'}));
+  const panel=await screen.findByRole('dialog',{name:'Clean up'});
+  await within(panel).findByRole('checkbox',{name:new RegExp(`Remove ${target.track||'A3'} · ${tname} at 0\\.10s`)});
+  check('Remove silences… opens the Clean up panel with detected ranges and the time saved',requests.some(r=>r.path==='/api/silence/detect'&&r.body.asset_id===target.asset_id&&r.body.threshold_db===-38&&r.body.min_silence_ms===600&&r.body.padding_ms===120)&&/1 silence selected · 1 cut · saves 0\.20s/.test(within(panel).getByText(/selected ·/).textContent));
+  fireEvent.change(within(panel).getByRole('slider',{name:'Silence threshold'}),{target:{value:'-25'}});
+  await waitFor(()=>assert.equal(within(panel).getAllByRole('checkbox').length,2));
+  check('moving the threshold slider detects again live',requests.some(r=>r.path==='/api/silence/detect'&&r.body.threshold_db===-25));
+  await user.click(within(panel).getByRole('checkbox',{name:/at 0\.60s/}));
+  await user.click(within(panel).getByRole('button',{name:'Apply 1 cut'}));
+  const near=(a,b)=>Math.abs(a-b)<=17;  // cut points snap to the project frame (30 fps)
+  await waitFor(()=>assert.ok(project.finishing_json.audio_clips.some(c=>c.id===target.id&&near(c.source_out_ms,100))));
+  const pieces=project.finishing_json.audio_clips.filter(c=>c.asset_id===target.asset_id&&c.track===target.track&&(c.id===target.id||c.name===target.name+' · 2'));
+  check('Apply cuts only the checked ranges and closes the gap in one undoable step',pieces.length===2&&near(pieces[1].source_in_ms,300)&&pieces[1].start_ms===target.start_ms+pieces[0].source_out_ms-pieces[0].source_in_ms&&!screen.queryByRole('dialog',{name:'Clean up'}));
+  await user.click(screen.getByRole('button',{name:'Undo timeline edit'}));
+  await waitFor(()=>assert.equal(project.finishing_json.audio_clips.find(c=>c.id===target.id)?.source_out_ms,target.source_out_ms));
+  check('undo restores the clip before the jump cuts',!project.finishing_json.audio_clips.some(c=>c.name===target.name+' · 2'));
+  fireEvent.contextMenu(screen.getAllByRole('button',{name:/Storyboard scene 1/})[0],{clientX:40,clientY:40});
+  await user.click(screen.getByRole('menuitem',{name:'Remove silences (jump cut)…'}));
+  const scenePanel=await screen.findByRole('dialog',{name:'Clean up'});
+  await within(scenePanel).findByRole('checkbox',{name:/Remove Clip sound at 0\.10s/});
+  await user.click(within(scenePanel).getByRole('button',{name:'Apply 2 cuts'}));  // the -25 dB threshold is kept between uses
+  await waitFor(()=>assert.ok(requests.some(r=>/\/api\/cleanup\/scenes\/[^/]+\/jump-cut$/.test(r.path))));
+  check('a scene jump cut sends the scene-time ranges to the backend in one request',requests.some(r=>r.path===`/api/cleanup/scenes/${project.scenes[0].id}/jump-cut`&&JSON.stringify(r.body.cuts)==='[[100,300],[600,700]]')&&requests.some(r=>r.path==='/api/silence/detect'&&r.body.scene_id===project.scenes[0].id&&r.body.source==='clips'));
+  await saved();
+  const narrationClip=screen.getAllByRole('button').filter(b=>b.className.includes('narration-clip')&&b.className.includes('has-take'))[0];
+  fireEvent.contextMenu(narrationClip,{clientX:40,clientY:40});
+  await user.click(screen.getByRole('menuitem',{name:'Remove filler words from narration…'}));
+  const fillerPanel=await screen.findByRole('dialog',{name:'Clean up'});
+  await within(fillerPanel).findByText('hello [um] from speech');
+  check('filler review lists each match with context, using the editable word list (like/so off)',requests.some(r=>r.path==='/api/fillers/detect'&&r.body.source==='narration'&&r.body.words.includes('um')&&r.body.words.includes('يعني')&&!r.body.words.includes('like')));
+  const before=project.finishing_json.audio_clips.length;
+  await user.click(within(fillerPanel).getByRole('button',{name:'Apply 1 cut'}));
+  await waitFor(()=>assert.equal(project.finishing_json.audio_clips.length,before+2));
+  const narr=project.finishing_json.audio_clips.filter(c=>c.asset_id==='detached-audio');
+  check('removing narration fillers moves the narration to A3 and cuts the filler there',requests.some(r=>r.path.endsWith('/detach-audio')&&r.body.source==='narration')&&narr.length===2&&near(narr[0].source_out_ms,110)&&near(narr[1].source_in_ms,390)&&narr[1].start_ms===narr[0].start_ms+narr[0].source_out_ms);
+  await user.click(screen.getByRole('button',{name:'Undo timeline edit'}));
+  await waitFor(()=>assert.equal(project.finishing_json.audio_clips.length,before));
+  check('undo puts the narration back in one step',!project.finishing_json.audio_clips.some(c=>c.asset_id==='detached-audio'));}
  await user.click(screen.getByRole('button',{name:'Mute clip sound for clip.mp4'}));
  await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.path.includes('/shots/')&&r.body?.audio?.mute===true)));
  await saved();
@@ -866,10 +922,20 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(within(exd).getByRole('radio',{name:/Small file/}));
  check('advanced export settings are visible as soon as the dialog opens',!!within(exd).getByRole('combobox',{name:'Export frame rate'}));
  await user.selectOptions(within(exd).getByRole('combobox',{name:'Export frame rate'}),'60');
+ await waitFor(()=>assert.ok(/GPU found: NVIDIA Test GPU/.test(exd.textContent)));
+ await user.selectOptions(within(exd).getByRole('combobox',{name:'Export encoder'}),'gpu');
  check('export dialog shows a size estimate and caption file links',/About/.test(exd.textContent)&&!!within(exd).getByRole('link',{name:'SRT'}));
  await user.click(within(exd).getByRole('button',{name:/^Export$/}));
  await waitFor(()=>assert.ok(requests.some(r=>r.path.includes('/export')&&r.body?.settings?.format==='mp4_h265')));
  check('Export sends the chosen preset and advanced settings',requests.some(r=>r.path.includes('/export')&&r.body.settings.format==='mp4_h265'&&r.body.settings.resolution==='720p'&&r.body.settings.fps===60));
+ check('Export dialog shows the detected GPU and sends the chosen encoder',requests.some(r=>r.path.includes('/export')&&r.body.settings.encoder==='gpu'));
+ await user.click(screen.getByRole('button',{name:'File',exact:true}));await user.click(screen.getByRole('button',{name:/Create vertical 9:16 version \(auto-reframe\)/}));
+ const rfd=await screen.findByRole('dialog',{name:'Create vertical version'});
+ check('auto-reframe dialog says it copies the project and works best with one main subject',/copy/.test(rfd.textContent)&&/one main subject/.test(rfd.textContent));
+ await user.click(within(rfd).getByRole('button',{name:/Create vertical 9:16 version/}));
+ await within(rfd).findByRole('button',{name:'Open vertical project'},{timeout:3000});
+ check('auto-reframe starts the copy job, shows progress and notes, then offers to open the new project',requests.some(r=>r.method==='POST'&&r.path.endsWith('/reframe')&&r.body.aspect==='9:16')&&/Done: 2 clips reframed/.test(rfd.textContent)&&/no clear subject/.test(rfd.textContent));
+ await user.click(within(rfd).getByRole('button',{name:'Stay here'}));
  // Duplicate / copy / paste
  const clipsBefore=project.scenes.length;
  const firstClip=document.querySelector('.picture-clip');
@@ -997,6 +1063,65 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(await screen.findByRole('button',{name:'Delete project Renamed project'}));
  await screen.findByText('Your saved projects will appear here.');
  check('confirmed deletion removes the project card',requests.some(r=>r.method==='DELETE'&&r.path===`/api/projects/${project.id}`));
+ // Live timeline playback (SequencePlayer.tsx) and keyframes (KeyframeEditor.tsx) on a fresh 3-scene project.
+ {cleanup();
+  const liveProject=clone(fixture);liveProject.title='Live playback';
+  const a=liveProject.scenes[0];a.rendered_asset_id='render-a';a.is_stale=false;a.transition_in_json={type:'cut',duration_ms:0};
+  const twin=(id,title,rendered)=>{const s=clone(a);s.id=id;s.title=title;s.rendered_asset_id=rendered;s.is_stale=!rendered;s.shots=s.shots.map(sh=>({...sh,id:id+'-shot'}));return s;};
+  liveProject.scenes=[a,twin('live-b','Part-B','render-b'),twin('live-c','Part-C',null)];liveProject.scenes.forEach((s,i)=>s.order_index=i);
+  project=liveProject;requests=[];
+  const plays=[],realPlay=window.HTMLMediaElement.prototype.play;
+  window.HTMLMediaElement.prototype.play=function(){plays.push(this.getAttribute('src'));return Promise.resolve();};
+  try{
+   render(React.createElement(App));
+   await user.click(await screen.findByRole('button',{name:/Live playback Open project/}));
+   await screen.findByRole('region',{name:/Edit /});
+   const vids=()=>[...document.querySelectorAll('.live-monitor video')],activeVid=()=>document.querySelector('.live-monitor video.active');
+   await user.click(screen.getByRole('button',{name:'Play movie'}));
+   const mon=await screen.findByRole('region',{name:'Live timeline playback'});
+   check('Play starts live timeline playback in the program monitor, without rendering the full video',document.getElementById('sequence-viewer').contains(mon)&&!requests.some(r=>r.path.includes('/export'))&&!!within(mon).getByText(/transitions show as cuts/)&&!!screen.getByRole('button',{name:'Pause movie'}));
+   check('the first rendered scene plays its preview media while the next scene preloads in the second player',vids().length===2&&activeVid()?.getAttribute('src').startsWith(`/api/scenes/${a.id}/preview-media?v=render-a`)&&vids().some(v=>v!==activeVid()&&v.getAttribute('src')?.startsWith('/api/scenes/live-b/preview-media?v=render-b'))&&plays.some(s=>s?.startsWith(`/api/scenes/${a.id}/`)));
+   fireEvent.ended(activeVid());
+   await waitFor(()=>assert.ok(activeVid()?.getAttribute('src').startsWith('/api/scenes/live-b/preview-media')));
+   check('at the cut the preloaded scene swaps in and the playhead follows the timeline',plays.some(s=>s?.startsWith('/api/scenes/live-b/'))&&tc()==='00:00:02:00');
+   fireEvent.ended(activeVid());
+   await within(mon).findByText(/Not rendered — render this scene/);
+   check('an unrendered scene shows its still for its length with a Render missing scenes action',!!mon.querySelector('.live-card img')&&!activeVid()&&tc().startsWith('00:00:04')&&!!within(mon).getByRole('button',{name:/Render missing scenes \(1\)/}));
+   fireEvent.keyDown(document.body,{key:'k'});
+   await waitFor(()=>assert.ok(screen.getByRole('button',{name:'Play movie'})));
+   check('K pauses live playback',!!screen.getByRole('button',{name:'Play movie'})&&!!screen.queryByRole('region',{name:'Live timeline playback'}));
+   await user.click(within(mon).getByRole('button',{name:/Render missing scenes \(1\)/}));
+   await waitFor(()=>assert.ok(activeVid()?.getAttribute('src')?.startsWith('/api/scenes/live-c/preview-media?v=render-live-c')),{timeout:4000});
+   check('Render missing scenes renders only the unrendered scene and playback picks up its render',requests.filter(r=>r.method==='POST'&&r.path.endsWith('/render')).map(r=>r.path).join()==='/api/scenes/live-c/render'&&!within(mon).queryByText(/Not rendered/));
+   const zoom=Number(screen.getByRole('slider',{name:'Timeline zoom'}).value);
+   fireEvent.pointerDown(screen.getByRole('slider',{name:'Timeline playhead'}),{clientX:zoom*1,pointerId:1});
+   await waitFor(()=>assert.ok(activeVid()?.getAttribute('src')?.startsWith(`/api/scenes/${a.id}/preview-media`)));
+   check('scrubbing the ruler seeks live playback inside the right scene',tc()==='00:00:01:00');
+   await user.click(within(mon).getByRole('button',{name:'Close timeline playback'}));
+   check('closing live playback returns to editing',!screen.queryByRole('region',{name:'Live timeline playback'})&&!!screen.getByRole('button',{name:'Play movie'}));
+   // Keyframes: text layer and overlay
+   await user.click(screen.getByRole('button',{name:/Select scene 1: Part-1/}));
+   await user.click(screen.getByRole('tab',{name:'Text',exact:true}));
+   const layerNo=(a.font_json.layers||[]).length+1;
+   await user.click(visibleEditor().getByRole('button',{name:'Add Text'}));
+   act(()=>{window.dispatchEvent(new CustomEvent('sceneforge-seek',{detail:{sceneId:a.id,timeMs:500}}));});
+   await user.click(visibleEditor().getByRole('button',{name:`Add keyframe at playhead for Layer ${layerNo}`}));
+   const sentLayer=()=>requests.filter(r=>r.method==='PATCH'&&r.path===`/api/scenes/${a.id}`&&r.body?.font?.layers?.[layerNo-1]?.keyframes).at(-1)?.body.font.layers[layerNo-1];
+   await waitFor(()=>assert.ok(sentLayer()),{timeout:4000});
+   const k=sentLayer().keyframes;
+   check('Add keyframe at playhead sends the text layer keyframe (layer time, current values)',k.length===1&&k[0].t_ms===500&&k[0].x===50&&k[0].y===25&&k[0].size===64&&k[0].ease==='linear'&&!!visibleEditor().getByRole('button',{name:'Keyframe 1 at 0.50s'}));
+   await user.click(screen.getByRole('tab',{name:'Overlays',exact:true}));
+   const pick=visibleEditor().getByRole('combobox',{name:'Add overlay from media'});
+   await waitFor(()=>assert.ok(pick.querySelector('option[value="pool-img"]')));
+   await user.selectOptions(pick,'pool-img');
+   const ovNo=(a.overlays_json||[]).length+1;
+   act(()=>{window.dispatchEvent(new CustomEvent('sceneforge-seek',{detail:{sceneId:a.id,timeMs:1200}}));});
+   await user.click(visibleEditor().getByRole('button',{name:`Add keyframe at playhead for Overlay ${ovNo}`}));
+   const sentOv=()=>requests.filter(r=>r.method==='PATCH'&&r.path===`/api/scenes/${a.id}`&&r.body?.overlays?.[ovNo-1]?.keyframes).at(-1)?.body.overlays[ovNo-1];
+   await waitFor(()=>assert.ok(sentOv()),{timeout:4000});
+   check('Add keyframe at playhead sends the overlay keyframe with position, size, rotation and opacity',sentOv().keyframes.length===1&&sentOv().keyframes[0].t_ms===1200&&['x','y','width','rotation','opacity'].every(key=>Number.isFinite(sentOv().keyframes[0][key])));
+  }finally{window.HTMLMediaElement.prototype.play=realPlay;}
+ }
  cleanup();healthBuild="old-backend";render(React.createElement(App));
  await screen.findByText(/Backend update required:/);
  check('mixed frontend and backend versions show a recovery notice');

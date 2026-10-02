@@ -10,8 +10,10 @@ import {ASSET_DRAG_TYPE, DraggedAsset, collectDroppedFiles, isMediaDrag} from '.
 import {AUDIO_TRACKS, AudioTrackId, MARKER_COLORS, TOOL_KEYS, TOOL_LABELS, TimelineAudioClip, TimelineMarker, TimelineSettings, TimelineTool, TrackId, clipTrack, isAudioTrackAudible, markerTime, nextAudioTrack, normalizeTimeline} from './timeline/timeline.types';
 import {EditResult, blade as bladeClip, bladeAll, clipEnd, moveClips, neighbours, packRows, rippleDelete, rippleTrim, roll, slide, slip, trackSelectForward, trim as trimClip} from './timeline/editOps';
 import {envelopePath} from './GainEnvelope';
+import {TIMELINE_SEEK_EVENT, openCleanup} from './cleanupApi';
 import {frameMs, intersectsWindow, rafCoalesce, visibleWindow, zoomAround} from './timeline/timeMath';
 import {readPreferences} from './preferences';
+import {SequencePlayer} from './SequencePlayer';
 import {WORKSPACE_EVENT, timelineHeightFor, workspacePreset, type WorkspacePreset} from './workspaces';
 
 export const TRANSITIONS = [
@@ -58,7 +60,7 @@ function writeTrackView(projectId:string,view:TrackView){try{localStorage.setIte
 // once as a fallback and move into the project the next time the timeline is saved.
 function legacyTimeline(projectId:string){const read=(k:string)=>{try{return JSON.parse(localStorage.getItem(k)||'null');}catch{return null;}};return {markers:read(`sceneforge.timelineMarkers.${projectId}`),locks:read(`sceneforge.timelineTrackLocks.${projectId}`)};}
 const audioTrackLabel=(t:AudioTrackId)=>t==='A3'?'Timeline audio':`Audio ${t.slice(1)}`;
-export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimShot,onRender,onSelect,onAdd,onReorder,onUpdate,exportAsset,exportScenes,onDelete,onDeleteScene,onToggleClipAudio,onAudio,onRemoveAudio,onUndo,onRedo,canUndo,canRedo,onSplit,onDropFiles,onDropAssets,notice,onRemoveSceneAudio,clipboard,onClipboard,onDuplicate,onPaste,multi,onMulti,selectedAudioClipId,onAudioClipSelect,onUpdateAudioClips,onUpdateTimeline,onDetachAudio}:{onDetachAudio?:(sceneId:string,source:'narration'|'shot',placeMs:number,shotId?:string,durationMs?:number)=>void;onUpdateTimeline?:(next:TimelineSettings,options?:{undoable?:boolean;label?:string})=>void;multi?:string[];onMulti?:(id:string,mode:'toggle'|'range'|'clear')=>void;clipboard?:{kind:'scene'|'audio';id:string;label:string}|null;onClipboard?:(c:{kind:'scene'|'audio';id:string;label:string})=>void;onDuplicate?:(id:string)=>void;onPaste?:(targetId:string)=>void;
+export function ProjectTimeline({onRefresh,project,selectedId,disabled,onDuration,onTrimShot,onRender,onSelect,onAdd,onReorder,onUpdate,exportAsset,exportScenes,onDelete,onDeleteScene,onToggleClipAudio,onAudio,onRemoveAudio,onUndo,onRedo,canUndo,canRedo,onSplit,onDropFiles,onDropAssets,notice,onRemoveSceneAudio,clipboard,onClipboard,onDuplicate,onPaste,multi,onMulti,selectedAudioClipId,onAudioClipSelect,onUpdateAudioClips,onUpdateTimeline,onDetachAudio}:{onRefresh?:()=>Promise<unknown>|void;onDetachAudio?:(sceneId:string,source:'narration'|'shot',placeMs:number,shotId?:string,durationMs?:number)=>void;onUpdateTimeline?:(next:TimelineSettings,options?:{undoable?:boolean;label?:string})=>void;multi?:string[];onMulti?:(id:string,mode:'toggle'|'range'|'clear')=>void;clipboard?:{kind:'scene'|'audio';id:string;label:string}|null;onClipboard?:(c:{kind:'scene'|'audio';id:string;label:string})=>void;onDuplicate?:(id:string)=>void;onPaste?:(targetId:string)=>void;
   onRemoveSceneAudio?:(sceneId:string)=>void;notice?:string;onDropFiles?:(sceneId:string|null,files:File[],insert?:{before?:string;after?:string;audioTrack?:boolean;timeMs?:number;track?:string})=>void;onDropAssets?:(sceneId:string|null,assets:DraggedAsset[],insert?:{before?:string;after?:string;audioTrack?:boolean;timeMs?:number;track?:string})=>void;
   onDuration?:(id:string,ms:number)=>void;onTrimShot?:(sceneId:string,shotId:string,sourceIn:number,sourceOut:number)=>void;onRender?:()=>void;onDelete?:()=>void;onDeleteScene?:(id:string)=>void;onToggleClipAudio?:(shotId:string,audio:Record<string,any>)=>void;onAudio?:()=>void;onRemoveAudio?:()=>void;onUndo?:()=>void;onRedo?:()=>void;canUndo?:boolean;canRedo?:boolean;onSplit?:(at:number,baked?:boolean)=>void;
   exportScenes?:Scene[];exportAsset?:string|null;project:Project;selectedId:string;disabled:boolean;onSelect:(id:string)=>void;onAdd:()=>void;selectedAudioClipId?:string;onAudioClipSelect?:(id:string)=>void;onUpdateAudioClips?:(clips:ProjectAudioClip[])=>void;
@@ -99,6 +101,9 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
   const viewUpdate=useRef(rafCoalesce<{left:number;width:number}>(v=>setView(v)));
   useEffect(()=>{const sync=()=>{if(scroll.current)setView({left:scroll.current.scrollLeft,width:scroll.current.clientWidth||1600});};sync();window.addEventListener('resize',sync);return()=>window.removeEventListener('resize',sync);},[scale]);
   const [monitor,setMonitor]=useState(false),[playing,setPlaying]=useState(false),[mediaError,setMediaError]=useState('');
+  // Live timeline playback (SequencePlayer.tsx): rendered scenes played in sequence, no full export needed.
+  const [live,setLive]=useState(false),[liveSeek,setLiveSeek]=useState({ms:0,n:0}),[liveRate,setLiveRate]=useState(1);
+  useEffect(()=>{if(monitor)setLive(false);},[monitor]);
   const player=useRef<HTMLVideoElement>(null),scroll=useRef<HTMLDivElement>(null);
   const rulerSelection=useRef<string|null>(null);
   const scenes=project.scenes,selected=scenes.find(s=>s.id===selectedId),index=scenes.findIndex(s=>s.id===selectedId);
@@ -180,7 +185,7 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
   function duplicateAudio(ids:string[]){const picked=projectAudio.filter(c=>ids.includes(c.id));if(!picked.length)return;const end=Math.max(...picked.map(clipEnd)),first=Math.min(...picked.map(c=>c.start_ms));const copies=picked.map(c=>({...c,id:crypto.randomUUID(),name:c.name.endsWith(' copy')?c.name:`${c.name} copy`,start_ms:c.start_ms-first+end}));applyAudioEdit({ok:true,clips:[...projectAudio,...copies],selected:copies.map(c=>c.id)},'Duplicated after the original.');}
   useEffect(()=>{if(!ctx)return;const close=()=>setCtx(null);window.addEventListener('click',close);window.addEventListener('keydown',close);return()=>{window.removeEventListener('click',close);window.removeEventListener('keydown',close);};},[ctx]);
   useEffect(()=>{setPosition(p=>Math.min(p,length));},[length]);
-  useEffect(()=>{setMonitor(false);setPlaying(false);},[project.id]);
+  useEffect(()=>{setMonitor(false);setPlaying(false);setLive(false);},[project.id]);
   const lastAspect=useRef(project.aspect);
   useEffect(()=>{if(lastAspect.current!==project.aspect){lastAspect.current=project.aspect;setMonitor(false);setPlaying(false);setMediaError('');setPosition(0);}},[project.aspect]);
   useEffect(()=>{if(exportAsset){setMonitor(true);setPosition(0);setMediaError('');}},[exportAsset]);
@@ -196,9 +201,12 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
     const limit=monitor&&Number.isFinite(player.current?.duration)?player.current!.duration*1000:length;
     const value=Math.max(0,Math.min(limit,ms));setPosition(value);
     if(monitor&&player.current){player.current.pause();player.current.currentTime=value/1000;}
+    if(live&&!monitor)setLiveSeek(s=>({ms:value,n:s.n+1}));
     if(!monitor){const clip=[...clips].reverse().find(c=>value>=c.start);if(clip)requestAnimationFrame(()=>window.dispatchEvent(new CustomEvent('sceneforge-seek',{detail:{sceneId:clip.scene.id,timeMs:value-clip.start}})));}
     if(select&&!monitor){const c=[...clips].reverse().find(c=>value>=c.start);if(c&&c.scene.id!==selectedId){rulerSelection.current=c.scene.id;onSelect(c.scene.id);}}
   }
+  const seekRef=useRef(seek);seekRef.current=seek;
+  useEffect(()=>{const h=(e:Event)=>seekRef.current(Number((e as CustomEvent).detail?.timeMs)||0);window.addEventListener(TIMELINE_SEEK_EVENT,h);return()=>window.removeEventListener(TIMELINE_SEEK_EVENT,h);},[]);
   const [dropTarget,setDropTarget]=useState('');
   // Drop/import results show briefly, then clear so the ruler stays usable.
   const [shownNotice,setShownNotice]=useState('');
@@ -221,10 +229,17 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
   }
   function togglePlay() {
     if(disabled||!scenes.some(s=>s.shots.length))return;
-    if(!exportAsset||staleExport){onRender?.();return;}
-    if(!monitor){setMonitor(true);setMediaError('');}
-    else if(player.current?.paused){if(player.current.ended)player.current.currentTime=0;void player.current.play().catch(()=>setMediaError('Press Play in the video controls to begin playback.'));}
+    // Play runs the timeline live from the scene renders; "Preview last export" keeps the movie player.
+    if(!monitor){if(!live)startLive();else{setLiveRate(1);setPlaying(p=>!p);}return;}
+    if(player.current?.paused){if(player.current.ended)player.current.currentTime=0;void player.current.play().catch(()=>setMediaError('Press Play in the video controls to begin playback.'));}
     else player.current?.pause();
+  }
+  function startLive(){const from=position>=length-1?0:position;setLive(true);setLiveRate(1);setPosition(from);setLiveSeek(s=>({ms:from,n:s.n+1}));setPlaying(true);}
+  // J / K / L: back 5 s, pause, play (L again: 2×, 4×) in live timeline playback.
+  function liveKey(k:'j'|'k'|'l'){
+    if(k==='k'){setPlaying(false);setLiveRate(1);return;}
+    if(k==='l'){if(!live)startLive();else if(!playing){setLiveRate(1);setPlaying(true);}else setLiveRate(r=>Math.min(4,r*2));return;}
+    seek(Math.max(0,position-5000),true);
   }
   // Editor shortcuts. Ignored while typing, while a dialog is open, and for
   // Space on a focused button (the browser already activates the button).
@@ -253,6 +268,7 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
       if(k==='v'&&sc&&clipboard&&!(clipboard.kind==='scene'?trackLocks.V1:trackLocks.A1)){e.preventDefault();onPaste?.(sc.id);return;}
     }
     if(mod)return;
+    if(!e.shiftKey&&!monitor&&!disabled&&['j','k','l'].includes(e.key.toLowerCase())&&scenes.some(s=>s.shots.length)){e.preventDefault();liveKey(e.key.toLowerCase() as 'j'|'k'|'l');return;}
     const toolKey=TOOL_KEYS[e.key.toLowerCase()];
     if(toolKey&&!e.shiftKey&&e.key.length===1){e.preventDefault();setTool(toolKey);showToolMessage(`${TOOL_LABELS[toolKey][0]} tool (${TOOL_LABELS[toolKey][1]})`);return;}
     if(e.key==='C'&&e.shiftKey&&!disabled){e.preventDefault();razorAll();return;}
@@ -408,8 +424,8 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
         <button title="Go to start (Home)" aria-label="Go to timeline start" onClick={()=>seek(0,true)}><SkipBack size={16}/></button>
         <button title="Previous scene" aria-label="Previous scene" disabled={disabled||!clips.length||position<=0} onClick={()=>seek([...clips].reverse().find(c=>c.start<position-1)?.start||0,true)}><StepBack size={16}/></button>
         <button title="Previous frame (←)" aria-label="Previous frame" disabled={disabled||position<=0} onClick={()=>seek(position-1000/project.fps,true)}><ChevronLeft size={16}/></button>
-        <button className="transport-play" title={playing?'Pause (Space)':'Play full video (Space); renders first if needed'} aria-label={playing?'Pause movie':'Play movie'} disabled={!scenes.some(s=>s.shots.length)||disabled} onClick={togglePlay}>{playing?<Pause size={16}/>:<Play size={16}/>}</button>
-        <button aria-label="Stop full video" title="Stop and return to start" disabled={!monitor} onClick={()=>seek(0)}><Square size={15}/></button>
+        <button className="transport-play" title={playing?'Pause (Space)':(monitor?'Play the last export (Space)':'Play the timeline from the scene renders (Space · J/K/L)')} aria-label={playing?'Pause movie':'Play movie'} disabled={!scenes.some(s=>s.shots.length)||disabled} onClick={togglePlay}>{playing?<Pause size={16}/>:<Play size={16}/>}</button>
+        <button aria-label="Stop full video" title="Stop and return to start" disabled={!monitor&&!live} onClick={()=>{if(live&&!monitor)setPlaying(false);seek(0);}}><Square size={15}/></button>
         <button title="Next frame (→)" aria-label="Next frame" disabled={disabled||position>=length} onClick={()=>seek(position+1000/project.fps,true)}><ChevronRight size={16}/></button>
         <button title="Next scene" aria-label="Next scene" disabled={disabled||!clips.some(c=>c.start>position+1)} onClick={()=>seek(clips.find(c=>c.start>position+1)?.start||length,true)}><StepForward size={16}/></button>
         <button title="Go to end (End)" aria-label="Go to timeline end" onClick={()=>seek(length,true)}><SkipForward size={16}/></button>
@@ -443,16 +459,22 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
               <button role="menuitem" onClick={close(()=>{if(sc)onClipboard?.({kind:'scene',id:sc.id,label:sc.title});})}>Copy scene <kbd>Ctrl+C</kbd></button>
               <button role="menuitem" disabled={!clipboard||disabled||trackLocks.V1} onClick={close(()=>onPaste?.(ctx.sceneId))}>{clipboard?.kind==='audio'?`Paste ${clipboard.label} here`:clipboard?`Paste “${clipboard.label}” after this`:'Paste'} <kbd>Ctrl+V</kbd></button>
               <button role="menuitem" disabled={disabled||!audioClipboard||!sceneClip} onClick={close(()=>sceneClip&&pasteAudio(sceneClip.start))}>Paste copied audio at scene start</button>
+              <button role="menuitem" disabled={disabled||trackLocks.V1||!sc?.shots.some(x=>x.asset?.type==='video')} onClick={close(()=>openCleanup('silence',{kind:'scene',sceneId:ctx.sceneId,source:'clips'}))}>Remove silences (jump cut)…</button>
+              <button role="menuitem" disabled={disabled||trackLocks.V1||!sc?.shots.some(x=>x.asset?.type==='video')} onClick={close(()=>openCleanup('fillers',{kind:'scene',sceneId:ctx.sceneId,source:'clips'}))}>Remove filler words…</button>
               <button role="menuitem" className="danger" disabled={disabled||trackLocks.V1} onClick={close(()=>onDeleteScene?.(ctx.sceneId))}>Ripple delete scene (close gap) <kbd>Delete</kbd></button>
             </>}
             {ctx.kind==='audio'&&<>
               <button role="menuitem" disabled={!take} onClick={close(()=>{if(sc&&take)onClipboard?.({kind:'audio',id:take.id,label:`${sc.title} audio`});})}>Copy audio <kbd>Ctrl+C</kbd></button>
               <button role="menuitem" disabled={clipboard?.kind!=='audio'||disabled||trackLocks.A1} onClick={close(()=>onPaste?.(ctx.sceneId))}>{clipboard?.kind==='audio'?`Paste ${clipboard.label} here`:'Paste audio'} <kbd>Ctrl+V</kbd></button>
               <button role="menuitem" disabled={!take||disabled||trackLocks.A1||trackLocks.A3||!sceneClip} onClick={close(()=>sceneClip&&onDetachAudio?.(ctx.sceneId,'narration',sceneClip.start))}>Move narration to timeline audio (A3) to cut or trim it</button>
+              <button role="menuitem" disabled={!take||disabled||trackLocks.A1||trackLocks.A3||!sceneClip} onClick={close(()=>openCleanup('silence',{kind:'scene',sceneId:ctx.sceneId,source:'narration'}))}>Move narration to timeline and remove silences…</button>
+              <button role="menuitem" disabled={!take||disabled||trackLocks.A1||trackLocks.A3||!sceneClip} onClick={close(()=>openCleanup('fillers',{kind:'scene',sceneId:ctx.sceneId,source:'narration'}))}>Remove filler words from narration…</button>
               <button role="menuitem" className="danger" disabled={!take||disabled||trackLocks.A1} onClick={close(()=>onRemoveSceneAudio?.(ctx.sceneId))}>Remove narration (keep video) <kbd>Delete</kbd></button>
             </>}
             {ctx.kind==='source'&&<>
               <button role="menuitem" disabled={disabled||trackLocks.A2||trackLocks.A3||!shot} onClick={close(()=>shot&&onDetachAudio?.(ctx.sceneId,'shot',ctx.startMs||0,shot.id,ctx.durationMs))}>Detach clip sound to timeline audio (A3) to cut it</button>
+              <button role="menuitem" disabled={disabled||trackLocks.A2||trackLocks.V1||!shot} onClick={close(()=>openCleanup('silence',{kind:'scene',sceneId:ctx.sceneId,source:'clips'}))}>Remove silences (jump cut)…</button>
+              <button role="menuitem" disabled={disabled||trackLocks.A2||trackLocks.V1||!shot} onClick={close(()=>openCleanup('fillers',{kind:'scene',sceneId:ctx.sceneId,source:'clips'}))}>Remove filler words…</button>
               <button role="menuitem" disabled={disabled||trackLocks.A2||!shot} onClick={close(()=>shot&&onToggleClipAudio?.(shot.id,{...(shot.audio_json||{}),mute:!shot.audio_json?.mute}))}>{shot?.audio_json?.mute?'Unmute clip sound':'Mute clip sound (keep video)'}</button>
             </>}
             {ctx.kind==='clip'&&menuClip&&<>
@@ -462,6 +484,7 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
               <button role="menuitem" disabled={disabled||!audioClipboard} onClick={close(()=>pasteAudio(position,clipTrack(menuClip)))}>Paste at playhead on {clipTrack(menuClip)} <kbd>Ctrl+V</kbd></button>
               <button role="menuitem" disabled={disabled} onClick={close(()=>duplicateAudio(ids))}>Duplicate <kbd>Ctrl+D</kbd></button>
               {menuClip.group?<button role="menuitem" disabled={disabled} onClick={close(()=>ungroupAudio(ids))}>Ungroup <kbd>Ctrl+Shift+G</kbd></button>:<button role="menuitem" disabled={disabled||ids.length<2} onClick={close(()=>groupAudio(ids))}>Group selected clips <kbd>Ctrl+G</kbd></button>}
+              <button role="menuitem" disabled={disabled} onClick={close(()=>openCleanup('silence',{kind:'clips',ids}))}>Remove silences…</button>
               <button role="menuitem" disabled={disabled} onClick={close(()=>addClipMarker(menuClip))}>Add marker on this clip (moves with it)</button>
               <button role="menuitem" disabled={disabled} onClick={close(()=>applyAudioEdit({ok:true,clips:projectAudio.map(c=>ids.includes(c.id)?{...c,mute:!menuClip.mute}:c)},menuClip.mute?'Unmuted.':'Muted.'))}>{menuClip.mute?'Unmute':'Mute'}</button>
               <span className="clip-menu-row" role="group" aria-label="Move to track">Move to {AUDIO_TRACKS.map(t=><button key={t} role="menuitem" disabled={disabled||t===clipTrack(menuClip)||trackLocks[t]} onClick={close(()=>{if(!timeline.audio_tracks.includes(t))saveTimeline({...timeline,audio_tracks:[...timeline.audio_tracks,t]});applyAudioEdit(moveClips(projectAudio,ids,0,t));})}>{t}</button>)}</span>
@@ -516,5 +539,6 @@ export function ProjectTimeline({project,selectedId,disabled,onDuration,onTrimSh
     </div>
     <footer className="sequence-status"><span>{staleExport?'EXPORT OUTDATED · Export again to include your latest changes':monitor?'LAST EXPORT · Export again after edits':'ASSEMBLY · Drag parts to reorder · Drop audio on a scene to add its sound · Drop images or videos on a scene, or after the last one'}</span><span>{scenes.some(s=>!s.shots.length)?'Empty placeholders are skipped on export · ':''}Estimated export {timecode(exportLength,project.fps)}</span></footer>
     {monitor&&exportAsset&&host&&createPortal(<div className="program-monitor"><header><strong>Last exported movie</strong><span>{staleExport?'Outdated — export again for current scenes':'Export again after edits'}</span><button title="Fullscreen movie" onClick={()=>void player.current?.requestFullscreen()}><Maximize2 size={15}/></button><button aria-label="Close movie preview" onClick={()=>{setMonitor(false);setPlaying(false);}}><X size={16}/></button></header><video ref={player} controls autoPlay src={api.assetStreamUrl(exportAsset)} onPlay={()=>setPlaying(true)} onPause={()=>setPlaying(false)} onEnded={()=>setPlaying(false)} onError={()=>setMediaError('The exported movie could not be loaded. Export again and retry.')} onTimeUpdate={e=>setPosition(e.currentTarget.currentTime*1000)}/>{mediaError&&<p role="alert">{mediaError}</p>}</div>,host)}
+    {live&&!monitor&&host&&<SequencePlayer project={project} clips={authored} host={host} playing={playing} rate={liveRate} seekRequest={liveSeek} onTime={setPosition} onPlayingChange={setPlaying} onClose={()=>{setLive(false);setPlaying(false);}} onRefresh={onRefresh}/>}
   </section>;
 }

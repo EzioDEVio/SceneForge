@@ -493,6 +493,12 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
             side_margin = round(canvas_w * (100 - float(layer.get('box_width', 80))) / 200)
         else:
             side_margin = 0
+        if layer.get('keyframes'):
+            # Keyframed motion (render/keyframes.py): stepped \pos/\frz/\fscx/\alpha events.
+            from app.render.keyframes import keyframed_text_events
+            kf_tags = r'\an%d\fs%d\c%s\b%d\bord%.1f\shad%.1f\fsp%.1f' % (align,layer_size,color,int(layer.get('bold',False)),layer.get('outline_width',0),layer.get('shadow',0),float(layer.get('spacing',0) or 0))
+            events.extend(keyframed_text_events(layer, index, start, end, kf_tags, canvas_w, canvas_h, ts, runs(layer['text'], family), side_margin, exit_ms, anim_ms if animation == 'fade' else 0))
+            continue
         event_prefix = f"Dialogue: {index+1},{ts(start)},{ts(end)},Default,,{side_margin},{side_margin},0,,"
         overrides = r'{\an%d%s\fs%d\c%s\b%d\bord%.1f\shad%.1f\fsp%.1f%s}' % (align,position_tag,layer_size,color,int(layer.get('bold',False)),layer.get('outline_width',0),layer.get('shadow',0),float(layer.get('spacing',0) or 0),extra)
         if animation == 'typewriter':

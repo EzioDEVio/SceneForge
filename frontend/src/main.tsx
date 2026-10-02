@@ -6,6 +6,8 @@ import "./studio.css";
 import "./preferences.css";
 import "./library.css";
 import "./usability.css";
+import "./cleanup.css";
+import "./keyframes.css";
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
   constructor(props: { children: React.ReactNode }) {

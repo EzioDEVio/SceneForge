@@ -98,6 +98,7 @@ def get_job(job_id: str, db: Session = Depends(get_db)):
         raise HTTPException(404, "Job not found")
     result = schemas.JobOut.model_validate(job).model_dump()
     result["result_asset_ids"] = (job.plan_json or {}).get("result_asset_ids", [])
+    result["warnings"] = [e["warning"] for e in (job.events_json or []) if isinstance(e, dict) and e.get("warning")][-20:]
     return result
 
 

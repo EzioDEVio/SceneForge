@@ -1,3 +1,34 @@
+# SceneForge Studio 0.8.0: Creator pack
+
+Faster editing for YouTube and short-form creators. Everything in 0.7.1 is included.
+
+**Clean up speech**
+- **Remove silences (jump cuts):** finds pauses with an adjustable threshold, minimum length and padding. You review the list and the time saved, then apply.
+  - Works on timeline audio clips, on a video scene (split into tight jump cuts with captions kept in sync), and on narration (moved to the timeline first).
+  - Each apply is one undo step.
+- **Remove filler words:** um, uh, erm, hmm and more, plus "you know" and "I mean", and Arabic fillers (يعني، اه، امم). It uses the scene's caption transcript.
+  - "like" and "so" are off by default, and you can edit the list.
+  - You tick the matches you want gone, then apply.
+
+**Vertical video**
+- **Auto-reframe 16:9 → 9:16:** File → *Create vertical 9:16 version* makes a copy of the project and follows the main subject in every shot, using the local cutout AI.
+  - The camera path is smoothed and speed-limited. The original project is unchanged.
+  - Per shot, in the Motion tab, you can choose Center, Follow subject or a Manual position.
+
+**Speed**
+- **GPU export (NVIDIA NVENC):** export uses the graphics card when one is detected (Encoder: Auto / CPU / GPU in Export → Advanced).
+  - If a GPU encode fails, it retries on the CPU automatically and shows a warning.
+  - Scene renders still use the CPU.
+- **Live timeline playback:** Play now plays the whole sequence from the scenes you have rendered, with the timeline audio and music, and no full render needed.
+  - Unrendered scenes show a still and a *Render missing scenes* button.
+  - J, K and L control playback.
+  - In this preview, transitions show as cuts.
+
+**Motion graphics**
+- **Keyframes** for stickers, overlays, textured titles and text layers. Animate position, size, rotation and opacity, with an ease for each keyframe.
+  - *Add keyframe at playhead* adds one at the current time; each layer shows its keyframes as a strip of diamonds.
+  - The editor preview follows the playhead.
+
 # SceneForge Studio 0.7.1
 
 A maintenance and usability update to 0.7.0.

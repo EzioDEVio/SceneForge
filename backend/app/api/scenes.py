@@ -99,7 +99,11 @@ def update_scene(scene_id: str, body: schemas.SceneUpdate, db: Session = Depends
             try:
                 layers = body.font['layers']
                 if not isinstance(layers, list) or len(layers) > 12: raise ValueError()
-                body.font['layers'] = [schemas.TextLayer.model_validate(layer).model_dump() for layer in layers]
+                from app.render.keyframes import KeyframeError, with_text_keyframes
+                try:
+                    body.font['layers'] = [with_text_keyframes(layer, schemas.TextLayer.model_validate(layer).model_dump()) for layer in layers]
+                except KeyframeError as e:
+                    raise HTTPException(400, str(e)) from None
                 if any(l['end_ms'] and l['end_ms'] <= l['start_ms'] for l in body.font['layers']): raise ValueError()
             except (ValidationError, ValueError, TypeError):
                 raise HTTPException(400, 'Text layers need valid positions, colors, sizes and end times after start times (maximum 12 layers).')
@@ -281,6 +285,8 @@ def update_shot(shot_id: str, body: dict, db: Session = Depends(get_db)):
             x, y, w, h = [float(crop[k]) for k in ("x", "y", "width", "height")]
             if not all(math.isfinite(v) for v in (x,y,w,h)) or min(x,y)<0 or min(w,h)<0.05 or x+w>1.00001 or y+h>1.00001: raise ValueError()
             body["crop"] = dict(x=x,y=y,width=w,height=h)
+            if isinstance(shot.crop_json, dict) and shot.crop_json.get("reframe"):  # keep auto-reframe (render/reframe.py)
+                body["crop"]["reframe"] = shot.crop_json["reframe"]
         except (KeyError, TypeError, ValueError):
             raise HTTPException(400, "Crop must stay within the image and retain at least 5% of its width and height.")
     for field in ("fit", "source_in_ms", "source_out_ms", "duration_ms", "is_selected", "order_index"):

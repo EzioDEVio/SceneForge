@@ -57,4 +57,7 @@ jobs:
             python tests/integration/test_rc8_audio.py
             python tests/integration/test_rc9_timeline.py
             python tests/integration/test_071_usability.py
+            python tests/integration/test_reframe_gpu.py
+            python tests/integration/test_cleanup.py
+            python tests/integration/test_keyframes_playback.py
           '

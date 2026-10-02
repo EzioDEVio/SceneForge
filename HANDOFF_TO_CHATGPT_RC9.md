@@ -8,6 +8,19 @@
 
 Read this file first, then `README.md`, `desktop/RELEASE_NOTES.md`, `handoff.md`, `PROJECT_HISTORY_AND_HANDOFF.md`, `docs/TIMELINE_ARCHITECTURE.md` and the original brief `SceneForge_Claude_Takeover_and_Timeline_Prompt.md`, which is in the owner's files, not in this repo.
 
+
+> **Update (2026-10-01):**
+> - **0.7.0 is published.** The tag `v0.7.0` is on `main` at `e5ae82a`.
+> - **0.7.1** is branch `claude/0.7.1` at commit `7cb2b31`. It contains the security fixes (urllib3 2.8.0, Vite 7) plus inspector tabs, workspaces, collapsible tracks, a shortcut sheet and tour, the AI model manager and a diagnostics export.
+> - **0.8.0** is branch `claude/0.8.0`, built on 0.7.1. It adds:
+>   - silence and filler removal (`backend/app/render/silence.py`, `api/cleanup.py`, `frontend/src/CleanupPanel.tsx`, `timeline/jumpCuts.ts`);
+>   - auto-reframe and project copy (`render/reframe.py`, `domain/project_copy.py`; `crop_json.reframe`);
+>   - NVENC export (`render/gpu.py`; export setting `encoder`);
+>   - live playback (`frontend/src/SequencePlayer.tsx`);
+>   - keyframes (`render/keyframes.py`, `frontend/src/keyframes.ts`; `keyframes[]` on overlays and text layers).
+> - NVENC was never exercised on real NVIDIA hardware during development; only detection, command building and the CPU fallback are tested.
+> - The integration list in `checks.yml` now has 36 scripts.
+
 ---
 
 ## 1. Ground rules the owner set

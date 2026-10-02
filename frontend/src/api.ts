@@ -1,4 +1,4 @@
-export interface TextLayer { kind?:'text'|'text_box'|'text_plus';box_width?:number; family?:string;outline_width?:number;shadow?:number;align?:string;exit_ms?:number; animation?:string;animation_ms?:number;spacing?:number;highlight?:string;id:string;text:string;x:number;y:number;size:number;color:string;start_ms:number;end_ms:number;bold:boolean;}
+export interface TextLayer { kind?:'text'|'text_box'|'text_plus';box_width?:number; family?:string;outline_width?:number;shadow?:number;align?:string;exit_ms?:number; animation?:string;animation_ms?:number;spacing?:number;highlight?:string;id:string;text:string;x:number;y:number;size:number;color:string;start_ms:number;end_ms:number;bold:boolean;keyframes?:import('./keyframes').Keyframe[];}
 export type CaptionSegment={id:string;text:string;start_ms:number;end_ms:number};
 // Thin fetch wrapper + types matching backend/app/domain/schemas.py.
 // Uses relative /api paths so it works both under the Vite dev proxy and
@@ -31,7 +31,7 @@ export type VideoGenerationRequest = {
 export type LocalVideoSystem = {detected:boolean;gpu_name:string|null;vram_gb:number|null;system_ram_gb:number|null;gpu_count:number;recommended_model_ids:string[];message:string};
 
 export type Shot = {
-  crop_json?: {x:number;y:number;width:number;height:number}|null;
+  crop_json?: {x:number;y:number;width:number;height:number;reframe?:Reframe}|null;
   id: string;
   asset_id: string;
   order_index: number;
@@ -87,7 +87,7 @@ export type FontSettings = {
 };
 
 /** Must match BUILD_ID in backend/app/main.py. */
-export const BUILD_ID = "v0.7.1";
+export const BUILD_ID = "v0.8.0";
 
 export type Adjust = Partial<Record<'exposure'|'contrast'|'highlights'|'shadows'|'temperature'|'tint'|'saturation'|'vibrance'|'sharpen'|'vignette'|'grain', number>>;
 export type Look = {
@@ -111,7 +111,9 @@ export type Overlay = {id: string; asset_id: string; kind?: 'media'|'sticker'; x
   radius: number; border: number; border_color: string; shadow: number; start_ms: number; end_ms: number | null;
   anim_in: 'none' | 'fade' | 'slide_left' | 'slide_up' | 'zoom'; anim_out: 'none' | 'fade' | 'slide_left' | 'slide_up' | 'zoom'; anim_ms: number;
   x2?: number | null; y2?: number | null; chroma?: string | null; chroma_similarity?: number; feather?: number;
-  loop?: 'none' | 'float' | 'pendulum' | 'bob'; loop_amount?: number; loop_period_ms?: number};
+  loop?: 'none' | 'float' | 'pendulum' | 'bob'; loop_amount?: number; loop_period_ms?: number;
+  /** Keyframed x/y/width/rotation/opacity, t_ms relative to start_ms (keyframes.ts, backend render/keyframes.py). */
+  keyframes?: import('./keyframes').Keyframe[]};
 export type ProjectAudioClip = {id: string; asset_id: string; name: string; start_ms: number; source_in_ms: number; source_out_ms: number; source_duration_ms: number; volume: number; fade_in_ms: number; fade_out_ms: number; mute: boolean; track?: import('./timeline/timeline.types').AudioTrackId; /** volume envelope: [source time ms, dB] */ gain?: [number, number][]; /** clips sharing a group id select and move together */ group?: string};
 export type Finishing = {music?: {asset_id: string; volume: number; duck: number; fade_in_ms: number; fade_out_ms: number} | null; audio_clips?: ProjectAudioClip[]; loudnorm?: boolean; leader?: boolean; timeline?: import('./timeline/timeline.types').TimelineSettings};
 export type FilmLook = {scratches: number; dust: number; flicker: number; weave: number; sound: number; fps: 0 | 16 | 18 | 24; tone: 'color' | 'faded' | 'sepia' | 'bw'};
@@ -169,6 +171,8 @@ export type Job = {
   error: string | null;
   artifact_asset_id: string | null;
   result_asset_ids?: string[];
+  /** non-fatal notes, e.g. the GPU encoder failed and the export was encoded on the CPU */
+  warnings?: string[];
 };
 
 export type ProviderProfile = {
@@ -194,7 +198,7 @@ const BASE = "";
 
 let activeWrites=0;
 export const hasActiveWrites=()=>activeWrites>0;
-async function req<T>(path: string, init?: RequestInit): Promise<T> {
+export async function req<T>(path: string, init?: RequestInit): Promise<T> {
   const write=!!init?.method&&init.method!=="GET";
   if(write)activeWrites++;
   try {
@@ -370,6 +374,19 @@ export const api = {
 /** Look preset packs (backend api/look_presets.py). */
 export type LookPreset = {id?: string; name: string; description?: string; effect_preset: string; effect_intensity: number; look: Record<string, any>; builtin?: boolean};
 export type LookPack = {format: 'sceneforge-look-pack'; version: 1; presets: LookPreset[]};
+/** Auto-reframe (backend render/reframe.py): per-shot crop window that follows the subject. */
+export type Reframe = {mode: 'center' | 'follow' | 'manual'; x?: number; track?: [number, number][]; method?: 'matte' | 'face' | 'center'; confidence?: number; analyzed_ms?: number};
+export type ReframeJob = {job_id: string; project_id: string; source_project_id: string; status: 'running' | 'succeeded' | 'failed' | 'cancelled'; stage: string; progress: number; done: number; total: number; warnings: string[]; error: string | null};
+export type EncoderInfo = {encoders: Record<string, {vendor: string; codec: string; listed: boolean; works: boolean; error: string | null; used_for_export: boolean}>; gpu: {available: boolean; vendor: string | null; name: string | null; h264: string | null; hevc: string | null}; notes: string[]; choices: string[]; default: string};
+export const reframeApi = {
+  duplicateProject: (projectId: string, title?: string) => req<Project>(`/api/projects/${projectId}/duplicate`, {method: 'POST', body: JSON.stringify({title})}),
+  start: (projectId: string, aspect = '9:16') => req<{job_id: string; project_id: string; total: number}>(`/api/projects/${projectId}/reframe`, {method: 'POST', body: JSON.stringify({aspect})}),
+  job: (jobId: string) => req<ReframeJob>(`/api/reframe/jobs/${jobId}`),
+  cancel: (jobId: string) => req(`/api/reframe/jobs/${jobId}/cancel`, {method: 'POST'}),
+  setShot: (shotId: string, body: {mode: Reframe['mode'] | 'off'; x?: number; reanalyze?: boolean}) => req<Shot>(`/api/shots/${shotId}/reframe`, {method: 'PUT', body: JSON.stringify(body)}),
+  encoders: (refresh = false) => req<EncoderInfo>(`/api/system/encoders${refresh ? '?refresh=true' : ''}`),
+};
+
 export const lookPresetApi = {
   list: () => req<{presets: LookPreset[]; builtin: LookPreset[]; look_keys: string[]}>('/api/look-presets'),
   validate: (pack: unknown) => req<{ok: boolean; presets: LookPreset[]}>('/api/look-presets/validate', {method: 'POST', body: JSON.stringify(pack)}),

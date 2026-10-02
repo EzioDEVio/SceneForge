@@ -24,6 +24,8 @@ Overlay fields (all validated by clean_overlays):
   loop_period_ms     300..10000, one full cycle
   kind               media | sticker | subject (subject = AI cutout layer, see render/cutout.py)
   above_text         true = composited after captions and titles (render_part's post-text pass)
+  keyframes          optional [{t_ms, x, y, width, rotation, opacity, ease}] (render/keyframes.py);
+                     when present they override x/y/width/rotation/opacity and the x2/y2 glide
     float    = sine drift on y plus a smaller, slower sine on x
     bob      = sine on y only
     pendulum = rotation oscillation (FFmpeg rotate with a t expression). The
@@ -38,6 +40,8 @@ import hashlib
 import math
 import re
 from pathlib import Path
+
+from app.render.keyframes import KeyframeError, clean_overlay_keyframes, overlay_filters, overlay_position, split_overlay
 
 ANIMS = ("none", "fade", "slide_left", "slide_up", "zoom")
 LOOPS = ("none", "float", "pendulum", "bob")
@@ -70,7 +74,7 @@ def clean_overlays(raw, project_id: str, db) -> list[dict]:
         raise OverlayError(f"A scene can have at most {MAX_OVERLAYS} overlays.")
     out = []
     for i, item in enumerate(raw):
-        if not isinstance(item, dict) or set(item) - set(DEFAULT_OVERLAY) - {"id"}:
+        if not isinstance(item, dict) or set(item) - set(DEFAULT_OVERLAY) - {"id", "keyframes"}:
             raise OverlayError(f"Overlay {i + 1} has unknown settings.")
         o = {**DEFAULT_OVERLAY, **item}
         asset = db.get(Asset, o["asset_id"]) if o["asset_id"] else None
@@ -107,6 +111,10 @@ def clean_overlays(raw, project_id: str, db) -> list[dict]:
             o[key] = int(round(o[key]))
         for key in ("x", "y", "width"):
             o[key] = round(float(o[key]), 2)
+        try:
+            clean_overlay_keyframes(o, f"Overlay {i + 1}")
+        except KeyframeError as e:
+            raise OverlayError(str(e)) from None
         out.append(o)
     return out
 
@@ -162,6 +170,7 @@ def build_overlay_pass(overlays: list[dict], assets: dict, frame_w: int, frame_h
     graph: list[str] = []
     idx = first_input
     for n, o in enumerate(overlays):
+        o = split_overlay(o)  # keyframes (render/keyframes.py); unchanged when there are none
         asset = assets[o["asset_id"]]
         aw, ah = (asset.width or 16), (asset.height or 9)
         cw = _even(frame_w * o["width"] / 100)
@@ -227,6 +236,7 @@ def build_overlay_pass(overlays: list[dict], assets: dict, frame_w: int, frame_h
         if zoom:
             z = "*".join(zoom)
             post.append(f"scale=w='max(2,trunc(iw*{z}/2)*2)':h='max(2,trunc(ih*{z}/2)*2)':eval=frame")
+        post += overlay_filters(o, st)
         graph.append(";".join(chain) + ("," + ",".join(post) if post else "") + f"[o{n}]")
         cx, cy = frame_w * o["x"] / 100, frame_h * o["y"] / 100
         dx = dy = "0"
@@ -258,7 +268,8 @@ def build_overlay_pass(overlays: list[dict], assets: dict, frame_w: int, frame_h
         if o["anim_out"] == "slide_up":
             dy = f"({dy})-{dist_y:.1f}*{p_out}"
         out = final if n == len(overlays) - 1 else f"ov{n}out"
-        graph.append(f"[{base}][o{n}]overlay=x='{cx:.1f}-w/2+{dx}':y='{cy:.1f}-h/2+{dy}':"
+        px, py = overlay_position(o, cx, cy, frame_w, frame_h, st)
+        graph.append(f"[{base}][o{n}]overlay=x='{px}-w/2+{dx}':y='{py}-h/2+{dy}':"
                      f"enable='between(t,{st:.3f},{en:.3f})':eval=frame:format=auto[{out}]")
         base = out
     return inputs, ";".join(graph)

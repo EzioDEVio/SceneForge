@@ -3,6 +3,9 @@ import {Plus, Trash2, Copy, ArrowUp, ArrowDown, Upload, PictureInPicture2, Searc
 import {api, Asset, Overlay, Scene} from './api';
 import {FeatureHelp} from './FeatureHelp';
 import {StickerLibraryGrid, STICKER_LIBRARY, type LibrarySticker} from './StickerLibrary';
+import {KeyframeEditor, useScenePlayhead, withKeyframes} from './KeyframeEditor';
+import {OVERLAY_KEYS, keyframedPatch, overlayAt} from './keyframes';
+import {sceneDuration} from './duration';
 
 export const OVERLAY_DEFAULTS: Omit<Overlay, 'id' | 'asset_id'> = {
   kind: 'media', x: 72, y: 30, width: 34, rotation: 0, opacity: 100, radius: 6, border: 6, border_color: '#FFFFFF', shadow: 60, feather: 0, chroma: null, chroma_similarity: 30, x2: null, y2: null,
@@ -44,16 +47,20 @@ function useProjectMedia(projectId: string) {
 
 /** Overlays drawn over the editor preview. Drag to move; drag the corner
  *  handle to resize (keeps the centre). Changes are live, saved on release. */
-export function OverlayCanvas({overlays, frameAspect, selected, onSelect, onChange, onCommit}: {
-  overlays: Overlay[]; frameAspect: number; selected: number; onSelect: (i: number) => void;
+export function OverlayCanvas({sceneId, overlays, frameAspect, selected, onSelect, onChange: change, onCommit}: {
+  sceneId?: string; overlays: Overlay[]; frameAspect: number; selected: number; onSelect: (i: number) => void;
   onChange: (i: number, patch: Partial<Overlay>, commit?: boolean) => void; onCommit: () => void;
 }) {
   const [media] = useProjectMediaFromOverlays(overlays);
+  // Keyframed overlays show (and edit) their state at the timeline playhead.
+  const playhead = useScenePlayhead(sceneId || '');
+  const shown = overlays.map(o => overlayAt(o, playhead));
+  const onChange = (i: number, patch: Partial<Overlay>, commit?: boolean) => change(i, keyframedPatch(overlays[i], patch, OVERLAY_KEYS, shown[i] as any, playhead), commit);
   const box = useRef<HTMLDivElement>(null);
   function drag(i: number, mode: 'move' | 'resize', e: React.PointerEvent) {
     e.preventDefault(); e.stopPropagation(); onSelect(i);
     const rect = box.current!.getBoundingClientRect();
-    const o = overlays[i], sx = e.clientX, sy = e.clientY;
+    const o = shown[i], sx = e.clientX, sy = e.clientY;
     const move = (ev: PointerEvent) => {
       if (mode === 'move') onChange(i, {x: +clamp(o.x + (ev.clientX - sx) / rect.width * 100, -20, 120).toFixed(2), y: +clamp(o.y + (ev.clientY - sy) / rect.height * 100, -20, 120).toFixed(2)});
       else {
@@ -65,7 +72,7 @@ export function OverlayCanvas({overlays, frameAspect, selected, onSelect, onChan
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
   }
   return <div ref={box} className="overlay-canvas">
-    {overlays.map((o, i) => {
+    {shown.map((o, i) => {
       const a = media[o.asset_id];
       const aspect = a ? (a.height || 9) / (a.width || 16) : 9 / 16;     // height / width of the media
       const heightCqw = o.width * aspect;
@@ -112,7 +119,9 @@ export function OverlayPanel({scene, overlays, selected, onSelect, onChange, dis
   useEffect(()=>{try{const ids=JSON.parse(localStorage.getItem(`sceneforge.customStickers.${scene.project_id}`)||'[]');setCustomStickerIds(Array.isArray(ids)?ids.filter((id:string)=>typeof id==='string'):[]);}catch{setCustomStickerIds([]);}},[scene.project_id]);
   useEffect(()=>{try{localStorage.setItem(`sceneforge.customStickers.${scene.project_id}`,JSON.stringify(customStickerIds));}catch{/* storage unavailable */}},[scene.project_id,customStickerIds]);
   const o = overlays[selected];
-  const set = (patch: Partial<Overlay>) => onChange(overlays.map((x, i) => i === selected ? {...x, ...patch} : x));
+  const playhead = useScenePlayhead(scene.id);
+  const shown = o && overlayAt(o, playhead);   // values at the playhead when keyframed
+  const set = (patch: Partial<Overlay>) => onChange(overlays.map((x, i) => i === selected ? {...x, ...keyframedPatch(x, patch, OVERLAY_KEYS, overlayAt(x, playhead) as any, playhead)} : x));
   function add(asset_id: string, preset:Partial<Overlay> = {}) {
     if (overlays.length >= 8) {setError('A scene can have at most 8 overlays.'); return;}
     const offset = overlays.length * 4;
@@ -187,8 +196,8 @@ export function OverlayPanel({scene, overlays, selected, onSelect, onChange, dis
   }
   const num = (key: keyof Overlay, label: string, min: number, max: number, step = 1, unit = '') =>
     <div className="adjust-row changed"><label htmlFor={`ov-${key}`}>{label}</label>
-      <input id={`ov-${key}`} aria-label={`Overlay ${label}`} type="range" min={min} max={max} step={step} value={o[key] as number} disabled={disabled} onChange={e => set({[key]: Number(e.target.value)} as any)}/>
-      <input aria-label={`Overlay ${label} value`} type="number" min={min} max={max} step={step} value={o[key] as number} disabled={disabled} onChange={e => set({[key]: clamp(Number(e.target.value) || 0, min, max)} as any)}/><span className="unit">{unit}</span></div>;
+      <input id={`ov-${key}`} aria-label={`Overlay ${label}`} type="range" min={min} max={max} step={step} value={shown[key] as number} disabled={disabled} onChange={e => set({[key]: Number(e.target.value)} as any)}/>
+      <input aria-label={`Overlay ${label} value`} type="number" min={min} max={max} step={step} value={shown[key] as number} disabled={disabled} onChange={e => set({[key]: clamp(Number(e.target.value) || 0, min, max)} as any)}/><span className="unit">{unit}</span></div>;
   const seconds = (ms: number | null) => ms === null ? '' : (ms / 1000).toFixed(1);
 
   return <div className="overlay-panel">
@@ -272,6 +281,8 @@ export function OverlayPanel({scene, overlays, selected, onSelect, onChange, dis
           <p className="hint">{o.loop === 'pendulum' ? 'Swings up to 25° each way, hinged at the top centre of the card.' : o.loop === 'float' ? 'Drifts up and down with a gentle sideways sway.' : 'Bobs up and down.'} Plays for the whole time the overlay is shown.</p>
         </>}
       </fieldset>
+      <KeyframeEditor sceneId={scene.id} label={`Overlay ${selected + 1}`} startMs={o.start_ms || 0} endMs={o.end_ms ?? sceneDuration(scene)} keyframes={o.keyframes} keys={OVERLAY_KEYS} disabled={disabled}
+        current={ms => overlayAt(o, ms) as any} onChange={k => onChange(overlays.map((x, i) => i === selected ? withKeyframes(x, k) : x))}/>
     </div>}
     {o && <p className="hint">Videos play silently and loop. Render the scene for the final result.</p>}
   </div>;

@@ -2,7 +2,7 @@
 import {build} from 'esbuild';
 import {createRequire} from 'node:module';
 import assert from 'node:assert/strict';
-await build({stdin:{contents:"export * from './src/timeline/timeline.types';export * from './src/timeline/timeMath';export * from './src/timeline/editOps';",resolveDir:'.',loader:'ts'},outfile:'node_modules/.cache/timeline-units.cjs',bundle:true,platform:'node',format:'cjs',logLevel:'silent'});
+await build({stdin:{contents:"export * from './src/timeline/timeline.types';export * from './src/timeline/timeMath';export * from './src/timeline/editOps';export * from './src/timeline/jumpCuts';",resolveDir:'.',loader:'ts'},outfile:'node_modules/.cache/timeline-units.cjs',bundle:true,platform:'node',format:'cjs',logLevel:'silent'});
 const require=createRequire(import.meta.url);
 const T=require('../node_modules/.cache/timeline-units.cjs');
 let passed=0;const check=(name,cond)=>{assert.ok(cond,name);console.log('PASS '+name);passed++;};
@@ -84,4 +84,20 @@ check('touching clips share a row; overlapping clips stack',rows.a===0&&rows.b==
 const clipM={id:'cm',time_ms:100,duration_ms:0,label:'x',color:'green',clip_id:'a',offset_ms:250};
 check('an attached marker follows its clip; a detached one keeps its time',T.markerTime(clipM,[{id:'a',start_ms:4000}])===4250&&T.markerTime(clipM,[])===100&&T.markerTime({...clipM,clip_id:undefined},[{id:'a',start_ms:4000}])===100);
 check('clip attachment survives normalization',T.normalizeTimeline({version:1,markers:[clipM]},[]).markers[0].clip_id==='a'&&T.normalizeTimeline({version:1,markers:[clipM]},[]).markers[0].offset_ms===250);
+// --- jump cuts (Clean up: remove silences / filler words) ------------------------------
+check('jump-cut ranges merge, clamp and sort',JSON.stringify(T.mergeRanges([[500,700],[100,200],[650,900],[-50,20]],0,800))==='[[0,20],[100,200],[500,800]]');
+const jc=clip('j',1000,1000,5000,{fade_in_ms:300,fade_out_ms:200,gain:[[1000,0],[4000,-6]],track:'A4'});
+const jcTrack=[jc,clip('after',6000,0,1000,{track:'A4'}),clip('other',4500,0,1000,{track:'A5'})];
+r=T.jumpCuts(jcTrack,['j'],()=>[[1500,2000],[3000,3400]],{makeId:ids});
+const parts=r.clips.filter(c=>c.id==='j'||c.name.startsWith('j ·'));
+check('jump cuts keep the non-silent source ranges as touching pieces',r.ok&&parts.length===3&&JSON.stringify(parts.map(p=>[p.start_ms,p.source_in_ms,p.source_out_ms]))==='[[1000,1000,1500],[1500,2000,3000],[2500,3400,5000]]');
+check('jump cuts keep the first id, fades only at the original ends, and the gain envelope on every piece',parts[0].id==='j'&&parts[0].fade_in_ms===300&&parts[0].fade_out_ms===0&&parts[1].fade_in_ms===0&&parts[2].fade_out_ms===200&&parts.every(p=>p.gain.length===2&&p.track==='A4'));
+check('jump cuts ripple later clips on the same track only, and report the removed time',byId(r,'after').start_ms===5100&&byId(r,'other').start_ms===4500&&r.removed_ms===900&&r.cuts===2&&r.selected.length===3);
+r=T.jumpCuts(jcTrack,['j'],()=>[[1500,2000]],{ripple:'clip'});
+check('ripple "clip" closes up the pieces but leaves other clips in place',r.ok&&byId(r,'after').start_ms===6000&&T.clipEnd(r.clips.filter(c=>c.name.startsWith('j')).at(-1))===4500);
+r=T.jumpCuts(jcTrack,['j'],()=>[[0,1210],[4990,9000]],{frame:40});
+check('ranges at the clip edges trim it; cut points snap to frames',r.ok&&byId(r,'j').source_in_ms===1200&&byId(r,'j').source_out_ms===5000&&byId(r,'j').start_ms===1000&&byId(r,'j').fade_in_ms===0);
+check('jump cuts refuse to delete a whole clip or to do nothing',!T.jumpCuts(jcTrack,['j'],()=>[[0,9999]]).ok&&!T.jumpCuts(jcTrack,['j'],()=>[[100,200]]).ok&&!T.jumpCuts(jcTrack,['missing'],()=>[]).ok);
+r=T.jumpCuts([clip('p',0,0,2000),clip('q',2000,0,2000)],['p','q'],()=>[[500,1000]]);
+check('cleaning two clips on one track keeps them touching',r.ok&&byId(r,'q').start_ms===1500&&r.clips.filter(c=>c.name.startsWith('q')).at(-1).start_ms===2000&&T.clipEnd(r.clips.filter(c=>c.name.startsWith('q')).at(-1))===3000);
 console.log(`${passed} timeline checks passed`);

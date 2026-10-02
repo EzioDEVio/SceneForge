@@ -10,7 +10,7 @@
 name: Release
 on:
   push:
-    branches: ['chatgpt/0.6.0-wip.10', 'chatgpt/0.7.0-video-generation', 'claude/0.7.0-*']
+    branches: ['chatgpt/0.6.0-wip.10', 'chatgpt/0.7.0-video-generation', 'claude/0.7.0-*', 'claude/0.*']
     tags: ['v*']
     paths-ignore:
       - '.github/workflows/checks.yml'

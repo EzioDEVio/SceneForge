@@ -8,7 +8,7 @@
 
 ![The SceneForge editor: scene bin, rendered scene preview with an iris-reveal title and a two-tone caption, scene settings, and the timeline with text, picture, narration and colour/beat markers](docs/images/editor-overview.png)
 
-> **Release status.** **0.7.1** is the latest release, a maintenance update (security and usability) to **0.7.0**. 0.7.0 was a large update over 0.5.3: a multitrack audio timeline with pro edit tools, 71 caption styles, 400 stickers and emoji, per-effect settings, AI subject cutout and voice isolation, and optional text-to-video. Items marked *(0.7.0)* are new in this version. The full record is in [`desktop/RELEASE_NOTES.md`](desktop/RELEASE_NOTES.md) and [`PROJECT_HISTORY_AND_HANDOFF.md`](PROJECT_HISTORY_AND_HANDOFF.md).
+> **Release status.** **0.8.0** is the latest release: the creator pack (silence and filler removal, auto-reframe to 9:16, GPU export, live playback, keyframes), on top of **0.7.1** (security and usability) and **0.7.0**. 0.7.0 was a large update over 0.5.3: a multitrack audio timeline with pro edit tools, 71 caption styles, 400 stickers and emoji, per-effect settings, AI subject cutout and voice isolation, and optional text-to-video. Items marked *(0.7.0)* are new in this version. The full record is in [`desktop/RELEASE_NOTES.md`](desktop/RELEASE_NOTES.md) and [`PROJECT_HISTORY_AND_HANDOFF.md`](PROJECT_HISTORY_AND_HANDOFF.md).
 
 The screenshots on this page come from the 0.7.0 build. They show a demo project made only from procedurally generated pictures, video and audio. [`scripts/capture_readme_screenshots.py`](scripts/capture_readme_screenshots.py) rebuilds the project and the screenshots.
 
@@ -21,6 +21,12 @@ The screenshots on this page come from the 0.7.0 build. They show a demo project
 - **400 stickers and emoji** *(0.7.0)*, **textured titles**, and **subject cutout** for photos and moving video, which puts text behind a person.
 - **Audio finishing:** AI voice isolation, dialogue cleanup, beat-aware music fitting, beat sync, automatic ducking under narration and loudness levelling to −14 LUFS.
 - **Optional AI generation.** Text-to-video runs locally through ComfyUI or in the cloud through Google Veo and Runway. Every cloud request shows a cost estimate and needs your confirmation. Image Studio supports several providers.
+- **Creator pack** *(0.8.0)*:
+  - remove silences (jump cuts) and filler words;
+  - auto-reframe to vertical 9:16;
+  - GPU (NVIDIA NVENC) export;
+  - live timeline playback;
+  - keyframe animation for stickers, overlays and titles.
 - **Exports** to YouTube, Shorts/Reels/TikTok, Instagram, ProRes, GIF, MP3/WAV and SRT/VTT. Rendering uses FFmpeg on your own computer.
 
 ## Feature tour
@@ -159,7 +165,7 @@ The screenshots on this page come from the 0.7.0 build. They show a demo project
 
 ## Install
 
-Installers are on the **[Releases page](https://github.com/EzioDEVio/SceneForge/releases/latest)**. The current version is **0.7.1**.
+Installers are on the **[Releases page](https://github.com/EzioDEVio/SceneForge/releases/latest)**. The current version is **0.8.0**.
 
 | System | File | First launch |
 |---|---|---|
@@ -326,6 +332,8 @@ The table summarizes the documented history. Versions marked WIP or RC were deve
 | **0.7.0 RC7** | Local Whisper fixed (FFmpeg decodes the audio, without PyAV), black first render fixed, AI subject cutout and textured titles. Unreleased. |
 | **0.7.0 RC8** | Better cutout (edge refinement, People model, preview, bundled small model), AI voice isolation, beat markers, volume envelopes, effect stack and look preset packs. Unreleased. |
 | **0.7.1** | Security updates (urllib3 2.8.0, Vite 7), inspector tab bar fix, workspaces, collapsible/compact tracks, keyboard shortcut sheet and tour, AI model manager, diagnostics export. |
+| **0.8.0** | Creator pack:<br>• Remove silences and filler words<br>• Auto-reframe to 9:16<br>• NVENC GPU export<br>• Live timeline playback<br>• Keyframes |
+| **0.7.1** | Security updates (urllib3, Vite 7) and usability:<br>• Inspector tabs<br>• Workspaces<br>• Collapsible tracks<br>• Shortcut sheet and tour<br>• AI model manager<br>• Diagnostics export |
 | **0.7.0 RC9** | 400 stickers and emoji, 71 caption styles, settings for 36 effects, clock and iris reveals, moving-video subject cutout, clip groups and clip-attached markers. **Current candidate**, unreleased. |
 
 ### Releasing (maintainers)

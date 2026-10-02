@@ -28,7 +28,8 @@ FORMATS = {
     "wav": ("wav", "audio/wav", "audio"),
 }
 QUALITY = ("draft", "standard", "high", "max")
-DEFAULT = {"resolution": "project", "fps": "project", "format": "mp4_h264", "quality": "standard"}
+ENCODERS = ("auto", "cpu", "gpu")   # auto = NVIDIA NVENC when its test encode works (render/gpu.py)
+DEFAULT = {"resolution": "project", "fps": "project", "format": "mp4_h264", "quality": "standard", "encoder": "auto"}
 
 
 class DeliveryError(ValueError):
@@ -38,7 +39,7 @@ class DeliveryError(ValueError):
 def clean(raw: dict | None) -> dict:
     s = {**DEFAULT, **(raw or {})}
     if set(s) - set(DEFAULT):
-        raise DeliveryError("Export settings are resolution, fps, format and quality.")
+        raise DeliveryError("Export settings are resolution, fps, format, quality and encoder.")
     if s["resolution"] not in RESOLUTIONS:
         raise DeliveryError("Resolution must be project, 720p, 1080p, 1440p or 4k.")
     if s["fps"] not in FPS:
@@ -47,6 +48,8 @@ def clean(raw: dict | None) -> dict:
         raise DeliveryError("Format must be one of: " + ", ".join(FORMATS) + ".")
     if s["quality"] not in QUALITY:
         raise DeliveryError("Quality must be draft, standard, high or max.")
+    if s["encoder"] not in ENCODERS:
+        raise DeliveryError("Encoder must be auto, cpu or gpu.")
     return s
 
 
@@ -66,7 +69,8 @@ def extension(settings: dict) -> tuple[str, str]:
     return ext, mime
 
 
-def deliver(master: str, settings: dict, width: int, height: int, fps: int, out_dir: str, ffmpeg_bin: str, cancel_check=None) -> str:
+def deliver(master: str, settings: dict, width: int, height: int, fps: int, out_dir: str, ffmpeg_bin: str, cancel_check=None,
+            warnings: list | None = None) -> str:
     s = clean(settings)
     ext, _, kind = FORMATS[s["format"]]
     out = str(Path(out_dir) / f"delivery_{uuid.uuid4().hex[:10]}.{ext}")
@@ -107,6 +111,11 @@ def deliver(master: str, settings: dict, width: int, height: int, fps: int, out_
                      "-movflags", "+faststart", "-c:a", "pcm_s16le"]
         args += ["-ar", "48000", "-ac", "2"] if s["format"] != "mov_prores" else ["-ar", "48000"]
     args.append(out)
+    from app.render import gpu as _gpu   # GPU (NVENC) for MP4 when chosen/available, CPU fallback
+    return _gpu.deliver_with_fallback(args, s, q, out, _encode, cancel_check, warnings)
+
+
+def _encode(args: list[str], out: str, cancel_check=None) -> str:
     flags = subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0  # type: ignore[attr-defined]
     proc = subprocess.Popen(args, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, creationflags=flags)
     while True:

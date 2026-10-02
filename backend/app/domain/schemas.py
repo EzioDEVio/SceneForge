@@ -228,6 +228,7 @@ class JobOut(BaseModel):
     error: str | None
     artifact_asset_id: str | None
     result_asset_ids: list[str] = Field(default_factory=list)
+    warnings: list[str] = Field(default_factory=list)   # non-fatal notes, e.g. GPU export fell back to CPU
 
     class Config:
         from_attributes = True

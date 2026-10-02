@@ -1,9 +1,9 @@
 import React, {useEffect, useMemo, useState} from 'react';
 import {X, Upload, MonitorPlay, Smartphone, Square, Film, Music, Image as ImageIcon, Gauge, FileText, Info} from 'lucide-react';
-import {api, type Project} from './api';
+import {api, reframeApi, type EncoderInfo, type Project} from './api';
 import {sceneDuration} from './duration';
 
-type S = {resolution: string; fps: string | number; format: string; quality: string};
+type S = {resolution: string; fps: string | number; format: string; quality: string; encoder?: string};
 const PRESETS: {key: string; name: string; note: string; Icon: typeof Film; vertical?: boolean; s: S}[] = [
   {key: 'yt', name: 'YouTube', note: '1080p · 30 fps · H.264', Icon: MonitorPlay, s: {resolution: '1080p', fps: 'project', format: 'mp4_h264', quality: 'high'}},
   {key: 'yt4k', name: 'YouTube 4K', note: '2160p · H.264 High', Icon: MonitorPlay, s: {resolution: '4k', fps: 'project', format: 'mp4_h264', quality: 'high'}},
@@ -18,11 +18,15 @@ const PRESETS: {key: string; name: string; note: string; Icon: typeof Film; vert
 const RATE: Record<string, number[]> = {mp4_h264: [3, 6, 9, 14], mp4_h265: [1.8, 3.5, 5.5, 9], webm: [2, 4, 6, 9], mov_prores: [45, 100, 145, 220], gif: [6, 8, 10, 14]};
 const SHORT: Record<string, number> = {'720p': 720, '1080p': 1080, '1440p': 1440, '4k': 2160};
 
-export function ExportDialog({project, onClose, onExport}: {project: Project; onClose: () => void; onExport: (s: S) => void}) {
+export function ExportDialog({project, onClose, onExport, onReframe}: {project: Project; onClose: () => void; onExport: (s: S) => void; onReframe?: () => void}) {
   const vertical = project.height > project.width * 1.2;
   const [preset, setPreset] = useState(vertical ? 'short' : 'yt');
   const [s, setS] = useState<S>((PRESETS.find(p => p.key === (vertical ? 'short' : 'yt')) || PRESETS[0]).s);
   const [adv, setAdv] = useState(true);
+  // Encoder: auto = NVIDIA NVENC when the backend's startup test encode worked (backend render/gpu.py).
+  const [encoder, setEncoder] = useState('auto');
+  const [enc, setEnc] = useState<EncoderInfo | null>(null);
+  useEffect(() => {reframeApi.encoders().then(i => {if (i && i.gpu) setEnc(i);}).catch(() => {});}, []);
   useEffect(() => {const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose(); window.addEventListener('keydown', esc); return () => window.removeEventListener('keydown', esc);}, [onClose]);
   const seconds = useMemo(() => project.scenes.filter(x => x.shots.length).reduce((a, x) => a + sceneDuration(x), 0) / 1000, [project]);
   const short = SHORT[s.resolution] || Math.min(project.width, project.height);
@@ -42,6 +46,7 @@ export function ExportDialog({project, onClose, onExport}: {project: Project; on
           {PRESETS.map(p => <button key={p.key} role="radio" aria-checked={preset === p.key} className={`export-preset ${preset === p.key ? 'selected' : ''}`} onClick={() => pick(p.key)}>
             <p.Icon size={18}/><strong>{p.name}</strong><small>{p.note}</small>{p.vertical && !vertical && <em>Needs a 9:16 project</em>}</button>)}
         </div>
+        {!vertical && onReframe && <p className="hint">Need a vertical video for TikTok, Reels or Shorts? <button className="text-btn" onClick={onReframe}>Create vertical 9:16 version (auto-reframe)</button></p>}
         <button className="text-btn" aria-expanded={adv} onClick={() => setAdv(a => !a)}>{adv ? '▾' : '▸'} Advanced settings</button>
         {adv && <div className="export-advanced">
           <label className="control-label">Resolution<select aria-label="Export resolution" value={s.resolution} disabled={audio} onChange={e => set({resolution: e.target.value})}>
@@ -53,6 +58,9 @@ export function ExportDialog({project, onClose, onExport}: {project: Project; on
             <option value="mov_prores">MOV · ProRes (for editing)</option><option value="gif">Animated GIF (no sound)</option><option value="mp3">MP3 (audio only)</option><option value="wav">WAV (audio only)</option></select></label>
           <label className="control-label">Quality<select aria-label="Export quality" value={s.quality} onChange={e => set({quality: e.target.value})}>
             <option value="draft">Draft · fast, small</option><option value="standard">Standard</option><option value="high">High</option><option value="max">Maximum · slow, large</option></select></label>
+          <label className="control-label">Encoder<select aria-label="Export encoder" value={encoder} disabled={audio} onChange={e => setEncoder(e.target.value)}>
+            <option value="auto">Auto (GPU when available)</option><option value="cpu">CPU</option><option value="gpu">GPU (NVIDIA NVENC)</option></select></label>
+          <p className="hint export-encoder-note">{enc?.gpu.available ? `GPU found: ${enc.gpu.name || 'NVIDIA GPU'} (${[enc.gpu.h264 && 'H.264', enc.gpu.hevc && 'H.265'].filter(Boolean).join(', ')}). ` : enc ? 'No usable NVIDIA GPU encoder was found; exports use the CPU. ' : ''}GPU encoding is used for MP4 only; if it fails, SceneForge finishes the export on the CPU and tells you.</p>
         </div>}
         <div className="export-summary">
           <span><Info size={13}/> {audio ? `Audio only · ${Math.round(seconds)} s` : `${s.format === 'gif' ? 'GIF' : `${w}×${h}`} · ${s.fps === 'project' ? project.fps : s.fps} fps · ${Math.round(seconds)} s`}</span>
@@ -64,7 +72,7 @@ export function ExportDialog({project, onClose, onExport}: {project: Project; on
           <a className="text-btn" href={api.captionsUrl(project.id, 'srt')} download>SRT</a><a className="text-btn" href={api.captionsUrl(project.id, 'vtt')} download>VTT</a>
           <span className="muted">Captions you styled are also burned into the video.</span></div>
         <div className="button-row export-actions"><button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={() => onExport(s)}><Upload size={14}/> Export</button></div>
+          <button className="btn btn-primary" onClick={() => onExport({...s, encoder})}><Upload size={14}/> Export</button></div>
       </div>
     </div>
   </div>;

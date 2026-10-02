@@ -331,8 +331,9 @@ def _render_single_shot(
         pre_filters += (f"{speed_pre}," if speed_pre else "") + f"fps={fps}," + (f"{speed_post}," if speed_post else "")
 
     if shot.crop_json:
-        c = shot.crop_json
-        pre_filters += f"crop=w='max(2,trunc(iw*{c['width']}/2)*2)':h='max(2,trunc(ih*{c['height']}/2)*2)':x='iw*{c['x']}':y='ih*{c['y']}',"
+        # Manual crop (unchanged string) + optional auto-reframe window (render/reframe.py).
+        from app.render.reframe import shot_crop_prefilter
+        pre_filters += shot_crop_prefilter(shot.crop_json, out_w, out_h, fps)
 
     graph, warning = filters.build_shot_video_chain(
         fit=shot.fit,
