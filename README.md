@@ -341,6 +341,7 @@ The table summarizes the documented history. Versions marked WIP or RC were deve
 | **0.7.0 RC7** | Local Whisper fixed (FFmpeg decodes the audio, without PyAV), black first render fixed, AI subject cutout and textured titles. Unreleased. |
 | **0.7.0 RC8** | Better cutout (edge refinement, People model, preview, bundled small model), AI voice isolation, beat markers, volume envelopes, effect stack and look preset packs. Unreleased. |
 | **0.7.1** | Security updates (urllib3 2.8.0, Vite 7), inspector tab bar fix, workspaces, collapsible/compact tracks, keyboard shortcut sheet and tour, AI model manager, diagnostics export. |
+| **0.9.2** | Video inside text shrinks to fit the screen; optional subject in front of the title. |
 | **0.9.1** | Video inside text titles; subject cutout no longer gets stuck on Windows; smaller logs; diagnostics include render errors; new screenshots. |
 | **0.9.0** | Friendlier editing:<br>• Typewriter box with sound preview<br>• Effects grouped<br>• Waveforms on A2–A8<br>• Auto-ducking for A3–A8<br>• Restore points<br>• Sample project<br>• Caption translation<br>• Title templates |
 | **0.8.0** | Creator pack:<br>• Remove silences and filler words<br>• Auto-reframe to 9:16<br>• NVENC GPU export<br>• Live timeline playback<br>• Keyframes |

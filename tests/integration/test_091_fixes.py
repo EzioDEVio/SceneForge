@@ -30,6 +30,9 @@ for kw in ({'text': ''}, {'text': 'x', 'size': 5}, {'text': 'x', 'outline': 99},
     try: render_knockout_card(kw.pop('text'), 320, 180, **kw)
     except TexturedTextError: bad += 1
 check('bad card settings give clear errors', bad == 4)
+wide = np.asarray(render_knockout_card('THIS IS TEST OF THIS RELEASE', 1920, 1080, 'Anton', 600, 50, 35, '#E10600', 100, 2, '#FFFFFF'))
+cols = np.where((wide[..., 3] < 255).any(0))[0]
+check('0.9.2: a long title at a big size shrinks to fit inside the frame', cols.min() > 40 and cols.max() < 1880)
 check('Arabic text is accepted', np.asarray(render_knockout_card('بغداد', 320, 180)).shape == (180, 320, 4))
 
 # ---- endpoint + render ----------------------------------------------------------------------

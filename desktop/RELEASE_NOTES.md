@@ -1,3 +1,14 @@
+# SceneForge Studio 0.9.2
+
+A quick fix for Video inside text. Everything in 0.9.1 is included.
+
+**Fixes**
+- **Video inside text titles always fit the screen.** A long title at a big letter size ran off both edges. The letters now shrink so the widest line fits, and the label says "shrunk to fit the screen" when that happens.
+- **The panel's preview shows the real proportions** (a 16:9 frame with the letters at their true size), so what you see is what renders.
+
+**New**
+- **Put the person or object in front of the title:** a new tick box in Video inside text runs the AI subject cutout right after adding the title, so the subject stands in front of the colour card. It works on one still image (Camera movement: Static) or one video clip up to 20 seconds.
+
 # SceneForge Studio 0.9.1
 
 Fixes from the 0.9.0 Windows test, and one new title style. Everything in 0.9.0 is included.

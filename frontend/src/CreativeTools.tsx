@@ -161,7 +161,9 @@ export function TexturedTitlePanel({scene, disabled, onDone}: {scene: Scene; dis
 }
 
 /** 0.9.1 "Video inside text": a colour card with the letters cut out, so the scene's own video or
- *  picture plays through the title (the classic documentary "1942" / place-name look). */
+ *  picture plays through the title (the classic documentary "1942" / place-name look).
+ *  0.9.2: the title shrinks to fit the frame, the preview shows the real proportions, and an
+ *  optional step puts the person or object in front of the card (AI subject cutout). */
 export function VideoInTextPanel({scene, disabled, onDone}: {scene: Scene; disabled: boolean; onDone: () => void | Promise<void>}) {
   const [text, setText] = React.useState('');
   const [font, setFont] = React.useState('Anton');
@@ -171,33 +173,83 @@ export function VideoInTextPanel({scene, disabled, onDone}: {scene: Scene; disab
   const [outline, setOutline] = React.useState(6);
   const [outlineColor, setOutlineColor] = React.useState('#FFFFFF');
   const [y, setY] = React.useState(55);
+  const [subjectFront, setSubjectFront] = React.useState(false);
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState('');
+  const [fitted, setFitted] = React.useState(false);
+  const box = React.useRef<HTMLDivElement>(null);
+  const label = React.useRef<HTMLSpanElement>(null);
   const hasMedia = scene.shots.length > 0;
+  const shot = scene.shots.find(s => s.is_selected) || scene.shots[0];
+  const isVideo = shot?.asset?.type === 'video';
+  // Preview at the real proportions: letter size is px at 1080p, shrunk to fit 92% of the width (as the render does).
+  React.useLayoutEffect(() => {
+    let live = true;
+    const fit = () => {
+      const b = box.current, l = label.current;
+      if (!live || !b || !l || !b.clientWidth) return;
+      const base = size / 1080 * b.clientHeight;
+      l.style.fontSize = `${base}px`;
+      const room = b.clientWidth * 0.92;
+      let px = base, w = l.getBoundingClientRect().width;
+      setFitted(w > room);
+      for (let i = 0; i < 4 && w > room; i++) {   // letter spacing does not scale, so settle in a few steps
+        px = px * room / w; l.style.fontSize = `${px}px`; w = l.getBoundingClientRect().width;
+      }
+    };
+    fit();
+    document.fonts?.ready.then(fit).catch(() => {});   // the web font may arrive after the first measure
+    return () => {live = false;};
+  }, [size, text, font, outline]);
+  async function putSubjectInFront() {
+    if (!isVideo) {
+      await api.subjectLayer(scene.id, {model: 'isnet', edge: 'soft', shift: 0});
+      return 'The subject now stands in front of the title. Render the scene to see it.';
+    }
+    const r = await api.subjectVideoLayer(scene.id, {model: 'u2netp', edge: 'soft', shift: 0});
+    if (r.status !== 'done' && r.job_id) {
+      for (;;) {
+        await new Promise(res => setTimeout(res, 800));
+        const j = await api.subjectVideoJob(r.job_id);
+        if (j.status === 'succeeded') break;
+        if (j.status === 'failed' || j.status === 'cancelled') throw new Error(j.error || 'The subject cutout did not finish.');
+        setMsg(`Cutting the subject out of the video: frame ${j.frames_done} of ${j.frames_total}…`);
+      }
+    }
+    return 'The moving subject now stands in front of the title. Render the scene to see it.';
+  }
   async function add() {
     setBusy(true); setMsg('Cutting the letters out of the colour card…');
     try {
       await api.knockoutTitle(scene.id, {text, font, font_size: size, background, opacity, outline, outline_color: outlineColor, y});
-      setMsg('Added as a full-screen layer in Overlays. Your video plays inside the letters; render the scene to see it move. Tip: give the picture a slow zoom in Motion.');
+      let done = 'Added as a full-screen layer in Overlays. Your video plays inside the letters; render the scene to see it move. Tip: give the picture a slow zoom in Motion.';
+      if (subjectFront) {
+        setMsg('Title added. Now cutting out the subject so it stands in front…');
+        try {done = await putSubjectInFront();}
+        catch (e: any) {done = `Title added, but the subject could not be put in front: ${e.message || e}. You can try again under Subject cutout.`;}
+      }
+      setMsg(done);
       await onDone();
     } catch (e: any) {setMsg(e.message || String(e));} finally {setBusy(false);}
   }
   return <section className="creative-card" aria-label="Video inside text">
     <header><Type size={15}/><strong>Video inside text</strong></header>
     <p className="hint">Covers the screen with a solid colour and cuts your title out of it, so this scene's video or picture shows through the letters, like a documentary place or year title.</p>
-    <div className="ko-preview" style={{background: background, opacity: Math.max(.35, opacity / 100)}} aria-hidden="true">
-      <span style={{fontFamily: font === 'Bebas Neue' ? "'Bebas Neue'" : font, WebkitTextStroke: outline ? `${Math.max(1, outline / 3)}px ${outlineColor}` : undefined, top: `${y}%`}}>{text.trim() || 'NORWAY'}</span>
+    <div ref={box} className="ko-preview" style={{background, opacity: Math.max(.35, opacity / 100)}} aria-hidden="true">
+      <span ref={label} style={{fontFamily: font === 'Bebas Neue' ? "'Bebas Neue'" : font, WebkitTextStroke: outline ? `${Math.max(1, outline / 4)}px ${outlineColor}` : undefined, top: `${y}%`}}>{text.trim() || 'NORWAY'}</span>
     </div>
     <label className="control-label">Title text<input aria-label="Video inside text title" maxLength={80} value={text} onChange={e => setText(e.target.value)} placeholder="e.g. 1942 or NORWAY"/></label>
     <div className="acc-grid">
       <label className="control-label">Font<select aria-label="Video inside text font" value={font} onChange={e => setFont(e.target.value)}>{FONTS.map(f => <option key={f}>{f}</option>)}</select></label>
       <label className="control-label">Card colour<input aria-label="Video inside text background colour" type="color" value={background} onChange={e => setBackground(e.target.value.toUpperCase())}/></label>
     </div>
-    <label className="control-label">Letter size · {size}px<input aria-label="Video inside text size" type="range" min={80} max={600} step={10} value={size} onChange={e => setSize(Number(e.target.value))}/></label>
+    <label className="control-label">Letter size · {size}px{fitted ? ' (shrunk to fit the screen)' : ''}<input aria-label="Video inside text size" type="range" min={80} max={600} step={10} value={size} onChange={e => setSize(Number(e.target.value))}/></label>
     <label className="control-label">Up–down · {y}%<input aria-label="Video inside text position" type="range" min={10} max={90} value={y} onChange={e => setY(Number(e.target.value))}/></label>
     <label className="control-label">Outline · {outline}px<input aria-label="Video inside text outline" type="range" min={0} max={30} value={outline} onChange={e => setOutline(Number(e.target.value))}/></label>
     {outline > 0 && <label className="control-label">Outline colour<input aria-label="Video inside text outline colour" type="color" value={outlineColor} onChange={e => setOutlineColor(e.target.value.toUpperCase())}/></label>}
     <label className="control-label">Card opacity · {opacity}%<input aria-label="Video inside text card opacity" type="range" min={10} max={100} step={5} value={opacity} onChange={e => setOpacity(Number(e.target.value))}/></label>
+    <label className="switch-label finishing-toggle"><input type="checkbox" aria-label="Put the subject in front of the title" checked={subjectFront} disabled={!hasMedia} onChange={e => setSubjectFront(e.target.checked)}/> Put the person or object in front of the title (AI cutout)</label>
+    {subjectFront && <p className="hint">{isVideo ? 'Works on one video clip up to 20 s at normal speed. It takes a little while (frame by frame, on this PC).' : 'Works on one still image with Camera movement set to Static in Motion.'}</p>}
     {!hasMedia && <p className="hint">Add a video or picture to this scene first: it is what shows inside the letters.</p>}
     <button className="btn btn-primary" disabled={disabled || busy || !text.trim() || !hasMedia} onClick={() => void add()}><Sparkles size={14}/> {busy ? 'Working…' : 'Add video-inside-text title'}</button>
     {msg && <p className="info-status" role="status">{msg}</p>}

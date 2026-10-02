@@ -87,7 +87,7 @@ logbuffer.install()
 # new interface connected to an old backend (e.g. a still-running old
 # start.bat window) shows "Backend update required" instead of silently
 # losing settings the old backend does not know.
-BUILD_ID = "v0.9.1"
+BUILD_ID = "v0.9.2"
 
 
 @app.get("/api/health")

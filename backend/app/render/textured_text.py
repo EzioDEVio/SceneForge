@@ -256,6 +256,19 @@ def render_knockout_card(text: str, width: int, height: int, font: str = "Anton"
         if not sp or arabic:
             return int(draw.textlength(line, font=fnt))
         return int(sum(draw.textlength(ch, font=fnt) for ch in line) + sp * (len(line) - 1))
+    # 0.9.2: shrink to fit. A long title at a big size ran off both edges of the frame;
+    # the widest line (plus its outline) now always fits inside 92% of the width.
+    room = width * 0.92 - 2 * ol
+    widest = max(line_width(line) for line in lines)
+    if widest > room > 0:
+        px = max(12, int(px * room / widest))
+        sp = int(round(sp * room / widest))
+        fnt = ImageFont.truetype(str(_font_path(font, arabic)), px, layout_engine=ImageFont.Layout.BASIC)
+
+    def line_width(line: str) -> int:  # noqa: F811  (re-measured with the fitted font)
+        if not sp or arabic:
+            return int(draw.textlength(line, font=fnt))
+        return int(sum(draw.textlength(ch, font=fnt) for ch in line) + sp * (len(line) - 1))
     asc, desc = fnt.getmetrics()
     line_h = asc + desc
     gap = int(px * 0.08)
