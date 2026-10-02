@@ -222,3 +222,68 @@ def render_textured_text(text: str, texture, font: str = "Anton", size: int = 16
     out = Image.alpha_composite(out, filled)
     bbox = out.getchannel("A").getbbox()
     return out.crop(bbox) if bbox else out
+
+
+def render_knockout_card(text: str, width: int, height: int, font: str = "Anton", size: int = 220, x: float = 50, y: float = 50,
+                         background: str = "#E10600", opacity: int = 100, outline: int = 6, outline_color: str = "#FFFFFF",
+                         spacing: int = 4):
+    """0.9.1 "video inside text": a full-frame card in a solid colour with the letters cut out, so the
+    scene's video or picture shows through the text (optionally with an outline around the letters).
+    Returns an RGBA image of width x height."""
+    import numpy as np
+    from PIL import Image, ImageDraw, ImageFont
+    text = (text or "").strip()
+    if not text:
+        raise TexturedTextError("Type the text for the title.")
+    if len(text) > MAX_CHARS:
+        raise TexturedTextError(f"Titles are limited to {MAX_CHARS} characters.")
+    if not 24 <= size <= 600:
+        raise TexturedTextError("Font size must be between 24 and 600.")
+    if not 0 <= outline <= 30 or not 10 <= opacity <= 100 or not 0 <= spacing <= 60:
+        raise TexturedTextError("Outline must be 0-30, opacity 10-100 and letter spacing 0-60.")
+    bg, oc = _rgb(background), _rgb(outline_color)
+    arabic = bool(_ARABIC.search(text))
+    scale = height / 1080                        # size and outline are given at 1080p
+    px, ol, sp = max(12, int(size * scale)), int(round(outline * scale)), int(round(spacing * scale))
+    try:
+        fnt = ImageFont.truetype(str(_font_path(font, arabic)), px, layout_engine=ImageFont.Layout.BASIC)
+    except OSError as e:
+        raise TexturedTextError(f"The font could not be loaded: {e}")
+    lines = [_shape(line) for line in text.splitlines() if line.strip()]
+    draw = ImageDraw.Draw(Image.new("L", (8, 8)))
+
+    def line_width(line: str) -> int:
+        if not sp or arabic:
+            return int(draw.textlength(line, font=fnt))
+        return int(sum(draw.textlength(ch, font=fnt) for ch in line) + sp * (len(line) - 1))
+    asc, desc = fnt.getmetrics()
+    line_h = asc + desc
+    gap = int(px * 0.08)
+    total_h = line_h * len(lines) + gap * (len(lines) - 1)
+    cx, cy = width * x / 100, height * y / 100
+    holes = Image.new("L", (width, height), 0)
+    ring = Image.new("L", (width, height), 0)
+    dh, dr = ImageDraw.Draw(holes), ImageDraw.Draw(ring)
+    top = cy - total_h / 2
+    for i, line in enumerate(lines):
+        lx = cx - line_width(line) / 2
+        ly = top + i * (line_h + gap)
+        pieces = [(line, lx)] if (not sp or arabic) else []
+        if not pieces:
+            pos = lx
+            for ch in line:
+                pieces.append((ch, pos))
+                pos += draw.textlength(ch, font=fnt) + sp
+        for chunk, px_x in pieces:
+            if ol:
+                dr.text((px_x, ly), chunk, font=fnt, fill=255, stroke_width=ol, stroke_fill=255)
+            dh.text((px_x, ly), chunk, font=fnt, fill=255)
+    hole = np.asarray(holes).astype(np.float32) / 255
+    edge = np.clip(np.asarray(ring).astype(np.float32) / 255 - hole, 0, 1) if ol else np.zeros_like(hole)
+    a_bg = opacity / 100
+    rgb = np.empty((height, width, 3), np.float32)
+    rgb[:] = bg
+    rgb = rgb * (1 - edge[..., None]) + np.array(oc, np.float32) * edge[..., None]
+    alpha = (a_bg * (1 - hole - edge) + edge).clip(0, 1)      # holes are see-through, outline is solid
+    out = np.dstack([rgb, alpha * 255]).round().clip(0, 255).astype(np.uint8)
+    return Image.fromarray(out, "RGBA")

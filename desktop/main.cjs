@@ -81,6 +81,8 @@ async function boot(){
    memoryGB:+(require('node:os').totalmem()/1e9).toFixed(1),cpus:require('node:os').cpus().length,backend:health,stableDiffusion:{folderSet:!!sd.folder,autostart:!!sd.autostart},
    workspace:dataDir,appState:(()=>{try{return JSON.parse(fs.readFileSync(path.join(dataDir,'app-state.json'),'utf8'))}catch{return null}})()};
   fs.writeFileSync(path.join(out,'system.json'),JSON.stringify(info,null,2));
+  // 0.9.1: include the backend's report too (recent render errors, settings without keys, model status).
+  try{const r=await fetch(origin+'/api/diagnostics.zip',{headers:{'X-SceneForge-Token':ready.token}});if(r.ok)fs.writeFileSync(path.join(out,'backend-report.zip'),Buffer.from(await r.arrayBuffer()));}catch{}
   await dialog.showMessageBox(window,{type:'info',message:'Diagnostics collected',detail:`A folder was created on your Desktop:\n${path.basename(out)}\n\nIt contains logs and system details only (no API keys or media). Attach its files to a GitHub issue or send them to the developer.`});
   shell.openPath(out);
  }

@@ -1,3 +1,18 @@
+# SceneForge Studio 0.9.1
+
+Fixes from the 0.9.0 Windows test, and one new title style. Everything in 0.9.0 is included.
+
+**New**
+- **Video inside text** (Overlays tab): a solid colour card with your title cut out of it, so the scene's video or picture plays inside the letters, like a documentary "1942" or place-name title. Choose the font, card colour and opacity, letter size, position and an outline.
+
+**Fixes**
+- **Subject cutout no longer gets stuck on "Cutting out the subject…".** When a video cutout stopped, Windows still held the half-written file, the clean-up crashed, and the job never reported back. FFmpeg is now stopped and waited for before its files are removed, and clean-up never crashes the job.
+- **Smaller, more useful logs:** the hang watchdog no longer dumps every thread's stack for event and media streams, which are long by design (one log had grown to 57,000 lines).
+- **Help → Collect diagnostics** now also saves the backend report (recent render errors, settings without API keys, model status) next to the logs.
+
+**Docs**
+- README screenshots retaken with the 0.9 interface, with new pictures of the Typewriter box and Video inside text.
+
 # SceneForge Studio 0.9.0: Friendlier editing
 
 Fixes from the 0.8.0 Windows test, a tidier Effects tab and the rest of the roadmap. Everything in 0.8.0 is included.

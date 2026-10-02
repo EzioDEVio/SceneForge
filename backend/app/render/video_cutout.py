@@ -369,12 +369,27 @@ def build_layer(plan: dict, dest: str, model: str = DEFAULT_VIDEO_MODEL, edge: s
                 p.kill()
             except Exception:  # noqa: BLE001
                 pass
-        Path(dest).unlink(missing_ok=True)
+        # Windows keeps the output locked until FFmpeg has really exited (0.9.1: a cancelled
+        # cutout crashed here with WinError 32 and the job stayed "running" for ever).
+        for p in (dec, enc):
+            try:
+                p.wait(timeout=15)
+            except Exception:  # noqa: BLE001
+                pass
+        for f in (err_dec, enc_err):
+            try:
+                f.close()
+            except Exception:  # noqa: BLE001
+                pass
+        safe_unlink(dest)
         raise
     finally:
         for f in (err_dec, enc_err):
-            f.close()
-        enc_log.unlink(missing_ok=True)
+            try:
+                f.close()
+            except Exception:  # noqa: BLE001
+                pass
+        safe_unlink(enc_log)
         try:
             dec.stdout.close()
         except Exception:  # noqa: BLE001
@@ -383,6 +398,20 @@ def build_layer(plan: dict, dest: str, model: str = DEFAULT_VIDEO_MODEL, edge: s
     if done >= min(total, 10):
         _save_speed(model, per)
     return {"frames": done, "ms_per_frame": round(per, 1), "codec": "vp9-alpha" if dest.endswith(".webm") else "qtrle"}
+
+
+def safe_unlink(path) -> None:
+    """Delete a temp file without ever raising; retry briefly while Windows still holds it."""
+    if not path:
+        return
+    for attempt in range(6):
+        try:
+            Path(path).unlink(missing_ok=True)
+            return
+        except PermissionError:
+            time.sleep(0.25 * (attempt + 1))
+        except OSError:
+            return
 
 
 # ---------------------------------------------------------------------------------- job
@@ -483,8 +512,7 @@ def _run_job(job_id: str, scene_id: str, model: str, edge: str, shift: int) -> N
         st.update(status="succeeded", stage="done")
         jobs._emit(job_id, {"status": JobStatus.SUCCEEDED, "stage": "Subject layer ready", "progress": 100})
     except Exception as exc:  # noqa: BLE001
-        if dest:
-            Path(dest).unlink(missing_ok=True)
+        safe_unlink(dest)
         cancelled = ctx.cancel_requested
         msg = "Cancelled." if cancelled else (str(exc) if isinstance(exc, CutoutError) else f"Video cutout failed: {exc}")
         if not cancelled and hasattr(exc, "detail"):

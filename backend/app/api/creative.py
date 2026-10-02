@@ -257,6 +257,56 @@ def textured_title(scene_id: str, body: TexturedTitleRequest, db: Session = Depe
             "texture_asset": schemas.AssetOut.model_validate(texture_asset) if texture_asset else None}
 
 
+class KnockoutTitleRequest(BaseModel):
+    text: str = Field(min_length=1, max_length=80)
+    font: str = "Anton"
+    font_size: int = Field(default=220, ge=24, le=600)
+    x: float = Field(default=50, ge=0, le=100)
+    y: float = Field(default=50, ge=0, le=100)
+    background: str = Field(default="#E10600", pattern=r"^#[0-9A-Fa-f]{6}$")
+    opacity: int = Field(default=100, ge=10, le=100)
+    outline: int = Field(default=6, ge=0, le=30)
+    outline_color: str = Field(default="#FFFFFF", pattern=r"^#[0-9A-Fa-f]{6}$")
+    spacing: int = Field(default=4, ge=0, le=60)
+    start_ms: int = Field(default=0, ge=0, le=3_600_000)
+    end_ms: int | None = Field(default=None, ge=0, le=3_600_000)
+
+
+@router.post("/api/scenes/{scene_id}/knockout-title")
+def knockout_title(scene_id: str, body: KnockoutTitleRequest, db: Session = Depends(get_db)):
+    """0.9.1 "Video inside text": a full-frame colour card with the letters cut out, added as an
+    overlay so the scene's own video or picture plays through the text."""
+    from app.render.textured_text import TexturedTextError, render_knockout_card
+    from app.render.overlays import MAX_OVERLAYS
+    scene = db.get(Scene, scene_id)
+    if not scene:
+        raise HTTPException(404, "Scene not found")
+    if len(scene.overlays_json or []) >= MAX_OVERLAYS:
+        raise HTTPException(400, f"This scene already has {MAX_OVERLAYS} overlays. Remove one in the Overlays tab first.")
+    if body.end_ms is not None and body.end_ms <= body.start_ms:
+        raise HTTPException(400, "The end time must be after the start time.")
+    project = scene.project
+    try:
+        img = render_knockout_card(body.text, project.width, project.height, body.font, body.font_size, body.x, body.y,
+                                   body.background, body.opacity, body.outline, body.outline_color, body.spacing)
+    except TexturedTextError as e:
+        raise HTTPException(400, str(e))
+    folder = Path(MEDIA_DIR) / scene.project_id
+    folder.mkdir(parents=True, exist_ok=True)
+    dest = folder / f"knockout_{uuid.uuid4().hex[:10]}.png"
+    img.save(dest)
+    label = "".join(ch for ch in body.text if ch.isalnum() or ch in " -")[:30].strip() or "title"
+    meta = {"knockout_title": body.model_dump()}
+    asset = _store_png(db, scene.project_id, dest, f"sticker-video-in-text-{label}.png", meta)
+    overlay = {"id": "ko" + uuid.uuid4().hex[:6], "asset_id": asset.id, "kind": "sticker", "x": 50, "y": 50, "width": 100,
+               "rotation": 0, "opacity": 100, "radius": 0, "border": 0, "shadow": 0, "anim_in": "fade", "anim_out": "fade", "anim_ms": 400,
+               "start_ms": body.start_ms, "end_ms": body.end_ms}
+    cleaned = _add_overlay(db, scene, overlay)
+    db.commit()
+    db.refresh(scene)
+    return {"scene": _scene_out(scene), "overlay": cleaned[-1], "asset": schemas.AssetOut.model_validate(asset)}
+
+
 # Video subject cutout ("text behind a moving subject") routes live in api/video_cutout.py.
 from app.api.video_cutout import router as _video_cutout_router  # noqa: E402
 router.include_router(_video_cutout_router)

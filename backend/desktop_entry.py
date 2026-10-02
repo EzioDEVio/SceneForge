@@ -26,7 +26,10 @@ class HangWatch:
         threading.Thread(target=self._watch, daemon=True).start()
 
     async def __call__(self, scope, receive, send):
-        if scope.get("type") != "http":
+        path = scope.get("path") or ""
+        # Event streams and media streams are long by design; dumping every thread's stack for
+        # them filled the log (0.9.1: tens of thousands of lines from /api/jobs/<id>/events).
+        if scope.get("type") != "http" or path.endswith("/events") or path.endswith("/stream") or "/preview-media" in path:
             return await self.app(scope, receive, send)
         with self.lock:
             self.n += 1; rid = self.n

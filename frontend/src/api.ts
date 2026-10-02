@@ -87,7 +87,7 @@ export type FontSettings = {
 };
 
 /** Must match BUILD_ID in backend/app/main.py. */
-export const BUILD_ID = "v0.9.0";
+export const BUILD_ID = "v0.9.1";
 
 export type Adjust = Partial<Record<'exposure'|'contrast'|'highlights'|'shadows'|'temperature'|'tint'|'saturation'|'vibrance'|'sharpen'|'vignette'|'grain', number>>;
 export type Look = {
@@ -333,6 +333,7 @@ export const api = {
   /** Copy a bundled library sticker into the project's Media Pool (re-used when already imported). */
   importSticker: (projectId: string, stickerId: string) => req<Asset>(`/api/projects/${projectId}/stickers/${encodeURIComponent(stickerId)}`, {method: "POST"}),
   stickerImageUrl: (stickerId: string) => `/api/stickers/${encodeURIComponent(stickerId)}/image`,
+  knockoutTitle: (sceneId: string, body: {text: string; font?: string; font_size?: number; background?: string; opacity?: number; outline?: number; outline_color?: string; x?: number; y?: number; spacing?: number; start_ms?: number; end_ms?: number | null}) => req<{scene: Scene; asset: Asset}>(`/api/scenes/${sceneId}/knockout-title`, {method: "POST", body: JSON.stringify(body)}),
   texturedTitle: (sceneId: string, body: Record<string, unknown>) => req<{scene: Scene; asset: Asset}>(`/api/scenes/${sceneId}/textured-title`, {method: "POST", body: JSON.stringify(body)}),
   beatMarkers: (projectId: string, body: {clip_id?: string; every?: number}) => req<{bpm: number; markers: {time_ms: number; downbeat: boolean}[]; truncated: boolean}>(`/api/projects/${projectId}/beat-markers`, {method: "POST", body: JSON.stringify(body)}),
   listModels: () => req<ModelListing>(`/api/models`),

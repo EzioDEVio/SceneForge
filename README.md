@@ -69,6 +69,10 @@ The screenshots on this page come from the 0.7.0 build. They show a demo project
 - **Title layers** (Text, Text Box, Text+) take more than 25 animations. The reveal set includes from-right, up, down, split, **clock wipe**, **counter-clockwise clock** and **iris** *(the last three: 0.7.0)*. There are also typewriter text with sound and per-letter and per-word animations.
 - Arabic is rendered right-to-left, with Arabic caption styles and fonts (Noto Naskh, Amiri, Tajawal and Lalezar).
 
+![Text tab with the Typewriter box: on/off switch, Slow/Natural/Fast speed, start delay, reveal time, keystroke sound with volume and a Preview sound button](docs/images/typewriter-box.png)
+
+- **Typewriter box** *(0.9.0)*: the caption typewriter, its speed and timing, and its keystroke sound (included or your own recording) in one place, with **Preview sound**. Also new: caption **translation to English** or bilingual captions, and **title templates** (lower third, intro, outro, chapter, quote).
+
 ### Effects and looks
 
 ![Effects tab for a mountain scene: effect strength and the Halation settings (threshold, radius, glow colour, glow amount)](docs/images/effects-settings.png)
@@ -103,6 +107,10 @@ The screenshots on this page come from the 0.7.0 build. They show a demo project
 ![Textured title panel: the word NEON filled with the built-in Neon pattern, with font, size, glow and outline controls, and the rendered result on the bokeh video](docs/images/textured-title.png)
 
 - **Textured titles** *(0.7.0)* fill big letters with a texture. The texture can be one of 9 built-in patterns (lava, neon, gold, chrome, marble, ice, fire, pixel blocks, galaxy), any image in your Media Pool, or a texture generated from a prompt by your image engine. Cloud image engines may charge for that. Titles support glow, outline, 8 fonts and Arabic.
+
+![Video inside text panel: a red card preview with the year 1942 cut out of it, with font, colour, size, position, outline and opacity controls](docs/images/video-in-text.png)
+
+- **Video inside text** *(0.9.1)*: a solid colour card with your title cut out of it, so the scene's video or picture plays inside the letters (the documentary "1942" / place-name look). Colour, opacity, font, size, position and an outline are adjustable.
 
 ![Subject cutout panel with the People model, the result preview on a checkerboard, and the rendered scene with the yellow word STORIES passing behind the presenter](docs/images/subject-cutout.png)
 
@@ -333,6 +341,7 @@ The table summarizes the documented history. Versions marked WIP or RC were deve
 | **0.7.0 RC7** | Local Whisper fixed (FFmpeg decodes the audio, without PyAV), black first render fixed, AI subject cutout and textured titles. Unreleased. |
 | **0.7.0 RC8** | Better cutout (edge refinement, People model, preview, bundled small model), AI voice isolation, beat markers, volume envelopes, effect stack and look preset packs. Unreleased. |
 | **0.7.1** | Security updates (urllib3 2.8.0, Vite 7), inspector tab bar fix, workspaces, collapsible/compact tracks, keyboard shortcut sheet and tour, AI model manager, diagnostics export. |
+| **0.9.1** | Video inside text titles; subject cutout no longer gets stuck on Windows; smaller logs; diagnostics include render errors; new screenshots. |
 | **0.9.0** | Friendlier editing:<br>• Typewriter box with sound preview<br>• Effects grouped<br>• Waveforms on A2–A8<br>• Auto-ducking for A3–A8<br>• Restore points<br>• Sample project<br>• Caption translation<br>• Title templates |
 | **0.8.0** | Creator pack:<br>• Remove silences and filler words<br>• Auto-reframe to 9:16<br>• NVENC GPU export<br>• Live timeline playback<br>• Keyframes |
 | **0.7.1** | Security updates (urllib3, Vite 7) and usability:<br>• Inspector tabs<br>• Workspaces<br>• Collapsible tracks<br>• Shortcut sheet and tour<br>• AI model manager<br>• Diagnostics export |

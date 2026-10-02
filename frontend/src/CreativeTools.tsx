@@ -159,3 +159,47 @@ export function TexturedTitlePanel({scene, disabled, onDone}: {scene: Scene; dis
     {msg && <p className="info-status" role="status">{msg}</p>}
   </section>;
 }
+
+/** 0.9.1 "Video inside text": a colour card with the letters cut out, so the scene's own video or
+ *  picture plays through the title (the classic documentary "1942" / place-name look). */
+export function VideoInTextPanel({scene, disabled, onDone}: {scene: Scene; disabled: boolean; onDone: () => void | Promise<void>}) {
+  const [text, setText] = React.useState('');
+  const [font, setFont] = React.useState('Anton');
+  const [size, setSize] = React.useState(260);
+  const [background, setBackground] = React.useState('#E10600');
+  const [opacity, setOpacity] = React.useState(100);
+  const [outline, setOutline] = React.useState(6);
+  const [outlineColor, setOutlineColor] = React.useState('#FFFFFF');
+  const [y, setY] = React.useState(55);
+  const [busy, setBusy] = React.useState(false);
+  const [msg, setMsg] = React.useState('');
+  const hasMedia = scene.shots.length > 0;
+  async function add() {
+    setBusy(true); setMsg('Cutting the letters out of the colour card…');
+    try {
+      await api.knockoutTitle(scene.id, {text, font, font_size: size, background, opacity, outline, outline_color: outlineColor, y});
+      setMsg('Added as a full-screen layer in Overlays. Your video plays inside the letters; render the scene to see it move. Tip: give the picture a slow zoom in Motion.');
+      await onDone();
+    } catch (e: any) {setMsg(e.message || String(e));} finally {setBusy(false);}
+  }
+  return <section className="creative-card" aria-label="Video inside text">
+    <header><Type size={15}/><strong>Video inside text</strong></header>
+    <p className="hint">Covers the screen with a solid colour and cuts your title out of it, so this scene's video or picture shows through the letters, like a documentary place or year title.</p>
+    <div className="ko-preview" style={{background: background, opacity: Math.max(.35, opacity / 100)}} aria-hidden="true">
+      <span style={{fontFamily: font === 'Bebas Neue' ? "'Bebas Neue'" : font, WebkitTextStroke: outline ? `${Math.max(1, outline / 3)}px ${outlineColor}` : undefined, top: `${y}%`}}>{text.trim() || 'NORWAY'}</span>
+    </div>
+    <label className="control-label">Title text<input aria-label="Video inside text title" maxLength={80} value={text} onChange={e => setText(e.target.value)} placeholder="e.g. 1942 or NORWAY"/></label>
+    <div className="acc-grid">
+      <label className="control-label">Font<select aria-label="Video inside text font" value={font} onChange={e => setFont(e.target.value)}>{FONTS.map(f => <option key={f}>{f}</option>)}</select></label>
+      <label className="control-label">Card colour<input aria-label="Video inside text background colour" type="color" value={background} onChange={e => setBackground(e.target.value.toUpperCase())}/></label>
+    </div>
+    <label className="control-label">Letter size · {size}px<input aria-label="Video inside text size" type="range" min={80} max={600} step={10} value={size} onChange={e => setSize(Number(e.target.value))}/></label>
+    <label className="control-label">Up–down · {y}%<input aria-label="Video inside text position" type="range" min={10} max={90} value={y} onChange={e => setY(Number(e.target.value))}/></label>
+    <label className="control-label">Outline · {outline}px<input aria-label="Video inside text outline" type="range" min={0} max={30} value={outline} onChange={e => setOutline(Number(e.target.value))}/></label>
+    {outline > 0 && <label className="control-label">Outline colour<input aria-label="Video inside text outline colour" type="color" value={outlineColor} onChange={e => setOutlineColor(e.target.value.toUpperCase())}/></label>}
+    <label className="control-label">Card opacity · {opacity}%<input aria-label="Video inside text card opacity" type="range" min={10} max={100} step={5} value={opacity} onChange={e => setOpacity(Number(e.target.value))}/></label>
+    {!hasMedia && <p className="hint">Add a video or picture to this scene first: it is what shows inside the letters.</p>}
+    <button className="btn btn-primary" disabled={disabled || busy || !text.trim() || !hasMedia} onClick={() => void add()}><Sparkles size={14}/> {busy ? 'Working…' : 'Add video-inside-text title'}</button>
+    {msg && <p className="info-status" role="status">{msg}</p>}
+  </section>;
+}

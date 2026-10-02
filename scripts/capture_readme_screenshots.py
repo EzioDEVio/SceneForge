@@ -301,7 +301,7 @@ class Editor:
     def open(self, inspector=None):
         pg = self.pg
         pg.goto(self.base + "/"); pg.wait_for_timeout(800)
-        pg.evaluate("w=>{try{localStorage.removeItem('sceneforge.preferences.v1');"
+        pg.evaluate("w=>{try{localStorage.setItem('sceneforge.tour.v1','done');localStorage.removeItem('sceneforge.preferences.v1');"
                     "if(w)localStorage.setItem('sceneforge.inspectorWidth',String(w));else localStorage.removeItem('sceneforge.inspectorWidth');}catch(e){}}",
                     inspector)
         pg.reload(); pg.wait_for_timeout(1500)
@@ -325,6 +325,9 @@ class Editor:
         self.pg.locator(f'[role=tab][id$="-{name}-tab"]:visible').first.click(); self.pg.wait_for_timeout(1000)
 
     def scroll_to(self, text, offset=10):
+        # 0.9.0: effects live in collapsible groups; open them so every card can be found
+        self.pg.evaluate("""()=>document.querySelectorAll('button.fx-group-head[aria-expanded="false"]').forEach(b=>b.click())""")
+        self.pg.wait_for_timeout(300)
         self.pg.evaluate("""([t,o])=>{const body=[...document.querySelectorAll('.inspector-body')].find(b=>b.getBoundingClientRect().width>0);
           const el=[...body.querySelectorAll('h2,h3,h4,h5,legend,strong,label,summary,span,p,button,div')].find(e=>e.children.length<4&&e.textContent.trim().toLowerCase().startsWith(t.toLowerCase()));
           if(!el) throw new Error('not found: '+t);
@@ -435,6 +438,17 @@ def capture(base: str, out: pathlib.Path):
         pattern.select_option(label=next(o for o in pattern.locator("option").all_inner_texts() if o.strip().lower() == "neon"))
         ed.play_at(3.4); shot("textured-title.png")
 
+        # 7b. Video inside text (0.9.1)
+        ed.scene("City lights"); ed.tab("Overlays")
+        ed.scroll_to("Video inside text", 10)
+        pg.locator(".inspector-body:visible input[placeholder*='NORWAY']").first.fill("1942")
+        ed.play_at(3.4); shot("video-in-text.png")
+
+        # 7c. Typewriter box with sound preview (0.9.0)
+        ed.scene("Golden hour"); ed.tab("Text")
+        ed.scroll_to("Typewriter", 10)
+        ed.play_at(3.4); shot("typewriter-box.png")
+
         # 8. Subject cutout with result preview (People model, local)
         ed.scene("Meet the storyteller"); ed.tab("Overlays")
         ed.scroll_to("Subject cutout", 10)
@@ -465,8 +479,10 @@ def capture(base: str, out: pathlib.Path):
         ed.open()
         pg.get_by_role("button", name="Generate video").first.click(); pg.wait_for_timeout(1500)
         pg.get_by_text("Google Veo", exact=True).first.click(); pg.wait_for_timeout(800)
-        sels = pg.locator("select:visible")
-        sels.nth(1).select_option("veo-3.1-fast"); sels.nth(3).select_option("8"); sels.nth(4).select_option("1080p"); sels.nth(5).select_option("2")
+        def pick(value, last=False):   # the generator's select that offers this option
+            loc = pg.locator(".video-gen-panel select:visible").filter(has=pg.locator(f'option[value="{value}"]'))
+            (loc.last if last else loc.first).select_option(value)
+        pick("veo-3.1-fast"); pg.wait_for_timeout(400); pick("8"); pick("1080p"); pick("2", last=True)
         pg.locator("textarea:visible").first.fill("Slow aerial dolly over a neon-lit city at dusk, light rain, reflections on wet streets, cinematic, 35mm")
         pg.wait_for_timeout(600)
         shot("text-to-video.png")

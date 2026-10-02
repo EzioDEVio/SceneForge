@@ -60,5 +60,6 @@ jobs:
             python tests/integration/test_reframe_gpu.py
             python tests/integration/test_cleanup.py
             python tests/integration/test_090_features.py
+            python tests/integration/test_091_fixes.py
             python tests/integration/test_keyframes_playback.py
           '
