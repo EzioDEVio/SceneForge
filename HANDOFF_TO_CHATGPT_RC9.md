@@ -20,6 +20,19 @@ Read this file first, then `README.md`, `desktop/RELEASE_NOTES.md`, `handoff.md`
 >   - keyframes (`render/keyframes.py`, `frontend/src/keyframes.ts`; `keyframes[]` on overlays and text layers).
 > - NVENC was never exercised on real NVIDIA hardware during development; only detection, command building and the CPU fallback are tested.
 > - The integration list in `checks.yml` now has 36 scripts.
+>
+> **Update (2026-10-02):**
+> - 0.7.1 is published (`v0.7.1` on `main` at `7cb2b31`). 0.8.0 passed the owner's Windows test.
+> - **0.9.0** is branch `claude/0.9.0`, built on 0.8.0. It adds:
+>   - timeline fixes (Beats menu clipping, track-name overlap, page sideways scroll) and waveforms on A2/A3–A8 (`AssetWave` in `NarrationWave.tsx`);
+>   - the Typewriter box (`frontend/src/TypewriterPanel.tsx`) and its sound preview (`backend/app/api/typewriter.py`);
+>   - Effects tab groups (`FxGroup` in `EffectsPanels.tsx`);
+>   - auto-ducking for A3–A8 (`audio_clips[].duck`, `duck_filter()` in `render/finishing.py`);
+>   - restore points (`domain/snapshots.py`, `api/snapshots.py`, `frontend/src/RestorePoints.tsx`; files in `DATA_DIR/snapshots/<project>/`);
+>   - the sample project (`domain/sample_project.py`, `POST /api/sample-project`);
+>   - caption translation (`task="translate"` in `providers/transcribe.py`; `translate: english|bilingual` on auto-captions);
+>   - title templates (`frontend/src/TextTemplates.tsx`).
+> - Actions are on the Node 24 versions (v6) and checks run on `ubuntu-24.04`. The integration list has 37 scripts (new: `test_090_features.py`).
 
 ---
 

@@ -1,5 +1,5 @@
 import React, {useEffect, useState} from 'react';
-import {Vibrate, Focus, EyeOff, Sun, Blend, Plus, Trash2, Palette, LayoutGrid, Route as RouteIcon, Box as BoxIcon, MousePointerClick, Undo2, PenLine, Timer} from 'lucide-react';
+import {Vibrate, Focus, EyeOff, Sun, Blend, Plus, Trash2, Palette, LayoutGrid, Route as RouteIcon, Box as BoxIcon, MousePointerClick, Undo2, PenLine, Timer, ChevronDown} from 'lucide-react';
 import type {Look, Scene} from './api';
 import {FeatureHelp} from './FeatureHelp';
 
@@ -85,6 +85,22 @@ function Pills<T extends string>({label, value, options, onChange, disabled}: {l
     {options.map(([v, l]) => <button key={v} role="radio" aria-checked={value === v} className={value === v ? 'selected' : ''} disabled={disabled} onClick={() => onChange(v)}>{l}</button>)}
   </div></div>;
 }
+
+/** A collapsible category on the Effects tab (0.9.0). Opens by itself when one of its effects is on. */
+export function FxGroup({id, title, Icon, description, items, active, children}: {id: string; title: string; Icon: typeof Sun; description: string; items?: string; active: number; children: React.ReactNode}) {
+  const [open, setOpen] = useState(() => {try {const v = sessionStorage.getItem(`sf.fxgroup.${id}`); return v === null ? active > 0 : v === '1';} catch {return active > 0;}});
+  const toggle = (next: boolean) => {setOpen(next); try {sessionStorage.setItem(`sf.fxgroup.${id}`, next ? '1' : '0');} catch {/* ignore */}};
+  return <section className={`fx-group ${open ? 'open' : ''}`} aria-label={`${title} effects`}>
+    <button className="fx-group-head" aria-expanded={open} onClick={() => toggle(!open)}>
+      <span className="fx-group-icon"><Icon size={16}/></span>
+      <span className="fx-group-text"><strong>{title}</strong><small>{description}</small>{items && <em>{items}</em>}</span>
+      {active > 0 && <span className="fx-group-badge">{active} on</span>}
+      <ChevronDown size={15} className="fx-group-chevron"/>
+    </button>
+    {open && <div className="fx-group-body">{children}</div>}
+  </section>;
+}
+
 function Section({title, Icon, on, onToggle, hint, children, disabled}: {title: string; Icon: typeof Sun; on: boolean; onToggle: (on: boolean) => void; hint: string; children: React.ReactNode; disabled: boolean}) {
   return <section className="look-section" aria-label={title}>
     <div className="look-heading"><h3><Icon size={15}/> {title}</h3><FeatureHelp compact title={title} description={hint} steps="Turn this feature on, adjust its controls, then preview or render the scene. Changes are saved with this scene."/>
@@ -137,7 +153,9 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
   // The live list (shared with the on-picture handles) wins, so dragging and sliders never overwrite each other.
   const annots: Annotation[] = liveAnnotations ?? ((st as any).annotations || []);
   const setAnnot = (i: number, p: Partial<Annotation>) => put('annotations', annots.map((a, k) => k === i ? {...a, ...p} : a));
+  const onCount = (xs: unknown[]) => xs.filter(Boolean).length;
   return <div className="look-panel scene-fx-panel">
+    <FxGroup id="colour" items="Split toning · Colour wheels" title="Colour grading" Icon={Palette} description="Change the mood of the picture with colour tints." active={onCount([!!tone, !!wheels])}>
     <Section title="Split toning" Icon={Blend} on={!!tone} onToggle={on => put('tone', on ? {...TONE} : null)} disabled={disabled} hint="Tint shadows and highlights with two colours, like a film grade. Shows in the preview.">
       {tone && <>
         <div className="adjust-row changed"><label>Shadows</label><input type="color" aria-label="Shadow colour" value={tone.shadow} disabled={disabled} onChange={e => put('tone', {...tone, shadow: e.target.value.toUpperCase()})}/><span/><span/></div>
@@ -146,19 +164,58 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
         <Row label="Balance" value={tone.balance} min={-100} max={100} onChange={balance => put('tone', {...tone, balance})} disabled={disabled}/>
       </>}
     </Section>
-    <section className="look-section" aria-label="Countdown intro">
-      <div className="look-heading"><h3><Timer size={15}/> Countdown intro</h3>
-        <button role="switch" aria-checked={!!(st as any).countdown} aria-label="Countdown intro" className={`fx-switch ${(st as any).countdown ? 'on' : ''}`} disabled={disabled}
-          onClick={() => put('countdown', (st as any).countdown ? null : {style: 'film', seconds: 5, beep: 'each', tone: 'bw', color: '#8F7CF0'})}><span/></button></div>
-      <p className="hint">A cinema countdown plays before this scene (the scene gets longer by its length). Off unless you switch it on.</p>
-      {(st as any).countdown && (() => {const cd = (st as any).countdown; const setCd = (p: any) => put('countdown', {...cd, ...p}); return <>
-        <Pills label="Countdown style" value={cd.style} options={[['film', 'Film leader'], ['modern', 'Modern'], ['minimal', 'Minimal']]} onChange={style => setCd({style})} disabled={disabled}/>
-        <label className="control-label">Length<select aria-label="Countdown length" value={cd.seconds} disabled={disabled} onChange={e => setCd({seconds: Number(e.target.value)})}>{[3, 4, 5, 6, 7, 8, 9, 10].map(n => <option key={n} value={n}>{n} seconds</option>)}</select></label>
-        <label className="control-label">Beeps<select aria-label="Countdown beeps" value={cd.beep} disabled={disabled} onChange={e => setCd({beep: e.target.value})}><option value="each">Every number</option><option value="two-pop">Classic 2-pop</option><option value="none">Silent</option></select></label>
-        {cd.style === 'film' && <Pills label="Countdown tone" value={cd.tone} options={[['bw', 'Black & white'], ['sepia', 'Sepia']]} onChange={tone => setCd({tone})} disabled={disabled}/>}
-        {cd.style === 'modern' && <div className="adjust-row changed"><label>Ring colour</label><input type="color" aria-label="Countdown ring colour" value={cd.color} disabled={disabled} onChange={e => setCd({color: e.target.value.toUpperCase()})}/><span/><span/></div>}
-      </>;})()}
-    </section>
+    <Section title="Colour wheels" Icon={Palette} on={!!wheels} onToggle={on => put('wheels', on ? {lift: ZERO3(), gamma: ZERO3(), gain: ZERO3()} : null)} disabled={disabled} hint="Lift tints the shadows, Gamma the midtones, Gain the highlights. Drag a dot towards a colour; double-click to reset. Shows in the preview.">
+      {wheels && <div className="wheels-row">
+        {(['lift', 'gamma', 'gain'] as const).map(k => <ColorWheel key={k} label={k[0].toUpperCase() + k.slice(1)} value={wheels[k]} disabled={disabled} onChange={v => put('wheels', {...wheels, [k]: v})}/>)}
+      </div>}
+    </Section>
+    </FxGroup>
+    <FxGroup id="light" items="Lens flare · Light leaks" title="Light & lens" Icon={Sun} description="Add glowing light on top of the picture." active={onCount([!!flare, !!leak])}>
+    <Section title="Lens flare" Icon={Sun} on={!!flare} onToggle={on => put('flare', on ? {...FLARE} : null)} disabled={disabled} hint="A procedurally drawn lens flare (glow, streak and ghosts) blended over the picture. Generated by SceneForge, not a photo or AI. Render to see it.">
+      {flare && <>
+        <Row label="Flare left–right" value={flare.x} min={0} max={100} unit="%" onChange={x => put('flare', {...flare, x})} disabled={disabled}/>
+        <Row label="Flare up–down" value={flare.y} min={0} max={100} unit="%" onChange={y => put('flare', {...flare, y})} disabled={disabled}/>
+        <div className="adjust-row changed"><label>Tint</label><input type="color" aria-label="Lens flare colour" value={flare.color} disabled={disabled} onChange={e => put('flare', {...flare, color: e.target.value.toUpperCase()})}/><span/><span/></div>
+        <Pills label="Blend" value={flare.blend} options={[['screen', 'Screen'], ['add', 'Add (brighter)']]} onChange={blend => put('flare', {...flare, blend})} disabled={disabled}/>
+        <Row label="Flare intensity" value={flare.amount} min={0} max={100} unit="%" onChange={amount => put('flare', {...flare, amount})} disabled={disabled}/>
+        <Row label="Horizontal drift" value={flare.drift} min={0} max={100} unit="%" onChange={drift => put('flare', {...flare, drift})} disabled={disabled}/>
+      </>}
+    </Section>
+    <Section title="Light leaks" Icon={Sun} on={!!leak} onToggle={on => put('leak', on ? {...LEAK} : null)} disabled={disabled} hint="Soft coloured light drifting in from the edges, like old film or a vintage lens.">
+      {leak && <>
+        <Pills label="Colour" value={leak.color} options={[['warm', 'Warm'], ['cool', 'Cool'], ['rainbow', 'Rainbow']]} onChange={color => put('leak', {...leak, color})} disabled={disabled}/>
+        <Row label="Amount" value={leak.amount} min={0} max={100} unit="%" onChange={amount => put('leak', {...leak, amount})} disabled={disabled}/>
+        <Row label="Speed" value={leak.speed} min={0} max={100} unit="%" onChange={speed => put('leak', {...leak, speed})} disabled={disabled}/>
+      </>}
+    </Section>
+    </FxGroup>
+    <FxGroup id="motion" items="Camera shake · Wiggle · 3D photo" title="Camera & motion" Icon={Vibrate} description="Make the camera or the picture move." active={onCount([!!shake, !!wiggle, !!plx])}>
+    <Section title="Camera shake" Icon={Vibrate} on={!!shake} onToggle={on => put('shake', on ? {...SHAKE} : null)} disabled={disabled} hint="Handheld wobble for tension or action, with an optional impact zoom at the start. Render to see it.">
+      {shake && <>
+        <Pills<NonNullable<Shake['preset']>> label="Shake style" value={shake.preset || 'custom'} options={[['custom', 'Custom'], ['handheld', 'Handheld (subtle)'], ['walk', 'Walking'], ['run', 'Running'], ['impact', 'Impact hit']]} onChange={preset => put('shake', {...shake, ...SHAKE_PRESETS[preset], preset})} disabled={disabled}/>
+        <Row label="Shake" value={shake.amount} min={0} max={100} unit="%" onChange={amount => put('shake', {...shake, amount})} disabled={disabled}/>
+        <Row label="Speed" value={shake.speed} min={0} max={100} unit="%" onChange={speed => put('shake', {...shake, speed})} disabled={disabled}/>
+        <label className="switch-label finishing-toggle"><input type="checkbox" aria-label="Impact zoom" checked={shake.impact} disabled={disabled} onChange={e => put('shake', {...shake, impact: e.target.checked})}/> Impact zoom at the start</label>
+      </>}
+    </Section>
+    <Section title="Wiggle (turbulent displace)" Icon={Blend} on={!!wiggle} onToggle={on => put('wiggle', on ? {...WIGGLE} : null)} disabled={disabled} hint="Warps the picture with slowly moving waves, like heat haze or a dream sequence (FFmpeg displace). Render to see it.">
+      {wiggle && <>
+        <Row label="Wiggle amount" value={wiggle.amount} min={0} max={100} unit="%" onChange={amount => put('wiggle', {...wiggle, amount})} disabled={disabled}/>
+        <Row label="Wiggle speed" value={wiggle.speed} min={0} max={100} unit="%" onChange={speed => put('wiggle', {...wiggle, speed})} disabled={disabled}/>
+        <Row label="Wave size" value={wiggle.size} min={0} max={100} unit="%" onChange={size => put('wiggle', {...wiggle, size})} disabled={disabled}/>
+      </>}
+    </Section>
+    <Section title="3D photo (parallax)" Icon={BoxIcon} on={!!plx} onToggle={on => put('parallax', on ? {...PARALLAX} : null)} disabled={disabled} hint="Gives still photos depth: mark the subject; the background behind it is filled in automatically and the two move at different depths. Render to see it.">
+      {plx && <>
+        <Pills label="Subject shape" value={plx.shape} options={[['ellipse', 'Oval'], ['rect', 'Box']]} onChange={shape => put('parallax', {...plx, shape})} disabled={disabled}/>
+        <Box v={plx} set={p => put('parallax', {...plx, ...p})} disabled={disabled}/>
+        <Pills label="Camera move" value={plx.direction} options={[['in', 'Push in'], ['out', 'Pull out'], ['left', 'Drift left'], ['right', 'Drift right']]} onChange={direction => put('parallax', {...plx, direction})} disabled={disabled}/>
+        <Row label="Depth" value={plx.amount} min={0} max={100} unit="%" onChange={amount => put('parallax', {...plx, amount})} disabled={disabled}/>
+        <p className="hint">Applies to photos in this scene (not video clips). The subject box shows on the preview.</p>
+      </>}
+    </Section>
+    </FxGroup>
+    <FxGroup id="explain" items="Annotations · Spotlight · Map route" title="Point things out" Icon={PenLine} description="Draw arrows, circles, routes or a spotlight to guide the viewer." active={onCount([annots.length > 0, !!sp, !!route])}>
     <section className="look-section" aria-label="Annotations">
       <div className="look-heading"><h3><PenLine size={15}/> Annotations</h3><span className="hint">{annots.length}/10</span></div>
       <p className="hint">Arrows, circles, underlines, boxes and callouts that draw themselves on screen to point things out. Shown on the preview; render to see them draw.</p>
@@ -185,28 +242,15 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
         <button className="text-btn" disabled={disabled} onClick={() => put('annotations', annots.filter((_, k) => k !== i))}><Trash2 size={12}/> Remove</button>
       </fieldset>)}
     </section>
-    <Section title="Colour wheels" Icon={Palette} on={!!wheels} onToggle={on => put('wheels', on ? {lift: ZERO3(), gamma: ZERO3(), gain: ZERO3()} : null)} disabled={disabled} hint="Lift tints the shadows, Gamma the midtones, Gain the highlights. Drag a dot towards a colour; double-click to reset. Shows in the preview.">
-      {wheels && <div className="wheels-row">
-        {(['lift', 'gamma', 'gain'] as const).map(k => <ColorWheel key={k} label={k[0].toUpperCase() + k.slice(1)} value={wheels[k]} disabled={disabled} onChange={v => put('wheels', {...wheels, [k]: v})}/>)}
-      </div>}
-    </Section>
-    <Section title="3D photo (parallax)" Icon={BoxIcon} on={!!plx} onToggle={on => put('parallax', on ? {...PARALLAX} : null)} disabled={disabled} hint="Gives still photos depth: mark the subject; the background behind it is filled in automatically and the two move at different depths. Render to see it.">
-      {plx && <>
-        <Pills label="Subject shape" value={plx.shape} options={[['ellipse', 'Oval'], ['rect', 'Box']]} onChange={shape => put('parallax', {...plx, shape})} disabled={disabled}/>
-        <Box v={plx} set={p => put('parallax', {...plx, ...p})} disabled={disabled}/>
-        <Pills label="Camera move" value={plx.direction} options={[['in', 'Push in'], ['out', 'Pull out'], ['left', 'Drift left'], ['right', 'Drift right']]} onChange={direction => put('parallax', {...plx, direction})} disabled={disabled}/>
-        <Row label="Depth" value={plx.amount} min={0} max={100} unit="%" onChange={amount => put('parallax', {...plx, amount})} disabled={disabled}/>
-        <p className="hint">Applies to photos in this scene (not video clips). The subject box shows on the preview.</p>
+    <Section title="Spotlight" Icon={Focus} on={!!sp} onToggle={on => put('spotlight', on ? {...SPOT} : null)} disabled={disabled} hint="Darken everything except one area, to point at a face, a place on a map or a line in a document.">
+      {sp && <>
+        <Pills label="Shape" value={sp.shape} options={[['ellipse', 'Oval'], ['rect', 'Box']]} onChange={shape => put('spotlight', {...sp, shape})} disabled={disabled}/>
+        <Box v={sp} set={p => put('spotlight', {...sp, ...p})} disabled={disabled}/>
+        <Row label="Darken" value={sp.dim} min={0} max={100} unit="%" onChange={dim => put('spotlight', {...sp, dim})} disabled={disabled}/>
+        <Row label="Soft edge" value={sp.feather} min={0} max={100} unit="%" onChange={feather => put('spotlight', {...sp, feather})} disabled={disabled}/>
+        <Timing v={sp} set={p => put('spotlight', {...sp, ...p})} disabled={disabled} name="Spotlight"/>
       </>}
     </Section>
-    <Section title="Split screen" Icon={LayoutGrid} on={!!layout} onToggle={on => put('layout', on ? {...LAYOUT, type: vertical ? 'split2v' : 'split2'} : null)} disabled={disabled || videoOrImages < 2} hint={videoOrImages < 2 ? `Split screen shows several pictures at once, so this scene needs at least two. It has ${videoOrImages}.` : "Show the scene's pictures at the same time, e.g. then-and-now. They fill the panels in order and the preview shows the layout."}>
-      {layout && <>
-        <Pills label="Layout" value={layout.type} options={[['split2', 'Side by side'], ['split2v', 'Top & bottom'], ['split3', 'Three'], ['grid4', '2 × 2 grid']]} onChange={type => put('layout', {...layout, type})} disabled={disabled}/>
-        <Row label="Gap" value={layout.gap} min={0} max={40} unit="px" onChange={gap => put('layout', {...layout, gap})} disabled={disabled}/>
-        <div className="adjust-row changed"><label>Background</label><input type="color" aria-label="Split screen background" value={layout.bg} disabled={disabled} onChange={e => put('layout', {...layout, bg: e.target.value.toUpperCase()})}/><span/><span/></div>
-      </>}
-    </Section>
-    {videoOrImages < 2 && onAddMedia && <div className="split-add"><button className="btn primary" disabled={disabled} onClick={onAddMedia}><Plus size={14}/> Add another image or video to this scene</button></div>}
     <Section title="Map route" Icon={RouteIcon} on={!!route} onToggle={on => {onDraft({route: on ? {...ROUTE, points: [[20, 70], [50, 45], [78, 35]]} : null} as any); onRouteEditing?.(on);}} disabled={disabled} hint="A line that draws itself across the picture, with pins at each stop, like an army's march or a trade route.">
       {route && <>
         <button className={`btn ${routeEditing ? 'primary' : ''}`} aria-pressed={!!routeEditing} disabled={disabled} onClick={() => onRouteEditing?.(!routeEditing)}><MousePointerClick size={14}/> {routeEditing ? 'Done editing points' : 'Edit points on the preview'}</button>
@@ -231,23 +275,16 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
         </div>
       </>}
     </Section>
-    <Section title="Camera shake" Icon={Vibrate} on={!!shake} onToggle={on => put('shake', on ? {...SHAKE} : null)} disabled={disabled} hint="Handheld wobble for tension or action, with an optional impact zoom at the start. Render to see it.">
-      {shake && <>
-        <Pills<NonNullable<Shake['preset']>> label="Shake style" value={shake.preset || 'custom'} options={[['custom', 'Custom'], ['handheld', 'Handheld (subtle)'], ['walk', 'Walking'], ['run', 'Running'], ['impact', 'Impact hit']]} onChange={preset => put('shake', {...shake, ...SHAKE_PRESETS[preset], preset})} disabled={disabled}/>
-        <Row label="Shake" value={shake.amount} min={0} max={100} unit="%" onChange={amount => put('shake', {...shake, amount})} disabled={disabled}/>
-        <Row label="Speed" value={shake.speed} min={0} max={100} unit="%" onChange={speed => put('shake', {...shake, speed})} disabled={disabled}/>
-        <label className="switch-label finishing-toggle"><input type="checkbox" aria-label="Impact zoom" checked={shake.impact} disabled={disabled} onChange={e => put('shake', {...shake, impact: e.target.checked})}/> Impact zoom at the start</label>
+    </FxGroup>
+    <FxGroup id="layout" items="Split screen · Blur or pixelate" title="Layout & privacy" Icon={LayoutGrid} description="Show pictures side by side, or hide faces and names." active={onCount([!!layout, redact.length > 0])}>
+    <Section title="Split screen" Icon={LayoutGrid} on={!!layout} onToggle={on => put('layout', on ? {...LAYOUT, type: vertical ? 'split2v' : 'split2'} : null)} disabled={disabled || videoOrImages < 2} hint={videoOrImages < 2 ? `Split screen shows several pictures at once, so this scene needs at least two. It has ${videoOrImages}.` : "Show the scene's pictures at the same time, e.g. then-and-now. They fill the panels in order and the preview shows the layout."}>
+      {layout && <>
+        <Pills label="Layout" value={layout.type} options={[['split2', 'Side by side'], ['split2v', 'Top & bottom'], ['split3', 'Three'], ['grid4', '2 × 2 grid']]} onChange={type => put('layout', {...layout, type})} disabled={disabled}/>
+        <Row label="Gap" value={layout.gap} min={0} max={40} unit="px" onChange={gap => put('layout', {...layout, gap})} disabled={disabled}/>
+        <div className="adjust-row changed"><label>Background</label><input type="color" aria-label="Split screen background" value={layout.bg} disabled={disabled} onChange={e => put('layout', {...layout, bg: e.target.value.toUpperCase()})}/><span/><span/></div>
       </>}
     </Section>
-    <Section title="Spotlight" Icon={Focus} on={!!sp} onToggle={on => put('spotlight', on ? {...SPOT} : null)} disabled={disabled} hint="Darken everything except one area, to point at a face, a place on a map or a line in a document.">
-      {sp && <>
-        <Pills label="Shape" value={sp.shape} options={[['ellipse', 'Oval'], ['rect', 'Box']]} onChange={shape => put('spotlight', {...sp, shape})} disabled={disabled}/>
-        <Box v={sp} set={p => put('spotlight', {...sp, ...p})} disabled={disabled}/>
-        <Row label="Darken" value={sp.dim} min={0} max={100} unit="%" onChange={dim => put('spotlight', {...sp, dim})} disabled={disabled}/>
-        <Row label="Soft edge" value={sp.feather} min={0} max={100} unit="%" onChange={feather => put('spotlight', {...sp, feather})} disabled={disabled}/>
-        <Timing v={sp} set={p => put('spotlight', {...sp, ...p})} disabled={disabled} name="Spotlight"/>
-      </>}
-    </Section>
+    {videoOrImages < 2 && onAddMedia && <div className="split-add"><button className="btn primary" disabled={disabled} onClick={onAddMedia}><Plus size={14}/> Add another image or video to this scene</button></div>}
     <Section title="Blur or pixelate areas" Icon={EyeOff} on={redact.length > 0} onToggle={on => put('redact', on ? [{...REDACT}] : [])} disabled={disabled} hint="Hide faces, names or number plates. Up to 6 areas.">
       {redact.map((r: Redact, i: number) => <fieldset key={i} className="adjust-group"><legend>Area {i + 1}</legend>
         <Pills label="Style" value={r.mode} options={[['blur', 'Blur'], ['pixelate', 'Pixelate']]} onChange={mode => put('redact', redact.map((x: Redact, k: number) => k === i ? {...x, mode} : x))} disabled={disabled}/>
@@ -258,30 +295,22 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
       </fieldset>)}
       {redact.length > 0 && redact.length < 6 && <button className="text-btn" disabled={disabled} onClick={() => put('redact', [...redact, {...REDACT, x: Math.min(90, 50 + redact.length * 8)}])}><Plus size={12}/> Add another area</button>}
     </Section>
-    <Section title="Lens flare" Icon={Sun} on={!!flare} onToggle={on => put('flare', on ? {...FLARE} : null)} disabled={disabled} hint="A procedurally drawn lens flare (glow, streak and ghosts) blended over the picture. Generated by SceneForge, not a photo or AI. Render to see it.">
-      {flare && <>
-        <Row label="Flare left–right" value={flare.x} min={0} max={100} unit="%" onChange={x => put('flare', {...flare, x})} disabled={disabled}/>
-        <Row label="Flare up–down" value={flare.y} min={0} max={100} unit="%" onChange={y => put('flare', {...flare, y})} disabled={disabled}/>
-        <div className="adjust-row changed"><label>Tint</label><input type="color" aria-label="Lens flare colour" value={flare.color} disabled={disabled} onChange={e => put('flare', {...flare, color: e.target.value.toUpperCase()})}/><span/><span/></div>
-        <Pills label="Blend" value={flare.blend} options={[['screen', 'Screen'], ['add', 'Add (brighter)']]} onChange={blend => put('flare', {...flare, blend})} disabled={disabled}/>
-        <Row label="Flare intensity" value={flare.amount} min={0} max={100} unit="%" onChange={amount => put('flare', {...flare, amount})} disabled={disabled}/>
-        <Row label="Horizontal drift" value={flare.drift} min={0} max={100} unit="%" onChange={drift => put('flare', {...flare, drift})} disabled={disabled}/>
-      </>}
-    </Section>
-    <Section title="Wiggle (turbulent displace)" Icon={Blend} on={!!wiggle} onToggle={on => put('wiggle', on ? {...WIGGLE} : null)} disabled={disabled} hint="Warps the picture with slowly moving waves, like heat haze or a dream sequence (FFmpeg displace). Render to see it.">
-      {wiggle && <>
-        <Row label="Wiggle amount" value={wiggle.amount} min={0} max={100} unit="%" onChange={amount => put('wiggle', {...wiggle, amount})} disabled={disabled}/>
-        <Row label="Wiggle speed" value={wiggle.speed} min={0} max={100} unit="%" onChange={speed => put('wiggle', {...wiggle, speed})} disabled={disabled}/>
-        <Row label="Wave size" value={wiggle.size} min={0} max={100} unit="%" onChange={size => put('wiggle', {...wiggle, size})} disabled={disabled}/>
-      </>}
-    </Section>
-    <Section title="Light leaks" Icon={Sun} on={!!leak} onToggle={on => put('leak', on ? {...LEAK} : null)} disabled={disabled} hint="Soft coloured light drifting in from the edges, like old film or a vintage lens.">
-      {leak && <>
-        <Pills label="Colour" value={leak.color} options={[['warm', 'Warm'], ['cool', 'Cool'], ['rainbow', 'Rainbow']]} onChange={color => put('leak', {...leak, color})} disabled={disabled}/>
-        <Row label="Amount" value={leak.amount} min={0} max={100} unit="%" onChange={amount => put('leak', {...leak, amount})} disabled={disabled}/>
-        <Row label="Speed" value={leak.speed} min={0} max={100} unit="%" onChange={speed => put('leak', {...leak, speed})} disabled={disabled}/>
-      </>}
-    </Section>
+    </FxGroup>
+    <FxGroup id="intro" items="Countdown intro" title="Scene intro" Icon={Timer} description="A countdown that plays before this scene." active={onCount([!!(st as any).countdown])}>
+    <section className="look-section" aria-label="Countdown intro">
+      <div className="look-heading"><h3><Timer size={15}/> Countdown intro</h3>
+        <button role="switch" aria-checked={!!(st as any).countdown} aria-label="Countdown intro" className={`fx-switch ${(st as any).countdown ? 'on' : ''}`} disabled={disabled}
+          onClick={() => put('countdown', (st as any).countdown ? null : {style: 'film', seconds: 5, beep: 'each', tone: 'bw', color: '#8F7CF0'})}><span/></button></div>
+      <p className="hint">A cinema countdown plays before this scene (the scene gets longer by its length). Off unless you switch it on.</p>
+      {(st as any).countdown && (() => {const cd = (st as any).countdown; const setCd = (p: any) => put('countdown', {...cd, ...p}); return <>
+        <Pills label="Countdown style" value={cd.style} options={[['film', 'Film leader'], ['modern', 'Modern'], ['minimal', 'Minimal']]} onChange={style => setCd({style})} disabled={disabled}/>
+        <label className="control-label">Length<select aria-label="Countdown length" value={cd.seconds} disabled={disabled} onChange={e => setCd({seconds: Number(e.target.value)})}>{[3, 4, 5, 6, 7, 8, 9, 10].map(n => <option key={n} value={n}>{n} seconds</option>)}</select></label>
+        <label className="control-label">Beeps<select aria-label="Countdown beeps" value={cd.beep} disabled={disabled} onChange={e => setCd({beep: e.target.value})}><option value="each">Every number</option><option value="two-pop">Classic 2-pop</option><option value="none">Silent</option></select></label>
+        {cd.style === 'film' && <Pills label="Countdown tone" value={cd.tone} options={[['bw', 'Black & white'], ['sepia', 'Sepia']]} onChange={tone => setCd({tone})} disabled={disabled}/>}
+        {cd.style === 'modern' && <div className="adjust-row changed"><label>Ring colour</label><input type="color" aria-label="Countdown ring colour" value={cd.color} disabled={disabled} onChange={e => setCd({color: e.target.value.toUpperCase()})}/><span/><span/></div>}
+      </>;})()}
+    </section>
+    </FxGroup>
   </div>;
 }
 

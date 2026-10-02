@@ -1,3 +1,27 @@
+# SceneForge Studio 0.9.0: Friendlier editing
+
+Fixes from the 0.8.0 Windows test, a tidier Effects tab and the rest of the roadmap. Everything in 0.8.0 is included.
+
+**Fixes**
+- The **♪ Beats** menu on the timeline no longer cuts off its text on Windows.
+- Track names stay on one line next to the M / S / lock buttons. The first timeline audio track is now called **Music & SFX**.
+- The editor can no longer be pushed sideways by a wide panel (the left edge of the track list was cut off).
+- **Waveforms** now show on **A2 clip sound** and on every **A3–A8** clip, like the linked audio under a clip in other editors. Narration on A1 already had one.
+
+**Easier to understand**
+- **Typewriter has its own box** in the Text tab: the on/off switch, speed (Slow / Natural / Fast), start delay, reveal time, *Extend scene*, the keystroke sound, a volume slider, **Preview sound** (hear it without rendering) and uploading your own sound. Before, these were split between Caption style → Animation and the bottom of the tab.
+- **Effects tab sorted into groups.** From Split toning down to Look presets, effects now sit in collapsible groups with a plain description and the effects each group holds: *Colour grading, Light & lens, Camera & motion, Point things out, Layout & privacy, Scene intro* and *Combine & reuse looks*. A group opens by itself when one of its effects is on and shows how many are on.
+
+**New**
+- **Auto-ducking for A3–A8:** tick *Lower under voice* on a timeline clip and it gets quieter by itself whenever narration or a video's own sound plays. Choose how much, and apply it to the whole track in one click. Works in scene renders, live playback and export.
+- **Restore points:** File → *Restore points…*. SceneForge saves one every few minutes while you edit (only when something changed) and keeps the last 20; you can also save a named one. Restoring opens a **copy** of the project as it was, so nothing you have now is lost.
+- **Try a sample project:** on the Projects page. Opens a ready-made 3-scene project with pictures, captions, a title, a typewriter caption with sound, stickers, effects, music and sound effects. All its media is generated on your PC.
+- **Caption translation:** Auto captions → *Captions in*: the spoken language, **English (translated)**, or **Both** (each caption shows the spoken words with English underneath). It uses Local Whisper, so it is free and works offline. Whisper only translates into English.
+- **Title templates** in the Text tab: Lower third, Intro title, Outro / end card, Chapter heading and Quote. Each adds normal text layers that you edit like any title.
+
+**Build**
+- GitHub Actions updated to the Node 24 versions (checkout, setup-node, setup-python, upload-artifact v6). The checks run on a pinned Ubuntu 24.04.
+
 # SceneForge Studio 0.8.0: Creator pack
 
 Faster editing for YouTube and short-form creators. Everything in 0.7.1 is included.

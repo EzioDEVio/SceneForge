@@ -110,6 +110,8 @@ globalThis.fetch=async(path,init={})=>{
  return {ok:true,status:200,json:async()=>clone(result)};
 };
 let passed=0;
+// 0.9.0: the Effects tab sorts effects into collapsible groups; open them all (stays open via sessionStorage).
+async function openFxGroups(){for(const b of [...document.querySelectorAll('button.fx-group-head[aria-expanded="false"]')])fireEvent.click(b);await new Promise(r=>setTimeout(r,0));}
 const check=(name,condition=true)=>{assert.ok(condition,name);console.log('PASS '+name);passed++;};
 const visibleEditor=()=>within(screen.getByRole('region',{name:/Edit /}));
 const saved=()=>waitFor(()=>assert.equal(screen.getByRole('status').textContent,'All changes saved'));
@@ -224,7 +226,7 @@ try{
  check('independent Arabic caption editing',project.scenes.find(s=>s.id===firstId).subtitle_text==='مرحبا — Altair 8800'&&project.scenes.find(s=>s.id===firstId).spoken_text==='An edited narration.');
  await user.click(screen.getByRole('button',{name:'Pan left',exact:true}));await saved();
  check('motion selection updates the selected media',project.scenes.find(s=>s.id===firstId).shots[0].motion_json.type==='pan_left');
- await user.click(screen.getByRole('tab',{name:'Effects',exact:true}));
+ await user.click(screen.getByRole('tab',{name:'Effects',exact:true}));await openFxGroups();
  await user.type(screen.getByRole('textbox',{name:'Search effects'}),'warm');
  check('effect search narrows visible choices',screen.getAllByRole('button',{name:'Warm',exact:true}).length===1&&!screen.queryByRole('button',{name:'Cool',exact:true}));
  await user.click(screen.getByRole('button',{name:'Warm',exact:true}));await saved();
@@ -386,7 +388,7 @@ try{
  check('YouTube loudness saves on the project (the whole-video countdown switch is gone)',!screen.queryByRole('checkbox',{name:'Countdown leader'}));
  check('restore old photo is offered for image scenes',(await (async()=>{await user.click(screen.getByRole('tab',{name:'Media',exact:true}));const b=screen.queryByRole('button',{name:/Restore old photo/});await user.click(screen.getByRole('tab',{name:'Audio',exact:true}));return !!b;})()));
  // Effects pack controls
- await user.click(screen.getByRole('tab',{name:'Effects',exact:true}));
+ await user.click(screen.getByRole('tab',{name:'Effects',exact:true}));await openFxGroups();
  await user.click(screen.getByRole('switch',{name:'Camera shake'}));
 check('the timeline stays usable while an effect change is saving (no flicker)',!screen.getByRole('button',{name:/Add part/}).disabled&&!screen.getByRole('switch',{name:'Spotlight'}).disabled);
  await user.click(screen.getByRole('checkbox',{name:'Impact zoom'}));await saved();
@@ -426,7 +428,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.upload(screen.getByLabelText('Import look pack file'),new File(['{"presets":[]}'],'bad.json',{type:'application/json'}));
  check('an invalid pack shows the reason',!!(await screen.findByText(/Couldn't import “bad.json”: This file is not a SceneForge look pack/)));
  check('no Insert countdown button on the timeline side any more',!screen.queryByRole('button',{name:/Insert countdown/}));
- await user.click(screen.getByRole('switch',{name:'Countdown intro'}));
+ await openFxGroups();await user.click(screen.getByRole('switch',{name:'Countdown intro'}));
  await user.click(within(screen.getByRole('radiogroup',{name:'Countdown style'})).getByRole('radio',{name:'Modern'}));await saved();
  check('Countdown intro is an effect you switch on for a scene',lk().some(l=>l.countdown?.style==='modern'&&l.countdown.seconds===5));
  await user.click(screen.getByRole('switch',{name:'Countdown intro'}));await saved();
@@ -549,7 +551,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getByRole('button',{name:'Add textured title'}));
  await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/textured-title')&&r.body?.text==='LAVA'&&r.body?.texture?.preset==='neon')));
  check('textured title sends the text and chosen pattern',true);
- await user.click(screen.getByRole('tab',{name:'Effects',exact:true}));
+ await user.click(screen.getByRole('tab',{name:'Effects',exact:true}));await openFxGroups();
  await user.click(screen.getByRole('button',{name:'Original',exact:true}));await saved();
  const a3=screen.getByLabelText('Project audio timeline track');
  const audioData=(name)=>({types:['Files'],files:[new File(['audio'],name,{type:'audio/mpeg'})],items:[],dropEffect:'',getData:()=>''});
@@ -568,6 +570,12 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  fireEvent.change(screen.getByRole('slider',{name:'Timeline audio clip volume'}),{target:{value:'70'}});
  await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.body?.finishing?.audio_clips?.some(c=>c.name==='music-a.mp3'&&c.volume===70))));
  check('project audio clip volume control saves independently',project.finishing_json.audio_clips.find(c=>c.name==='music-a.mp3').volume===70);
+ await user.click(screen.getByRole('checkbox',{name:'Lower this clip under voice'}));
+ await waitFor(()=>assert.ok(project.finishing_json.audio_clips.find(c=>c.name==='music-a.mp3').duck===60));
+ check('auto-ducking switches on for a timeline clip with a sensible default',!!screen.getByRole('slider',{name:'Auto-ducking amount'}));
+ await user.click(screen.getByRole('checkbox',{name:'Lower this clip under voice'}));
+ await waitFor(()=>assert.ok(!project.finishing_json.audio_clips.find(c=>c.name==='music-a.mp3').duck));
+ check('auto-ducking switches off again',!screen.queryByRole('slider',{name:'Auto-ducking amount'}));
  const audioClipBeforeCut=project.finishing_json.audio_clips.find(c=>c.name==='music-a.mp3');
  const cutBlock=screen.getByRole('button',{name:'Select audio clip music-a.mp3'});cutBlock.getBoundingClientRect=()=>({left:0,top:0,width:1000,height:28,right:1000,bottom:28});
  fireEvent.pointerDown(cutBlock,{pointerId:2,clientX:500});fireEvent.pointerUp(window,{pointerId:2,clientX:500});
@@ -786,6 +794,10 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  check('Text Box layers expose a wrapping width control',screen.getAllByRole('slider',{name:/text box width/}).length>0);
  await user.click(visibleEditor().getAllByRole('button',{name:'Add Text+',exact:true})[0]);await saved();
  check('Text+ layers are distinct advanced title clips',[...document.querySelectorAll('.text-edit-clip')].some(block=>block.textContent?.includes('Text+ title')));
+ const layersBeforeTemplate=project.scenes.find(s=>s.id===firstId).font_json.layers.length;
+ await user.click(visibleEditor().getByRole('button',{name:'Add Lower third template'}));await saved();
+ check('a title template adds its ready-made layers',project.scenes.find(s=>s.id===firstId).font_json.layers.length===layersBeforeTemplate+2&&project.scenes.find(s=>s.id===firstId).font_json.layers.some(l=>l.text==='Your Name'));
+ check('the typewriter has its own box with speed and sound',!!within(visibleEditor().getByRole('region',{name:'Typewriter'})).getByRole('button',{name:'Preview typewriter sound'}));
  const layerText=visibleEditor().getByRole('textbox',{name:'Layer 1 text'});
  await user.clear(layerText);await user.type(layerText,'A chapter title');await user.tab();await saved();
  check('overlay text persists independently of captions',project.scenes.find(s=>s.id===firstId).font_json.layers[0].text==='A chapter title');

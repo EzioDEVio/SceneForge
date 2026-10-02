@@ -35,4 +35,12 @@ check('timeline snapping chooses the nearest scene edge or marker within toleran
 check('no adjustments means no preview filter',adjustPreviewFilter({},'wb')===''&&adjustPreviewFilter(undefined,'wb')==='');
 const pf=adjustPreviewFilter({saturation:-100,temperature:40,contrast:20},'wb');
 check('preview filter maps saturation, contrast and white balance',pf.includes('saturate(0.000)')&&pf.includes('contrast(1.200)')&&pf.includes('url(#wb)'));
+// 0.9.0 title templates must satisfy the backend TextLayer schema (schemas.TextLayer)
+await build({stdin:{contents:"export {TEXT_TEMPLATES,templateLayers} from './src/TextTemplates';export {ANIMATIONS} from './src/TitleDesigner';",resolveDir:'.',loader:'tsx'},outfile:'node_modules/.cache/units-templates.cjs',bundle:true,platform:'node',format:'cjs',logLevel:'silent',jsx:'automatic'});
+const {TEXT_TEMPLATES,templateLayers,ANIMATIONS}=require('../node_modules/.cache/units-templates.cjs');
+const FAMILIES=['Noto Naskh Arabic','Noto Sans Arabic','Noto Sans','Amiri','Tajawal','Lalezar','Poppins','Bebas Neue','Anton','Pacifico'];
+const okLayer=l=>FAMILIES.includes(l.family)&&l.shadow<=10&&l.shadow>=0&&l.size>=12&&l.size<=200&&l.x>=0&&l.x<=100&&l.y>=0&&l.y<=100&&ANIMATIONS.includes(l.animation)&&['left','center','right'].includes(l.align||'center')&&(!l.end_ms||l.end_ms>l.start_ms)&&/^#[0-9a-fA-F]{6}$/.test(l.color);
+check('every title template makes layers the backend accepts',TEXT_TEMPLATES.length>=5&&TEXT_TEMPLATES.every(t=>templateLayers(t,0).every(okLayer)));
+let n=0;const ids=templateLayers(TEXT_TEMPLATES[0],2000,()=>'id'+(n++));
+check('template layers get fresh ids and start at the given time',ids[0].id==='id0'&&ids[1].id==='id1'&&ids[0].start_ms===2300&&ids[0].end_ms===7000);
 console.log(`${passed} unit checks passed.`);

@@ -196,6 +196,8 @@ def delete_project(project_id: str, db: Session = Depends(get_db)):
     db.expire(project, ["jobs", "scenes"])
     db.delete(project)
     db.commit()
+    from app.domain.snapshots import delete_all as _drop_snapshots
+    _drop_snapshots(project_id)   # 0.9.0 restore points belong to the project
     return {"ok": True, "media_retained": True}
 
 

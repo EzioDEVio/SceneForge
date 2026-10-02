@@ -108,3 +108,80 @@ html[data-theme="light"] :is(.inspector-tabs-more-button,.workspace-switcher){ba
 html[data-theme="light"] .inspector-tabs-menu{background:#fff;border-color:#cfd5df;color:#30394a}
 html[data-theme="light"] .inspector-tabs-menu button:hover{background:#ebe8fb}
 html[data-theme="light"] .track-collapse-button{color:#5e697c}
+
+/* 0.9.0: waveforms on A2 clip sound and A3–A8 clips (like linked audio in other editors) */
+.source-audio-clip,.project-audio-body{position:relative;overflow:hidden}
+.asset-wave{position:absolute;inset:2px 0;width:100%;height:calc(100% - 4px);pointer-events:none;opacity:.38}
+.asset-wave path{stroke:#9fd8ee;stroke-width:1}
+.project-audio-body .asset-wave path{stroke:#f3c983}
+.source-audio-clip>:not(.asset-wave),.project-audio-body>:not(.asset-wave):not(.gain-line){position:relative;z-index:1}
+/* 0.9.0: the Beats menu text was clipped on Windows (26px box with 6px padding) */
+.studio-shell .beat-marker-select{padding:0 22px 0 6px;line-height:normal;min-width:96px}
+/* 0.9.0: track names stay on one line next to M / S / lock buttons */
+.track-headers>div>span:not(.track-state-buttons){min-width:0;flex:1 1 auto;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.track-headers>div>span:not(.track-state-buttons) small{overflow:hidden;text-overflow:ellipsis}
+/* 0.9.0: never let a wide panel push the whole editor sideways (left edge was cut off) */
+html,body{overflow-x:clip}
+.studio-shell{max-width:100vw;overflow-x:clip}
+
+/* 0.9.0: Typewriter in its own box */
+.typewriter-box{margin:18px 0 14px;padding:12px 12px 10px;border:1px solid #3d4350;border-radius:10px;background:#20232b}
+.typewriter-box .section-heading{margin-bottom:6px}
+.typewriter-box .tw-group{margin-top:10px;padding:9px 10px;border:1px solid #343945;border-radius:8px;background:#1b1e25}
+.typewriter-box .tw-group legend{padding:0 5px;font-size:10px;font-weight:700;letter-spacing:1px;text-transform:uppercase;color:#9aa5ba}
+.typewriter-box .tw-off{opacity:.55}
+.typewriter-box .tw-speeds .btn{flex:1}
+.typewriter-box .tw-speeds .btn.selected{border-color:#8b7cf0;background:#3a3460;color:#fff}
+.typewriter-box .tw-volume span{display:flex;align-items:center;gap:5px}
+.typewriter-box .tw-volume input{width:100%}
+.typewriter-box .tw-sound-row{display:flex;align-items:center;justify-content:space-between;gap:8px;margin:6px 0 8px}
+.typewriter-box .tw-sound-name{font-size:11px;color:#b9c2d3}
+html[data-theme="light"] .studio-shell .typewriter-box{background:#fbfbfe;border-color:#dfe3ec}
+html[data-theme="light"] .studio-shell .typewriter-box .tw-group{background:#fff;border-color:#e3e6ee}
+html[data-theme="light"] .studio-shell .typewriter-box .tw-sound-name{color:#4b5565}
+html[data-theme="light"] .studio-shell .typewriter-box .tw-speeds .btn.selected{background:#eeebfc;color:#3d3480}
+
+/* 0.9.0: Effects tab groups (Split toning → Look presets used to be one long list) */
+.fx-groups-heading{margin:22px 0 8px;padding-top:16px;border-top:1px solid #3a3f4b}
+.fx-groups-heading h3{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.fx-group{margin:8px 0;border:1px solid #3a3f4b;border-radius:10px;background:#1f2229;overflow:hidden}
+.fx-group.open{border-color:#5a5190}
+.fx-group-head{width:100%;display:flex;align-items:center;gap:10px;padding:10px 11px;border:0;background:none;color:inherit;text-align:left}
+.fx-group-head:hover{background:#272b34}
+.fx-group-icon{flex:0 0 30px;height:30px;display:grid;place-items:center;border-radius:8px;background:#2f2b48;color:#b9aefa}
+.fx-group-text{flex:1;min-width:0;display:flex;flex-direction:column;gap:1px}
+.fx-group-text strong{font-size:12.5px}
+.fx-group-text small{font-size:10.5px;color:#98a2b6;line-height:1.35}
+.fx-group-badge{flex:none;font-size:10px;font-weight:700;padding:2px 7px;border-radius:10px;background:#2e5b49;color:#bff0d6}
+.fx-group-chevron{flex:none;color:#8d97ab;transition:transform .15s}
+.fx-group.open .fx-group-chevron{transform:rotate(180deg)}
+.fx-group-body{padding:2px 11px 10px;border-top:1px solid #343945}
+.fx-group-body>.look-section:first-child{border-top:0}
+.scene-fx-panel{margin-top:0}
+html[data-theme="light"] .studio-shell .fx-group{background:#fff;border-color:#dfe3ec}
+html[data-theme="light"] .studio-shell .fx-group.open{border-color:#b2a5f0}
+html[data-theme="light"] .studio-shell .fx-group-head:hover{background:#f6f5fd}
+html[data-theme="light"] .studio-shell .fx-group-icon{background:#eeebfc;color:#5b4bc4}
+html[data-theme="light"] .studio-shell .fx-group-text small{color:#667085}
+html[data-theme="light"] .studio-shell .fx-group-body{border-color:#e7e9f0}
+html[data-theme="light"] .studio-shell .fx-group-badge{background:#dff3e8;color:#23704b}
+html[data-theme="light"] .studio-shell .fx-groups-heading{border-color:#e3e6ee}
+.fx-group-text em{font-style:normal;font-size:10px;color:#b7acf5;margin-top:2px}html[data-theme="light"] .studio-shell .fx-group-text em{color:#5b4bc4}
+.auto-duck-box{margin:10px 0;padding:8px 10px;border:1px solid #343945;border-radius:8px}.auto-duck-box .hint{margin:4px 0}html[data-theme="light"] .studio-shell .auto-duck-box{border-color:#e3e6ee}
+
+/* 0.9.0 restore points */
+.restore-save-row{display:flex;gap:8px;margin:12px 0}
+.restore-save-row input{flex:1;min-width:0}
+.restore-list{list-style:none;margin:10px 0 0;padding:0;display:flex;flex-direction:column;gap:6px;max-height:50vh;overflow:auto}
+.restore-list li{display:flex;align-items:center;gap:8px;padding:8px 10px;border:1px solid var(--line,#dfe3ec);border-radius:8px}
+.restore-list li>div{flex:1;min-width:0;display:flex;flex-direction:column}
+.restore-list li span{font-size:11px;color:#7b8493}
+.sample-project{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:14px 0 26px;padding:16px 20px;border:1px dashed rgba(139,124,240,.5);border-radius:12px;background:rgba(139,124,240,.08);color:inherit}.sample-project h2{font-size:15px;margin:0 0 4px;color:inherit}.sample-project .hint{margin:0;max-width:640px}@media(max-width:640px){.sample-project{flex-direction:column;align-items:flex-start}}
+
+/* 0.9.0 title templates */
+.text-templates{margin-top:12px}
+.text-templates h4{display:flex;align-items:center;gap:6px;margin:0;font-size:12px}
+.text-template-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+.text-template{flex-direction:column;align-items:flex-start;justify-content:flex-start;gap:2px;white-space:normal;text-align:left;padding:8px 9px}
+.text-template small{font-size:10px;font-weight:400;color:#98a2b6;line-height:1.35}
+html[data-theme="light"] .studio-shell .text-template small{color:#667085}

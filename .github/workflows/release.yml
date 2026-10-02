@@ -44,10 +44,10 @@ jobs:
       run:
         shell: bash
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with: {node-version: '22'}
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with: {python-version: '3.12'}
       - name: Check the tag matches the app version
         if: startsWith(github.ref, 'refs/tags/v')
@@ -128,7 +128,7 @@ jobs:
           $res = Join-Path $installDir 'resources'
           python desktop/tests/e2e_backend.py --exe (Join-Path $res 'backend/sceneforge-backend.exe') --ffmpeg-dir (Join-Path $res 'ffmpeg/bin') --resources (Join-Path $res 'app-resources')
           if ($LASTEXITCODE -ne 0) { throw 'End-to-end editor test failed in the installed app' }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: SceneForge-Studio-${{ matrix.name }}
           path: |

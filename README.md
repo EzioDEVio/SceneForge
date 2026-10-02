@@ -27,6 +27,7 @@ The screenshots on this page come from the 0.7.0 build. They show a demo project
   - GPU (NVIDIA NVENC) export;
   - live timeline playback;
   - keyframe animation for stickers, overlays and titles.
+- **Friendlier editing** *(0.9.0)*: a dedicated Typewriter box with sound preview, an Effects tab sorted into clear groups, waveforms on every audio lane, auto-ducking for A3–A8, automatic restore points, a sample project, caption translation to English (or bilingual) and title templates.
 - **Exports** to YouTube, Shorts/Reels/TikTok, Instagram, ProRes, GIF, MP3/WAV and SRT/VTT. Rendering uses FFmpeg on your own computer.
 
 ## Feature tour
@@ -332,6 +333,7 @@ The table summarizes the documented history. Versions marked WIP or RC were deve
 | **0.7.0 RC7** | Local Whisper fixed (FFmpeg decodes the audio, without PyAV), black first render fixed, AI subject cutout and textured titles. Unreleased. |
 | **0.7.0 RC8** | Better cutout (edge refinement, People model, preview, bundled small model), AI voice isolation, beat markers, volume envelopes, effect stack and look preset packs. Unreleased. |
 | **0.7.1** | Security updates (urllib3 2.8.0, Vite 7), inspector tab bar fix, workspaces, collapsible/compact tracks, keyboard shortcut sheet and tour, AI model manager, diagnostics export. |
+| **0.9.0** | Friendlier editing:<br>• Typewriter box with sound preview<br>• Effects grouped<br>• Waveforms on A2–A8<br>• Auto-ducking for A3–A8<br>• Restore points<br>• Sample project<br>• Caption translation<br>• Title templates |
 | **0.8.0** | Creator pack:<br>• Remove silences and filler words<br>• Auto-reframe to 9:16<br>• NVENC GPU export<br>• Live timeline playback<br>• Keyframes |
 | **0.7.1** | Security updates (urllib3, Vite 7) and usability:<br>• Inspector tabs<br>• Workspaces<br>• Collapsible tracks<br>• Shortcut sheet and tour<br>• AI model manager<br>• Diagnostics export |
 | **0.7.0 RC9** | 400 stickers and emoji, 71 caption styles, settings for 36 effects, clock and iris reveals, moving-video subject cutout, clip groups and clip-attached markers. **Current candidate**, unreleased. |

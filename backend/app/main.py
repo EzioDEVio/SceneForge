@@ -75,6 +75,10 @@ app.include_router(reframe_api.router)   # project copy + auto-reframe 9:16
 app.include_router(encoders_api.router)  # GPU encoder detection (startup, cached)
 from app.api import cleanup  # noqa: E402
 app.include_router(cleanup.router)
+from app.api import typewriter as typewriter_api  # noqa: E402
+app.include_router(typewriter_api.router)  # 0.9.0 typewriter sound preview
+from app.api import snapshots as snapshots_api  # noqa: E402
+app.include_router(snapshots_api.router)   # 0.9.0 project restore points
 from app import logbuffer  # noqa: E402
 logbuffer.install()
 
@@ -83,7 +87,7 @@ logbuffer.install()
 # new interface connected to an old backend (e.g. a still-running old
 # start.bat window) shows "Backend update required" instead of silently
 # losing settings the old backend does not know.
-BUILD_ID = "v0.8.0"
+BUILD_ID = "v0.9.0"
 
 
 @app.get("/api/health")

@@ -146,18 +146,18 @@ def local_busy() -> bool:
     return _ACTIVE_RUNS > 0 or _LOCAL_LOCK.locked()
 
 
-def _local(path: str, language: str | None) -> dict:
+def _local(path: str, language: str | None, task: str = "transcribe") -> dict:
     global _ACTIVE_RUNS
     with _LOCAL_LOCK:
         _ACTIVE_RUNS += 1
     try:
-        return _local_run(path, language)
+        return _local_run(path, language, task)
     finally:
         with _LOCAL_LOCK:
             _ACTIVE_RUNS -= 1
 
 
-def _local_run(path: str, language: str | None) -> dict:
+def _local_run(path: str, language: str | None, task: str = "transcribe") -> dict:
     """Run CPU int8 Whisper. The small multilingual model is fetched once and cached."""
     global _LOCAL_MODEL
     try:
@@ -186,7 +186,8 @@ def _local_run(path: str, language: str | None) -> dict:
         audio = _decode_pcm16k(input_path)
 
         def recognize(use_vad: bool) -> dict:
-            segments, info = _LOCAL_MODEL.transcribe(audio, language=language or None,
+            # task="translate" makes Whisper write English whatever language is spoken (0.9.0).
+            segments, info = _LOCAL_MODEL.transcribe(audio, language=language or None, task=task,
                                                       word_timestamps=True, vad_filter=use_vad,
                                                       condition_on_previous_text=False)
             words = []
@@ -262,9 +263,15 @@ def _openai(key: str, path: str, language: str | None) -> dict:
     return {"language": j.get("language") or language or "", "text": (j.get("text") or "").strip(), "words": words, "provider": "openai"}
 
 
-def transcribe(db, path: str, provider: str = "auto", language: str | None = None) -> dict:
+def transcribe(db, path: str, provider: str = "auto", language: str | None = None, task: str = "transcribe") -> dict:
+    if task not in ("transcribe", "translate"):
+        raise TranscribeError("Unknown transcription task.")
     if provider == "auto":
         provider = "local"
+    if task == "translate":
+        if provider != "local":
+            raise TranscribeError("Translating captions to English uses Local Whisper (free, on this computer). Choose Local Whisper.")
+        return _local(path, None, "translate")
     if provider == "local":
         return _local(path, language)
     if provider not in ("elevenlabs", "openai"):

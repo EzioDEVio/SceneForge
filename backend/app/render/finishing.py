@@ -82,7 +82,7 @@ def clean_finishing(raw: dict, project_id: str, db) -> dict:
         raise FinishingError("The timeline supports up to 64 project audio clips.")
     clean_clips = []
     for index, clip in enumerate(clips):
-        allowed = {"id", "asset_id", "name", "start_ms", "source_in_ms", "source_out_ms", "source_duration_ms", "volume", "fade_in_ms", "fade_out_ms", "mute", "track", "gain", "group"}
+        allowed = {"id", "asset_id", "name", "start_ms", "source_in_ms", "source_out_ms", "source_duration_ms", "volume", "fade_in_ms", "fade_out_ms", "mute", "track", "gain", "group", "duck"}
         if not isinstance(clip, dict) or set(clip) - allowed:
             raise FinishingError(f"Project audio clip {index + 1} has unsupported settings.")
         asset = db.get(Asset, clip.get("asset_id")) if clip.get("asset_id") else None
@@ -123,6 +123,13 @@ def clean_finishing(raw: dict, project_id: str, db) -> dict:
                     raise FinishingError(f"Project audio clip {index + 1} envelope points are [source time ms, -60..12 dB].")
                 pts.append([int(point[0]), round(float(point[1]), 1)])
             cleaned["gain"] = sorted(pts)
+        duck = clip.get("duck")
+        if duck is not None:
+            # 0.9.0 auto-ducking: the clip gets quieter whenever narration or clip sound is playing.
+            if isinstance(duck, bool) or not isinstance(duck, (int, float)) or not 0 <= duck <= 100:
+                raise FinishingError(f"Project audio clip {index + 1} ducking must be between 0 and 100.")
+            if int(duck) > 0:
+                cleaned["duck"] = int(duck)
         group = clip.get("group")
         if group is not None:
             if not isinstance(group, str) or not 0 < len(group) <= 40:
@@ -298,6 +305,16 @@ def countdown_leader(width: int, height: int, fps: int) -> Path:
 # --------------------------------------------------------------------------
 # Export finishing
 # --------------------------------------------------------------------------
+def duck_ratio(amount: int) -> float:
+    """Sidechain ratio for a 0-100 ducking amount (same curve as the music bed)."""
+    return 2 + 18 * max(0, min(100, int(amount))) / 100
+
+
+def duck_filter(clip_label: str, side_label: str, out_label: str, amount: int) -> str:
+    return (f"[{clip_label}][{side_label}]sidechaincompress=threshold=0.015:ratio={duck_ratio(amount):.1f}"
+            f":attack=40:release=600[{out_label}]")
+
+
 def finish_export(export_path: str, project, cancel_check=None) -> str:
     from app.db.database import SessionLocal
     from app.db.models import Asset
@@ -309,7 +326,12 @@ def finish_export(export_path: str, project, cancel_check=None) -> str:
         return export_path
     duration = (probe(export_path).duration_ms or 0) / 1000
     inputs = ["-i", export_path]
-    graph = ["[0:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo[main]"]
+    ducked = [i for i, clip in enumerate(audio_clips) if clip.get("duck")]
+    base = "[0:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo"
+    if ducked:   # one copy of the voice/clip-sound track per ducked clip, used only as a sidechain key
+        graph = [base + f",asplit={len(ducked) + 1}[main]" + "".join(f"[duckkey{i}]" for i in ducked)]
+    else:
+        graph = [base + "[main]"]
     label = "main"
     if music:
         with SessionLocal() as db:
@@ -356,8 +378,12 @@ def finish_export(export_path: str, project, cancel_check=None) -> str:
                 parts.append(f"adelay={start}|{start}")
                 clip_label = f"timeline_audio_{index}"
                 mixed_label = f"timeline_mix_{index}"
-                graph += [f"{','.join(parts)}[{clip_label}]",
-                          f"[{label}][{clip_label}]amix=inputs=2:duration=first:normalize=0[{mixed_label}]"]
+                if clip.get("duck"):
+                    graph += [f"{','.join(parts)}[{clip_label}raw]",
+                              duck_filter(f"{clip_label}raw", f"duckkey{index}", clip_label, clip["duck"])]
+                else:
+                    graph.append(f"{','.join(parts)}[{clip_label}]")
+                graph.append(f"[{label}][{clip_label}]amix=inputs=2:duration=first:normalize=0[{mixed_label}]")
                 label = mixed_label
     if loud:
         graph.append(f"[{label}]loudnorm=I={YOUTUBE_LUFS}:TP=-1.5:LRA=11,aresample=48000[lvl]")
@@ -397,7 +423,7 @@ def scene_preview_plan(fin: dict, scene_start_ms: int, part_ms: int, project_ms:
         cut_head = max(0, -rel)
         clips.append({"asset_id": clip["asset_id"], "name": clip.get("name"), "delay_ms": max(0, rel),
                       "source_in_ms": int(clip["source_in_ms"]) + cut_head, "length_ms": length - cut_head,
-                      "volume": int(clip["volume"]), "gain": clip.get("gain"),
+                      "volume": int(clip["volume"]), "gain": clip.get("gain"), "duck": int(clip.get("duck") or 0),
                       "fade_in_ms": 0 if cut_head else int(clip["fade_in_ms"]),
                       "fade_out_ms": int(clip["fade_out_ms"]) if rel + length <= part_ms + 50 else 0})
     music = fin.get("music")
@@ -418,10 +444,12 @@ def mix_scene_preview(part_path: str, plan: dict, out_path: str) -> str:
     part_s = plan["part_ms"] / 1000
     inputs = ["-i", part_path]
     graph = []
+    ducked = [i for i, clip in enumerate(plan["clips"]) if clip.get("duck")]
+    split = (f",asplit={len(ducked) + 1}[main]" + "".join(f"[duckkey{i}]" for i in ducked)) if ducked else "[main]"
     if probe(part_path).has_audio:
-        graph.append("[0:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo[main]")
+        graph.append("[0:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo" + split)
     else:
-        graph.append(f"anullsrc=r=48000:cl=stereo,atrim=duration={part_s:.3f}[main]")
+        graph.append(f"anullsrc=r=48000:cl=stereo,atrim=duration={part_s:.3f}" + split)
     label = "main"
 
     def path_of(db, asset_id):
@@ -465,7 +493,11 @@ def mix_scene_preview(part_path: str, plan: dict, out_path: str) -> str:
                 fo = min(clip["fade_out_ms"] / 1000, length)
                 parts.append(f"afade=t=out:st={max(0, length - fo):.3f}:d={fo:.3f}")
             parts.append(f"adelay={clip['delay_ms']}|{clip['delay_ms']}")
-            graph += [",".join(parts) + f"[pc{i}]", f"[{label}][pc{i}]amix=inputs=2:duration=first:normalize=0[pm{i}]"]
+            if clip.get("duck"):
+                graph += [",".join(parts) + f"[pc{i}raw]", duck_filter(f"pc{i}raw", f"duckkey{i}", f"pc{i}", clip["duck"])]
+            else:
+                graph.append(",".join(parts) + f"[pc{i}]")
+            graph.append(f"[{label}][pc{i}]amix=inputs=2:duration=first:normalize=0[pm{i}]")
             label = f"pm{i}"
     run_ffmpeg([*inputs, "-filter_complex", ";".join(graph), "-map", "0:v", "-map", f"[{label}]",
                 "-c:v", "copy", "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-movflags", "+faststart", out_path])

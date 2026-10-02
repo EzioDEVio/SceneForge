@@ -184,8 +184,7 @@ export function CaptionStylePanel({scene, onChange}: {scene: Scene; onChange: (f
       <Num label="Entrance length" value={Number(f.caption_animation_ms || 900) / 1000} min={0.1} max={10} step={0.1} unit="s" onChange={s => set({caption_animation_ms: Math.round(s * 1000)})}/>
       <Seg label="Exit" value={f.exit_animation || 'none'} options={[['none', 'None'], ['fade', 'Fade out'], ['pop', 'Pop out']]} onChange={v => set({exit_animation: v})}/>
       <Seg label="Loop" value={f.loop || 'none'} options={[['none', 'None'], ['pulse', 'Pulse']]} onChange={v => set({loop: v})}/>
-      <label className="switch-label finishing-toggle"><input type="checkbox" checked={!!f.typewriter} onChange={e => set({typewriter: e.target.checked, ...(e.target.checked ? {captions_enabled: true, karaoke: false, split: 'full'} : {})})}/> Typewriter reveal (captions)</label>
-      <p className="hint">{busyAnim ? 'Typewriter reveal animates the captions on its own; turn it off to use the animations above.' : 'In phrases mode each phrase gets the entrance, exit and pulse. Arabic animates word by word. Render text preview for the exact result.'}</p>
+      <p className="hint">{busyAnim ? 'The Typewriter box below is animating the captions; turn Typewriter reveal off there to use these animations.' : 'In phrases mode each phrase gets the entrance, exit and pulse. Arabic animates word by word. For letter-by-letter typing with sound, use the Typewriter box below. Render text preview for the exact result.'}</p>
     </Group>
   </div>;
 }
@@ -202,6 +201,7 @@ export function AutoCaptions({scene, onDone, onStyle}: {scene: Scene; onDone: (s
   const [source, setSource] = React.useState('auto');
   const [style, setStyle] = React.useState('Viral bold');
   const [wordsPerClip,setWordsPerClip]=React.useState(3);
+  const [translate,setTranslate]=React.useState('');   // 0.9.0: '' | 'english' | 'bilingual'
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState('');
   const tr = (scene.font_json as any)?.transcript;
@@ -211,7 +211,7 @@ export function AutoCaptions({scene, onDone, onStyle}: {scene: Scene; onDone: (s
     setBusy(true); setMsg('Listening to the speech…');
     try {
       const preset = CAPTION_PRESETS.find(p => p.name === style);
-      const sc = await api.autoCaptions(scene.id, {provider, language: lang, phrase_words:wordsPerClip, source}); const t = (sc.font_json as any)?.transcript;
+      const sc = await api.autoCaptions(scene.id, {provider: translate ? 'local' : provider, language: lang, phrase_words:wordsPerClip, source, ...(translate ? {translate} : {})}); const t = (sc.font_json as any)?.transcript;
       if (preset && onStyle) await onStyle({...preset.values, captions_enabled: true, typewriter: false});
       const portions=(sc.font_json as any)?.caption_segments?.length||0;
       setMsg(`Done: ${t?.words?.length || 0} words · ${portions} editable caption clips${t?.language ? ` · language: ${t.language}` : ''}${t?.word_timing==='estimated'?' · timing estimated from phrase boundaries':''}${preset ? ` · style: ${preset.name}` : ''}. Edit each clip below or click it on T1.`); onDone(sc);
@@ -226,10 +226,12 @@ export function AutoCaptions({scene, onDone, onStyle}: {scene: Scene; onDone: (s
       <label className="control-label">Language<select aria-label="Speech language" value={lang} disabled={disabled} onChange={e => setLang(e.target.value)}>{LANGS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
       {hasNarr && hasVideo && <label className="control-label">Audio source<select aria-label="Caption audio source" value={source} disabled={disabled} onChange={e=>setSource(e.target.value)}><option value="auto">Auto · narration first</option><option value="narration">Scene narration</option><option value="clips">Video clip sound</option></select></label>}
       <label className="control-label">Caption style<select aria-label="Auto caption style" value={style} disabled={disabled} onChange={e => {setStyle(e.target.value);const p=CAPTION_PRESETS.find(x=>x.name===e.target.value);if(p)setWordsPerClip(Number(p.values.phrase_words||3));}}><option value="">Keep current style</option>{captionStyleOptions(CAPTION_PRESETS)}</select></label>
-      <label className="control-label">Service<select aria-label="Transcription service" value={provider} disabled={disabled} onChange={e => setProvider(e.target.value)}><option value="local">Local Whisper · free</option><option value="elevenlabs">ElevenLabs Scribe · cloud</option><option value="openai">OpenAI Whisper · cloud</option></select></label>
+      <label className="control-label">Captions in<select aria-label="Caption translation" value={translate} disabled={disabled} onChange={e=>setTranslate(e.target.value)}><option value="">The spoken language</option><option value="english">English (translated)</option><option value="bilingual">Both: spoken + English</option></select></label>
+      <label className="control-label">Service<select aria-label="Transcription service" value={translate ? 'local' : provider} disabled={disabled || !!translate} title={translate ? 'Translation uses Local Whisper (free, on this PC)' : undefined} onChange={e => setProvider(e.target.value)}><option value="local">Local Whisper · free</option><option value="elevenlabs">ElevenLabs Scribe · cloud</option><option value="openai">OpenAI Whisper · cloud</option></select></label>
       <label className="control-label">Words per caption clip<select aria-label="Words per caption clip" value={wordsPerClip} disabled={disabled} onChange={e=>setWordsPerClip(Math.max(1,Math.min(8,Number(e.target.value)||3)))}>{Array.from({length:8},(_,i)=>i+1).map(n=><option key={n} value={n}>{n} {n===1?'word':'words'}</option>)}</select></label>
       <button className="btn btn-primary acc-go" disabled={busy || disabled} onClick={() => void go()}><Sparkles size={14}/> {busy ? 'Transcribing…' : hasTranscript ? 'Regenerate captions' : 'Generate captions'}</button>
     </div>
+    {translate && <p className="hint">Translation to English is done by Local Whisper on this PC, free. {translate === 'bilingual' ? 'Each caption shows the spoken words with the English underneath (it listens twice, so it takes about twice as long).' : 'Captions are written in English whatever language is spoken.'} Whisper only translates into English.</p>}
     {provider === 'local' && <p className="hint">Runs on this PC with no API key. The multilingual Whisper model downloads once on first use; after that, captions work offline.</p>}
     {msg && <p className="info-status" aria-live="polite">{msg}</p>}
     {provider === 'local' && <WhisperCheck/>}

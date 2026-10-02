@@ -87,7 +87,7 @@ export type FontSettings = {
 };
 
 /** Must match BUILD_ID in backend/app/main.py. */
-export const BUILD_ID = "v0.8.0";
+export const BUILD_ID = "v0.9.0";
 
 export type Adjust = Partial<Record<'exposure'|'contrast'|'highlights'|'shadows'|'temperature'|'tint'|'saturation'|'vibrance'|'sharpen'|'vignette'|'grain', number>>;
 export type Look = {
@@ -114,7 +114,8 @@ export type Overlay = {id: string; asset_id: string; kind?: 'media'|'sticker'; x
   loop?: 'none' | 'float' | 'pendulum' | 'bob'; loop_amount?: number; loop_period_ms?: number;
   /** Keyframed x/y/width/rotation/opacity, t_ms relative to start_ms (keyframes.ts, backend render/keyframes.py). */
   keyframes?: import('./keyframes').Keyframe[]};
-export type ProjectAudioClip = {id: string; asset_id: string; name: string; start_ms: number; source_in_ms: number; source_out_ms: number; source_duration_ms: number; volume: number; fade_in_ms: number; fade_out_ms: number; mute: boolean; track?: import('./timeline/timeline.types').AudioTrackId; /** volume envelope: [source time ms, dB] */ gain?: [number, number][]; /** clips sharing a group id select and move together */ group?: string};
+export type ProjectAudioClip = {id: string; asset_id: string; name: string; start_ms: number; source_in_ms: number; source_out_ms: number; source_duration_ms: number; volume: number; fade_in_ms: number; fade_out_ms: number; mute: boolean; track?: import('./timeline/timeline.types').AudioTrackId; /** volume envelope: [source time ms, dB] */ gain?: [number, number][]; /** clips sharing a group id select and move together */ group?: string; /** 0.9.0 auto-ducking amount 10–100 (absent = off) */ duck?: number};
+export type Snapshot = {id: string; created_at: string; reason: 'auto' | 'manual'; label: string; title: string; scenes: number};
 export type Finishing = {music?: {asset_id: string; volume: number; duck: number; fade_in_ms: number; fade_out_ms: number} | null; audio_clips?: ProjectAudioClip[]; loudnorm?: boolean; leader?: boolean; timeline?: import('./timeline/timeline.types').TimelineSettings};
 export type FilmLook = {scratches: number; dust: number; flicker: number; weave: number; sound: number; fps: 0 | 16 | 18 | 24; tone: 'color' | 'faded' | 'sepia' | 'bw'};
 
@@ -236,7 +237,7 @@ export const api = {
     req<Scene>(`/api/projects/${projectId}/scenes`, { method: "POST", body: JSON.stringify({}) }),
   insertCountdown: (projectId: string, body: {style: string; seconds: number; beep: string; tone: string; color?: string; after_scene_id?: string | null}) =>
     req<Scene>(`/api/projects/${projectId}/insert-countdown`, {method: 'POST', body: JSON.stringify(body)}),
-  autoCaptions: (sceneId: string, body: {provider?: string; language?: string; source?: string; phrase_words?: number}) =>
+  autoCaptions: (sceneId: string, body: {provider?: string; language?: string; source?: string; phrase_words?: number; translate?: string}) =>
     req<Scene>(`/api/scenes/${sceneId}/auto-captions`, {method: 'POST', body: JSON.stringify(body)}),
   applyToScenes: (sourceId: string, targets: string[], parts: string[]) =>
     req<{changed: number}>(`/api/scenes/${sourceId}/apply-to`, {method: 'POST', body: JSON.stringify({targets, parts})}),
@@ -338,6 +339,13 @@ export const api = {
   deleteModel: (kind: string, id: string) => req<{removed: boolean; freed_bytes: number; message: string}>(`/api/models/${encodeURIComponent(kind)}/${encodeURIComponent(id)}`, {method: "DELETE"}),
   downloadModel: (kind: string, id: string) => req<{status: string; message?: string}>(`/api/models/${encodeURIComponent(kind)}/${encodeURIComponent(id)}/download`, {method: "POST"}),
   diagnosticsUrl: () => `/api/diagnostics.zip`,
+  // 0.9.0 restore points
+  listSnapshots: (projectId: string) => req<{snapshots: Snapshot[]}>(`/api/projects/${projectId}/snapshots`),
+  saveSnapshot: (projectId: string, body: {auto?: boolean; label?: string} = {}) => req<{saved: boolean; reason?: string; snapshot?: Snapshot}>(`/api/projects/${projectId}/snapshots`, {method: "POST", body: JSON.stringify(body)}),
+  restoreSnapshot: (projectId: string, snapId: string) => req<Project>(`/api/projects/${projectId}/snapshots/${encodeURIComponent(snapId)}/restore`, {method: "POST"}),
+  deleteSnapshot: (projectId: string, snapId: string) => req<void>(`/api/projects/${projectId}/snapshots/${encodeURIComponent(snapId)}`, {method: "DELETE"}),
+  // 0.9.0 sample project
+  createSampleProject: () => req<Project>(`/api/sample-project`, {method: "POST"}),
   whisperCheck: () => req<{ok: boolean; model_dir: string; checks: {name: string; ok: boolean; detail: string}[]}>(`/api/local-speech/whisper/check`),
   whisperReset: () => req<{removed: boolean; message: string}>(`/api/local-speech/whisper/reset`, {method: "POST"}),
   localEngineStatus: (engine: string) => req<{engine: string; reachable: boolean; state: string; docker: string; message: string; log: string; services_bundled: boolean}>(`/api/local-speech/${engine}/status`),

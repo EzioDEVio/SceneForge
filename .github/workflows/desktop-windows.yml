@@ -13,11 +13,11 @@ jobs:
       CSC_IDENTITY_AUTO_DISCOVERY: 'false'
       SCENEFORGE_SD_AUTOSTART: '0'
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
         with:
           node-version: '22'
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: '3.12'
       - name: Install build dependencies
@@ -68,7 +68,7 @@ jobs:
           if (-not $uninstaller) { throw 'Uninstaller missing' }
           $uninstall = Start-Process $uninstaller.FullName -ArgumentList '/S' -Wait -PassThru
           if ($uninstall.ExitCode -ne 0) { throw 'Uninstall failed' }
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: SceneForge-Studio-Windows
           path: |

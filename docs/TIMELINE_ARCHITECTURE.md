@@ -1,6 +1,6 @@
 # Timeline architecture (timeline v1)
 
-This describes the timeline as of 0.7.0 RC5. It adds independent audio tracks, edit tools, and project-saved markers and track state. The scene-based picture model it was built on is kept.
+This describes the timeline as of 0.7.0 RC5, with later additions noted (0.9.0: auto-ducking and waveforms). It adds independent audio tracks, edit tools, and project-saved markers and track state. The scene-based picture model it was built on is kept.
 
 ## Lanes
 
@@ -36,6 +36,14 @@ The migration is **reversible**:
 - An older build ignores the `timeline` key on read. Its validator would reject the key on a later write of finishing settings, though. To open a v1 project in an older build, remove `timeline` and any `track` fields first. Clips on A4–A8 then play on A3.
 
 The backend validator is `clean_timeline()` in `backend/app/render/finishing.py`. It checks track names, which states each track type allows, marker bounds and colours. It rejects timeline versions newer than it knows, so a future format is never silently truncated.
+
+## Auto-ducking (0.9.0)
+
+`audio_clips[].duck` (10–100, absent = off) makes a timeline clip quieter whenever the scene sound (narration on A1 and clip sound on A2, i.e. the rendered parts' audio) is playing. Export and the scene preview mix split the scene audio once per ducked clip and use it as the key of a `sidechaincompress` on that clip (`duck_filter()` in `finishing.py`, same curve as the music bed). Clips are still mixed with `amix … normalize=0`, so ducking only ever lowers a clip.
+
+## Waveforms (0.9.0)
+
+A1 narration, A2 clip sound and A3–A8 clips draw the used part of their source's waveform (`AssetWave` in `NarrationWave.tsx`, from `GET /api/assets/{id}/waveform`, cached per asset). Files without audio draw nothing.
 
 ## Audibility (export)
 
@@ -102,10 +110,8 @@ With 1,000 clips at 55 px/s in a 1,600 px view, 45 of 1,000 clips are rendered. 
 
 ## Not yet implemented (roadmap)
 
-These wait until their full workflows (UI, persistence, export and tests) can land together:
+These wait until their full workflows (UI, persistence, export and tests) can land together (clip-attached markers, volume envelopes and keyframes shipped in 0.7.0–0.8.0):
 
-- Clip-attached markers
-- Gain envelopes and keyframes
 - Compound/nested clips
 - A1/A2/music-bed solo
 - Free multitrack video

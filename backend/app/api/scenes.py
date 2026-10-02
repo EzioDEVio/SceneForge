@@ -787,8 +787,17 @@ def auto_captions(scene_id: str, body: dict | None = None, db: Session = Depends
             if not wav:
                 raise HTTPException(400, "The videos in this scene have no sound to transcribe.")
             source = "clips"
+        translate = body.get("translate") or None   # 0.9.0: None | "english" | "bilingual"
+        if translate not in (None, "english", "bilingual"):
+            raise HTTPException(400, "translate must be english or bilingual.")
+        english = None
         try:
-            result = tr.transcribe(db, str(wav), provider, language)
+            if translate == "english":
+                result = tr.transcribe(db, str(wav), "local", None, task="translate")
+            else:
+                result = tr.transcribe(db, str(wav), provider, language)
+                if translate == "bilingual":
+                    english = tr.transcribe(db, str(wav), "local", None, task="translate")
         except tr.TranscribeError as e:
             raise HTTPException(400, str(e))
     finally:
@@ -805,10 +814,25 @@ def auto_captions(scene_id: str, body: dict | None = None, db: Session = Depends
         chunk = words[index:index + phrase_words]
         caption_segments.append({'id': str(uuid.uuid4()), 'text': ' '.join(row[0] for row in chunk),
                                  'start_ms': max(0, int(chunk[0][1])), 'end_ms': max(int(chunk[0][1]) + 100, int(chunk[-1][2]))})
+    if english is not None:
+        # Bilingual: each caption gets a second line with the English words spoken in the same time span.
+        en_words = [[w, s + offset, e + offset] for w, s, e in english.get("words", [])]
+        if english.get("language") == "en" and result.get("language") == "en":
+            en_words = []   # already English: nothing to add
+        extra: dict[int, list[str]] = {}
+        for w, ws, we in en_words:   # every English word goes to the caption nearest its middle
+            mid = (ws + we) / 2
+            best = min(range(len(caption_segments)), key=lambda i: 0 if caption_segments[i]["start_ms"] <= mid <= caption_segments[i]["end_ms"]
+                       else min(abs(mid - caption_segments[i]["start_ms"]), abs(mid - caption_segments[i]["end_ms"])))
+            extra.setdefault(best, []).append(w)
+        for i, seg in enumerate(caption_segments):
+            if extra.get(i):
+                seg["text"] = seg["text"] + "\n" + " ".join(extra[i])
     scene.subtitle_text = " ".join(w for w, _, _ in words)
     font = dict(scene.font_json or {})
     font["transcript"] = {"language": result["language"], "provider": result["provider"], "source": source,
-                          "word_timing": result.get("word_timing", "provider"), "words": words}
+                          "word_timing": result.get("word_timing", "provider"), "words": words,
+                          **({"translated": translate} if translate else {})}
     font['caption_segments'] = caption_segments
     font["captions_enabled"] = True
     scene.font_json = font
