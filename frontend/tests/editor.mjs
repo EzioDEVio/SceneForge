@@ -748,8 +748,11 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  check('trim handles move with the arrow keys',true);
  await waitFor(()=>assert.ok(project.scenes[0].voice_takes.find(v=>v.id===pool2.id).edit_json.in_ms===1500));
  const shotsBefore=project.scenes[0].shots.length, scenesBefore=project.scenes.length;
+ const requestsBeforeRemove=requests.length;
  await user.click(within(editor).getByRole('button',{name:/Remove from scene/}));
- await waitFor(()=>assert.ok(requests.some(r=>r.path===`/api/scenes/${project.scenes[0].id}/voice-takes/clear-selection`)));
+ // Wait for THIS click's request (earlier checks may already have cleared narration), then for the result.
+ await waitFor(()=>assert.ok(requests.slice(requestsBeforeRemove).some(r=>r.path===`/api/scenes/${project.scenes[0].id}/voice-takes/clear-selection`)));
+ await waitFor(()=>assert.ok(!project.scenes[0].voice_takes.some(v=>v.accepted)));
  check('Remove from scene takes the audio off but keeps the picture',project.scenes[0].shots.length===shotsBefore&&project.scenes.length===scenesBefore&&!project.scenes[0].voice_takes.some(v=>v.accepted));
  check('removing audio keeps the scene length by switching to fixed timing',requests.some(r=>r.method==='PATCH'&&r.path===`/api/scenes/${project.scenes[0].id}`&&r.body.timing_mode==='fixed'&&r.body.requested_duration_ms>1000));
  pool2.accepted=true;await act(async()=>{window.dispatchEvent(new Event('focus'));});
