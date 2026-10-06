@@ -4,6 +4,7 @@
 !ifndef BUILD_UNINSTALLER
 !include "nsDialogs.nsh"
 !include "LogicLib.nsh"
+!include "MUI2.nsh"
 Var SFWhisper
 Var SFImages
 Var SFVoice
@@ -17,33 +18,34 @@ Var SFGpuFlag
 !macroend
 
 Function SFLocalAIPage
+  !insertmacro MUI_HEADER_TEXT "Set up local AI" "Choose optional tools to install with SceneForge."
   nsDialogs::Create 1018
   Pop $0
-  ${NSD_CreateLabel} 0 0 100% 24u "Install local AI with SceneForge. Downloads are shown in the installation log. Allow at least 15 GB of free space and internet access."
+  ${NSD_CreateLabel} 0 0 100% 20u "Install local AI with SceneForge. Downloads are shown in the installation log. Allow at least 15 GB of free space and internet access."
   Pop $0
-  ${NSD_CreateCheckbox} 0 30u 100% 12u "Whisper - automatic captions (about 145 MB)"
+  ${NSD_CreateCheckbox} 0 24u 100% 12u "Whisper - automatic captions (about 145 MB)"
   Pop $SFWhisper
   ${NSD_Check} $SFWhisper
-  ${NSD_CreateCheckbox} 0 48u 100% 12u "Stable Diffusion - local pictures (several GB)"
+  ${NSD_CreateCheckbox} 0 39u 100% 12u "Stable Diffusion - local pictures (several GB)"
   Pop $SFImages
   ${NSD_Check} $SFImages
-  ${NSD_CreateCheckbox} 0 66u 100% 12u "Chatterbox - multilingual voices (several GB)"
+  ${NSD_CreateCheckbox} 0 54u 100% 12u "Chatterbox - multilingual voices (several GB)"
   Pop $SFVoice
   ${NSD_Check} $SFVoice
-  ${NSD_CreateCheckbox} 0 84u 100% 12u "Use NVIDIA GPU for images (requires driver and Docker GPU support)"
+  ${NSD_CreateCheckbox} 0 69u 100% 12u "Use NVIDIA GPU for images (requires driver and Docker GPU support)"
   Pop $SFGpu
-  ${NSD_CreateLabel} 0 104u 100% 28u "Image/voice engines use Docker Desktop. Windows may need approval, first-run setup or restart. Review the links below for Docker, OpenRAIL-M and Chatterbox terms."
+  ${NSD_CreateLabel} 0 85u 100% 20u "Image and voice tools need Docker Desktop and may need a Windows restart. Review the component terms below."
   Pop $0
-  ${NSD_CreateLink} 0 134u 30% 12u "Docker terms"
+  ${NSD_CreateLink} 0 108u 30% 10u "Docker terms"
   Pop $0
   ${NSD_OnClick} $0 SFDockerTerms
-  ${NSD_CreateLink} 33% 134u 30% 12u "Image model terms"
+  ${NSD_CreateLink} 33% 108u 30% 10u "Image model terms"
   Pop $0
   ${NSD_OnClick} $0 SFImageTerms
-  ${NSD_CreateLink} 66% 134u 30% 12u "Voice model terms"
+  ${NSD_CreateLink} 66% 108u 30% 10u "Voice model terms"
   Pop $0
   ${NSD_OnClick} $0 SFVoiceTerms
-  ${NSD_CreateCheckbox} 0 154u 100% 22u "I reviewed and accept the component terms and selected downloads."
+  ${NSD_CreateCheckbox} 0 124u 100% 12u "I accept the terms for the selected AI components."
   Pop $SFTerms
   nsDialogs::Show
 FunctionEnd

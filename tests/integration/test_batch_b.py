@@ -122,8 +122,20 @@ from app.render.routes import _label_text,_label_font
 shaped=_label_text('قرطبة')
 check('Arabic stop labels are shaped (joined letter forms) and use the Arabic font',any('\ufe70'<=c<='\ufeff' for c in shaped) and 'Naskh' in _label_font('قرطبة',20).getname()[0] and _label_text('Toledo')=='Toledo')
 pl=clean_route({'points':[[10,50],[90,50]],'marker':'plane','draw_ms':1000})
-mid=np.frombuffer(subprocess.check_output(['ffmpeg','-v','error','-i',route_clip(pl,640,360,30,t/'routes'),'-vf','select=eq(n\\,15)','-frames:v','1','-f','rawvideo','-pix_fmt','rgba','-']),np.uint8).reshape(360,640,4).astype(int)
-check('a moving plane icon rides along the route',((mid[...,:3].min(axis=-1)>230)&(mid[...,3]>200)).sum()>150)
+plane_frames=np.frombuffer(subprocess.check_output(['ffmpeg','-v','error','-i',route_clip(pl,640,360,30,t/'routes'),'-f','rawvideo','-pix_fmt','rgba','-']),np.uint8).reshape(-1,360,640,4)
+# The shared airplane artwork is coloured, not the old white polygon. Count
+# opaque pixels away from the horizontal route/pins, then measure its position
+# at two times: a missing, stationary or misplaced icon must still fail.
+yy,xx=np.indices((360,640))
+plane_positions=[]
+for frame_number in (15,24):
+ icon_pixels=(plane_frames[frame_number,...,3]>200)&(np.abs(yy-180)>6)
+ check('plane artwork is visible off the route at frame '+str(frame_number),icon_pixels.sum()>150)
+ x,y=xx[icon_pixels].mean(),yy[icon_pixels].mean()
+ expected_x=64+512*(0.5-0.5*np.cos(np.pi*frame_number/29))
+ check('plane rides at the timed route head at frame '+str(frame_number),abs(x-expected_x)<4 and abs(y-180)<4)
+ plane_positions.append(x)
+check('the plane moves forward along the route',plane_positions[1]-plane_positions[0]>200)
 
 # --- beat sync ---------------------------------------------------------------------
 ff('-f','lavfi','-i',"aevalsrc='0.8*sin(2*PI*60*t)*exp(-40*mod(t,0.5))':s=22050:d=12",str(t/'beat.wav'))   # 120 BPM kick
