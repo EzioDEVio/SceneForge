@@ -56,12 +56,12 @@ export function ReframeProjectDialog({project, onClose, onOpen}: {project: Proje
 const MODES: [Reframe['mode'], string][] = [['center', 'Center'], ['follow', 'Follow subject'], ['manual', 'Manual']];
 
 /** Per-clip reframe override (shown in Motion → Crop & focal zoom). */
-export function ShotReframe({shot, save}: {shot: Shot; save: (f: () => Promise<unknown>) => Promise<boolean>}) {
+export function ShotReframe({shot, save,onDraft}: {shot: Shot;onDraft?:(patch:Record<string,any>)=>void; save: (f: () => Promise<unknown>) => Promise<boolean>}) {
   const r = shot.crop_json?.reframe;
   const [x, setX] = useState(Math.round((r?.x ?? 0.5) * 100));
   const [busy, setBusy] = useState(false);
   useEffect(() => setX(Math.round((r?.x ?? 0.5) * 100)), [shot.id, r?.x]);
-  const set = async (body: Parameters<typeof reframeApi.setShot>[1]) => {setBusy(true); try {await save(() => reframeApi.setShot(shot.id, body));} finally {setBusy(false);}};
+  const set = async (body: Parameters<typeof reframeApi.setShot>[1]) => {setBusy(true); try {if(onDraft){const result=await reframeApi.setShot(shot.id,{...body,preview_only:true} as any);onDraft({crop:result.crop_json,fit:result.fit});}else await save(() => reframeApi.setShot(shot.id, body));} finally {setBusy(false);}};
   const mode = r?.mode;
   return <div className="shot-reframe" role="group" aria-label="Reframe">
     <div className="fit-choice"><span>Reframe for other shapes</span>

@@ -31,7 +31,7 @@ diff=np.abs(frame(out,.1)-frame(out,.5))
 for label,band in [('top',diff[:60]),('middle',diff[60:120]),('bottom',diff[120:])]:check('glitch changes '+label+' of frame',band.mean()>5)
 for color in ['red','blue']:
  run(['-f','lavfi','-i',f'color={color}:s=320x180:r=30','-f','lavfi','-i','anullsrc=r=48000:cl=stereo','-t','2','-c:v','libx264','-c:a','aac',str(t/(color+'.mp4'))])
-project=SimpleNamespace(id='fixture',fps=30,width=320,height=180)
+project=SimpleNamespace(id='fixture',fps=30,width=320,height=180,finishing_json={})
 scenes=[SimpleNamespace(id='red'),SimpleNamespace(id='blue')]
 for transition,bright in [('fade_through_black',False),('fade_white',True)]:
  result=render_export(project,scenes,{c:str(t/(c+'.mp4')) for c in ['red','blue']},[{'type':transition,'duration_ms':1000}],RenderContext())

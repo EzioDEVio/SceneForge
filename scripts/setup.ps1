@@ -14,12 +14,12 @@ Write-Host " SceneForge Studio - Setup"
 Write-Host "============================================"
 
 if (-not (Test-Command "python")) {
-    Write-Host "[ERROR] Python was not found on PATH. Install Python 3.11+ from https://www.python.org/downloads/" -ForegroundColor Red
+    Write-Host "[ERROR] Python was not found on PATH. Install Python 3.12 from https://www.python.org/downloads/" -ForegroundColor Red
     Write-Host "        and check 'Add python.exe to PATH' during install." -ForegroundColor Red
     exit 1
 }
 if (-not (Test-Command "node")) {
-    Write-Host "[ERROR] Node.js was not found on PATH. Install Node 18+ LTS from https://nodejs.org/" -ForegroundColor Red
+    Write-Host "[ERROR] Node.js was not found on PATH. Install Node 22.12+ LTS from https://nodejs.org/" -ForegroundColor Red
     exit 1
 }
 if (-not (Test-Command "ffmpeg") -or -not (Test-Command "ffprobe")) {
@@ -31,19 +31,16 @@ if (-not (Test-Command "ffmpeg") -or -not (Test-Command "ffprobe")) {
 Write-Host "[OK] python, node, ffmpeg, ffprobe all found on PATH."
 
 Write-Host "`nSetting up backend (Python virtual environment)..."
-Set-Location "$root\backend"
-if (-not (Test-Path ".venv")) {
-    python -m venv .venv
-}
-& ".venv\Scripts\Activate.ps1"
-python -m pip install --upgrade pip
-pip install -r requirements.txt
+& python "$PSScriptRoot\windows_runtime.py" setup
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Host "[OK] Backend dependencies installed."
 
 Write-Host "`nSetting up frontend (npm)..."
 Set-Location "$root\frontend"
 npm install
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 npm run build
+if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
 Write-Host "[OK] Frontend built to frontend\dist."
 
 Write-Host "`n============================================"

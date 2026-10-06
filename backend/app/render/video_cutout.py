@@ -509,16 +509,19 @@ def _run_job(job_id: str, scene_id: str, model: str, edge: str, shift: int) -> N
                     job.plan_json = {"result_asset_ids": [asset.id], "notes": plan["notes"], **stats}
                 st["asset_id"] = asset.id
             dest = None
-        st.update(status="succeeded", stage="done")
+        # 0.9.3: record the final state in the database BEFORE the in-memory status, so anyone who
+        # sees "succeeded"/"cancelled" in the status poll also sees it in /api/jobs (CI race).
         jobs._emit(job_id, {"status": JobStatus.SUCCEEDED, "stage": "Subject layer ready", "progress": 100})
+        st.update(status="succeeded", stage="done")
     except Exception as exc:  # noqa: BLE001
         safe_unlink(dest)
         cancelled = ctx.cancel_requested
         msg = "Cancelled." if cancelled else (str(exc) if isinstance(exc, CutoutError) else f"Video cutout failed: {exc}")
         if not cancelled and hasattr(exc, "detail"):
             msg = str(exc.detail)
-        st.update(status="cancelled" if cancelled else "failed", error=msg, stage="cancelled" if cancelled else "failed")
-        jobs._emit(job_id, {"status": JobStatus.CANCELLED if cancelled else JobStatus.FAILED, "stage": st["stage"], "error": msg})
+        stage = "cancelled" if cancelled else "failed"
+        jobs._emit(job_id, {"status": JobStatus.CANCELLED if cancelled else JobStatus.FAILED, "stage": stage, "error": msg})
+        st.update(status=stage, error=msg, stage=stage)
     finally:
         with jobs._lock:
             jobs._contexts.pop(job_id, None)

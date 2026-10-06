@@ -47,14 +47,15 @@ def export_project_endpoint(project_id: str, skip_empty: bool = False, body: dic
     project = db.get(Project, project_id)
     if not project:
         raise HTTPException(404, "Project not found")
-    if not project.scenes:
+    free = (project.finishing_json or {}).get("free_timeline") or {}
+    if not project.scenes and not free.get("enabled"):
         raise HTTPException(400, "Project has no parts to export.")
-
-    empty = [s.title or f"Scene {s.order_index + 1}" for s in project.scenes if not s.shots]
+    wanted = {c["scene_id"] for c in free.get("clips", [])} if free.get("enabled") else None
+    empty = [s.title or f"Scene {s.order_index + 1}" for s in project.scenes if not s.shots and (wanted is None or s.id in wanted)]
     if empty and not skip_empty:
         raise HTTPException(400, "These scenes have no media: " + ", ".join(empty) + ". Add media, or choose to export only scenes with media.")
-    selected_ids = [s.id for s in project.scenes if s.shots]
-    if not selected_ids: raise HTTPException(400, "Add media to at least one scene before exporting.")
+    selected_ids = [s.id for s in project.scenes if s.shots and (wanted is None or s.id in wanted)]
+    if not selected_ids and not (free.get("enabled") and ((project.finishing_json or {}).get("layer_clips") or (project.finishing_json or {}).get("audio_clips"))): raise HTTPException(400, "Add media to the timeline before exporting.")
     job_id = job_worker.reserve_job_id()
     try:
         job = RenderJob(id=job_id, project_id=project_id, scene_id=None, scope=JobScope.FULL_EXPORT, status=JobStatus.QUEUED)
@@ -78,6 +79,17 @@ def project_captions(project_id: str, format: str = "srt", db: Session = Depends
         raise HTTPException(404, "Project not found")
     if format not in ("srt", "vtt"):
         raise HTTPException(400, "Caption format must be srt or vtt.")
+    free = (project.finishing_json or {}).get('free_timeline') or {}
+    if free.get('enabled'):
+        cues=[]
+        for clip in free.get('clips', []):
+            scene=next((s for s in project.scenes if s.id==clip['scene_id']), None)
+            if not scene:continue
+            length=scene.measured_duration_ms or scene.natural_duration_ms or scene.requested_duration_ms or 4000
+            for a,b,text in delivery.caption_cues([(scene,0,length)]):
+                begin=max(a,clip['source_in_ms']);end=min(b,clip['source_in_ms']+clip['duration_ms'])
+                if end>begin:cues.append((clip['start_ms']+begin-clip['source_in_ms'],clip['start_ms']+end-clip['source_in_ms'],text))
+        return PlainTextResponse(delivery.captions_file(sorted(cues), format), media_type='text/vtt' if format=='vtt' else 'application/x-subrip')
     timed, cursor, prev = [], 0, None
     for s in [s for s in project.scenes if s.shots]:
         length = s.measured_duration_ms or s.natural_duration_ms or s.requested_duration_ms or 4000

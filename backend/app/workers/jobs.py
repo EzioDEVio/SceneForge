@@ -158,7 +158,7 @@ def request_cancel(job_id: str) -> bool:
     return False
 
 
-def _run_part_job(job_id: str, project_id: str, scene_id: str) -> None:
+def _run_part_job(job_id: str, project_id: str, scene_id: str, draft_snapshot=None) -> None:
     ctx = RenderContext()
     with _lock:
         _contexts[job_id] = ctx
@@ -173,6 +173,9 @@ def _run_part_job(job_id: str, project_id: str, scene_id: str) -> None:
             _ = [s.asset for s in scene.shots]
             _ = [t.audio_asset for t in scene.voice_takes]
             db.expunge_all()
+
+        if draft_snapshot is not None:
+            scene, project = draft_snapshot
 
         _last_emitted_pct = {"visual": -1}
 
@@ -206,9 +209,10 @@ def _run_part_job(job_id: str, project_id: str, scene_id: str) -> None:
             db.add(asset)
             db.flush()
             db_scene = db.get(Scene, scene_id)
-            db_scene.rendered_plan_hash = plan["combined"]
-            db_scene.rendered_asset_id = asset.id
-            db_scene.measured_duration_ms = total_ms
+            if draft_snapshot is None:
+                db_scene.rendered_plan_hash = plan["combined"]
+                db_scene.rendered_asset_id = asset.id
+                db_scene.measured_duration_ms = total_ms
             job = db.get(RenderJob, job_id)
             job.artifact_asset_id = asset.id
         for w in ctx.warnings:
@@ -448,11 +452,11 @@ def _run_video_generation_job(job_id: str, project_id: str, request_data: dict) 
             _active_jobs.discard(job_id)
 
 
-def start_part_job(job_id: str, project_id: str, scene_id: str) -> None:
+def start_part_job(job_id: str, project_id: str, scene_id: str, draft_snapshot=None) -> None:
     with _lock:
         _active_jobs.add(job_id)
     try:
-        threading.Thread(target=_run_part_job, args=(job_id, project_id, scene_id), daemon=True).start()
+        threading.Thread(target=_run_part_job, args=(job_id, project_id, scene_id, draft_snapshot), daemon=True).start()
     except Exception:
         with _lock:
             _active_jobs.discard(job_id)

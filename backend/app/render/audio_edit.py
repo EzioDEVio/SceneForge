@@ -11,7 +11,7 @@ from __future__ import annotations
 
 MIN_CLIP_MS = 200
 MAX_FADE_MS = 10000
-DEFAULT_EDIT = {"in_ms": 0, "out_ms": None, "volume": 100, "fade_in_ms": 0, "fade_out_ms": 0, "voice_fx": "none"}
+DEFAULT_EDIT = {"in_ms": 0, "out_ms": None, "volume": 100, "fade_in_ms": 0, "fade_out_ms": 0, "voice_fx": "none", "censor": []}
 # Voice effects: "clean" reduces background noise and evens the level (home
 # recordings); "radio" is a 1940s newsreel / wireless sound; "telephone" is narrower.
 VOICE_FX = {
@@ -92,7 +92,10 @@ def clean_edit(raw: dict | None, source_ms: int | None) -> dict:
         raise AudioEditError("Fade in and fade out together are longer than the trimmed audio.")
     if edit["voice_fx"] not in VOICE_FX:
         raise AudioEditError("Voice effect must be one of: " + ", ".join(VOICE_FX) + ".")
-    return {"in_ms": in_ms, "out_ms": out_ms, "volume": volume, **fades, "voice_fx": edit["voice_fx"]}
+    from app.render.censor import clean_ranges
+    try: censor = clean_ranges(edit["censor"], source_ms)
+    except ValueError as e: raise AudioEditError(str(e)) from None
+    return {"censor": censor, "in_ms": in_ms, "out_ms": out_ms, "volume": volume, **fades, "voice_fx": edit["voice_fx"]}
 
 
 def is_default(edit: dict | None) -> bool:
@@ -117,6 +120,9 @@ def narration_filter(edit: dict | None, clip_ms: int) -> str:
         parts.append(f"atrim=start={e['in_ms'] / 1000:.3f}{end},asetpts=PTS-STARTPTS")
     if VOICE_FX.get(e.get("voice_fx", "none")):
         parts.append(voice_fx_filter(e["voice_fx"]))
+    from app.render.censor import censor_filter
+    censorship = censor_filter(e.get("censor"), e["in_ms"])
+    if censorship: parts.append(censorship)
     if e["volume"] != 100:
         parts.append(f"volume={e['volume'] / 100:.3f}")
     if e["fade_in_ms"]:

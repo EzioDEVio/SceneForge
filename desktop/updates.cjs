@@ -66,22 +66,12 @@ function backupDatabase(workspaceDir, label, now = new Date()) {
   return target;
 }
 
-/** Once per workspace: switch off Stable Diffusion's automatic start (a heavy engine that
- *  can make the whole computer slow while it starts). Returns true when it was switched off,
- *  so the app can explain how to turn it back on. */
+/** Record the startup preference review without changing the owner's choice. */
 function reviewSdAutostart(workspaceDir) {
   const stateFile = path.join(workspaceDir, 'app-state.json');
   const state = readJSON(stateFile, {});
-  if (state.sdAutostartReviewed) return false;
-  const sdFile = path.join(workspaceDir, 'local-images.json');
-  const sd = readJSON(sdFile, null);
-  let changed = false;
-  if (sd && sd.autostart) {
-    writeJSON(sdFile, {...sd, autostart: false});
-    changed = true;
-  }
-  writeJSON(stateFile, {...state, sdAutostartReviewed: true});
-  return changed;
+  if (!state.sdAutostartReviewed) writeJSON(stateFile, {...state, sdAutostartReviewed: true});
+  return false;
 }
 
 /** Plain-language reason for an update-check failure. */

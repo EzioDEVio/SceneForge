@@ -11,8 +11,8 @@ from __future__ import annotations
 import re
 
 HEADING_PATTERNS = [
-    re.compile(r"^\s*(?:اللقطة|المشهد)\s*[\d٠-٩]+", re.UNICODE),
-    re.compile(r"^\s*Scene\s*\d+", re.IGNORECASE),
+    re.compile(r"^\s*(?:#{1,6}\s*)?(?:اللقطة|المشهد)\s*[\d٠-٩]+", re.UNICODE),
+    re.compile(r"^\s*(?:#{1,6}\s*)?Scene\s*\d+", re.IGNORECASE),
 ]
 FIELD_PATTERNS = {
     "visual": re.compile(r"^\s*(?:Visual|AI Image Prompt|الصورة|اللقطة البصرية)\s*[:：]\s*(.*)$", re.IGNORECASE | re.UNICODE),
@@ -74,16 +74,18 @@ def parse_script(text: str) -> dict:
         body_lines = lines[1:]
 
         fields = {"visual": [], "on_screen": [], "narration": [], "timecode": [], "other": []}
+        active_field = None
         for line in body_lines:
             matched = False
             for key, pattern in FIELD_PATTERNS.items():
                 m = pattern.match(line)
                 if m:
+                    active_field = key
                     fields[key].append(m.group(1))
                     matched = True
                     break
             if not matched and line.strip():
-                fields["other"].append(line)
+                fields[active_field or "other"].append(line)
 
         narration_text = "\n".join(fields["narration"]).strip()
         visual_text = "\n".join(fields["visual"]).strip()
@@ -124,6 +126,19 @@ def parse_script(text: str) -> dict:
         })
 
     return {"scenes": scenes, "unclassified_text": None, "warnings": warnings}
+
+
+def parse_paragraphs(text: str) -> dict:
+    """Blank lines alone split scenes; heading-looking lines remain ordinary narration."""
+    normalized = text.replace("\r\n", "\n").replace("\r", "\n")
+    blocks = [b.strip() for b in re.split(r"\n\s*\n", normalized) if b.strip()]
+    scenes = []
+    for i, block in enumerate(blocks):
+        spoken = _strip_non_narration(block)
+        scenes.append({"title": f"Scene {i+1}", "original_text": block, "spoken_text": spoken,
+            "subtitle_text": _strip_citations(spoken), "source_refs": _extract_refs(block),
+            "warnings": [], "matched_template": True})
+    return {"scenes": scenes, "unclassified_text": None, "warnings": [] if scenes else ["Empty input."]}
 
 
 def _strip_non_narration(text: str) -> str:

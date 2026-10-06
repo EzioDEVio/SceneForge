@@ -114,6 +114,9 @@ def clip_audio(scene, shots, durations, media_root, work_dir: Path, ffmpeg_bin: 
             filters = [*tempo, f"volume={vol:.3f}", "aresample=48000", "aformat=channel_layouts=stereo", "apad", f"atrim=0:{ms/1000:.3f}"]
             if fade_in > 0: filters.append(f"afade=t=in:st=0:d={fade_in:.3f}")
             if fade_out > 0: filters.append(f"afade=t=out:st={max(0, ms/1000-fade_out):.3f}:d={fade_out:.3f}")
+            from app.render.censor import censor_filter
+            cf = censor_filter(a.get("censor"), shot.source_in_ms or 0)
+            if cf: filters = ["asetpts=PTS-STARTPTS", cf, *filters]
             af = ",".join(filters)
             cmd = [ffmpeg_bin, "-y", "-v", "error", "-ss", f"{(shot.source_in_ms or 0)/1000:.3f}", "-i", str(src),
                    "-t", f"{ms/1000*speed:.3f}", "-vn", "-af", af, "-ar", "48000", "-ac", "2", str(seg)]

@@ -1,3 +1,13 @@
+## Combined local AI installer test update
+
+The approved source update adds an NSIS component page and managed Whisper,
+Stable Diffusion and Chatterbox installation, progress, Retry and automatic
+startup. See [LOCAL_AI_INSTALLER.md](../docs/LOCAL_AI_INSTALLER.md) for exact
+behavior and required Windows acceptance tests. The checkpoint ZIP is source
+plus a compiled frontend, not an installer. Manual Release workflow runs create
+installer artifacts without publishing. Historical notes below describe earlier
+installer milestones and do not supersede the new test boundaries.
+
 # SceneForge Windows Desktop Alpha
 
 This milestone packages the working Workspace 2.5 editor as a Windows x64 desktop application. The setup wizard installs the desktop window, a private Python backend, FFmpeg/ffprobe, fonts and prebuilt editor assets. Python, Node.js and FFmpeg are not required on the customer's PATH.

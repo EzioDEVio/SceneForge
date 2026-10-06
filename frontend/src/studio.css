@@ -687,3 +687,51 @@ html[data-theme="light"] .studio-shell .beat-marker-select{background:#fff;color
 .gain-point{display:flex;align-items:center;gap:8px;font-size:12px}.gain-point input[type=number]{width:64px}.gain-point input[type=range]{width:110px}
 .project-audio-body{position:relative}.gain-line{position:absolute;inset:2px 0;width:100%;height:calc(100% - 4px);pointer-events:none}.gain-line polyline{fill:none;stroke:#ffd25a;stroke-width:2;vector-effect:non-scaling-stroke}
 .project-audio-row.grouped .project-audio-body{box-shadow:inset 0 -3px 0 #5fd08a}
+
+/* Keep the title dialog above the editor and give its controls readable colours. */
+.title-designer-backdrop{z-index:1000;color-scheme:dark;color:#e0e3eb}.title-designer-backdrop .drawer{background:#282b32}.title-designer-backdrop input,.title-designer-backdrop select,.title-designer-backdrop textarea{background:#24272e;color:#e0e3eb;border:1px solid #454a55}
+
+/* Group clip timing tools without hiding controls. */
+.speed-controls{display:flex;flex-direction:column;gap:12px}
+.speed-controls>h3{margin-bottom:0}
+.speed-card{padding:14px;border:1px solid var(--border,#454a58);border-radius:10px;background:var(--panel,#24272e);display:flex;flex-direction:column;gap:10px;min-width:0}
+.speed-card h4{margin:0;font-size:13px;font-weight:650}
+.speed-card .hint{margin:0;line-height:1.5}
+.speed-card .control-label{display:flex;flex-direction:column;gap:10px}
+.speed-card input[type=range]{width:100%;accent-color:var(--blue,#ad91f4)}
+.speed-card .segmented.speed-ramp-options{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px;width:100%}
+.speed-card .speed-ramp-options>button{min-width:0;padding:10px 8px;background:transparent;color:inherit;border-color:var(--border,#454a58)}
+.speed-card .speed-ramp-options>button:last-child{grid-column:1/-1}
+.speed-card .speed-ramp-options>button.selected{background:#443568;border-color:#b69cff;color:#f4efff;box-shadow:inset 0 0 0 1px #b69cff}
+.speed-card .audio-times{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+.speed-card .audio-times label{display:flex;flex-direction:column;gap:6px;min-width:0}
+.speed-card .audio-times input{width:100%;box-sizing:border-box}
+.layer-save-status{min-height:1.5em}.layer-save-status.save-error{color:#ffaaaa}
+html[data-theme="light"] .studio-shell .speed-card{background:#f8f9fc;border-color:#d4d9e3;color:#30394a}
+html[data-theme="light"] .studio-shell .speed-card .speed-ramp-options>button{border-color:#cbd2de}
+html[data-theme="light"] .studio-shell .speed-card .speed-ramp-options>button.selected{background:#eee8fc;border-color:#7756ba;color:#4c2c85;box-shadow:inset 0 0 0 1px #7756ba}
+html[data-theme="light"] .studio-shell .layer-save-status.save-error{color:#b42318}
+
+.layer-video-settings{grid-column:1/-1;border:1px solid var(--line);border-radius:9px;padding:12px;display:grid;gap:10px}.layer-video-settings h4{margin:0}
+
+.audio-workspace{display:flex;flex-direction:column;gap:16px}
+.audio-workspace .look-section,.audio-workspace .audio-clip-editor{border-bottom:0;margin:0;padding:0}
+.audio-card{border:1px solid var(--line,#454a58);border-radius:10px;background:#252932;padding:14px;margin:12px 0;display:flex;flex-direction:column;gap:10px;min-width:0}
+.audio-card h3,.audio-card h4,.audio-card .hint{margin:0}.audio-card .hint{line-height:1.5}
+.audio-card .control-label{display:flex;flex-direction:column;gap:7px}
+.audio-card .lut-row{display:flex;gap:8px;flex-wrap:wrap}.audio-card .lut-row select{flex:1;min-width:140px}
+.audio-preset-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:7px}.audio-preset-grid .btn{justify-content:center;white-space:normal}
+.audio-preview-options{display:flex;flex-wrap:wrap;gap:12px;align-items:center}.audio-preview-options>label:first-child{display:flex;gap:8px;align-items:center}
+.audio-card input[type=range]{accent-color:#71c9a4}.audio-card .audio-times input{max-width:110px}
+.audio-card .section-heading{flex-wrap:wrap;gap:8px}.audio-card .section-heading strong{overflow-wrap:anywhere}
+html[data-theme="light"] .studio-shell .audio-card{background:#f7faf9;border-color:#d1ded8;color:#293d36}
+html[data-theme="light"] .studio-shell .audio-card input[type=range]{accent-color:#258368}
+.layer-draft-frame video{pointer-events:auto!important}
+
+.story-prepare-toggle{margin:14px 0;font-weight:600}.story-scene-setup{border:1px solid var(--line,#454a58);border-radius:10px;padding:14px;margin:12px 0}.story-scene-setup legend{font-weight:650;padding:0 6px}
+.story-setup-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}.story-setup-grid .audio-card{margin:0}.story-setup-grid label{display:flex;flex-direction:column;gap:6px}
+.story-media-choices{max-height:160px;overflow:auto;display:grid;gap:8px}.story-media-choices label{flex-direction:row;align-items:center;overflow-wrap:anywhere}
+.story-setup-footer{display:flex;gap:16px;align-items:center;flex-wrap:wrap;margin:12px 0}.story-setup-footer input[type=number]{width:76px}
+@media(max-width:700px){.story-setup-grid{grid-template-columns:1fr}}
+
+.audio-card .audio-times{display:flex;flex-wrap:wrap;gap:8px}.audio-card .audio-times label{min-width:0}.audio-card .audio-times .btn{margin-left:auto}

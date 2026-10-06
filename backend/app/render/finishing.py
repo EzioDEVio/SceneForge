@@ -11,6 +11,7 @@
 Generated media is cached under PROXIES_DIR/finishing and is safe to delete.
 """
 from __future__ import annotations
+from app.render.font_runtime import load_font
 
 import hashlib
 import os
@@ -54,8 +55,8 @@ MUSIC_DEFAULTS = {"asset_id": None, "volume": 35, "duck": 70, "fade_in_ms": 1500
 
 def clean_finishing(raw: dict, project_id: str, db) -> dict:
     from app.db.models import Asset
-    if not isinstance(raw, dict) or set(raw) - {"music", "audio_clips", "loudnorm", "leader", "timeline"}:
-        raise FinishingError("Finishing settings may only contain music, audio_clips, loudnorm, leader and timeline.")
+    if not isinstance(raw, dict) or set(raw) - {"music", "audio_clips", "loudnorm", "leader", "timeline", "layer_clips", "free_timeline"}:
+        raise FinishingError("Finishing settings may only contain music, audio_clips, loudnorm, leader, timeline, layer_clips and free_timeline.")
     out: dict = {}
     for key in ("loudnorm", "leader"):
         value = raw.get(key, False)
@@ -82,7 +83,7 @@ def clean_finishing(raw: dict, project_id: str, db) -> dict:
         raise FinishingError("The timeline supports up to 64 project audio clips.")
     clean_clips = []
     for index, clip in enumerate(clips):
-        allowed = {"id", "asset_id", "name", "start_ms", "source_in_ms", "source_out_ms", "source_duration_ms", "volume", "fade_in_ms", "fade_out_ms", "mute", "track", "gain", "group", "duck"}
+        allowed = {"id", "asset_id", "name", "start_ms", "source_in_ms", "source_out_ms", "source_duration_ms", "volume", "fade_in_ms", "fade_out_ms", "mute", "track", "gain", "group", "duck", "censor"}
         if not isinstance(clip, dict) or set(clip) - allowed:
             raise FinishingError(f"Project audio clip {index + 1} has unsupported settings.")
         asset = db.get(Asset, clip.get("asset_id")) if clip.get("asset_id") else None
@@ -112,6 +113,10 @@ def clean_finishing(raw: dict, project_id: str, db) -> dict:
         cleaned = {"id": str(clip.get("id") or uuid.uuid4()), "asset_id": asset.id, "name": name, "source_duration_ms": source_ms,
                    "start_ms": start, "source_in_ms": source_in, "source_out_ms": source_out,
                    "volume": volume, "fade_in_ms": fade_in, "fade_out_ms": fade_out, "mute": mute}
+        if "censor" in clip:
+            from app.render.censor import clean_ranges
+            try: cleaned["censor"] = clean_ranges(clip["censor"], source_ms)
+            except ValueError as e: raise FinishingError(str(e)) from None
         gain = clip.get("gain")
         if gain:
             if not isinstance(gain, list) or len(gain) > 32:
@@ -140,6 +145,12 @@ def clean_finishing(raw: dict, project_id: str, db) -> dict:
         clean_clips.append(cleaned)
     if clean_clips:
         out["audio_clips"] = clean_clips
+    if "layer_clips" in raw:
+        from app.render.layer_clips import clean_layer_clips
+        out["layer_clips"] = clean_layer_clips(raw["layer_clips"], project_id, db)
+    if "free_timeline" in raw:
+        from app.render.free_timeline import clean_free_timeline
+        out["free_timeline"] = clean_free_timeline(raw["free_timeline"], project_id, db)
     if "timeline" in raw:
         out["timeline"] = clean_timeline(raw["timeline"])
     return out
@@ -272,7 +283,7 @@ def countdown_leader(width: int, height: int, fps: int) -> Path:
         if out.exists():
             return out
         font_path = BUNDLED_FONT_PATH.parent / "NotoSans-Bold.ttf"
-        font = ImageFont.truetype(str(font_path), int(height * 0.42))
+        font = load_font(str(font_path), int(height * 0.42))
         cx, cy, r = width / 2, height / 2, height * 0.36
         frames = []
         for f in range(LEADER_SECONDS * fps):
@@ -368,6 +379,9 @@ def finish_export(export_path: str, project, cancel_check=None) -> str:
                 parts = [f"[{input_index}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo",
                          f"atrim=start={int(clip['source_in_ms'])/1000:.3f}:end={int(clip['source_out_ms'])/1000:.3f}",
                          "asetpts=PTS-STARTPTS", f"volume={int(clip['volume'])/100:.3f}"]
+                from app.render.censor import censor_filter
+                cf = censor_filter(clip.get("censor"), clip["source_in_ms"])
+                if cf: parts.insert(3, cf)
                 envelope = gain_filter(clip.get("gain"), int(clip["source_in_ms"]))
                 if envelope:
                     parts.append(envelope)
@@ -423,7 +437,7 @@ def scene_preview_plan(fin: dict, scene_start_ms: int, part_ms: int, project_ms:
         cut_head = max(0, -rel)
         clips.append({"asset_id": clip["asset_id"], "name": clip.get("name"), "delay_ms": max(0, rel),
                       "source_in_ms": int(clip["source_in_ms"]) + cut_head, "length_ms": length - cut_head,
-                      "volume": int(clip["volume"]), "gain": clip.get("gain"), "duck": int(clip.get("duck") or 0),
+                      "censor": clip.get("censor", []), "volume": int(clip["volume"]), "gain": clip.get("gain"), "duck": int(clip.get("duck") or 0),
                       "fade_in_ms": 0 if cut_head else int(clip["fade_in_ms"]),
                       "fade_out_ms": int(clip["fade_out_ms"]) if rel + length <= part_ms + 50 else 0})
     music = fin.get("music")
@@ -484,6 +498,9 @@ def mix_scene_preview(part_path: str, plan: dict, out_path: str) -> str:
             parts = [f"[{idx}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo",
                      f"atrim=start={clip['source_in_ms'] / 1000:.3f}:duration={length:.3f}", "asetpts=PTS-STARTPTS",
                      f"volume={clip['volume'] / 100:.3f}"]
+            from app.render.censor import censor_filter
+            cf = censor_filter(clip.get("censor"), clip["source_in_ms"])
+            if cf: parts.insert(3, cf)
             envelope = gain_filter(clip.get("gain"), clip["source_in_ms"])
             if envelope:
                 parts.append(envelope)

@@ -7,7 +7,7 @@ from app.db.database import get_db
 from app.db.models import Asset, Project, Scene, RenderJob
 from app.domain import schemas
 from app.domain.constants import ASPECT_DIMENSIONS, AspectRatio
-from app.domain.import_parser import parse_script
+from app.domain.import_parser import parse_script, parse_paragraphs
 from app.render.timeline import is_stale
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
@@ -124,7 +124,14 @@ def import_preview(project_id: str, body: schemas.ImportPreviewRequest, db: Sess
     project = db.get(Project, project_id)
     if not project:
         raise HTTPException(404, "Project not found")
-    result = parse_script(body.text)
+    if body.split_mode not in ("headings", "paragraphs"):
+        raise HTTPException(400, "Choose headings or paragraphs.")
+    text = body.text
+    if len(text) > 200_000:
+        raise HTTPException(400, "Script is too long; import it in smaller sections.")
+    result = parse_paragraphs(text) if body.split_mode == "paragraphs" else parse_script(text)
+    if len(result["scenes"]) > 500:
+        raise HTTPException(400, "Import at most 500 scenes at a time.")
     return schemas.ImportPreviewResponse(**result)
 
 
@@ -357,3 +364,24 @@ def beat_markers(project_id: str, body: dict | None = None, db: Session = Depend
         times = [t for t in times if start <= t <= (end if end is not None else t)]
     out = [{"time_ms": t + offset, "downbeat": i % 4 == 0} for i, t in enumerate(times) if i % every == 0 and t + offset >= 0]
     return {"bpm": round(bpm, 1), "markers": out[:200], "truncated": len(out) > 200}
+
+
+@router.get("/{project_id}/layer-preview")
+def layer_preview(project_id: str, style: str, db: Session = Depends(get_db)):
+    import json
+    from fastapi.responses import FileResponse
+    from app.render.layer_clips import clean_layer_clips, text_raster
+    from app.render.finishing import FinishingError
+    project = db.get(Project, project_id)
+    if not project:
+        raise HTTPException(404, "Project not found")
+    if len(style) > 5000:
+        raise HTTPException(400, "Text preview settings are too long.")
+    try:
+        clip = clean_layer_clips([json.loads(style)], project_id, db)[0]
+        if clip['kind'] in ('image', 'video'):
+            raise FinishingError('This preview is for text clips.')
+        path = text_raster(clip, project.width, project.height)
+    except (FinishingError, ValueError, TypeError) as exc:
+        raise HTTPException(400, str(exc))
+    return FileResponse(path, media_type="image/png")

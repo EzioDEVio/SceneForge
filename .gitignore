@@ -23,3 +23,9 @@ desktop/build/
 desktop/vendor/
 desktop/release/
 *.spec
+
+# Isolated Playwright acceptance-test tooling
+tests/browser/node_modules/
+
+# Browser checkpoint screenshot (the reviewed manual image is under docs/images).
+/docs/qa/timeline-overlays-093.png

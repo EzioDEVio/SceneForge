@@ -160,6 +160,11 @@ def set_shot_reframe(shot_id: str, body: dict = Body(...), db: Session = Depends
             raise HTTPException(400, str(e))
         shot.crop_json = rf.with_reframe(shot.crop_json, reframe)
         shot.fit = "cover"
+    if body.get('preview_only'):
+        from app.domain.schemas import ShotOut
+        out = ShotOut.model_validate(shot)
+        db.rollback()
+        return out
     shot.scene.revision += 1
     db.commit()
     db.refresh(shot)

@@ -48,8 +48,8 @@ export const PRESETS_CSS = `
 /** "Look presets": built-in starter pack + the user's own presets (stored by the backend in
  *  the data folder). Click a tile to apply it to this scene (undoable); import packs by
  *  drag-and-drop onto the Effects panel or with "Import pack"; save / export looks as JSON. */
-export function LookPresets({scene, disabled, flush, onRecord, onApplied}: {scene: Scene; disabled: boolean; flush: () => Promise<boolean>;
-  onRecord: (label: string, undo: () => Promise<unknown>, redo: () => Promise<unknown>) => unknown; onApplied: () => void}) {
+export function LookPresets({scene, disabled, flush, onRecord, onApplied,onDraft}: {scene: Scene; disabled: boolean; flush: () => Promise<boolean>;
+  onRecord: (label: string, undo: () => Promise<unknown>, redo: () => Promise<unknown>) => unknown; onApplied: () => void;onDraft?:(patch:Record<string,any>)=>void}) {
   const [mine, setMine] = useState<LookPreset[]>([]);
   const [builtin, setBuiltin] = useState<LookPreset[]>([]);
   const [keys, setKeys] = useState<string[]>(FALLBACK_KEYS);
@@ -75,6 +75,7 @@ export function LookPresets({scene, disabled, flush, onRecord, onApplied}: {scen
 
   const apply = async (p: LookPreset) => {
     if (disabled || busy) return;
+    if(onDraft){onDraft({effect_preset:p.effect_preset,effect_intensity:p.effect_intensity,look:Object.fromEntries(keys.map(k=>[k,p.look?.[k]??null]))});setMsg({text:`Draft “${p.name}”. Preview, then Apply or Cancel.`});return;}
     if (!(await flush())) return;
     const before = {effect_preset: scene.effect_preset, effect_intensity: scene.effect_intensity, look: Object.fromEntries(keys.map(k => [k, (scene.look_json as any)?.[k] ?? null]))};
     const after = {effect_preset: p.effect_preset, effect_intensity: p.effect_intensity, look: Object.fromEntries(keys.map(k => [k, p.look?.[k] ?? null]))};

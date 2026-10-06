@@ -1,3 +1,5 @@
+import {KnockoutPreview} from "./KnockoutPreview";
+import {BUNDLED_FAMILIES} from './fonts';
 // RC7 creative tools: AI subject cutout ("text behind subject", background removal) and
 // textured text titles (procedural presets, a Media Pool image, or a generated texture).
 import React from 'react';
@@ -6,7 +8,7 @@ import {api, Asset, ProviderProfile, Scene, SubjectVideoEstimate, SubjectVideoJo
 
 const PRESETS: [string, string][] = [['lava', 'Lava'], ['neon', 'Neon'], ['gold', 'Gold'], ['chrome', 'Chrome'], ['marble', 'Marble'],
   ['ice', 'Ice'], ['fire', 'Fire'], ['pixel', 'Pixel blocks'], ['galaxy', 'Galaxy']];
-const FONTS = ['Anton', 'Bebas Neue', 'Poppins', 'Noto Sans', 'Pacifico', 'Lalezar', 'Tajawal', 'Noto Naskh Arabic'];
+const FONTS = BUNDLED_FAMILIES;
 
 export function SubjectCutoutPanel({scene, disabled, onDone}: {scene: Scene; disabled: boolean; onDone: () => void | Promise<void>}) {
   const [model, setModel] = React.useState<'human' | 'isnet' | 'u2netp'>('isnet');
@@ -168,7 +170,7 @@ export function VideoInTextPanel({scene, disabled, onDone}: {scene: Scene; disab
   const [text, setText] = React.useState('');
   const [font, setFont] = React.useState('Anton');
   const [size, setSize] = React.useState(260);
-  const [background, setBackground] = React.useState('#E10600');
+  const [background, setBackground] = React.useState('#30343B');
   const [opacity, setOpacity] = React.useState(100);
   const [outline, setOutline] = React.useState(6);
   const [outlineColor, setOutlineColor] = React.useState('#FFFFFF');
@@ -236,9 +238,10 @@ export function VideoInTextPanel({scene, disabled, onDone}: {scene: Scene; disab
     <header><Type size={15}/><strong>Video inside text</strong></header>
     <p className="hint">Covers the screen with a solid colour and cuts your title out of it, so this scene's video or picture shows through the letters, like a documentary place or year title.</p>
     <div ref={box} className="ko-preview" style={{background, opacity: Math.max(.35, opacity / 100)}} aria-hidden="true">
-      <span ref={label} style={{fontFamily: font === 'Bebas Neue' ? "'Bebas Neue'" : font, WebkitTextStroke: outline ? `${Math.max(1, outline / 4)}px ${outlineColor}` : undefined, top: `${y}%`}}>{text.trim() || 'NORWAY'}</span>
+      <span ref={label} style={{fontFamily: font === 'Bebas Neue' ? "'Bebas Neue'" : font, WebkitTextStroke: outline ? `${Math.max(1, outline / 4)}px ${outlineColor}` : undefined, top: `${y}%`}}>{text.trim() || 'YOUR TITLE'}</span>
     </div>
-    <label className="control-label">Title text<input aria-label="Video inside text title" maxLength={80} value={text} onChange={e => setText(e.target.value)} placeholder="e.g. 1942 or NORWAY"/></label>
+    <label className="control-label">Title text<input aria-label="Video inside text title" maxLength={80} value={text} onChange={e => setText(e.target.value)} placeholder="e.g. PARIS or 1969"/></label>
+    <p className="hint">Type a word or year, e.g. PARIS or 1969.</p>
     <div className="acc-grid">
       <label className="control-label">Font<select aria-label="Video inside text font" value={font} onChange={e => setFont(e.target.value)}>{FONTS.map(f => <option key={f}>{f}</option>)}</select></label>
       <label className="control-label">Card colour<input aria-label="Video inside text background colour" type="color" value={background} onChange={e => setBackground(e.target.value.toUpperCase())}/></label>
@@ -251,6 +254,7 @@ export function VideoInTextPanel({scene, disabled, onDone}: {scene: Scene; disab
     <label className="switch-label finishing-toggle"><input type="checkbox" aria-label="Put the subject in front of the title" checked={subjectFront} disabled={!hasMedia} onChange={e => setSubjectFront(e.target.checked)}/> Put the person or object in front of the title (AI cutout)</label>
     {subjectFront && <p className="hint">{isVideo ? 'Works on one video clip up to 20 s at normal speed. It takes a little while (frame by frame, on this PC).' : 'Works on one still image with Camera movement set to Static in Motion.'}</p>}
     {!hasMedia && <p className="hint">Add a video or picture to this scene first: it is what shows inside the letters.</p>}
+    <KnockoutPreview key={scene.id} sceneId={scene.id} settings={{text, font, font_size: size, background, opacity, outline, outline_color: outlineColor, y}} disabled={disabled || busy || !text.trim() || !hasMedia}/>
     <button className="btn btn-primary" disabled={disabled || busy || !text.trim() || !hasMedia} onClick={() => void add()}><Sparkles size={14}/> {busy ? 'Working…' : 'Add video-inside-text title'}</button>
     {msg && <p className="info-status" role="status">{msg}</p>}
   </section>;

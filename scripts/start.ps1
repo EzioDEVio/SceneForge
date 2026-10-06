@@ -9,12 +9,6 @@ if ($listener) {
 }
 Write-Host "Backend folder: $root\backend"
 Set-Location "$root\backend"
-if (-not (Test-Path ".venv\Scripts\Activate.ps1")) {
-    Write-Host "[ERROR] Backend virtual environment not found. Run scripts\setup.ps1 first." -ForegroundColor Red
-    exit 1
-}
-& ".venv\Scripts\Activate.ps1"
-
 if (-not (Test-Path "$root\frontend\dist\index.html")) {
     Write-Host "[WARN] frontend\dist not found - the app UI will not be served." -ForegroundColor Yellow
     Write-Host "       Run scripts\setup.ps1 (or 'npm run build' in frontend\) first." -ForegroundColor Yellow
@@ -22,4 +16,5 @@ if (-not (Test-Path "$root\frontend\dist\index.html")) {
 
 Write-Host "Starting SceneForge Studio at http://127.0.0.1:8000 ..."
 Write-Host "Press Ctrl+C to stop."
-python -m uvicorn app.main:app --host 127.0.0.1 --port 8000
+& python "$PSScriptRoot\windows_runtime.py" start
+exit $LASTEXITCODE

@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from typing import Any
+import re
+from app.domain.fonts import ALL_FAMILIES
 
 from pydantic import field_validator, model_validator, BaseModel, Field
 
@@ -182,6 +184,7 @@ class ReorderRequest(BaseModel):
 
 
 class ImportPreviewRequest(BaseModel):
+    split_mode: str = "headings"
     text: str
     filename: str | None = None
 
@@ -293,7 +296,7 @@ class GenerateVideoRequest(BaseModel):
 class TextLayer(BaseModel):
     kind: str = Field(default="text_plus", pattern=r"^(text|text_box|text_plus)$")
     box_width: float = Field(default=80, ge=20, le=100)
-    family: str = Field(default="Noto Naskh Arabic", pattern=r"^(Noto Naskh Arabic|Noto Sans Arabic|Noto Sans|Amiri|Tajawal|Lalezar|Poppins|Bebas Neue|Anton|Pacifico)$")
+    family: str = Field(default="Noto Naskh Arabic", pattern="^(?:" + "|".join(re.escape(f) for f in ALL_FAMILIES) + ")$")
     align: str = Field(default="center", pattern=r"^(left|center|right)$")
     outline_width: float = Field(default=0, ge=0, le=10)
     shadow: float = Field(default=0, ge=0, le=10)

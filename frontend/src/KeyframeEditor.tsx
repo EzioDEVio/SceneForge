@@ -63,7 +63,7 @@ export function KeyframeEditor({sceneId, label, startMs, endMs, keyframes, keys,
       <span className="keyframe-playhead" aria-hidden="true" style={{left: `${Math.max(0, Math.min(100, local / span * 100))}%`, opacity: inside ? 1 : .35}}/>
       {kfs.map((k, i) => <button key={k.t_ms} className={`keyframe-diamond ${existing === k ? 'current' : ''}`} style={{left: `${Math.min(100, k.t_ms / span * 100)}%`}} aria-label={`Keyframe ${i + 1} at ${sec(k.t_ms)}s`} title={`Keyframe ${i + 1} · ${sec(k.t_ms)}s · click to move the preview there`} onClick={() => seekTo(k)}/>)}
     </div>
-    {kfs.length === 0 ? <p className="hint">Move the timeline playhead inside this layer and add keyframes to animate position, size, rotation and opacity. With keyframes, dragging on the preview edits the keyframe at the playhead.</p> :
+    {kfs.length === 0 ? <p className="hint">Move the timeline playhead inside this layer and add keyframes to animate position, size, rotation and opacity. For text, use X, Y and Font size in Text settings; changes edit the keyframe at the playhead. Image overlays can be dragged on the preview.</p> :
       <ol className="keyframe-list">{kfs.map((k, i) => <li key={k.t_ms}>
         <label>t<input aria-label={`Keyframe ${i + 1} time (s)`} type="number" min={0} max={span / 1000} step={0.05} defaultValue={(k.t_ms / 1000).toFixed(2)} key={k.t_ms} disabled={disabled} onBlur={e => retime(k, Number(e.target.value))} onKeyDown={e => {if (e.key === 'Enter') e.currentTarget.blur();}}/>s</label>
         <select aria-label={`Keyframe ${i + 1} easing`} value={k.ease || 'linear'} disabled={disabled} onChange={e => set(kfs.map(x => x === k ? {...x, ease: e.target.value as Ease} : x))}>{EASES.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>

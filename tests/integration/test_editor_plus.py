@@ -20,7 +20,13 @@ def check(name,ok):
  n+=1;print('PASS '+name,flush=True)
 buf=io.BytesIO();Image.new('RGB',(64,64),'red').save(buf,'JPEG');jpg=buf.getvalue()
 def response(data,code=200):return SimpleNamespace(ok=code==200,is_redirect=False,status_code=code,json=lambda:data)
-with TestClient(app) as client:
+# Native credential-store availability is a separate platform gate.
+class FixtureVault:
+ def __init__(self): self.values={}
+ def set_password(self,service,key,value): self.values[(service,key)]=value
+ def get_password(self,service,key): return self.values.get((service,key))
+ def delete_password(self,service,key): self.values.pop((service,key),None)
+with patch('app.security.secrets.vault',return_value=FixtureVault()), TestClient(app) as client:
  p=client.post('/api/projects',json={'title':'Delete check'}).json()
  scene=client.get('/api/projects/'+p['id']).json()['scenes'][0]['id']
  cf=client.post('/api/providers',json={'capability':'image','name':'cloudflare','api_key':'test-secret','base_url':'a'*32}).json()

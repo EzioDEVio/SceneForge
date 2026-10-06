@@ -272,6 +272,13 @@ class KnockoutTitleRequest(BaseModel):
     end_ms: int | None = Field(default=None, ge=0, le=3_600_000)
 
 
+def _knockout_overlay(asset_id: str, body: KnockoutTitleRequest) -> dict:
+    # Preview and Apply must preserve identical transparent holes and timing.
+    return {"id": "ko" + uuid.uuid4().hex[:6], "asset_id": asset_id, "kind": "sticker", "x": 50, "y": 50, "width": 100,
+            "rotation": 0, "opacity": 100, "radius": 0, "border": 0, "shadow": 0, "anim_in": "fade", "anim_out": "fade", "anim_ms": 400,
+            "start_ms": body.start_ms, "end_ms": body.end_ms}
+
+
 @router.post("/api/scenes/{scene_id}/knockout-title")
 def knockout_title(scene_id: str, body: KnockoutTitleRequest, db: Session = Depends(get_db)):
     """0.9.1 "Video inside text": a full-frame colour card with the letters cut out, added as an
@@ -298,13 +305,58 @@ def knockout_title(scene_id: str, body: KnockoutTitleRequest, db: Session = Depe
     label = "".join(ch for ch in body.text if ch.isalnum() or ch in " -")[:30].strip() or "title"
     meta = {"knockout_title": body.model_dump()}
     asset = _store_png(db, scene.project_id, dest, f"sticker-video-in-text-{label}.png", meta)
-    overlay = {"id": "ko" + uuid.uuid4().hex[:6], "asset_id": asset.id, "kind": "sticker", "x": 50, "y": 50, "width": 100,
-               "rotation": 0, "opacity": 100, "radius": 0, "border": 0, "shadow": 0, "anim_in": "fade", "anim_out": "fade", "anim_ms": 400,
-               "start_ms": body.start_ms, "end_ms": body.end_ms}
+    overlay = _knockout_overlay(asset.id, body)
     cleaned = _add_overlay(db, scene, overlay)
     db.commit()
     db.refresh(scene)
     return {"scene": _scene_out(scene), "overlay": cleaned[-1], "asset": schemas.AssetOut.model_validate(asset)}
+
+
+@router.post("/api/scenes/{scene_id}/knockout-title/preview", response_model=schemas.JobCreateResponse)
+def preview_knockout_title(scene_id: str, body: KnockoutTitleRequest, db: Session = Depends(get_db)):
+    """Render the real knockout over an isolated scene snapshot, without applying it."""
+    from copy import deepcopy
+    from app.db.models import RenderJob
+    from app.domain.constants import JobScope, JobStatus
+    from app.render.textured_text import TexturedTextError, render_knockout_card
+    from app.render.overlays import clean_overlays, MAX_OVERLAYS
+    from app.workers import jobs
+    scene = db.get(Scene, scene_id)
+    if not scene: raise HTTPException(404, "Scene not found")
+    if not scene.shots: raise HTTPException(400, "Add media before previewing.")
+    if len(scene.overlays_json or []) >= MAX_OVERLAYS:
+        raise HTTPException(400, "Remove an overlay before adding this title.")
+    if body.end_ms is not None and body.end_ms <= body.start_ms:
+        raise HTTPException(400, "The end time must be after the start time.")
+    project = scene.project
+    try:
+        img = render_knockout_card(body.text, project.width, project.height, body.font, body.font_size,
+                                  body.x, body.y, body.background, body.opacity, body.outline, body.outline_color, body.spacing)
+    except TexturedTextError as exc: raise HTTPException(400, str(exc)) from exc
+    folder = Path(MEDIA_DIR) / scene.project_id
+    folder.mkdir(parents=True, exist_ok=True)
+    dest = folder / f"preview_knockout_{uuid.uuid4().hex[:10]}.png"
+    img.save(dest)
+    # Retain the render dependency, but never write draft overlays into the saved scene.
+    asset = _store_png(db, scene.project_id, dest, "preview-video-inside-text.png", {"preview_only": True, "hidden_from_pool": True})
+    db.commit()
+    try:
+        overlay = _knockout_overlay(asset.id, body)
+        scene.overlays_json = clean_overlays(list(scene.overlays_json or []) + [overlay], scene.project_id, db)
+        _ = [(s.asset, s.scene) for s in scene.shots]
+        _ = [t.audio_asset for t in scene.voice_takes]
+        _ = project.scenes
+        db.expunge_all()
+        snapshot = deepcopy((scene, project))
+    finally: db.rollback()
+    job_id = jobs.reserve_job_id()
+    try:
+        db.add(RenderJob(id=job_id, project_id=project.id, scene_id=scene_id, scope=JobScope.PART, status=JobStatus.QUEUED))
+        db.commit()
+        jobs.start_part_job(job_id, project.id, scene_id, snapshot)
+    except Exception:
+        db.rollback(); jobs.release_job_id(job_id); raise
+    return {"job_id": job_id}
 
 
 # Video subject cutout ("text behind a moving subject") routes live in api/video_cutout.py.

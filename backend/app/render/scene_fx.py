@@ -161,14 +161,24 @@ def clean_wheels(d) -> dict:
     return out
 
 
-CLEANERS = {"wheels": clean_wheels, "shake": clean_shake, "spotlight": clean_spotlight, "redact": clean_redact, "leak": clean_leak, "tone": clean_tone,
+def clean_stabilize(d) -> dict:
+    d = _only({"strength": 50, **(d or {})}, {"strength"}, "Stabilization")
+    return {"strength": int(_num(d, "strength", 1, 100, "Stabilization"))}
+
+
+def clean_finish(d):
+    d = _only({"amount": 50, **(d or {})}, {"amount"}, "Finishing effect")
+    return {"amount": int(_num(d, "amount", 0, 100, "Finishing effect"))}
+
+
+CLEANERS = {"vignette": clean_finish, "letterbox": clean_finish, "sharpen": clean_finish,"stabilize": clean_stabilize, "wheels": clean_wheels, "shake": clean_shake, "spotlight": clean_spotlight, "redact": clean_redact, "leak": clean_leak, "tone": clean_tone,
             "flare": clean_flare, "wiggle": clean_wiggle}
 
 
 def has_scene_fx(look: dict | None) -> bool:
     look = look or {}
     return bool(look.get("shake") or look.get("spotlight") or look.get("redact") or look.get("leak") or look.get("route") or look.get("annotations")
-                or look.get("flare") or look.get("wiggle"))
+                or look.get("flare") or look.get("wiggle") or look.get("vignette") or look.get("letterbox") or look.get("sharpen"))
 
 
 # --------------------------------------------------------------------------

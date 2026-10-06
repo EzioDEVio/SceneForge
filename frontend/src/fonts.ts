@@ -6,7 +6,7 @@
 export const ARABIC_FAMILIES = ['Noto Naskh Arabic', 'Noto Sans Arabic', 'Amiri', 'Tajawal', 'Lalezar'];
 const OWN_LATIN = ['Amiri', 'Tajawal', 'Lalezar'];
 const ARABIC_PARTNER: Record<string, string> = {'Poppins': 'Tajawal', 'Bebas Neue': 'Lalezar', 'Anton': 'Lalezar', 'Pacifico': 'Amiri'};
-export const BUNDLED_FAMILIES = ['Noto Sans', 'Poppins', 'Bebas Neue', 'Anton', 'Pacifico', 'Noto Naskh Arabic', 'Noto Sans Arabic', 'Amiri', 'Tajawal', 'Lalezar'];
+export const BUNDLED_FAMILIES = ['Noto Sans', 'Poppins', 'Bebas Neue', 'Anton', 'Pacifico', 'Noto Naskh Arabic', 'Noto Sans Arabic', 'Amiri', 'Tajawal', 'Lalezar','DejaVu Sans','DejaVu Serif','DejaVu Sans Mono','Latin Modern Sans','Latin Modern Roman','Latin Modern Mono','Latin Modern Roman Slanted','Latin Modern Sans Demi Cond','Latin Modern Mono Caps'];
 const SERIF_LATIN = ['Times New Roman', 'Georgia'];
 
 export function fontPair(family?: string): [arabic: string, latin: string] {

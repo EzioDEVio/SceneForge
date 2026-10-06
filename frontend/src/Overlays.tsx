@@ -211,23 +211,6 @@ export function OverlayPanel({scene, overlays, selected, onSelect, onChange, dis
       <button className="btn" disabled={disabled} onClick={() => file.current?.click()}><Upload size={14}/> Upload</button>
       <input ref={file} type="file" accept="image/*,video/*" hidden aria-label="Upload overlay media" onChange={e => void upload(e.target.files?.[0])}/>
     </div>
-    <section className="media-layout-section" aria-label="Media layout presets">
-      <div className="section-heading"><strong>Arrange video & image layers</strong><FeatureHelp compact title="Arrange media layers" description="Place two or more video or image overlays in a clean split-screen layout. Your main scene remains behind them, and stickers stay independently positioned." steps="Add each source with Add from Media Pool or Upload above, then choose a layout. Drag the media on the preview or use Position & size to fine-tune it. These controls arrange media layers only; they do not move stickers or change the scene order."/></div>
-      <p className="hint">Choose video or image layers above. Stickers keep their own position and size.</p>
-      <div className="media-layout-grid" role="group" aria-label="Video and image layout presets">{([['side2','2 side by side',2],['side3','3 side by side',3],['stack2','2 stacked',2],['stack3','3 stacked',3],['grid4','2 × 2 grid',4]] as const).map(([mode,label,count])=><button key={mode} type="button" className="media-layout-button" aria-label={label} title={`${label} · arrange video and image layers`} disabled={disabled||mediaLayerIndexes.length<count} onClick={()=>arrange(mode)}><span className={`media-layout-preview layout-${mode}`} aria-hidden="true">{Array.from({length:count},(_,i)=><i key={i}/>)}</span><span className="media-layout-label">{label}</span><small>{count} media layers</small></button>)}</div>
-      {mediaLayerIndexes.length<2&&<p className="media-layout-empty">Add at least two images or videos to enable split-screen layouts.</p>}
-    </section>
-    {error && <p className="form-error" role="alert">{error}</p>}
-    <section className="sticker-library" aria-label="Stickers and emoji">
-      <div className="section-heading"><h3><Sticker size={15}/> Stickers & emoji</h3><span>{STICKER_LIBRARY.length+customStickerIds.length}</span><FeatureHelp compact title="Stickers and emoji" description="Add a reusable graphic or emoji as a normal image overlay on the scene." steps="Search or browse the sticker grid, click an item, then select it in the overlay list or preview to resize, position, animate, or delete it. Upload PNG or WebP files to keep transparent backgrounds; JPEG images are supported without transparency. Your uploads are saved in this project's Media Pool and listed here on this device."/></div>
-      <p className="hint">Choose a sticker, or upload a PNG/WebP (transparent) or JPEG (solid background). Added stickers start at a compact size.</p>
-      <label className="search-control"><Search size={14}/><input aria-label="Search stickers and emoji" placeholder="Search stickers…" value={stickerQuery} onChange={e=>setStickerQuery(e.target.value)}/></label>
-      <div className="sticker-upload-row"><button className="btn" disabled={disabled||overlays.length>=8} onClick={()=>stickerFile.current?.click()}><Upload size={13}/> Upload sticker</button><input ref={stickerFile} type="file" accept=".png,.webp,.jpg,.jpeg,image/png,image/webp,image/jpeg" hidden aria-label="Upload custom sticker" onChange={e=>void uploadCustomSticker(e.target.files?.[0])}/></div>
-      <StickerLibraryGrid query={stickerQuery} disabled={disabled||overlays.length>=8} busyId={stickerBusy} onPick={s=>void addLibrarySticker(s)}
-        extraMatches={media.some(asset=>asset.type==='image'&&customStickerIds.includes(asset.id)&&`${asset.original_filename} upload custom`.toLowerCase().includes(stickerQuery.toLowerCase()))}
-        extra={<>{media.filter(asset=>asset.type==='image'&&customStickerIds.includes(asset.id)&&`${asset.original_filename} upload custom`.toLowerCase().includes(stickerQuery.toLowerCase())).map(asset=><button key={asset.id} className="sticker-choice custom-sticker-choice" title={asset.original_filename} aria-label={`Add uploaded sticker ${asset.original_filename}`} disabled={disabled||overlays.length>=8} onClick={()=>add(asset.id,{width:18,border:0,radius:0,shadow:25})}><img src={api.assetThumbUrl(asset.id,160)} alt=""/><small>{asset.original_filename}</small></button>)}</>}/>
-      {overlays.length>=8&&<p className="hint">This scene has reached the 8 overlay limit.</p>}
-    </section>
     {overlays.length > 0 && <ul className="overlay-list" aria-label="Overlays (top of list is drawn on top)">
       {[...overlays.keys()].reverse().map(i => <li key={overlays[i].id} className={i === selected ? 'selected' : ''}>
         <button className="overlay-pick" aria-pressed={i === selected} onClick={() => onSelect(i)}><img src={api.assetThumbUrl(overlays[i].asset_id, 160)} alt=""/> Overlay {i + 1}</button>
@@ -237,7 +220,7 @@ export function OverlayPanel({scene, overlays, selected, onSelect, onChange, dis
         <button className="icon-reset" aria-label={`Delete overlay ${i + 1}`} disabled={disabled} onClick={() => {onChange(overlays.filter((_, k) => k !== i)); onSelect(Math.max(0, Math.min(selected, overlays.length - 2)));}}><Trash2 size={12}/></button>
       </li>)}
     </ul>}
-    {o && <div className="panel-grid">
+    {o && <><nav className="overlay-access" aria-label="Overlay control shortcuts">{['Position & size','Frame','Move & green screen','Timing & animation','Loop motion'].map(label=><button className="btn" key={label} onClick={e=>{const panel=e.currentTarget.closest('.overlay-panel');const target=Array.from(panel?.querySelectorAll('fieldset')||[]).find(el=>el.querySelector('legend')?.textContent===label);target?.scrollIntoView({block:'start',behavior:'auto'});(target?.querySelector('input,button') as HTMLElement|null)?.focus({preventScroll:true});}}>{label}</button>)}</nav><div className="panel-grid">
       <fieldset className="adjust-group"><legend>Position & size</legend>
         {num('x', 'Left–right', -20, 120, 0.5, '%')}{num('y', 'Up–down', -20, 120, 0.5, '%')}{num('width', 'Size', 3, 100, 0.5, '%')}
         {num('rotation', 'Rotation', -180, 180, 1, '°')}{num('opacity', 'Opacity', 0, 100, 1, '%')}
@@ -283,7 +266,25 @@ export function OverlayPanel({scene, overlays, selected, onSelect, onChange, dis
       </fieldset>
       <KeyframeEditor sceneId={scene.id} label={`Overlay ${selected + 1}`} startMs={o.start_ms || 0} endMs={o.end_ms ?? sceneDuration(scene)} keyframes={o.keyframes} keys={OVERLAY_KEYS} disabled={disabled}
         current={ms => overlayAt(o, ms) as any} onChange={k => onChange(overlays.map((x, i) => i === selected ? withKeyframes(x, k) : x))}/>
-    </div>}
+    </div></>}
     {o && <p className="hint">Videos play silently and loop. Render the scene for the final result.</p>}
+    <section className="media-layout-section" aria-label="Media layout presets">
+      <div className="section-heading"><strong>Arrange video & image layers</strong><FeatureHelp compact title="Arrange media layers" description="Place two or more video or image overlays in a clean split-screen layout. Your main scene remains behind them, and stickers stay independently positioned." steps="Add each source with Add from Media Pool or Upload above, then choose a layout. Drag the media on the preview or use Position & size to fine-tune it. These controls arrange media layers only; they do not move stickers or change the scene order."/></div>
+      <p className="hint">Choose video or image layers above. Stickers keep their own position and size.</p>
+      <div className="media-layout-grid" role="group" aria-label="Video and image layout presets">{([['side2','2 side by side',2],['side3','3 side by side',3],['stack2','2 stacked',2],['stack3','3 stacked',3],['grid4','2 × 2 grid',4]] as const).map(([mode,label,count])=><button key={mode} type="button" className="media-layout-button" aria-label={label} title={`${label} · arrange video and image layers`} disabled={disabled||mediaLayerIndexes.length<count} onClick={()=>arrange(mode)}><span className={`media-layout-preview layout-${mode}`} aria-hidden="true">{Array.from({length:count},(_,i)=><i key={i}/>)}</span><span className="media-layout-label">{label}</span><small>{count} media layers</small></button>)}</div>
+      {mediaLayerIndexes.length<2&&<p className="media-layout-empty">Add at least two images or videos to enable split-screen layouts.</p>}
+    </section>
+    {error && <p className="form-error" role="alert">{error}</p>}
+    <section className="sticker-library" aria-label="Stickers and emoji">
+      <div className="section-heading"><h3><Sticker size={15}/> Stickers & emoji</h3><span>{STICKER_LIBRARY.length+customStickerIds.length}</span><FeatureHelp compact title="Stickers and emoji" description="Add a reusable graphic or emoji as a normal image overlay on the scene." steps="Search or browse the sticker grid, click an item, then select it in the overlay list or preview to resize, position, animate, or delete it. Upload PNG or WebP files to keep transparent backgrounds; JPEG images are supported without transparency. Your uploads are saved in this project's Media Pool and listed here on this device."/></div>
+      <p className="hint">Choose a sticker, or upload a PNG/WebP (transparent) or JPEG (solid background). Added stickers start at a compact size.</p>
+      <label className="search-control"><Search size={14}/><input aria-label="Search stickers and emoji" placeholder="Search stickers…" value={stickerQuery} onChange={e=>setStickerQuery(e.target.value)}/></label>
+      <div className="sticker-upload-row"><button className="btn" disabled={disabled||overlays.length>=8} onClick={()=>stickerFile.current?.click()}><Upload size={13}/> Upload sticker</button><input ref={stickerFile} type="file" accept=".png,.webp,.jpg,.jpeg,image/png,image/webp,image/jpeg" hidden aria-label="Upload custom sticker" onChange={e=>void uploadCustomSticker(e.target.files?.[0])}/></div>
+      <StickerLibraryGrid query={stickerQuery} disabled={disabled||overlays.length>=8} busyId={stickerBusy} onPick={s=>void addLibrarySticker(s)}
+        extraMatches={media.some(asset=>asset.type==='image'&&customStickerIds.includes(asset.id)&&`${asset.original_filename} upload custom`.toLowerCase().includes(stickerQuery.toLowerCase()))}
+        extra={<>{media.filter(asset=>asset.type==='image'&&customStickerIds.includes(asset.id)&&`${asset.original_filename} upload custom`.toLowerCase().includes(stickerQuery.toLowerCase())).map(asset=><button key={asset.id} className="sticker-choice custom-sticker-choice" title={asset.original_filename} aria-label={`Add uploaded sticker ${asset.original_filename}`} disabled={disabled||overlays.length>=8} onClick={()=>add(asset.id,{width:18,border:0,radius:0,shadow:25})}><img src={api.assetThumbUrl(asset.id,160)} alt=""/><small>{asset.original_filename}</small></button>)}</>}/>
+      {overlays.length>=8&&<p className="hint">This scene has reached the 8 overlay limit.</p>}
+    </section>
+
   </div>;
 }

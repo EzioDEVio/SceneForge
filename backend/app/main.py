@@ -14,7 +14,14 @@ from app.db.database import init_db, SessionLocal
 from app.db.models import ProviderProfile
 from app.security.secrets import migrate_credentials
 
-app = FastAPI(title="SceneForge Studio API", version="0.1.0-m1")
+app = FastAPI(title="SceneForge Studio API", version="0.9.3")
+
+from app.render.font_runtime import FontRuntimeError
+from fastapi.responses import JSONResponse
+
+@app.exception_handler(FontRuntimeError)
+async def font_runtime_error(request, exc):
+    return JSONResponse(status_code=503, content={"detail": str(exc)})
 
 # Local-first: bind loopback by default (see scripts/start.*), but still
 # validate allowed origins rather than treating "runs on localhost" alone
@@ -34,6 +41,9 @@ app.add_middleware(DesktopSessionMiddleware,token=os.environ.get("SCENEFORGE_DES
 def on_startup():
     logbuffer.install()   # again: uvicorn may have reconfigured logging after import
     init_db()
+    from app.managed_ai import autostart
+    threading_start = __import__("threading").Thread(target=autostart, daemon=True)
+    threading_start.start()
     # In-process render/generation threads cannot survive an app restart. Mark
     # their durable rows interrupted so stale jobs do not block project deletion.
     from app.workers.jobs import recover_interrupted_jobs
@@ -42,10 +52,17 @@ def on_startup():
     import os,threading
     if os.name=='nt' and os.environ.get('SCENEFORGE_SD_AUTOSTART')!='0':
         from app.local_images import start, settings
-        if settings()['autostart']:
+        from app.managed_ai import preferences as managed_preferences
+        if settings()['autostart'] and 'stable_diffusion' not in managed_preferences().get('components',[]):
             threading.Thread(target=start,daemon=True).start()
 
 
+from app.api import story_tools
+app.include_router(story_tools.router)
+from app.api import editor_drafts
+app.include_router(editor_drafts.router)
+from app.api import route_icons
+app.include_router(route_icons.router)
 app.include_router(projects.router)
 app.include_router(scenes.router)
 app.include_router(assets.router)
@@ -53,6 +70,8 @@ from app.api import effect_scenes  # noqa: E402
 app.include_router(effect_scenes.router)
 app.include_router(voice.router)
 app.include_router(render.router)
+from app.api import managed_ai as managed_ai_api
+app.include_router(managed_ai_api.router)
 app.include_router(providers.router)
 app.include_router(images.router)
 app.include_router(local_speech.router)
@@ -87,7 +106,7 @@ logbuffer.install()
 # new interface connected to an old backend (e.g. a still-running old
 # start.bat window) shows "Backend update required" instead of silently
 # losing settings the old backend does not know.
-BUILD_ID = "v0.9.2"
+BUILD_ID = "v0.9.3"
 
 
 @app.get("/api/health")
@@ -98,7 +117,8 @@ def health():
 @app.get('/api/close-status')
 def close_status():
     from app.workers import jobs as job_worker
-    return {'ready': not job_worker.active_job_ids()}
+    from app.managed_ai import state as ai_state
+    return {'ready': not job_worker.active_job_ids() and ai_state()['status']!='running'}
 
 
 # Serve the built frontend (npm run build -> frontend/dist) from the same

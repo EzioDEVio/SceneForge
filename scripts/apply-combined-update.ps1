@@ -10,7 +10,7 @@ $targetRoot = (Resolve-Path -LiteralPath $AppPath.Trim().Trim('"')).Path
 if ($targetRoot.Equals($bundleRoot, [StringComparison]::OrdinalIgnoreCase)) { throw 'Choose the existing app, not the update package.' }
 if (-not (Test-Path -LiteralPath (Join-Path $targetRoot 'backend\app\main.py'))) { throw 'SceneForge backend not found.' }
 if (-not (Test-Path -LiteralPath (Join-Path $targetRoot 'frontend\package.json'))) { throw 'SceneForge frontend not found.' }
-$items = @('frontend\dist', 'frontend\src', 'frontend\public', 'frontend\index.html', 'backend\app', 'assets\sfx', 'services', 'START_HERE_COMBINED.md', 'frontend\package.json', 'frontend\package-lock.json')
+$items = @('frontend\dist', 'frontend\src', 'frontend\public', 'frontend\index.html', 'backend\app', 'assets\sfx', 'services', 'START_HERE_COMBINED.md', 'frontend\package.json', 'frontend\package-lock.json', 'scripts\windows_runtime.py', 'scripts\setup.bat', 'scripts\setup.ps1', 'scripts\start.bat', 'scripts\start.ps1', 'scripts\dev.bat', 'backend\requirements.txt')
 foreach ($item in $items) {
     if (-not (Test-Path -LiteralPath (Join-Path $bundleRoot $item))) { throw "Incomplete update: missing $item" }
 }
@@ -48,6 +48,6 @@ try {
 }
 Write-Host 'Combined Beta applied.' -ForegroundColor Green
 Write-Host "Backup: $backup"
-Write-Host 'Restart the ORIGINAL app, then Ctrl+F5 in the browser.'
+Write-Host 'Run scripts\setup.bat in the ORIGINAL app, then scripts\start.bat and Ctrl+F5 in the browser.'
 Write-Host 'Projects, media, API keys and installed dependencies are preserved.'
 Write-Host 'Re-render scenes to hear synchronized typewriter audio.'

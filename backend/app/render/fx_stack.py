@@ -27,9 +27,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-STACK_IDS: tuple[str, ...] = ("spotlight", "leak", "flare", "wiggle", "shake")
+STACK_IDS: tuple[str, ...] = ("spotlight", "leak", "flare", "wiggle", "shake", "vignette", "letterbox", "sharpen")
 DEFAULT_ORDER: tuple[str, ...] = STACK_IDS
-LABELS = {"spotlight": "Spotlight", "leak": "Light leaks", "flare": "Lens flare", "wiggle": "Wiggle", "shake": "Camera shake"}
+LABELS = {"spotlight": "Spotlight", "leak": "Light leaks", "flare": "Lens flare", "wiggle": "Wiggle", "shake": "Camera shake", "vignette": "Edge vignette", "letterbox": "Cinema bars", "sharpen": "Detail sharpening"}
 
 
 def _clean_ids(value, name: str) -> list[str]:
@@ -94,6 +94,13 @@ def stack_graph(base: str, look: dict, w: int, h: int, fps: int, dur: float, cac
             g, base = fx.flare_graph(base, p, png, drift, w, h, fps, dur)
         elif fx_id == "wiggle":
             g, base = fx.wiggle_graph(base, p, w, h, fps, dur)
+        elif fx_id in ("vignette", "letterbox", "sharpen"):
+            amount = p["amount"] / 100
+            filt = (f"vignette=angle={amount*1.2:.3f}" if fx_id == "vignette" else
+                    f"drawbox=x=0:y=0:w=iw:h=ih*{amount*.18:.4f}:color=black:t=fill,drawbox=x=0:y=ih*(1-{amount*.18:.4f}):w=iw:h=ih*{amount*.18:.4f}:color=black:t=fill" if fx_id == "letterbox" else
+                    f"unsharp=5:5:{amount*1.5:.3f}:5:5:0")
+            label = "finish_" + fx_id
+            g = [f"[{base}]{filt}[{label}]"]; base = label
         else:
             g, base = fx.shake_graph(base, p, w, h, fps)
         parts += g

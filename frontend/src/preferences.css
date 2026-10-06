@@ -235,3 +235,15 @@ html[data-theme="warm"] .studio-shell :is(.studio-toolbar,.scene-sidebar,.inspec
 html[data-theme="warm"] .studio-shell :is(.workspace,.editing-area,.editor-main,.sequence-tracks,.sequence-content){background:#211e1a}
 html[data-theme="warm"] .studio-shell .inspector-body :is(fieldset,.clip-sound,.auto-captions-panel,.typewriter-controls,.timing-section,.framing-controls,.text-quick){background:#302b26;color:#eee7de;border-color:#4b4035}
 html[data-theme="warm"] .studio-shell :is(input,select,textarea){background:#28231f;color:#eee7de;border-color:#5a4d40}
+
+/* Ordinary action buttons need a light surface as well as dark text. */
+html[data-theme="light"] .studio-shell .btn:where(:not(.btn-primary):not(.primary):not(.selected):not(.active)),html[data-theme="light"] .studio-shell .icon-btn{background:#fff;border-color:#cbd2de;color:#30394a}
+html[data-theme="light"] .studio-shell .btn:where(:not(.btn-primary):not(.primary):not(.selected):not(.active)):hover:not(:disabled),html[data-theme="light"] .studio-shell .icon-btn:hover:not(:disabled){background:#eceff6;border-color:#9cabc3;color:#263348}
+html[data-theme="light"] .studio-shell .btn.primary{background:#6757d9;border-color:#6757d9;color:#fff}
+html[data-theme="light"] .studio-shell .btn.danger{color:#a02b34}
+html[data-theme="light"] .studio-shell .editor-menubar,html[data-theme="light"] .studio-shell .editor-menu-items{background:#f8f9fc;border-color:#cbd2de;color:#30394a}
+html[data-theme="light"] .studio-shell .editor-menu-items button:hover{background:#e9e5fa}
+html[data-theme="light"] .studio-shell .timeline-tools>button{background:#fff}
+html[data-theme="light"] .studio-shell .script-card h3{color:#30394a}
+html[data-theme="light"] .studio-shell .script-box{background:#fff;border-color:#cbd2de;color:#30394a}
+html[data-theme="light"] .story-tools .audio-card{background:#f7faf9;border-color:#d1ded8;color:#293d36}

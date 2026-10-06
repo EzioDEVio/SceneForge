@@ -2,6 +2,7 @@ import React, {useMemo, useState} from 'react';
 import {ChevronLeft,ChevronRight,Scissors,Search,Trash2,Type} from 'lucide-react';
 import type {CaptionSegment} from './api';
 import {FeatureHelp} from './FeatureHelp';
+import {CaptionEmojiPicker} from './CaptionEmojiPicker';
 
 function uid(){return globalThis.crypto?.randomUUID?.()||`cap-${Date.now()}-${Math.random().toString(16).slice(2)}`;}
 
@@ -53,6 +54,7 @@ export function CaptionSegmentsEditor({segments,onChange,direction='auto',onDire
         <button type="button" className="text-btn danger" aria-label={`Remove caption ${i+1}`} title="Remove this caption clip" onClick={()=>onChange(segments.filter(x=>x.id!==s.id))}><Trash2 size={13}/></button>
       </div></div>
       {collapsed?<button type="button" className="caption-collapsed-text" dir={direction} onClick={()=>{setCollapsed(false);onFocusSegment?.(s.id);}}>{s.text||'Empty caption'}</button>:<textarea aria-label={`Caption segment ${i+1} text`} dir={direction} value={s.text} onFocus={()=>onFocusSegment?.(s.id)} onChange={e=>patch(s.id,{text:e.target.value})}/>}
+      {!collapsed&&<CaptionEmojiPicker index={i+1} value={s.emoji||''} side={s.emoji_side||'right'} onChange={emoji=>patch(s.id,{emoji})} onSide={emoji_side=>patch(s.id,{emoji_side})}/>}
       {!collapsed&&<div className="caption-segment-times"><label>Start <span><input aria-label={`Caption ${i+1} start time`} type="number" min={0} max={3600000} step={50} value={s.start_ms} onChange={e=>patch(s.id,{start_ms:Math.max(0,Math.min(s.end_ms-50,Number(e.target.value)||0))})}/> ms</span></label>
         <label>End <span><input aria-label={`Caption ${i+1} end time`} type="number" min={s.start_ms+50} max={3600000} step={50} value={s.end_ms} onChange={e=>patch(s.id,{end_ms:Math.max(s.start_ms+50,Math.min(3600000,Number(e.target.value)||s.start_ms+50))})}/> ms</span></label></div>}
     </article>)}</div>

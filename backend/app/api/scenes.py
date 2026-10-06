@@ -118,10 +118,16 @@ def update_scene(scene_id: str, body: schemas.SceneUpdate, db: Session = Depends
                     start, end = segment.get('start_ms'), segment.get('end_ms')
                     if not isinstance(sid, str) or len(sid) > 80 or not isinstance(text, str) or len(text) > 2000: raise ValueError()
                     if isinstance(start, bool) or not isinstance(start, int) or isinstance(end, bool) or not isinstance(end, int) or start < 0 or end <= start or end > 3_600_000: raise ValueError()
-                    clean.append({'id': sid, 'text': text, 'start_ms': start, 'end_ms': end})
+                    from app.render.caption_emoji import EMOJI_IDS
+                    emoji, side = segment.get('emoji', ''), segment.get('emoji_side', 'right')
+                    if emoji not in ('', *EMOJI_IDS) or side not in ('left', 'right'): raise ValueError()
+                    row = {'id': sid, 'text': text, 'start_ms': start, 'end_ms': end}
+                    if emoji: row.update(emoji=emoji, emoji_side=side)
+                    clean.append(row)
+                if sum(bool(row.get('emoji')) for row in clean) > 64: raise ValueError()
                 body.font['caption_segments'] = clean
             except (ValueError, TypeError):
-                raise HTTPException(400, 'Caption segments need text and valid start/end times (maximum 2,000 segments).')
+                raise HTTPException(400, 'Caption segments need text and valid start/end times and bundled emoji (maximum 2,000 segments; 64 with emoji).')
         scene.font_json = {**scene.font_json, **body.font}
     if body.lead_ms is not None:
         scene.lead_ms = body.lead_ms
@@ -285,7 +291,10 @@ def update_shot(shot_id: str, body: dict, db: Session = Depends(get_db)):
             x, y, w, h = [float(crop[k]) for k in ("x", "y", "width", "height")]
             if not all(math.isfinite(v) for v in (x,y,w,h)) or min(x,y)<0 or min(w,h)<0.05 or x+w>1.00001 or y+h>1.00001: raise ValueError()
             body["crop"] = dict(x=x,y=y,width=w,height=h)
-            if isinstance(shot.crop_json, dict) and shot.crop_json.get("reframe"):  # keep auto-reframe (render/reframe.py)
+            if 'reframe' in crop:
+                from app.render.reframe import clean_reframe
+                body['crop']['reframe'] = clean_reframe(crop['reframe'])
+            elif isinstance(shot.crop_json, dict) and shot.crop_json.get("reframe"):
                 body["crop"]["reframe"] = shot.crop_json["reframe"]
         except (KeyError, TypeError, ValueError):
             raise HTTPException(400, "Crop must stay within the image and retain at least 5% of its width and height.")
@@ -294,7 +303,7 @@ def update_shot(shot_id: str, body: dict, db: Session = Depends(get_db)):
             setattr(shot, field, body[field])
     if "audio" in body:
         a = body["audio"]
-        if not isinstance(a, dict) or set(a) - {"volume", "mute", "duck", "fade_in_ms", "fade_out_ms"}:
+        if not isinstance(a, dict) or set(a) - {"volume", "mute", "duck", "fade_in_ms", "fade_out_ms", "censor"}:
             raise HTTPException(400, "Clip sound settings are volume, mute, ducking, and fade durations.")
         v = a.get("volume", 100)
         if isinstance(v, bool) or not isinstance(v, (int, float)) or not 0 <= v <= 200:
@@ -307,7 +316,10 @@ def update_shot(shot_id: str, body: dict, db: Session = Depends(get_db)):
             if isinstance(value, bool) or not isinstance(value, (int, float)) or not 0 <= value <= 10000:
                 raise HTTPException(400, "Clip fade durations must be between 0 and 10000 ms.")
             fades[key] = int(round(value))
-        shot.audio_json = {"volume": round(float(v), 1), "mute": a.get("mute", False), "duck": a.get("duck", True), **fades}
+        from app.render.censor import clean_ranges
+        try: censor = clean_ranges(a.get("censor", []), shot.asset.duration_ms if shot.asset else None)
+        except ValueError as e: raise HTTPException(400, str(e)) from None
+        shot.audio_json = {"censor": censor, "volume": round(float(v), 1), "mute": a.get("mute", False), "duck": a.get("duck", True), **fades}
     if "motion" in body:
         from app.render.filters import EASINGS
         motion = body["motion"]
@@ -832,6 +844,7 @@ def auto_captions(scene_id: str, body: dict | None = None, db: Session = Depends
     font = dict(scene.font_json or {})
     font["transcript"] = {"language": result["language"], "provider": result["provider"], "source": source,
                           "word_timing": result.get("word_timing", "provider"), "words": words,
+                          **({"source_offset_ms": offset, "source_asset_id": take.audio_asset_id, "source_in_ms": int((take.edit_json or {}).get("in_ms", 0))} if source == "narration" else {}),
                           **({"translated": translate} if translate else {})}
     font['caption_segments'] = caption_segments
     font["captions_enabled"] = True
@@ -931,8 +944,12 @@ def detach_audio(scene_id: str, body: dict, db: Session = Depends(get_db)):
         end = min(int(shot.source_out_ms or shot.asset.duration_ms or start + duration), start + int(duration))
         if end - start < 100:
             raise HTTPException(400, "The clip is too short to detach its sound.")
+        from app.render.censor import censor_filter
+        # Normalize before sample expressions: mono AAC plus downstream stereo
+        # negotiation can crash older FFmpeg aeval implementations.
+        sound_censor = "aformat=sample_rates=48000:channel_layouts=stereo," + (censor_filter((shot.audio_json or {}).get("censor"), start) or "anull")
         try:
-            run_ffmpeg(["-ss", f"{start/1000:.6f}", "-i", _resolve_asset_path(shot.asset), "-t", f"{(end-start)/1000:.6f}", "-vn",
+            run_ffmpeg(["-ss", f"{start/1000:.6f}", "-i", _resolve_asset_path(shot.asset), "-t", f"{(end-start)/1000:.6f}", "-vn", "-af", sound_censor,
                         "-ar", "48000", "-ac", "2", "-c:a", "pcm_s16le", str(out)])
         except Exception:
             raise HTTPException(400, "This video clip has no sound to detach.")

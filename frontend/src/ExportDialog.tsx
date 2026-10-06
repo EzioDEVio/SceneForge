@@ -5,7 +5,7 @@ import {sceneDuration} from './duration';
 
 type S = {resolution: string; fps: string | number; format: string; quality: string; encoder?: string};
 const PRESETS: {key: string; name: string; note: string; Icon: typeof Film; vertical?: boolean; s: S}[] = [
-  {key: 'yt', name: 'YouTube', note: '1080p · 30 fps · H.264', Icon: MonitorPlay, s: {resolution: '1080p', fps: 'project', format: 'mp4_h264', quality: 'high'}},
+  {key: 'yt', name: 'YouTube', note: '1080p · project frame rate · H.264', Icon: MonitorPlay, s: {resolution: '1080p', fps: 'project', format: 'mp4_h264', quality: 'high'}},
   {key: 'yt4k', name: 'YouTube 4K', note: '2160p · H.264 High', Icon: MonitorPlay, s: {resolution: '4k', fps: 'project', format: 'mp4_h264', quality: 'high'}},
   {key: 'short', name: 'TikTok · Reels · Shorts', note: '1080×1920 · 30 fps', Icon: Smartphone, vertical: true, s: {resolution: '1080p', fps: 30, format: 'mp4_h264', quality: 'high'}},
   {key: 'ig', name: 'Instagram feed', note: '1080p · H.264', Icon: Square, s: {resolution: '1080p', fps: 30, format: 'mp4_h264', quality: 'standard'}},
@@ -28,7 +28,7 @@ export function ExportDialog({project, onClose, onExport, onReframe}: {project: 
   const [enc, setEnc] = useState<EncoderInfo | null>(null);
   useEffect(() => {reframeApi.encoders().then(i => {if (i && i.gpu) setEnc(i);}).catch(() => {});}, []);
   useEffect(() => {const esc = (e: KeyboardEvent) => e.key === 'Escape' && onClose(); window.addEventListener('keydown', esc); return () => window.removeEventListener('keydown', esc);}, [onClose]);
-  const seconds = useMemo(() => project.scenes.filter(x => x.shots.length).reduce((a, x) => a + sceneDuration(x), 0) / 1000, [project]);
+  const seconds = useMemo(() => project.finishing_json?.free_timeline?.enabled?Math.max(0,...project.finishing_json.free_timeline.clips.map(c=>c.start_ms+c.duration_ms),...(project.finishing_json.layer_clips||[]).map(c=>c.start_ms+c.duration_ms),...(project.finishing_json.audio_clips||[]).map(c=>c.start_ms+c.source_out_ms-c.source_in_ms))/1000:project.scenes.filter(x => x.shots.length).reduce((a, x) => a + sceneDuration(x), 0) / 1000, [project]);
   const short = SHORT[s.resolution] || Math.min(project.width, project.height);
   const w = project.width >= project.height ? Math.round(short * project.width / project.height / 2) * 2 : short;
   const h = project.width >= project.height ? short : Math.round(short * project.height / project.width / 2) * 2;
@@ -37,6 +37,10 @@ export function ExportDialog({project, onClose, onExport, onReframe}: {project: 
     seconds * ((RATE[s.format] || RATE.mp4_h264)[q] * (w * h) / (1920 * 1080) + 0.19) / 8;
   const pick = (k: string) => {const p = PRESETS.find(x => x.key === k)!; setPreset(k); setS(p.s);};
   const set = (p: Partial<S>) => {setPreset('custom'); setS(v => ({...v, ...p}));};
+  const effectiveFps=s.format==='gif'?Math.min([10,12,15,20][q],s.fps==='project'?project.fps:Number(s.fps)):s.fps==='project'?project.fps:Number(s.fps);
+  const gifW=Math.min(w,[480,640,720,960][q]);
+  const gifH=Math.round(h*gifW/w/2)*2;
+  const empty=project.scenes.filter(scene=>!scene.shots.length&&(!project.finishing_json?.free_timeline?.enabled||project.finishing_json.free_timeline.clips.some(c=>c.scene_id===scene.id)));
   const audio = s.format === 'mp3' || s.format === 'wav';
   return <div className="info-backdrop" onMouseDown={e => e.target === e.currentTarget && onClose()}>
     <div className="info-panel wide export-dialog" role="dialog" aria-modal="true" aria-label="Export video">
@@ -44,7 +48,7 @@ export function ExportDialog({project, onClose, onExport, onReframe}: {project: 
       <div className="info-body">
         <div className="export-presets" role="radiogroup" aria-label="Export preset">
           {PRESETS.map(p => <button key={p.key} role="radio" aria-checked={preset === p.key} className={`export-preset ${preset === p.key ? 'selected' : ''}`} onClick={() => pick(p.key)}>
-            <p.Icon size={18}/><strong>{p.name}</strong><small>{p.note}</small>{p.vertical && !vertical && <em>Needs a 9:16 project</em>}</button>)}
+            <p.Icon size={18}/><strong>{p.name}</strong><small>{p.key==='yt'?`1080p · ${project.fps} fps · H.264`:p.note}</small>{p.vertical && !vertical && <em>Needs a 9:16 project</em>}</button>)}
         </div>
         {!vertical && onReframe && <p className="hint">Need a vertical video for TikTok, Reels or Shorts? <button className="text-btn" onClick={onReframe}>Create vertical 9:16 version (auto-reframe)</button></p>}
         <button className="text-btn" aria-expanded={adv} onClick={() => setAdv(a => !a)}>{adv ? '▾' : '▸'} Advanced settings</button>
@@ -62,8 +66,9 @@ export function ExportDialog({project, onClose, onExport, onReframe}: {project: 
             <option value="auto">Auto (GPU when available)</option><option value="cpu">CPU</option><option value="gpu">GPU (NVIDIA NVENC)</option></select></label>
           <p className="hint export-encoder-note">{enc?.gpu.available ? `GPU found: ${enc.gpu.name || 'NVIDIA GPU'} (${[enc.gpu.h264 && 'H.264', enc.gpu.hevc && 'H.265'].filter(Boolean).join(', ')}). ` : enc ? 'No usable NVIDIA GPU encoder was found; exports use the CPU. ' : ''}GPU encoding is used for MP4 only; if it fails, SceneForge finishes the export on the CPU and tells you.</p>
         </div>}
+        {!!empty.length&&<p role="status" className="hint">Scenes without media: {empty.map(s=>s.title).join(", ")}. Export reviews these before skipping them.</p>}
         <div className="export-summary">
-          <span><Info size={13}/> {audio ? `Audio only · ${Math.round(seconds)} s` : `${s.format === 'gif' ? 'GIF' : `${w}×${h}`} · ${s.fps === 'project' ? project.fps : s.fps} fps · ${Math.round(seconds)} s`}</span>
+          <span><Info size={13}/> {audio ? `Audio only · ${Math.round(seconds)} s` : `${s.format === 'gif' ? `GIF ${gifW}×${gifH}` : `${w}×${h}`} · ${effectiveFps} fps · ${Math.round(seconds)} s`}</span>
           <span>About <b>{mb >= 1000 ? `${(mb / 1000).toFixed(1)} GB` : `${Math.max(1, Math.round(mb))} MB`}</b></span>
         </div>
         {s.resolution === '4k' && <p className="hint">4K takes longer and makes large files. It only looks sharper if your photos and videos are high resolution.</p>}
@@ -72,7 +77,7 @@ export function ExportDialog({project, onClose, onExport, onReframe}: {project: 
           <a className="text-btn" href={api.captionsUrl(project.id, 'srt')} download>SRT</a><a className="text-btn" href={api.captionsUrl(project.id, 'vtt')} download>VTT</a>
           <span className="muted">Captions you styled are also burned into the video.</span></div>
         <div className="button-row export-actions"><button className="btn" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={() => onExport({...s, encoder})}><Upload size={14}/> Export</button></div>
+          <button disabled={!project.scenes.some(s=>s.shots.length)} className="btn btn-primary" onClick={() => onExport({...s, encoder})}><Upload size={14}/> Export</button></div>
       </div>
     </div>
   </div>;

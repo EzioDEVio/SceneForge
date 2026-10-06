@@ -12,6 +12,7 @@ none. Frames stream into FFmpeg one at a time (no large memory use at 4K); the r
 MP4 with sound, cached by its settings.
 """
 from __future__ import annotations
+from app.render.font_runtime import load_font
 
 import hashlib
 import math
@@ -58,7 +59,7 @@ def clean(raw: dict) -> dict:
 
 def _font(size: int):
     from PIL import ImageFont
-    return ImageFont.truetype(str(BUNDLED_FONT_PATH.parent / "NotoSans-Bold.ttf"), size)
+    return load_font(str(BUNDLED_FONT_PATH.parent / "NotoSans-Bold.ttf"), size)
 
 
 def _film_frame(W, H, f, fps, total, rng):

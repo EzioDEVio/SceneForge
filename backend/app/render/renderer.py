@@ -13,6 +13,7 @@ from __future__ import annotations
 import hashlib
 import os
 import shutil
+import tempfile
 import uuid
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -210,10 +211,14 @@ def _apply_overlays_above_text(scene: Scene, project: Project, final_path: str, 
     from app.config import PROXIES_DIR
     from app.render.overlays import build_overlay_pass
     above = [o for o in scene.overlays_json or [] if o.get("above_text")]
+    from app.render.caption_emoji import emoji_overlays
+    emoji, emoji_assets = emoji_overlays(scene.font_json or {}, *_canvas(project), total_ms)
+    assets = {**_overlay_assets(above), **emoji_assets}
+    above = [*above, *emoji]
     if not above:
         return final_path
     out_w, out_h = _canvas(project)
-    inputs, graph = build_overlay_pass(above, _overlay_assets(above), out_w, out_h, project.fps, total_ms,
+    inputs, graph = build_overlay_pass(above, assets, out_w, out_h, project.fps, total_ms,
                                        Path(PROXIES_DIR) / "overlays", base="0:v", first_input=1, final="ovt")
     out = str(Path(work_dir) / "scene_above_text.mp4")
     run_ffmpeg(["-i", final_path, *inputs, "-filter_complex", graph + ";[ovt]format=yuv420p,setsar=1[vout]", "-map", "[vout]",
@@ -328,6 +333,12 @@ def _render_single_shot(
             input_args = ["-ss", f"{in_ms/1000:.3f}", "-i", src_path, "-t", f"{duration_s:.3f}"]
         if p.rotation in (90, -90, 270, -270):
             pre_filters = "transpose=1," if p.rotation in (90, -270) else "transpose=2,"
+        stabilize = (scene.look_json or {}).get("stabilize")
+        if stabilize:
+            from app.render.scene_fx import clean_stabilize
+            strength = clean_stabilize(stabilize)["strength"]
+            radius = 16 if strength <= 33 else 32 if strength <= 66 else 64
+            pre_filters += f"deshake=rx={radius}:ry={radius}:edge=mirror,"
         pre_filters += (f"{speed_pre}," if speed_pre else "") + f"fps={fps}," + (f"{speed_post}," if speed_post else "")
 
     if shot.crop_json:
@@ -440,17 +451,25 @@ def mux_audio_and_captions(
             word_times=_caption_word_times(scene, lead_ms, narration_path),
         )
         fonts_dir = escape_path_for_filter(str(BUNDLED_FONT_PATH.parent))
-        ass_escaped = escape_path_for_filter(ass_path)
         captioned_path = str(work_dir / "scene_captioned.mp4")
-        run_ffmpeg(
-            [
-                "-i", visual_path,
-                "-vf", f"ass='{ass_escaped}':fontsdir='{fonts_dir}'",
-                "-c:v", "libx264", "-preset", X264_PRESET, "-crf", X264_CRF, "-pix_fmt", "yuv420p",
-                captioned_path,
-            ],
-            cancel_check=ctx.cancel_check,
-        )
+        # libass's own file API may reject long Windows filenames even when
+        # FFmpeg can read the video. A relative name alone can still resolve to
+        # a long pathname. Stage only the generated ASS in a short OS temp
+        # directory; each subprocess has its own cwd, with no global chdir.
+        # Keep the original ASS beside the job for diagnostics and clean the
+        # temporary copy on success, failure or cancellation.
+        with tempfile.TemporaryDirectory(prefix="sf-captions-") as caption_dir:
+            shutil.copyfile(ass_path, Path(caption_dir) / "captions.ass")
+            run_ffmpeg(
+                [
+                    "-i", str(Path(visual_path).resolve()),
+                    "-vf", f"ass='captions.ass':fontsdir='{fonts_dir}'",
+                    "-c:v", "libx264", "-preset", X264_PRESET, "-crf", X264_CRF, "-pix_fmt", "yuv420p",
+                    str(Path(captioned_path).resolve()),
+                ],
+                cancel_check=ctx.cancel_check,
+                cwd=caption_dir,
+            )
 
     typing_path = None
     font = scene.font_json
@@ -759,6 +778,15 @@ def render_export(project: Project, scenes: list[Scene], scene_paths: dict[str, 
     """Assemble the parts, then apply project finishing: countdown leader,
     background music with ducking, and loudness levelling."""
     from app.render.finishing import finish_export
-    out_path = _render_export_core(project, scenes, scene_paths, *args, **kwargs)
+    free = bool(((project.finishing_json or {}).get("free_timeline") or {}).get("enabled"))
+    if free:
+        from app.render.free_timeline import render_free_timeline
+        free_ctx = kwargs.get("ctx") or next((a for a in args if isinstance(a, RenderContext)), None)
+        out_path = render_free_timeline(project, scene_paths, free_ctx.cancel_check if free_ctx else None)
+    else:
+        out_path = _render_export_core(project, scenes, scene_paths, *args, **kwargs)
     ctx = kwargs.get("ctx") or next((a for a in args if isinstance(a, RenderContext)), None)
+    from app.render.layer_clips import render_layer_clips
+    if not free:
+        out_path = render_layer_clips(out_path, project, ctx.cancel_check if ctx else None, scenes, scene_paths)
     return finish_export(out_path, project, ctx.cancel_check if ctx else None)

@@ -1,3 +1,4 @@
+import {LayerPreview} from "./TimelineLayers";
 import React, {useEffect, useMemo, useRef, useState} from 'react';
 import {createPortal} from 'react-dom';
 import {Clapperboard, X} from 'lucide-react';
@@ -49,6 +50,7 @@ export function SequencePlayer({project, clips, host, playing, rate, seekRequest
   const segsRef = useRef(segs); segsRef.current = segs;
   const length = segs[segs.length - 1]?.end || 0;
   const videos = [useRef<HTMLVideoElement>(null), useRef<HTMLVideoElement>(null)];
+  const [previewTime,setPreviewTime]=useState(seekRequest.ms);
   const [active, setActive] = useState(0);
   const [index, setIndex] = useState(() => segmentAt(segs, seekRequest.ms));
   const st = useRef({active: 0, index: segmentAt(segs, seekRequest.ms), loaded: ['', ''] as string[], time: seekRequest.ms, wall: 0, wallMs: 0, raf: 0, lastEmit: 0, playing: false, rate: 1});
@@ -59,7 +61,7 @@ export function SequencePlayer({project, clips, host, playing, rate, seekRequest
   const emit = (ms: number, force = false) => {
     const s = st.current; s.time = ms;
     const now = performance.now();
-    if (force || now - s.lastEmit > 40) {s.lastEmit = now; onTime(Math.max(0, Math.min(length, ms)));}
+    if (force || now - s.lastEmit > 40) {s.lastEmit = now; setPreviewTime(ms); onTime(Math.max(0, Math.min(length, ms)));}
   };
   function load(slot: number, url: string) {
     const v = videos[slot].current; if (!v) return;
@@ -177,6 +179,7 @@ export function SequencePlayer({project, clips, host, playing, rate, seekRequest
       <button aria-label="Close timeline playback" onClick={() => {stop(); onClose();}}><X size={16}/></button>
     </header>
     <div className="live-stage">
+      <div className="live-layer-frame" style={{aspectRatio:`${project.width}/${project.height}`,"--live-aspect":project.width/project.height} as React.CSSProperties}><LayerPreview project={project} time={previewTime} playing={playing} rate={rate}/></div>
       {[0, 1].map(slot => <video key={slot} ref={videos[slot]} data-slot={slot} className={slot === active && seg?.status === 'ready' ? 'active' : ''} aria-hidden={slot !== active || seg?.status !== 'ready'} playsInline preload="auto"
         onEnded={() => {if (slot === st.current.active && st.current.playing) advance();}}
         onError={() => {if (slot === st.current.active && segsRef.current[st.current.index]?.status === 'ready') setError('This scene\'s preview could not be loaded. Render the scene again and retry.');}}/>)}

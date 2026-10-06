@@ -21,13 +21,27 @@ the build scripts that fetch these components, is at https://github.com/EzioDEVi
 | Poppins, Bebas Neue, Anton, Pacifico, Amiri, Tajawal, Lalezar (from github.com/google/fonts) | SIL Open Font License 1.1 | `assets/fonts/licenses/OFL-*.txt` |
 | Synthetic typewriter sound | Generated for SceneForge | `assets/sfx/SOURCE.md` |
 | Twemoji emoji graphics (322 emoji in `assets/stickers/emoji/`, rasterised to PNG from Twemoji v17.0.3 SVGs) | CC-BY 4.0 — Copyright Twitter, Inc. and other contributors; https://github.com/jdecked/twemoji | `assets/stickers/LICENSE-TWEMOJI-GRAPHICS.txt`. Fetched and rasterised by `scripts/build_sticker_library.py`. |
+| Route artwork (plane, ship, car, pin) | Twemoji graphics, CC-BY 4.0 | Reused bundled PNGs; `assets/route-icons/SOURCE.md` and the existing Twemoji license. |
 | Graphic stickers (badges, arrows, speech bubbles, shapes, social buttons in `assets/stickers/graphics/`) | Drawn for SceneForge (GPL-3.0-or-later) with the bundled OFL fonts | `scripts/build_sticker_library.py` |
 
 ## Not bundled
-AI models and engines are **not** included in the installers. Optional local engines (Stable Diffusion
+The installer build fetches and verifies U2-Net small (`u2netp.onnx`, approximately 4.6 MB, Apache-2.0) for subject cutout; see `desktop/scripts/fetch_models.py`. Large generative AI engines and their models are not bundled. Optional local engines (Stable Diffusion
 via AUTOMATIC1111, Chatterbox, Kokoro) and any models you download keep their own licenses, which may
 restrict commercial use. Cloud providers (OpenAI, Google Gemini, ElevenLabs, Together, Cloudflare,
 Hugging Face) are used only with your own account and are subject to their terms.
 
 ## Warranty
 SceneForge Studio comes with ABSOLUTELY NO WARRANTY, to the extent permitted by law (GPL-3.0 sections 15–16).
+
+## Additional bundled fonts
+
+DejaVu Sans/Serif/Mono retain their upstream notices in
+assets/fonts/licenses/DejaVu-LICENSE.txt (Bitstream/DejaVu terms).
+Latin Modern Sans/Roman/Mono/Slanted/Demi Cond/Caps retain their original
+font names and GUST Font License/LPPL notices in
+assets/fonts/licenses/Latin-Modern-LICENSE.txt. Unmodified font files and
+notices are also included in frontend/public/fonts.
+
+The local AI installer downloads separate Docker, SD 1.5 and Chatterbox
+components after terms review. See LOCAL_AI_INSTALLER.md for their sources,
+terms, storage, GPU/CPU behavior and Windows validation requirements.

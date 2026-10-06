@@ -1,3 +1,5 @@
+import {LocalAISetup} from './LocalAISetup';
+import {ProviderConnection} from "./ProviderConnection";
 import React, {useEffect, useRef, useState} from 'react';
 import {X, Sparkles, Cloud, Cpu, Mic, CheckCircle2, AlertCircle, ExternalLink, FolderOpen, Play, RefreshCw, Code2, Bug, FileText, LifeBuoy} from 'lucide-react';
 import {api, ProviderProfile} from './api';
@@ -14,13 +16,15 @@ type Desktop = {
 const desktop = (): Desktop | undefined => (window as any).sceneforgeDesktop;
 const REPO = 'https://github.com/EzioDEVio/SceneForge';
 const openLink = (url: string) => desktop() ? desktop()!.openExternal(url) : window.open(url, '_blank', 'noopener');
-const CLOUD: {name: string; match: RegExp; what: string; url: string}[] = [
-  {name: 'ElevenLabs', match: /elevenlabs/i, what: 'Natural voices in many languages, with exact word timing for captions.', url: 'https://elevenlabs.io'},
-  {name: 'OpenAI', match: /openai/i, what: 'Image generation.', url: 'https://platform.openai.com/api-keys'},
-  {name: 'Google Gemini', match: /gemini/i, what: 'Image generation.', url: 'https://aistudio.google.com/app/apikey'},
-  {name: 'Together AI', match: /together/i, what: 'Voices.', url: 'https://api.together.ai'},
-  {name: 'Cloudflare Workers AI', match: /cloudflare/i, what: 'Image generation with a free daily allowance.', url: 'https://dash.cloudflare.com'},
-  {name: 'Hugging Face', match: /hugging/i, what: 'Image generation with free models.', url: 'https://huggingface.co/settings/tokens'},
+const CLOUD: {id:string; name: string; match: RegExp; what: string; url: string}[] = [
+  {id:'elevenlabs', name: 'ElevenLabs', match: /elevenlabs/i, what: 'Natural voices in many languages, with exact word timing for captions.', url: 'https://elevenlabs.io'},
+  {id:'openai', name: 'OpenAI', match: /openai/i, what: 'Image generation.', url: 'https://platform.openai.com/api-keys'},
+  {id:'gemini', name: 'Google Gemini', match: /^gemini$/i, what: 'Image generation.', url: 'https://aistudio.google.com/app/apikey'},
+  {id:'together', name: 'Together AI', match: /together/i, what: 'FLUX image generation.', url: 'https://api.together.ai'},
+  {id:'cloudflare', name: 'Cloudflare Workers AI', match: /cloudflare/i, what: 'Image generation with a free daily allowance.', url: 'https://dash.cloudflare.com'},
+  {id:'huggingface', name: 'Hugging Face', match: /hugging/i, what: 'Image generation with free models.', url: 'https://huggingface.co/settings/tokens'},
+  {id:'google_veo',name:'Google Veo',match:/^google_veo$/i,what:'Video generation.',url:''},
+  {id:'runway',name:'Runway',match:/^runway$/i,what:'Video generation.',url:''},
 ];
 
 export function Modal({title, icon, onClose, children, wide}: {title: string; icon: React.ReactNode; onClose: () => void; children: React.ReactNode; wide?: boolean}) {
@@ -59,8 +63,9 @@ export function AIEnginesPanel({section, onClose, onOpenSettings}: {section?: st
   const [busy, setBusy] = useState(false);
   const refs = {start: useRef<HTMLElement>(null), cloud: useRef<HTMLElement>(null), sd: useRef<HTMLElement>(null), voices: useRef<HTMLElement>(null)};
   useEffect(() => {
-    api.listProviders().then(setProviders).catch(() => setProviders([]));
+    const refresh=()=>api.listProviders().then(setProviders).catch(() => setProviders([]));void refresh();window.addEventListener('sceneforge:providers-changed',refresh);
     fetch('/api/local-image-settings').then(r => r.json()).then(setSd).catch(() => setSd({}));
+    return ()=>window.removeEventListener('sceneforge:providers-changed',refresh);
   }, []);
   useEffect(() => {const el = section && (refs as any)[section]?.current; if (el) setTimeout(() => el.scrollIntoView({block: 'start', behavior: 'smooth'}), 60);}, [section]);
   const configured = (p: {match: RegExp}) => (providers || []).find(x => x.configured && (p.match.test(x.name) || p.match.test(x.base_url || '')));
@@ -88,17 +93,17 @@ export function AIEnginesPanel({section, onClose, onOpenSettings}: {section?: st
     </section>
     <section ref={refs.cloud as any} className="info-card">
       <div className="info-card-head"><h3><Cloud size={16}/> Cloud providers</h3><Badge ok={count > 0}>{providers === null ? 'Checking…' : `${count} connected`}</Badge></div>
-      <div className="provider-grid">
-        {CLOUD.map(p => {const c = configured(p); return <div key={p.name} className={`provider-card ${c ? 'connected' : ''}`}>
-          <div className="provider-top"><b>{p.name}</b>{c ? <Badge ok>Connected</Badge> : <span className="info-badge off">Not set up</span>}</div>
-          <p>{p.what}</p>{c && <p className="muted">Key {c.masked_key}</p>}
-          <button className="text-btn" onClick={() => openLink(p.url)}><ExternalLink size={12}/> {c ? 'Account' : 'Get a key'}</button>
+      <p className="hint">Expand a provider below to add or replace its API key here. Collapse it when done. Local engines remain in their own sections below.</p>
+      <div className="provider-accordion-list">
+        {CLOUD.map(p => {const c = (providers||[]).find(v=>v.name===p.id);return <div className="provider-setup-card" key={p.id}>
+          <ProviderConnection name={p.id} profile={c} onSaved={()=>api.listProviders().then(setProviders)}/>
+          {p.url&&<button className="text-btn provider-account" onClick={()=>openLink(p.url)}><ExternalLink size={12}/> {c?.configured?'Account':'Get a key'} · {p.name}</button>}
         </div>;})}
       </div>
-      <Steps items={[<>Create an account on the provider's website and copy your <b>API key</b>.</>, <>Open <b>Settings</b> and paste the key under the provider. It is stored in your system's credential store, never in project files.</>, <>Pick the provider when generating an image or voice.</>]}/>
+      <Steps items={[<>Create an account on the provider's website and copy your <b>API key</b>.</>, <>Expand the provider above and paste your key. It is stored in your system's credential store, never in project files.</>, <>Pick the provider when generating an image or voice.</>]}/>
       <button className="btn primary" onClick={onOpenSettings}>Open Settings to add or change keys</button>
     </section>
-    <section ref={refs.sd as any} className="info-card">
+    <LocalAISetup onReady={()=>api.listProviders().then(setProviders)}/><section ref={refs.sd as any} className="info-card">
       <div className="info-card-head"><h3><Cpu size={16}/> Stable Diffusion: free local images</h3><Badge ok={!!sd?.folder}>{sd?.folder ? 'Folder set' : 'Not set up'}</Badge></div>
       <p>Uses <b>AUTOMATIC1111 Stable Diffusion WebUI</b> installed on this PC. Needs a graphics card with at least 4 GB of memory; starting takes a few minutes and uses a lot of memory while running.</p>
       <Steps items={[<>Install AUTOMATIC1111 and make sure it runs on its own. <button className="text-btn inline" onClick={() => openLink('https://github.com/AUTOMATIC1111/stable-diffusion-webui')}><ExternalLink size={12}/> Installation guide</button></>,
@@ -118,7 +123,7 @@ export function AIEnginesPanel({section, onClose, onOpenSettings}: {section?: st
       <Steps items={[<>Install <b>Docker Desktop</b> and start it. <button className="text-btn inline" onClick={() => openLink('https://www.docker.com/products/docker-desktop/')}><ExternalLink size={12}/> Download</button></>,
         <>In a scene, open <b>Audio → Voice & narration</b> and click <b>Connect Chatterbox</b> or <b>Connect Kokoro</b>.</>,
         <>Pick the engine, a voice and a language, then <b>Generate</b>. The first start downloads the voice model.</>]}/>
-      <p className="muted">Coming in the next version: built-in free voices (Piper) and captions (Whisper) with no Docker needed.</p>
+      <p className="muted">Local captions already use Whisper without Docker. Open Text → Auto captions to check or download the model. Local narration engines require their separate setup.</p>
     </section>
   </Modal>;
 }

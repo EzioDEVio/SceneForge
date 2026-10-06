@@ -1,5 +1,5 @@
 export interface TextLayer { kind?:'text'|'text_box'|'text_plus';box_width?:number; family?:string;outline_width?:number;shadow?:number;align?:string;exit_ms?:number; animation?:string;animation_ms?:number;spacing?:number;highlight?:string;id:string;text:string;x:number;y:number;size:number;color:string;start_ms:number;end_ms:number;bold:boolean;keyframes?:import('./keyframes').Keyframe[];}
-export type CaptionSegment={id:string;text:string;start_ms:number;end_ms:number};
+export type CaptionSegment={emoji?:string;emoji_side?:'left'|'right';id:string;text:string;start_ms:number;end_ms:number};
 // Thin fetch wrapper + types matching backend/app/domain/schemas.py.
 // Uses relative /api paths so it works both under the Vite dev proxy and
 // the production build served from the same FastAPI origin.
@@ -42,7 +42,7 @@ export type Shot = {
   source_out_ms: number | null;
   duration_ms: number | null;
   is_selected: boolean;
-  audio_json?: {volume?: number; mute?: boolean; duck?: boolean; fade_in_ms?: number; fade_out_ms?: number};
+  audio_json?: {censor?:CensorRange[];volume?: number; mute?: boolean; duck?: boolean; fade_in_ms?: number; fade_out_ms?: number};
   asset?: Asset;
 };
 
@@ -63,7 +63,8 @@ export type VoiceTake = {
   edit_json?: AudioEdit;
   effective_duration_ms?: number | null;
 };
-export type AudioEdit = {in_ms?: number; out_ms?: number | null; volume?: number; fade_in_ms?: number; fade_out_ms?: number; voice_fx?: string};
+export type CensorRange = {start_ms:number;end_ms:number;mode:'bleep'|'mute'};
+export type AudioEdit = {censor?:CensorRange[];in_ms?: number; out_ms?: number | null; volume?: number; fade_in_ms?: number; fade_out_ms?: number; voice_fx?: string};
 export type Waveform = {duration_ms: number; peaks: number[]; peak: number};
 
 export type FontSettings = {
@@ -77,6 +78,7 @@ export type FontSettings = {
   captions_enabled: boolean;
   layers?: TextLayer[];
   caption_segments?: CaptionSegment[];
+  transcript?:{source_offset_ms?:number;source_asset_id?:string;source_in_ms?:number;source:string;words:[string,number,number][];word_timing?:string};
   caption_direction?: 'auto'|'ltr'|'rtl';
   typewriter?: boolean;
   typewriter_sound?: boolean;
@@ -87,10 +89,11 @@ export type FontSettings = {
 };
 
 /** Must match BUILD_ID in backend/app/main.py. */
-export const BUILD_ID = "v0.9.2";
+export const BUILD_ID = "v0.9.3";
 
 export type Adjust = Partial<Record<'exposure'|'contrast'|'highlights'|'shadows'|'temperature'|'tint'|'saturation'|'vibrance'|'sharpen'|'vignette'|'grain', number>>;
-export type Look = {
+export type Look = {vignette?:{amount:number}|null;letterbox?:{amount:number}|null;sharpen?:{amount:number}|null;
+  stabilize?: {strength:number} | null;
   glitch?: {speed: number; block: 'small' | 'medium' | 'large'} | null;
   adjust?: Adjust | null;
   lut?: {asset_id: string; strength: number} | null;
@@ -114,9 +117,12 @@ export type Overlay = {id: string; asset_id: string; kind?: 'media'|'sticker'; x
   loop?: 'none' | 'float' | 'pendulum' | 'bob'; loop_amount?: number; loop_period_ms?: number;
   /** Keyframed x/y/width/rotation/opacity, t_ms relative to start_ms (keyframes.ts, backend render/keyframes.py). */
   keyframes?: import('./keyframes').Keyframe[]};
-export type ProjectAudioClip = {id: string; asset_id: string; name: string; start_ms: number; source_in_ms: number; source_out_ms: number; source_duration_ms: number; volume: number; fade_in_ms: number; fade_out_ms: number; mute: boolean; track?: import('./timeline/timeline.types').AudioTrackId; /** volume envelope: [source time ms, dB] */ gain?: [number, number][]; /** clips sharing a group id select and move together */ group?: string; /** 0.9.0 auto-ducking amount 10–100 (absent = off) */ duck?: number};
+export type ProjectAudioClip = {censor?:CensorRange[];id: string; asset_id: string; name: string; start_ms: number; source_in_ms: number; source_out_ms: number; source_duration_ms: number; volume: number; fade_in_ms: number; fade_out_ms: number; mute: boolean; track?: import('./timeline/timeline.types').AudioTrackId; /** volume envelope: [source time ms, dB] */ gain?: [number, number][]; /** clips sharing a group id select and move together */ group?: string; /** 0.9.0 auto-ducking amount 10–100 (absent = off) */ duck?: number};
 export type Snapshot = {id: string; created_at: string; reason: 'auto' | 'manual'; label: string; title: string; scenes: number};
-export type Finishing = {music?: {asset_id: string; volume: number; duck: number; fade_in_ms: number; fade_out_ms: number} | null; audio_clips?: ProjectAudioClip[]; loudnorm?: boolean; leader?: boolean; timeline?: import('./timeline/timeline.types').TimelineSettings};
+export type TimelineLayerClip = {id:string;kind:"image"|"video"|"text"|"text_box"|"text_plus";name:string;asset_id?:string;text?:string;source_in_ms?:number;mute?:boolean;volume?:number;track:number;start_ms:number;duration_ms:number;x:number;y:number;width:number;rotation:number;opacity:number;size:number;color:string;family:string;align:"left"|"center"|"right"};
+export type FreeSceneClip={id:string;scene_id:string;start_ms:number;source_in_ms:number;duration_ms:number;track:number};
+export type FreeTimeline={enabled:boolean;clips:FreeSceneClip[]};
+export type Finishing = {free_timeline?:FreeTimeline;layer_clips?:TimelineLayerClip[];music?: {asset_id: string; volume: number; duck: number; fade_in_ms: number; fade_out_ms: number} | null; audio_clips?: ProjectAudioClip[]; loudnorm?: boolean; leader?: boolean; timeline?: import('./timeline/timeline.types').TimelineSettings};
 export type FilmLook = {scratches: number; dust: number; flicker: number; weave: number; sound: number; fps: 0 | 16 | 18 | 24; tone: 'color' | 'faded' | 'sepia' | 'bw'};
 
 export type Scene = {
@@ -222,6 +228,8 @@ export async function req<T>(path: string, init?: RequestInit): Promise<T> {
   } finally {if(write)activeWrites--;}
 }
 
+export type KnockoutTitleSettings = {text: string; font?: string; font_size?: number; background?: string; opacity?: number; outline?: number; outline_color?: string; x?: number; y?: number; spacing?: number; start_ms?: number; end_ms?: number | null};
+
 export const api = {
   createProject: (title: string, aspect: string, fps = 30) =>
     req<Project>("/api/projects", { method: "POST", body: JSON.stringify({ title, aspect, fps }) }),
@@ -293,11 +301,13 @@ export const api = {
   deleteTake: (takeId: string) => req(`/api/voice-takes/${takeId}`, {method:"DELETE"}),
   selectTake: (takeId: string) => req<VoiceTake>(`/api/voice-takes/${takeId}/select`, { method: "POST" }),
 
+  saveEditorState: (id:string,body:import("./editorDraft").EditorEdits)=>req<Scene>(`/api/scenes/${id}/editor-state`,{method:"POST",body:JSON.stringify(body)}),
+  previewEditorDraft: (id:string,body:import("./editorDraft").EditorEdits)=>req<{job_id:string}>(`/api/scenes/${id}/draft-preview`,{method:"POST",body:JSON.stringify(body)}),
   renderPart: (sceneId: string) => req<{ job_id: string }>(`/api/scenes/${sceneId}/render`, { method: "POST" }),
   exportProject: (projectId: string, skipEmpty = false, settings?: Record<string, unknown>) =>
     req<{ job_id: string }>(`/api/projects/${projectId}/export?skip_empty=${skipEmpty}`, { method: "POST", body: JSON.stringify({settings: settings || {}}) }),
   captionsUrl: (projectId: string, format: 'srt' | 'vtt') => `/api/projects/${projectId}/captions?format=${format}`,
-  getJob: (jobId: string) => req<Job>(`/api/jobs/${jobId}`),
+  getJob: (jobId: string, signal?:AbortSignal) => req<Job>(`/api/jobs/${jobId}`,{signal}),
   cancelJob: (jobId: string) => req(`/api/jobs/${jobId}/cancel`, { method: "POST" }),
 
   importPreview: (projectId: string, text: string) =>
@@ -333,7 +343,8 @@ export const api = {
   /** Copy a bundled library sticker into the project's Media Pool (re-used when already imported). */
   importSticker: (projectId: string, stickerId: string) => req<Asset>(`/api/projects/${projectId}/stickers/${encodeURIComponent(stickerId)}`, {method: "POST"}),
   stickerImageUrl: (stickerId: string) => `/api/stickers/${encodeURIComponent(stickerId)}/image`,
-  knockoutTitle: (sceneId: string, body: {text: string; font?: string; font_size?: number; background?: string; opacity?: number; outline?: number; outline_color?: string; x?: number; y?: number; spacing?: number; start_ms?: number; end_ms?: number | null}) => req<{scene: Scene; asset: Asset}>(`/api/scenes/${sceneId}/knockout-title`, {method: "POST", body: JSON.stringify(body)}),
+  previewKnockoutTitle: (sceneId: string, body: KnockoutTitleSettings): Promise<{job_id: string}> => req(`/api/scenes/${sceneId}/knockout-title/preview`, {method: "POST", body: JSON.stringify(body)}),
+  knockoutTitle: (sceneId: string, body: KnockoutTitleSettings) => req<{scene: Scene; asset: Asset}>(`/api/scenes/${sceneId}/knockout-title`, {method: "POST", body: JSON.stringify(body)}),
   texturedTitle: (sceneId: string, body: Record<string, unknown>) => req<{scene: Scene; asset: Asset}>(`/api/scenes/${sceneId}/textured-title`, {method: "POST", body: JSON.stringify(body)}),
   beatMarkers: (projectId: string, body: {clip_id?: string; every?: number}) => req<{bpm: number; markers: {time_ms: number; downbeat: boolean}[]; truncated: boolean}>(`/api/projects/${projectId}/beat-markers`, {method: "POST", body: JSON.stringify(body)}),
   listModels: () => req<ModelListing>(`/api/models`),

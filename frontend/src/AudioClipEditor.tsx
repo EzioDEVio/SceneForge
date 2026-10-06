@@ -1,3 +1,5 @@
+import {AudioCensor} from './AudioCensor';
+import type {CensorRange} from './api';
 import React, {useEffect, useRef, useState} from 'react';
 import {Play, Square, Trash2, RotateCcw, AudioLines} from 'lucide-react';
 import {api, AudioEdit, Scene, VoiceTake, Waveform} from './api';
@@ -23,7 +25,7 @@ export function loadWaveform(assetId: string, points = 600): Promise<Waveform> {
   return waveCache.get(key)!;
 }
 
-const DEFAULTS = {in_ms: 0, out_ms: null as number | null, volume: 100, fade_in_ms: 0, fade_out_ms: 0, voice_fx: 'none'};
+const DEFAULTS = {in_ms: 0, out_ms: null as number | null, volume: 100, fade_in_ms: 0, fade_out_ms: 0, voice_fx: 'none',censor:[] as CensorRange[]};
 const secs = (ms: number) => (ms / 1000).toFixed(2);
 
 /** Peak bars as a single SVG path, from `from` to `to` (0..1 of the file). */
@@ -45,25 +47,28 @@ export function AudioClipEditor({scene, take, disabled, onChanged, onRemove}: Pr
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [playing, setPlaying] = useState(false);
+  const [previewRate,setPreviewRate]=useState(1),[original,setOriginal]=useState(false);
+  const beforeMute=useRef(100);
   const [head, setHead] = useState<number | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout>>();
   const audio = useRef<HTMLAudioElement>(null);
-  const graph = useRef<{ctx: AudioContext; gain: GainNode} | null>(null);
+  const graph = useRef<{ctx: AudioContext; gain: GainNode; censor:GainNode; tone:GainNode} | null>(null);
   const strip = useRef<HTMLDivElement>(null);
   const raf = useRef(0);
 
   useEffect(() => {setEdit({...DEFAULTS, ...(take.edit_json || {})}); setError('');}, [take.id]);
   useEffect(() => {let live = true; if (asset) loadWaveform(asset.id).then(w => live && setWave(w)).catch(() => live && setWave(null)); return () => {live = false;};}, [asset?.id]);
-  useEffect(() => () => {stop(); if (timer.current) clearTimeout(timer.current);}, []);
+  useEffect(() => () => {stop(); if (timer.current) clearTimeout(timer.current);void graph.current?.ctx.close();}, []);
 
   const outMs = edit.out_ms ?? source;
   const clipMs = Math.max(0, outMs - edit.in_ms);
 
-  function change(patch: Partial<typeof edit>) {
+  function change(patch: Partial<typeof edit>,now=false) {
     const next = {...edit, ...patch};
+    const used=Math.max(0,(next.out_ms??source)-next.in_ms);next.fade_in_ms=Math.min(next.fade_in_ms,used);next.fade_out_ms=Math.min(next.fade_out_ms,Math.max(0,used-next.fade_in_ms));
     setEdit(next); setError(''); setStatus('Unsaved changes');
     if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => void save(next), 450);
+    if(now)void save(next);else timer.current = setTimeout(() => void save(next), 450);
   }
   async function save(next: typeof edit) {
     try {
@@ -89,32 +94,35 @@ export function AudioClipEditor({scene, take, disabled, onChanged, onRemove}: Pr
 
   function stop() {
     cancelAnimationFrame(raf.current);
-    audio.current?.pause(); setPlaying(false); setHead(null);
+    audio.current?.pause(); if(graph.current)graph.current.tone.gain.value=0; setPlaying(false); setHead(null);
   }
   async function play() {
     const el = audio.current; if (!el) return;
     if (playing) {stop(); return;}
-    const vol = edit.volume / 100;
+    const vol = original?1:edit.volume / 100;
+    el.playbackRate=previewRate;
     try {
       if (!graph.current && typeof AudioContext !== 'undefined') {
         const ctx = new AudioContext(); const gain = ctx.createGain();
-        ctx.createMediaElementSource(el).connect(gain).connect(ctx.destination);
-        graph.current = {ctx, gain};
+        const censor=ctx.createGain(),tone=ctx.createGain(),osc=ctx.createOscillator();osc.frequency.value=1000;tone.gain.value=0;osc.connect(tone).connect(gain);osc.start();ctx.createMediaElementSource(el).connect(censor).connect(gain).connect(ctx.destination);
+        graph.current = {ctx, gain, censor, tone};
       }
       const g = graph.current;
       if (g) {
-        await g.ctx.resume(); const now = g.ctx.currentTime, clip = clipMs / 1000;
+        await g.ctx.resume(); const now = g.ctx.currentTime, clip = (original?source:clipMs) / 1000 / previewRate;
         g.gain.gain.cancelScheduledValues(now);
-        g.gain.gain.setValueAtTime(edit.fade_in_ms ? 0 : vol, now);
-        if (edit.fade_in_ms) g.gain.gain.linearRampToValueAtTime(vol, now + edit.fade_in_ms / 1000);
-        if (edit.fade_out_ms) {g.gain.gain.setValueAtTime(vol, now + clip - edit.fade_out_ms / 1000); g.gain.gain.linearRampToValueAtTime(0, now + clip);}
+        g.gain.gain.setValueAtTime(!original&&edit.fade_in_ms ? 0 : vol, now);
+        if (!original&&edit.fade_in_ms) g.gain.gain.linearRampToValueAtTime(vol, now + edit.fade_in_ms / 1000 / previewRate);
+        if (!original&&edit.fade_out_ms) {g.gain.gain.setValueAtTime(vol, now + clip - edit.fade_out_ms / 1000 / previewRate); g.gain.gain.linearRampToValueAtTime(0, now + clip);}
         el.volume = 1;
       } else el.volume = Math.min(1, vol);
-      el.currentTime = edit.in_ms / 1000;
+      if(g){const range=!original&&edit.censor.find(r=>edit.in_ms>=r.start_ms&&edit.in_ms<r.end_ms);g.censor.gain.value=range?0:1;g.tone.gain.value=range&&range.mode==='bleep'?.15:0;}
+      el.currentTime = original?0:edit.in_ms / 1000;
       await el.play(); setPlaying(true);
       const tick = () => {
         const t = el.currentTime * 1000;
-        if (t >= outMs || el.paused) {stop(); return;}
+        if (t >= (original?source:outMs) || el.paused) {stop(); return;}
+        if(g){const range=!original&&edit.censor.find(r=>t>=r.start_ms&&t<r.end_ms);g.censor.gain.value=range?0:1;g.tone.gain.value=range&&range.mode==='bleep'?.15:0;}
         setHead(t); raf.current = requestAnimationFrame(tick);
       };
       raf.current = requestAnimationFrame(tick);
@@ -126,8 +134,9 @@ export function AudioClipEditor({scene, take, disabled, onChanged, onRemove}: Pr
   return <section className="audio-clip-editor" aria-label="Scene audio clip">
     <div className="look-heading"><h3><AudioLines size={15}/> Scene audio</h3><FeatureHelp compact title="Scene audio clip" description="Edit the selected narration or recording without changing the original audio file in the Media Pool." steps="Adjust the in/out handles, volume, fades, and voice effect. Changes are saved on this scene's selected take."/><span className="hint" aria-live="polite">{status}</span></div>
     <p className="audio-clip-name" title={asset.original_filename}>{asset.original_filename || take.voice || 'Narration'} · {secs(clipMs)} s used of {secs(source)} s</p>
-    <div className="audio-wave" ref={strip}>
+    <div className="audio-card"><h4>Trim & listen</h4><p className="hint">Drag the handles to keep the part you need.</p><div className="audio-wave" ref={strip}>
       {wave ? <WavePath peaks={wave.peaks} height={56} className="audio-wave-svg"/> : <div className="audio-wave-empty">Reading waveform…</div>}
+      {edit.censor.map((range,i)=><div key={i} className="audio-censor-band" aria-label={`${range.mode} range ${(range.start_ms/1000).toFixed(2)}–${(range.end_ms/1000).toFixed(2)} seconds`} style={{position:"absolute",top:0,bottom:0,left:pct(range.start_ms),width:pct(range.end_ms-range.start_ms),background:"#aa77dd55",pointerEvents:"none"}}/>)}
       <div className="audio-trimmed" style={{left: 0, width: pct(edit.in_ms)}}/>
       <div className="audio-trimmed" style={{left: pct(outMs), right: 0}}/>
       {edit.fade_in_ms > 0 && <div className="audio-fade in" style={{left: pct(edit.in_ms), width: pct(edit.fade_in_ms)}}/>}
@@ -145,7 +154,8 @@ export function AudioClipEditor({scene, take, disabled, onChanged, onRemove}: Pr
         onChange={e => change({out_ms: Math.min(source, Math.max(edit.in_ms + 200, Math.round(Number(e.target.value) * 1000) || source))})}/></label>
       <button className="btn" onClick={() => void play()} disabled={disabled}>{playing ? <><Square size={13}/> Stop</> : <><Play size={13}/> Play clip</>}</button>
     </div>
-    <label className="control-label">Volume · {edit.volume}%
+    <div className="audio-preview-options"><label>Preview speed<select aria-label="Audio preview speed" value={previewRate} disabled={disabled} onChange={e=>{stop();setPreviewRate(Number(e.target.value));}}>{[.75,1,1.25,1.5].map(n=><option key={n} value={n}>{n}×</option>)}</select></label><label className="switch-label"><input type="checkbox" aria-label="Listen to original audio" checked={original} disabled={disabled} onChange={e=>{stop();setOriginal(e.target.checked);}}/> Hear original file</label></div><p className="audio-listening-state">{original?"Listening: original file (trim, fades, level and censor bypassed)":"Listening: edited narration (trim, fades, level and censor applied)"}</p><p className="hint">Preview speed and Hear original are for listening only. Voice effects are heard after rendering.</p></div>
+    <div className="audio-card"><h4>Level & fades</h4><label className="switch-label"><input type="checkbox" aria-label="Mute scene narration" checked={edit.volume===0} disabled={disabled} onChange={e=>{if(e.target.checked){beforeMute.current=edit.volume||100;change({volume:0});}else change({volume:beforeMute.current});}}/> Mute narration</label><label className="control-label">Volume · {edit.volume}%
       <input aria-label="Audio volume" type="range" min={0} max={200} step={5} value={edit.volume} disabled={disabled} onChange={e => change({volume: Number(e.target.value)})} onDoubleClick={() => change({volume: 100})}/></label>
     <div className="audio-fades">
       <label className="control-label">Fade in · {secs(edit.fade_in_ms)} s
@@ -153,11 +163,11 @@ export function AudioClipEditor({scene, take, disabled, onChanged, onRemove}: Pr
       <label className="control-label">Fade out · {secs(edit.fade_out_ms)} s
         <input aria-label="Fade out" type="range" min={0} max={Math.min(10000, Math.max(0, clipMs - edit.fade_in_ms))} step={100} value={edit.fade_out_ms} disabled={disabled} onChange={e => change({fade_out_ms: Number(e.target.value)})}/></label>
     </div>
-    <label className="control-label">Voice effect<select aria-label="Voice effect" value={edit.voice_fx || 'none'} disabled={disabled} onChange={e => change({voice_fx: e.target.value})}>
+    </div><div className="audio-card"><h4>Voice cleanup & style</h4><div className="audio-preset-grid" role="group" aria-label="Scene audio presets">{[['Clear speech','clean'],['Dialogue','dialogue'],['Vintage radio','radio'],['Natural','none']].map(([label,fx])=><button className="btn" key={fx} disabled={disabled} onClick={()=>change({voice_fx:fx})}>{label}</button>)}</div><p className="hint">Presets change the voice effect while keeping your trim, volume and fades.</p><label className="control-label">Voice effect<select aria-label="Voice effect" value={edit.voice_fx || 'none'} disabled={disabled} onChange={e => change({voice_fx: e.target.value})}>
       <option value="none">None</option><option value="clean">Clean up (less noise, even level)</option><option value="dialogue">Dialogue cleanup (noise reduction — not AI voice isolation)</option><option value="radio">1940s radio / newsreel</option><option value="telephone">Telephone</option>
     </select></label>
     <NarrationVoiceIsolation scene={scene} take={take} disabled={disabled} onChanged={onChanged}/>
-    {error && <p className="form-error" role="alert">{error}</p>}
+    </div><AudioCensor ranges={edit.censor} sourceMs={source} disabled={disabled} onChange={censor=>{stop();change({censor},true);}} words={scene.font_json.transcript?.source==='narration'&&scene.font_json.transcript.source_asset_id===asset.id?scene.font_json.transcript.words||[]:[]} wordOffset={(scene.font_json.transcript?.source_in_ms??edit.in_ms)-(scene.font_json.transcript?.source_offset_ms??scene.lead_ms??250)}/>{error && <p className="form-error" role="alert">{error}</p>}
     <div className="button-row audio-actions">
       <button className="text-btn" disabled={disabled || JSON.stringify(edit) === JSON.stringify(DEFAULTS)} onClick={() => change({...DEFAULTS})}><RotateCcw size={12}/> Reset edits</button>
       <button className="btn danger" disabled={disabled} onClick={() => {stop(); void onRemove();}}><Trash2 size={13}/> Remove from scene</button>

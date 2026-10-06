@@ -8,6 +8,8 @@ import "./library.css";
 import "./usability.css";
 import "./cleanup.css";
 import "./keyframes.css";
+import "./recovery.css";
+import "./friendly.css";
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
   constructor(props: { children: React.ReactNode }) {

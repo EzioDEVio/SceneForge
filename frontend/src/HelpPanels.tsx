@@ -28,30 +28,41 @@ export const SHORTCUT_GROUPS: {title: string; note?: string; items: Shortcut[]}[
   {title: 'Edit', items: [
     {keys: ['Ctrl+Z'], action: 'Undo timeline edit'},
     {keys: ['Ctrl+Shift+Z', 'Ctrl+Y'], action: 'Redo timeline edit'},
-    {keys: ['Ctrl+C'], action: 'Copy the selected scene, focused narration, or selected timeline audio clips'},
-    {keys: ['Ctrl+X'], action: 'Cut the selected timeline audio clips'},
-    {keys: ['Ctrl+V'], action: 'Paste (scene, narration audio, or audio clips at the playhead)'},
-    {keys: ['Ctrl+D'], action: 'Duplicate the selected scene or timeline audio clips'},
+    {keys: ['Ctrl+A'], action: 'Select all scenes, or all unlocked timeline audio clips when an audio track has focus'},
+    {keys: ['S'], action: 'Split the focused scene, image, text or audio clip at the playhead'},
+    {keys: ['M'], action: 'Add a named marker at the playhead'},
+    {keys: ['+', '-'], action: 'Zoom the timeline in / out'},
+    {keys: ['Ctrl+C'], action: 'Copy the selected image/text clip, scene, narration, or timeline audio clips'},
+    {keys: ['Ctrl+X'], action: 'Cut the selected image/text clip or timeline audio clips'},
+    {keys: ['Ctrl+V'], action: 'Paste (scene, narration, image/text or audio clips at the playhead)'},
+    {keys: ['Ctrl+D'], action: 'Duplicate the selected image/text clip, scene or timeline audio clips'},
     {keys: ['Ctrl+G'], action: 'Group the selected timeline audio clips'},
     {keys: ['Ctrl+Shift+G'], action: 'Ungroup'},
-    {keys: ['Delete'], action: 'Delete focused audio clips or narration; ripple-delete the selected scene'},
+    {keys: ['Delete'], action: 'Delete an image/text clip, audio or narration; ripple-delete the selected scene'},
     {keys: ['Shift+Delete'], action: 'Ripple-delete the selected timeline audio clips'},
   ]},
   {title: 'Projects and app', items: [
     {keys: ['Ctrl+N'], action: 'New project'},
     {keys: ['Ctrl+O'], action: 'Open project'},
-    {keys: ['Ctrl+,'], action: 'Preferences (desktop app menu)'},
-    {keys: ['Ctrl+Shift+A'], action: 'AI engines & providers (desktop app menu)'},
-    {keys: ['?'], action: 'Show this list of shortcuts'},
+    {keys: ['Ctrl+,'], action: 'Preferences'},
+    {keys: ['Ctrl+Shift+A'], action: 'AI engines & providers'},
+    {keys: ['Ctrl+S'], action: 'Save a restore point (after saving current edits)'},
+    {keys: ['Ctrl+E'], action: 'Open Export video'},
+    {keys: ['Ctrl+/', '?'], action: 'Show this list of shortcuts'},
     {keys: ['Esc'], action: 'Close a dialog or menu'},
     {keys: ['←', '→', 'Home', 'End'], action: 'Move between Scene settings tabs (when a tab has focus)'},
   ]},
 ];
 
 export function ShortcutSheet({onClose}: {onClose: () => void}) {
+  const [search,setSearch]=useState('');
+  const query=search.trim().toLowerCase();
+  const groups=SHORTCUT_GROUPS.map(g=>({...g,items:g.items.filter(item=>`${g.title} ${item.action} ${item.keys.join(' ')}`.toLowerCase().includes(query))})).filter(g=>g.items.length);
   return <Modal title="Keyboard shortcuts" icon={<Keyboard size={18}/>} onClose={onClose} wide>
     <p className="info-lead">Shortcuts work while you are not typing in a text field. On macOS, use ⌘ instead of Ctrl.</p>
-    <div className="shortcut-groups">{SHORTCUT_GROUPS.map(g => <section key={g.title} className="shortcut-group" aria-label={g.title}>
+    <label className="control-label">Find a shortcut<input autoFocus type="search" aria-label="Search keyboard shortcuts" placeholder="Search actions or keys, e.g. split or Ctrl+S" value={search} onChange={e=>setSearch(e.target.value)}/></label>
+    {!groups.length&&<p role="status">No shortcuts match your search.</p>}
+    <div className="shortcut-groups">{groups.map(g => <section key={g.title} className="shortcut-group" aria-label={g.title}>
       <h3>{g.title}</h3>{g.note && <p className="hint">{g.note}</p>}
       <dl>{g.items.map(item => <div key={item.keys.join() + item.action} className="shortcut-row">
         <dt>{item.keys.map((k, i) => <React.Fragment key={k}>{i > 0 && <span className="kbd-sep">/</span>}<kbd>{k}</kbd></React.Fragment>)}</dt>

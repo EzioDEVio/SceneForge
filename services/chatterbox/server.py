@@ -22,6 +22,25 @@ class Speech(BaseModel):
 def health():
     return {'service':'chatterbox','model_ready':model is not None,'loading':loading,'last_error':last_error}
 
+@app.post('/warmup')
+def warmup():
+    global model, loading, last_error
+    with lock:
+        loading = True
+        try:
+            if model is None:
+                from chatterbox.mtl_tts import ChatterboxMultilingualTTS
+                model = ChatterboxMultilingualTTS.from_pretrained(device=os.environ.get('CHATTERBOX_DEVICE', 'cpu'))
+            last_error = None
+            return {'service':'chatterbox','model_ready':True}
+        except Exception as exc:
+            last_error = type(exc).__name__ + ': ' + str(exc)[:500]
+            import logging
+            logging.exception('Chatterbox model warmup failed')
+            raise HTTPException(503, 'Chatterbox model setup failed: ' + last_error + '. Retry resumes cached downloads.') from exc
+        finally:
+            loading = False
+
 @app.get('/v1/audio/voices')
 def voices():
     return {'voices': [{'id': 'default'}]}

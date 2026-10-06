@@ -11,6 +11,7 @@ bundled in assets/fonts so libass never needs a system fallback. Text stays in
 logical order; libass still performs bidi reordering and Arabic shaping.
 """
 from __future__ import annotations
+from app.render.font_runtime import load_font
 
 import unicodedata
 
@@ -20,8 +21,7 @@ LATIN_DEFAULT = "Noto Sans"
 _OWN_LATIN = {"Amiri", "Tajawal", "Lalezar"}
 # Latin display families paired with a matching Arabic design.
 _ARABIC_PARTNER = {"Poppins": "Tajawal", "Bebas Neue": "Lalezar", "Anton": "Lalezar", "Pacifico": "Amiri"}
-ALL_FAMILIES = ("Noto Naskh Arabic", "Noto Sans Arabic", "Noto Sans", "Amiri", "Tajawal", "Lalezar",
-                "Poppins", "Bebas Neue", "Anton", "Pacifico")
+from app.domain.fonts import ALL_FAMILIES
 # Latin families whose design matches a serif Arabic companion better.
 _SERIF_LATIN = {"Times New Roman", "Georgia"}
 
@@ -120,7 +120,7 @@ def _line_ratio(path) -> float:
     """Visible capital height as a share of the height libass sizes by (ascent+descent).
     Matching this across fonts makes the same size setting look the same size."""
     from PIL import ImageFont
-    f = ImageFont.truetype(str(path), 200)
+    f = load_font(str(path), 200)
     a, d = f.getmetrics()
     top, bottom = f.getbbox("H")[1], f.getbbox("H")[3]
     return (a + d) / max(1, bottom - top)

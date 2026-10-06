@@ -21,7 +21,7 @@ const requestClose=createCloseController({
  exit:()=>{quitting=true;window?.webContents.on('will-prevent-unload',e=>e.preventDefault());app.quit();},
  report:async reason=>{
   const active=reason==='active-work',pending=reason==='pending-work';
-  await dialog.showMessageBox(window,{type:active||pending?'info':'warning',title:'SceneForge is still open',message:active?'Finish active work before closing.':pending?'SceneForge is finishing a project change.':'SceneForge could not save your changes.',detail:active?'Wait for the current render, export or video generation to finish, then close the app again.':pending?'Keep the app open until the current save or edit completes, then try again.':"Your project remains open so you can retry the save. Check the editor save status and make sure the workspace is writable.",buttons:['Keep SceneForge open'],defaultId:0,cancelId:0,noLink:true});
+  await dialog.showMessageBox(window,{type:active||pending?'info':'warning',title:'SceneForge is still open',message:active?'Finish active work before closing.':pending?'SceneForge is finishing a project change.':'SceneForge could not save your changes.',detail:active?'Wait for the current render, export, AI installation or video generation to finish, then close the app again.':pending?'Keep the app open until the current save or edit completes, then try again.':"Your project remains open so you can retry the save. Check the editor save status and make sure the workspace is writable.",buttons:['Keep SceneForge open'],defaultId:0,cancelId:0,noLink:true});
  }
 });
 // One user-data folder name for every platform; projects from older names are migrated in boot().

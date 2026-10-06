@@ -1,5 +1,7 @@
 <p align="center"><img src="docs/sceneforge-banner.svg" alt="SceneForge Studio — Your story, frame by frame" width="100%"></p>
 
+**0.9.3 Section D checkpoint:** Open **Edit → Script → Scenes / AutoCut / Stabilize video / Project templates**. Templates are also available on the Projects page. See [Section D testing and limits](docs/STATUS_v0.9.3_D.md).
+
 # SceneForge Studio
 
 **A free, open-source desktop editor for narrated documentary videos.** Turn a script, photos, clips and a voice into a finished film one scene at a time. You get film looks, captions that follow the narration, a multitrack audio timeline, stickers, titles and optional AI tools. Arabic and English are first-class.
@@ -8,7 +10,10 @@
 
 ![The SceneForge editor: scene bin, rendered scene preview with an iris-reveal title and a two-tone caption, scene settings, and the timeline with text, picture, narration and colour/beat markers](docs/images/editor-overview.png)
 
-> **Release status.** **0.8.0** is the latest release: the creator pack (silence and filler removal, auto-reframe to 9:16, GPU export, live playback, keyframes), on top of **0.7.1** (security and usability) and **0.7.0**. 0.7.0 was a large update over 0.5.3: a multitrack audio timeline with pro edit tools, 71 caption styles, 400 stickers and emoji, per-effect settings, AI subject cutout and voice isolation, and optional text-to-video. Items marked *(0.7.0)* are new in this version. The full record is in [`desktop/RELEASE_NOTES.md`](desktop/RELEASE_NOTES.md) and [`PROJECT_HISTORY_AND_HANDOFF.md`](PROJECT_HISTORY_AND_HANDOFF.md).
+> **0.9.3 source review checkpoint.** Includes Script → Scenes, AutoCut, stabilization, templates, timeline video/image/text layers, caption emoji and censor ranges. The editor recovery adds atomic Motion/Effects drafts, rendered previews with Apply/Cancel, inspector section navigation, shared map-route artwork and four additional movements. See [Stage 6 release readiness](docs/STAGE6_RELEASE_READINESS.md) for fresh validation and pending Windows/installer checks. Owner reviews of Stages 1–5 were HTML reviews; this is not a published release or a tested Windows package.
+
+
+**Independent image and text clips (new checkpoint).** Place the playhead at five seconds and choose **Add image at playhead**, or drag an image from Media Pool or a local folder onto an upper Overlay track. In **Text → Text overlays**, drag **Text**, **Text box** or **Text+** onto a track, or click a card to insert it at the playhead. Move clips left/right, change track, and drag their edges to trim. Click a clip for timing and placement controls; use **Apply changes**, or save pending text with Ctrl+S. Drag images and text in the preview to position them. These layers appear in live playback and full exports, support Undo/Redo and restore points, and can span scenes. Timed captions have readable beige boxes in the timeline and caption editor. See [overlay checkpoint validation](docs/STATUS_v0.9.3_OVERLAYS.md). The Windows review update adds sliders with exact values, a draft placement preview before Apply, darker caption cards and distinct whole-video/scene-title groups. See [review fixes and retest steps](docs/STATUS_v0.9.3_REVIEW_FIXES.md).
 
 The screenshots on this page come from the 0.7.0 build. They show a demo project made only from procedurally generated pictures, video and audio. [`scripts/capture_readme_screenshots.py`](scripts/capture_readme_screenshots.py) rebuilds the project and the screenshots.
 
@@ -55,7 +60,7 @@ The screenshots on this page come from the 0.7.0 build. They show a demo project
 - **Volume envelopes** take up to 32 keyframes on an A3–A8 clip, with presets such as *dip under a voice*. The line is drawn on the clip and heard in scene renders and in the export. **Clip groups** select and move together: Ctrl+G groups, and Ctrl+Shift+G ungroups. *(0.7.0)*
 - **Right-click menus** for audio clips, scenes, narration and clip sound. From these menus you can split, duplicate, move a clip to another track, add a marker to the clip, or **detach narration or clip sound to A3** so you can cut it. *(0.7.0)*
 - Everything that existed before: drag-and-drop of files and whole folders, 28 curated transitions with live previews, split and ripple delete, multi-select with batch apply, snapping, linked trimming of source video and audio, Ctrl+wheel zoom around the pointer, and undo/redo.
-- The design notes are in [`docs/TIMELINE_ARCHITECTURE.md`](docs/TIMELINE_ARCHITECTURE.md). V1 is still scene-based. Free multitrack *video* and nested clips are not implemented yet.
+- The design notes are in [`docs/TIMELINE_ARCHITECTURE.md`](docs/TIMELINE_ARCHITECTURE.md). V1 is still scene-based. Upper Overlay tracks accept independent video, image and text clips that can span scenes. V1 remains scene-based; nested sequences are not implemented.
 
 ### Captions and text
 
@@ -243,7 +248,7 @@ Price references: [Google Veo pricing](https://ai.google.dev/gemini-api/docs/pri
 Requirements:
 
 - **Python 3.12.** The backend pins `numpy==2.5.3`, which needs 3.12.
-- **Node.js 20 or later.** CI uses 22.
+- **Node.js 22.12 or later.** CI uses Node 22.
 - **FFmpeg** on your PATH.
 
 The desktop installer bundles its own Python runtime and FFmpeg. You only need these tools to run from source.
@@ -256,6 +261,13 @@ scripts\setup.bat
 scripts\start.bat          :: serves the built app at http://127.0.0.1:8000
 scripts\dev.bat            :: or: backend with --reload on :8000 + Vite dev server on :5173
 ```
+
+Windows setup keeps each checkout's Python runtime under
+`%LOCALAPPDATA%\SceneForge\runtimes\<checkout-id>` so DLLs are not loaded from
+an excessively long Downloads path. Setup and startup draw Latin and Arabic
+text before reporting success. Projects and media remain in `backend\data`.
+If a text preview reports a font-runtime error, close the app, rerun setup,
+and restart. See [text-runtime recovery](docs/TEXT_RUNTIME_RECOVERY.md).
 
 **macOS / Linux**
 ```bash
@@ -304,7 +316,7 @@ ELECTRON_SKIP_BINARY_DOWNLOAD=1 npm --prefix desktop ci && npm --prefix desktop 
 python tests/integration/test_combined.py                       # each integration test is a standalone script
 ```
 
-- **Build and render checks** (`.github/workflows/checks.yml`) run on every push. They run the frontend build and tests, then **32 Python integration scripts** that render real media with FFmpeg.
+- **Build and render checks** (`.github/workflows/checks.yml`) run on every push. They run the frontend build and tests, then the Python integration scripts that render real media with FFmpeg.
 - On Linux, the credential tests need a Secret Service keyring. Run them under `dbus-run-session` with `gnome-keyring-daemon` unlocked, as CI does.
 - Tests never call paid providers. Those calls are mocked.
 - **Last full local run (RC9):**
@@ -353,7 +365,8 @@ The table summarizes the documented history. Versions marked WIP or RC were deve
 1. Set the version in `desktop/package.json`, for example `0.7.0`, or `0.7.0-beta.1` for a beta.
 2. Commit, then tag and push: `git tag v0.7.0 && git push origin v0.7.0`.
 3. The **Release** workflow tests everything and builds the Windows, Linux and macOS installers. It attaches them to a **draft** release.
-4. Review the draft and click **Publish release**. Users' apps offer the update only after that.
+4. Wait for **Windows**, **Linux**, and **Verify draft release files** to pass. The final check requires the Windows installer, its blockmap and update metadata, plus the Linux AppImage, deb and update metadata. Missing, empty or unfinished uploads fail the check. macOS is still experimental.
+5. With the owner's approval, review the draft and click **Publish release**. Users' apps offer the update only after that. Do not publish the draft while either required build or the final file check is pending or red. See [release verification](docs/STATUS_v0.9.3_C.md).
 
 ## Licenses and credits
 

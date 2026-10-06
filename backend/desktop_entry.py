@@ -53,6 +53,17 @@ class HangWatch:
 
 
 def main():
+    if len(sys.argv)>1 and sys.argv[1]=='--install-local-ai':
+        if len(sys.argv)!=5:raise SystemExit('Expected components, workspace and GPU flag.')
+        os.environ['SCENEFORGE_DATA_DIR']=sys.argv[3]
+        if getattr(sys,'frozen',False):
+            from pathlib import Path
+            os.environ['SCENEFORGE_RESOURCE_DIR']=str(Path(sys.executable).resolve().parents[1]/'app-resources')
+        from app.db.database import init_db
+        from app.managed_ai import install
+        init_db()
+        components=[v for v in sys.argv[2].split(',') if v]
+        raise SystemExit(0 if install(components,sys.argv[4]=='1') else 1)
     if len(os.environ.get('SCENEFORGE_DESKTOP_TOKEN', '')) < 32:
         raise RuntimeError('Desktop backend requires a per-launch authentication token.')
     preload()

@@ -1,0 +1,608 @@
+<title>SceneForge Studio User Guide</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Familjen+Grotesk:wght@500;600;700&family=Atkinson+Hyperlegible:ital,wght@0,400;0,700;1,400&family=JetBrains+Mono:wght@500&display=swap">
+<style>
+/* Layout: a documentation site — sticky chapter rail on the left, one reading column on the right.
+   The colour system is the editor's own track colours (T1 text, V1 picture, A1 narration, A2 clip sound, A3 music),
+   so every chapter wears the colour of the part of the app it explains. */
+:root{
+  --bg:#f7f6fb; --panel:#ffffff; --ink:#1d1b26; --muted:#5d5a6d; --line:#e2dfec; --accent:#6a55d9; --accent-soft:#eeebfc;
+  --t1:#a07a1c; --v1:#6a55d9; --a1:#2d8a6b; --a2:#2c7f97; --a3:#c46a1f; --fx:#c2407a; --ai:#4b6bd6; --out:#3f8a3a;
+  --kbd-bg:#f1eff7; --tip-bg:#fff7e6; --tip-line:#f0c46b; --warn-bg:#fdeef0; --warn-line:#e6a0ab;
+  --display:'Familjen Grotesk', 'Segoe UI', system-ui, sans-serif;
+  --body:'Atkinson Hyperlegible', 'Segoe UI', system-ui, sans-serif;
+  --mono:'JetBrains Mono', ui-monospace, Consolas, monospace;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#15141b; --panel:#1d1c25; --ink:#ecebf3; --muted:#a6a3b8; --line:#2f2d3b; --accent:#a99bf6; --accent-soft:#2a2645;
+  --t1:#e0b54a; --v1:#a99bf6; --a1:#5fcca3; --a2:#5bbfd9; --a3:#f0a05a; --fx:#ef7fae; --ai:#8ea6f5; --out:#84cc7a;
+  --kbd-bg:#26242f; --tip-bg:#2b2416; --tip-line:#8a6a2a; --warn-bg:#2e1a1f; --warn-line:#7d3d48; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#15141b; --panel:#1d1c25; --ink:#ecebf3; --muted:#a6a3b8; --line:#2f2d3b; --accent:#a99bf6; --accent-soft:#2a2645;
+  --t1:#e0b54a; --v1:#a99bf6; --a1:#5fcca3; --a2:#5bbfd9; --a3:#f0a05a; --fx:#ef7fae; --ai:#8ea6f5; --out:#84cc7a;
+  --kbd-bg:#26242f; --tip-bg:#2b2416; --tip-line:#8a6a2a; --warn-bg:#2e1a1f; --warn-line:#7d3d48; color-scheme:dark}
+
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font:16px/1.65 var(--body);margin:0}
+a{color:var(--accent)}
+.shell{display:grid;grid-template-columns:260px minmax(0,1fr);max-width:1240px;margin:0 auto;padding-inline:24px;gap:40px}
+.rail{position:sticky;top:env(safe-area-inset-top,0px);align-self:start;height:100vh;overflow:auto;padding-block:28px 40px}
+.brand{display:flex;align-items:center;gap:10px;font:700 18px var(--display);letter-spacing:-.2px;margin-bottom:4px}
+.brand i{width:30px;height:30px;border-radius:8px;background:var(--accent);display:grid;place-items:center;color:var(--panel);font-style:normal;font-size:15px}
+.ver{font:12px var(--mono);color:var(--muted);margin:0 0 18px}
+.find{width:100%;padding:8px 10px;border:1px solid var(--line);border-radius:8px;background:var(--panel);color:var(--ink);font:14px var(--body);margin-bottom:16px}
+.rail nav ol{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.rail nav a{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:7px;text-decoration:none;color:var(--muted);font-size:14.5px}
+.rail nav a:hover,.rail nav a.on{background:var(--accent-soft);color:var(--ink)}
+.rail nav a b{width:8px;height:8px;border-radius:2px;flex:none}
+main{padding-block:36px 96px;min-width:0}
+.hero{padding-block:8px 28px;border-bottom:1px solid var(--line);margin-bottom:8px}
+.hero h1{font:700 clamp(32px,5vw,46px)/1.08 var(--display);letter-spacing:-1px;margin:0 0 12px;text-wrap:balance}
+.hero p{max-width:64ch;color:var(--muted);font-size:17.5px;margin:0}
+.tracks{display:flex;flex-wrap:wrap;gap:8px;margin-top:20px}
+.chip{display:inline-flex;align-items:center;gap:7px;font:600 12.5px var(--display);padding:4px 10px 4px 4px;border-radius:999px;border:1px solid var(--line);background:var(--panel)}
+.chip b{font:600 11px var(--mono);color:var(--panel);padding:2px 6px;border-radius:5px}
+section.ch{padding-top:44px;scroll-margin-top:12px}
+.ch-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:6px}
+.ch-head span{font:600 12px var(--mono);letter-spacing:1px;text-transform:uppercase;color:var(--c)}
+.ch h2{font:700 30px/1.15 var(--display);letter-spacing:-.6px;margin:0;text-wrap:balance;width:100%}
+.ch h2::before{content:"";display:inline-block;width:12px;height:12px;border-radius:3px;background:var(--c);margin-right:12px;vertical-align:4px}
+.ch h3{font:600 20px/1.3 var(--display);margin:30px 0 8px;letter-spacing:-.2px}
+.ch p,.ch li{max-width:68ch}
+.lead{font-size:17.5px;color:var(--muted)}
+ol.steps{counter-reset:s;list-style:none;padding:0;margin:14px 0;display:flex;flex-direction:column;gap:10px}
+ol.steps>li{counter-increment:s;position:relative;padding-left:42px}
+ol.steps>li::before{content:counter(s);position:absolute;left:0;top:1px;width:28px;height:28px;border-radius:50%;background:var(--c,var(--accent));color:var(--panel);font:700 14px/28px var(--display);text-align:center}
+figure{margin:20px 0;background:var(--panel);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+figure img{display:block;width:100%;height:auto}
+figcaption{padding:10px 14px;font-size:14px;color:var(--muted);border-top:1px solid var(--line)}
+.tip,.warn{border-left:4px solid var(--tip-line);background:var(--tip-bg);padding:12px 16px;border-radius:0 10px 10px 0;margin:16px 0;max-width:68ch}
+.warn{border-color:var(--warn-line);background:var(--warn-bg)}
+.tip strong,.warn strong{font-family:var(--display)}
+kbd{font:500 12.5px var(--mono);background:var(--kbd-bg);border:1px solid var(--line);border-bottom-width:2px;border-radius:5px;padding:1px 6px;white-space:nowrap}
+.ui{font-weight:700}
+.tbl{overflow-x:auto;margin:16px 0;border:1px solid var(--line);border-radius:10px;background:var(--panel)}
+table{border-collapse:collapse;width:100%;font-size:15px}
+th,td{text-align:left;padding:9px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font:600 13px var(--display);letter-spacing:.3px;color:var(--muted);background:var(--kbd-bg)}
+tr:last-child td{border-bottom:0}
+.grid2{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;margin:16px 0}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;min-width:0}
+.card h4{font:600 16px var(--display);margin:0 0 4px}
+.card p{margin:0;font-size:15px;color:var(--muted)}
+.diagram{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:14px;margin:18px 0;overflow-x:auto}
+.diagram svg{display:block;min-width:620px;width:100%;height:auto}
+.foot{margin-top:72px;padding-top:20px;border-top:1px solid var(--line);color:var(--muted);font-size:14px}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+@media (max-width:900px){.shell{grid-template-columns:1fr;gap:0}.rail{position:static;height:auto;padding-block:20px 0;border-bottom:1px solid var(--line)}.rail nav ol{flex-direction:row;flex-wrap:wrap}.rail nav a{font-size:13.5px;padding:4px 8px}}
+@media (prefers-reduced-motion:no-preference){html{scroll-behavior:smooth}}
+</style>
+
+<div class="shell">
+<aside class="rail" aria-label="Chapters">
+  <div class="brand"><i>▶</i>SceneForge Studio</div>
+  <p class="ver">User guide · version 0.9.3</p>
+  <label for="find" class="sr" hidden>Find a topic</label>
+  <input id="find" class="find" type="search" placeholder="Find a topic, e.g. keyframes" autocomplete="off">
+  <nav><ol id="toc">
+    <li><a href="#start"><b style="background:var(--accent)"></b>Getting started</a></li>
+    <li><a href="#tour"><b style="background:var(--accent)"></b>The editor at a glance</a></li>
+    <li><a href="#projects"><b style="background:var(--accent)"></b>Projects and restore points</a></li>
+    <li><a href="#scenes"><b style="background:var(--v1)"></b>Scenes, pictures and video</a></li>
+    <li><a href="#voice"><b style="background:var(--a1)"></b>Narration and voices</a></li>
+    <li><a href="#captions"><b style="background:var(--t1)"></b>Captions</a></li>
+    <li><a href="#titles"><b style="background:var(--t1)"></b>Titles and templates</a></li>
+    <li><a href="#timeline"><b style="background:var(--a3)"></b>The timeline</a></li>
+    <li><a href="#audio"><b style="background:var(--a3)"></b>Music and audio mixing</a></li>
+    <li><a href="#effects"><b style="background:var(--fx)"></b>Effects and looks</a></li>
+    <li><a href="#overlays"><b style="background:var(--fx)"></b>Stickers and overlays</a></li>
+    <li><a href="#keyframes"><b style="background:var(--fx)"></b>Keyframe animation</a></li>
+    <li><a href="#creative"><b style="background:var(--fx)"></b>Cutout and special titles</a></li>
+    <li><a href="#cleanup"><b style="background:var(--a1)"></b>Creator time-savers</a></li>
+    <li><a href="#ai"><b style="background:var(--ai)"></b>AI engines</a></li>
+    <li><a href="#export"><b style="background:var(--out)"></b>Export and share</a></li>
+    <li><a href="#prefs"><b style="background:var(--muted)"></b>Workspaces and preferences</a></li>
+    <li><a href="#keys"><b style="background:var(--muted)"></b>Keyboard shortcuts</a></li>
+    <li><a href="#help"><b style="background:var(--muted)"></b>Troubleshooting</a></li>
+  </ol></nav>
+</aside>
+
+<main>
+<header class="hero">
+  <h1>Make a narrated video, one scene at a time</h1>
+  <p>SceneForge Studio turns a script, pictures and clips into a finished video with voice, captions, music, titles and effects. This guide walks through every part of the app, from your first project to export. The AI that matters runs on your own computer, free.</p>
+  <div class="tracks" aria-label="The timeline tracks this guide is colour-coded by">
+    <span class="chip"><b style="background:var(--t1)">T1</b>Text and captions</span>
+    <span class="chip"><b style="background:var(--v1)">V1</b>Picture</span>
+    <span class="chip"><b style="background:var(--a1)">A1</b>Narration</span>
+    <span class="chip"><b style="background:var(--a2)">A2</b>Clip sound</span>
+    <span class="chip"><b style="background:var(--a3)">A3–A8</b>Music and sound effects</span>
+  </div>
+</header>
+
+<!-- ============================================================ -->
+<section class="ch" id="start" style="--c:var(--accent)">
+  <div class="ch-head"><span>Chapter 1</span><h2>Getting started</h2></div>
+  <p class="lead">Install the app, open the sample project, and render your first scene in about five minutes.</p>
+  <h3>Install</h3>
+  <ol class="steps">
+    <li>Download the installer for your system from the <a href="https://github.com/EzioDEVio/SceneForge/releases/latest">Releases page</a>: <span class="ui">Windows-x64-Setup.exe</span> for Windows 10/11, <span class="ui">.AppImage</span> or <span class="ui">.deb</span> for Linux, <span class="ui">.dmg</span> for Apple Silicon Macs (experimental).</li>
+    <li>Run it. On Windows, if <span class="ui">"Windows protected your PC"</span> appears, click <span class="ui">More info → Run anyway</span>. The installer is not code-signed yet.</li>
+    <li>Open SceneForge Studio. A short tour points out the main areas; you can replay it any time from <span class="ui">Help → Show tour</span>.</li>
+  </ol>
+  <p>Everything the app needs is inside the installer: the video engine (FFmpeg), fonts, 400 stickers and the small background-removal model. The caption model (Whisper, about 145 MB) downloads once the first time you make captions; after that the app works offline.</p>
+  <h3>Your first five minutes</h3>
+  <ol class="steps">
+    <li>On the Projects page, click <span class="ui">Try a sample project</span>. A three-scene project opens with pictures, captions, a title, stickers, effects, music and sound effects.</li>
+    <li>Click <span class="ui">Render scene</span> under the preview. A progress bar shows the render; a few seconds later the finished scene plays.</li>
+    <li>Press <kbd>Space</kbd> to play the whole timeline from the rendered scenes.</li>
+    <li>Change something (a caption word, an effect, a sticker) and render again. That loop is how you work in SceneForge.</li>
+  </ol>
+  <figure><img src="images/home-daylight.png" alt="The Projects page in the Daylight theme with Create a project and the project list" loading="lazy"><figcaption>The Projects page: create a project, try the sample, or open an existing one.</figcaption></figure>
+</section>
+
+<!-- ============================================================ -->
+<section class="ch" id="tour" style="--c:var(--accent)">
+  <div class="ch-head"><span>Chapter 2</span><h2>The editor at a glance</h2></div>
+  <p class="lead">Four areas, always in the same place: scenes on the left, the preview in the middle, scene settings on the right and the timeline underneath.</p>
+  <figure><img src="images/editor-overview.png" alt="The SceneForge editor with the scene list, preview, scene settings and the multitrack timeline" loading="lazy"><figcaption>The editor. Your work is saved automatically ("All changes saved" under the project name).</figcaption></figure>
+  <div class="grid2">
+    <div class="card"><h4>Scenes, Media Pool, Transitions</h4><p>The left panel lists your scenes in order. <span class="ui">Media Pool</span> holds every file you imported; <span class="ui">Transitions</span> sets how scenes change.</p></div>
+    <div class="card"><h4>Preview</h4><p><span class="ui">Preview</span> shows a fast editing view; <span class="ui">Rendered scene</span> plays the real render. Use <span class="ui">Safe zones</span> to keep text clear of phone buttons.</p></div>
+    <div class="card"><h4>Scene settings</h4><p>Tabs for the selected scene: <span class="ui">Media, Motion, Effects, Overlays, Text, Audio, Clip Audio</span>. Every tab has an ⓘ button that explains it.</p></div>
+    <div class="card"><h4>Timeline</h4><p>Text on T1, pictures on V1, narration on A1, video sound on A2 and free audio tracks A3–A8. Play, cut, trim and mark here.</p></div>
+  </div>
+  <div class="tip"><strong>Tip.</strong> Press <kbd>?</kbd> to see every keyboard shortcut. Hover any button to read what it does.</div>
+</section>
+
+<!-- ============================================================ -->
+<section class="ch" id="projects" style="--c:var(--accent)">
+  <div class="ch-head"><span>Chapter 3</span><h2>Projects and restore points</h2></div>
+  <p class="lead">A project is your whole video: its scenes, media, audio and settings.</p>
+  <h3>Create a project</h3>
+  <ol class="steps">
+    <li>On the Projects page, type a <span class="ui">Project name</span>.</li>
+    <li>Choose a <span class="ui">Format</span>: <span class="ui">16:9</span> for YouTube, <span class="ui">9:16</span> for Shorts, Reels and TikTok, <span class="ui">1:1</span> or <span class="ui">4:5</span> for Instagram.</li>
+    <li>Choose a <span class="ui">Frame rate</span> (30 fps suits most videos) and click <span class="ui">Create project</span>. It starts with three empty scenes.</li>
+  </ol>
+  <h3>Restore points</h3>
+  <p>SceneForge saves a restore point every few minutes while you edit, but only when something changed, and keeps the last 20. Open <span class="ui">File → Restore points…</span> to see them, or to save a named one before a big change (for example "Before recolouring").</p>
+  <p><span class="ui">Open this version</span> opens a <strong>copy</strong> of the project as it was. Your current project is never overwritten.</p>
+  <h3>Make a vertical copy</h3>
+  <p><span class="ui">File → Create vertical 9:16 version (auto-reframe)</span> makes a portrait copy of a 16:9 project. The local AI follows the main subject in every shot so it stays in frame. Details are in <a href="#cleanup">Creator time-savers</a>.</p>
+</section>
+
+<!-- ============================================================ -->
+<section class="ch" id="scenes" style="--c:var(--v1)">
+  <div class="ch-head"><span>Chapter 4 · V1</span><h2>Scenes, pictures and video</h2></div>
+  <p class="lead">Each scene is one part of your story: a picture or clip, its narration, its captions and its look.</p>
+  <h3>Add media</h3>
+  <ol class="steps">
+    <li>Drag images or videos from your computer onto the timeline or onto a scene, or use <span class="ui">File → Import files to Media Pool…</span>.</li>
+    <li>Files dropped on empty starter scenes fill them in order; extra files become new scenes.</li>
+    <li>In the <span class="ui">Media</span> tab you can also <span class="ui">Generate image</span> with an AI image engine, or <span class="ui">Restore old photo</span>.</li>
+  </ol>
+  <h3>Arrange scenes</h3>
+  <ul>
+    <li>Drag scenes on the V1 track to reorder them, or use <span class="ui">Earlier / Later</span> above the timeline.</li>
+    <li>Pick a <span class="ui">Transition</span> and its <span class="ui">Duration</span> for the selected scene (Dissolve, Slide, Wipe, Circle open, Zoom, Smooth and more).</li>
+    <li>Right-click a scene for <span class="ui">Split scene at playhead</span>, <span class="ui">Duplicate</span>, <span class="ui">Copy</span>, <span class="ui">Paste</span> and <span class="ui">Ripple delete</span>.</li>
+  </ul>
+  <h3>Length of a scene</h3>
+  <p>By default a scene lasts as long as its narration plus a little breathing room. In the <span class="ui">Media</span> tab, set <span class="ui">Timing mode</span> to <span class="ui">Fixed duration</span> to choose an exact length in seconds.</p>
+  <h3>Motion and speed</h3>
+  <p>Motion and Effects changes stay in a local draft. Use <span class="ui">Render draft preview</span> to check the actual renderer output before saving. <span class="ui">Apply changes</span> saves the draft as one Undo step; <span class="ui">Cancel changes</span> restores saved settings. Apply or Cancel before leaving the editor. Minimize or close the companion preview without discarding the draft. The section chooser jumps to the matching controls and shows whether they affect the selected media, scene, or entire project.</p>
+  <p>The <span class="ui">Motion</span> tab sets the camera movement on a still picture: zoom in or out, pan in any direction, close-up, or a Ken Burns move between two points you choose. For video clips it sets speed, freeze frames and smooth slow motion, plus framing and crop.</p>
+</section>
+
+<!-- ============================================================ -->
+<section class="ch" id="voice" style="--c:var(--a1)">
+  <div class="ch-head"><span>Chapter 5 · A1</span><h2>Narration and voices</h2></div>
+  <p class="lead">Write the words for each scene, then turn them into a voice or record your own.</p>
+  <ol class="steps">
+    <li>Select a scene and type or paste its words into <span class="ui">Narration script</span> under the preview. The counter shows words and spoken seconds.</li>
+    <li>Click <span class="ui">Generate voice</span>. Choose a voice engine: local voices (Kokoro, Chatterbox) are free; cloud voices (OpenAI, ElevenLabs) use your own API key.</li>
+    <li>Listen to the take in the <span class="ui">Audio</span> tab and accept it. It appears on the A1 track with its waveform.</li>
+  </ol>
+  <p>To use your own recording instead, drop an audio file on the scene's A1 lane, or use <span class="ui">File → Import audio to selected scene…</span>.</p>
+  <h3>Edit the narration</h3>
+  <ul>
+    <li>In the <span class="ui">Audio</span> tab, trim the start and end, set the volume and add fades.</li>
+    <li><span class="ui">Isolate voice</span> removes music and background noise behind speech, using a local AI model.</li>
+    <li>Right-click the narration on A1 and choose <span class="ui">Move narration to timeline audio (A3)</span> to cut it freely with the timeline tools.</li>
+  </ul>
+  <figure><img src="images/audio-voice-isolation.png" alt="The Audio tab with clip volume, trims, fades and Isolate voice" loading="lazy"><figcaption>Audio controls for a clip: volume, trim, fades and AI voice isolation.</figcaption></figure>
+</section>
+
+<!-- ============================================================ -->
+<section class="ch" id="captions" style="--c:var(--t1)">
+  <div class="ch-head"><span>Chapter 6 · T1</span><h2>Captions</h2></div>
+  <p class="lead">Captions can come from the speech automatically, in any language, with word-by-word timing.</p>
+  <h3>Make captions automatically</h3>
+  <ol class="steps">
+    <li>Open the <span class="ui">Text</span> tab. In <span class="ui">Auto captions</span>, leave <span class="ui">Language</span> on <span class="ui">Detect automatically</span>.</li>
+    <li>Pick a <span class="ui">Caption style</span> and how many <span class="ui">Words per caption clip</span> (3 is a good start for Shorts).</li>
+    <li>Choose <span class="ui">Captions in</span>: the spoken language, <span class="ui">English (translated)</span>, or <span class="ui">Both</span> (the spoken words with English underneath).</li>
+    <li>Click <span class="ui">Generate captions</span>. <span class="ui">Local Whisper · free</span> runs on your computer; the first run downloads the model once.</li>
+  </ol>
+  <p>Each caption becomes a block on T1. Click one to edit its words or timing. You can also type captions by hand in <span class="ui">On-screen captions</span>.</p>
+  <figure><img src="images/caption-styles.png" alt="The caption style picker with groups Social, Cinematic, Karaoke, Fun, Minimal and Arabic" loading="lazy"><figcaption>71 caption styles in six groups, including karaoke word highlighting and Arabic styles.</figcaption></figure>
+  <h3>Style and animate</h3>
+  <p>Under <span class="ui">Caption style</span> set the font, size, colours, outline, shadow, box, position, phrase or word-by-word display, karaoke highlight and an entrance animation. Arabic captions are laid out right to left automatically.</p>
+  <h3>Typewriter</h3>
+  <p>The <span class="ui">Typewriter</span> box types your captions letter by letter. Turn on <span class="ui">Typewriter reveal</span>, pick <span class="ui">Slow, Natural</span> or <span class="ui">Fast</span>, and tick <span class="ui">Synchronized keystrokes</span> for a typing sound. <span class="ui">Preview sound</span> plays it without rendering; <span class="ui">Upload typewriter sound</span> uses your own recording.</p>
+  <figure><img src="images/typewriter-box.png" alt="The Typewriter box with speed, timing and sound settings" loading="lazy"><figcaption>The Typewriter box: switch, speed, timing, sound and volume in one place.</figcaption></figure>
+</section>
+
+<!-- ============================================================ -->
+<section class="ch" id="titles" style="--c:var(--t1)">
+  <div class="ch-head"><span>Chapter 7 · T1</span><h2>Titles and templates</h2></div>
+  <p class="lead">Titles are separate from captions: each one is its own timed layer on T1, with its own font and animation.</p>
+  <div class="grid2">
+    <div class="card"><h4>Add Text</h4><p>A simple title line.</p></div>
+    <div class="card"><h4>Add Text Box</h4><p>A paragraph that wraps inside a width you set.</p></div>
+    <div class="card"><h4>Add Text+</h4><p>An advanced title with letter spacing, highlight colours and letter-by-letter animations.</p></div>
+  </div>
+  <p>For each title set the X and Y position, font size, start and end time, font, alignment, outline, shadow, colour and one of more than 25 animations: fades, slides, wipes, clock and iris reveals, typewriter, neon, bounce and per-letter or per-word effects. Move titles with the X and Y controls in Text settings.</p>
+  <h3>Templates</h3>
+  <p>Under <span class="ui">Templates</span> in the Text tab, one click adds a ready-made set of layers: <span class="ui">Lower third</span> (name and role), <span class="ui">Intro title</span>, <span class="ui">Outro / end card</span>, <span class="ui">Chapter heading</span> and <span class="ui">Quote</span>. Then change the words like any title.</p>
+  <p>For a full-screen title card on its own background, use <span class="ui">Add title card</span> in the scene list.</p>
+</section>
+
+<!-- ============================================================ -->
+<section class="ch" id="timeline" style="--c:var(--a3)">
+  <div class="ch-head"><span>Chapter 8 · Timeline</span><h2>The timeline</h2></div>
+  <p class="lead">The timeline shows the whole video. Scenes play on V1; free audio clips sit on A3–A8, where the professional edit tools work.</p>
+  <figure><img src="images/timeline-multitrack.png" alt="The timeline with T1, V1, A1, A2 and four timeline audio tracks, markers and a right-click menu" loading="lazy"><figcaption>Tracks, markers, beat markers and the right-click menu on clip sound.</figcaption></figure>
+  <h3>Stack video, images and text</h3>
+  <figure><img src="images/timeline-overlays-093.png" alt="Independent beige text and blue image clips above the video, with beige timed caption boxes and text placement controls" loading="lazy"><figcaption>Image and text clips keep their own timing above the video. Beige boxes show editable caption segments.</figcaption></figure>
+  <ol class="steps">
+    <li>Move the playhead to the time you want, for example five seconds into a twenty-second clip.</li>
+    <li>Choose <span class="ui">Add video at playhead</span> or <span class="ui">Add image at playhead</span>, or drag a video or image from Media Pool or a folder onto an upper <span class="ui">Overlay</span> track.</li>
+    <li>For text, open <span class="ui">Text → Text overlays</span>. Drag a <span class="ui">Text</span>, <span class="ui">Text box</span> or <span class="ui">Text+</span> card to a track. Clicking a card adds it at the playhead. These <span class="ui">Whole-video tracks</span> clips can span scenes. The <span class="ui">Scene titles &amp; labels</span> buttons below add within-scene titles with the existing animation and keyframe tools.</li>
+    <li>Drag a clip left or right to move it in time, or up/down to change track. Drag either edge to change its length. Click the clip for text, timing and placement controls. Move a slider or type an exact value. Check <span class="ui">Preview before applying</span>, then choose <span class="ui">Apply changes</span> to save. The draft preview opens beside the main monitor on a still from the current scene. Controls remain in Media for video/images and Text for text clips. Minimize or close the second preview without losing your draft; Restore draft preview opens it again. The main monitor shows saved layers.</li>
+    <li>Drag the video, image or text in the preview to place it. Track 1 appears above track 2. The layers appear in timeline playback and <span class="ui">Export video</span>; scene downloads contain the scene’s own layers.</li>
+  </ol>
+  <p>Right-click an overlay for editing, split, duplicate or delete. <kbd>Ctrl+Z</kbd> undoes an edit; <kbd>Ctrl+Y</kbd> redoes it. <kbd>S</kbd> splits the selected overlay at the playhead; <kbd>Ctrl+C</kbd>, <kbd>Ctrl+X</kbd>, <kbd>Ctrl+V</kbd> and <kbd>Ctrl+D</kbd> copy, cut, paste and duplicate. <kbd>Delete</kbd> removes the selected overlay while keeping the video. <kbd>Ctrl+S</kbd> saves pending text before creating a restore point. Shortcuts stay inactive while typing.</p>
+  <p>Video, images and text keep their own timing across scenes. A stacked video starts muted; open its controls to change the source start, volume or mute setting. Moving its left edge advances the source start. Use Export video to hear the full stack. Audio clips stay on the audio tracks. Empty starter scenes are skipped on export, and overlay timing follows the footage around them. Up to 64 overlay clips and six tracks are supported. Existing scene captions and titles remain on T1; generated caption segments show as separate beige boxes with their words and times.</p>
+  <h3>Play and move around</h3>
+  <ul>
+    <li><kbd>Space</kbd> plays the timeline from your rendered scenes, with music and timeline audio. Scenes that are not rendered yet show a still and a <span class="ui">Render missing scenes</span> button.</li>
+    <li><kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd> play back, pause and play forward (press <kbd>L</kbd> again for 2× and 4×). <kbd>←</kbd> <kbd>→</kbd> step one frame.</li>
+    <li>Click or drag on the ruler to place the playhead. <kbd>Ctrl</kbd>+mouse wheel zooms the timeline.</li>
+  </ul>
+  <p>The overlay save button shows <span class="ui">Saved</span> after success, then returns to <span class="ui">Apply changes</span> when you edit again. Failed saves retain your draft for retry.</p>
+  <p>In each generated caption clip, choose an <span class="ui">Emoji</span> and its left/right side. All 322 bundled emoji are available. Use Browse emoji for colour thumbnails, search by name or symbol, and filter by category. Bundled colour artwork follows that caption’s time span beside the caption text. Choose None to remove it. Rendering confirms placement; up to 64 caption clips per scene can carry emoji. Typewriter captions do not show timed emoji.</p>
+  <h3>Edit tools for audio clips (A3–A8)</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Key</th><th>Tool</th><th>What a drag does</th></tr></thead>
+    <tbody>
+      <tr><td><kbd>V</kbd></td><td>Select</td><td>Moves a clip; drag up or down to change track. <kbd>Ctrl</kbd>+click selects several.</td></tr>
+      <tr><td><kbd>A</kbd></td><td>Track select forward</td><td>Selects the clip and everything after it on that track.</td></tr>
+      <tr><td><kbd>B</kbd></td><td>Ripple trim</td><td>Trims an edge and moves later clips so no gap opens.</td></tr>
+      <tr><td><kbd>N</kbd></td><td>Roll</td><td>Moves the cut between two touching clips.</td></tr>
+      <tr><td><kbd>Y</kbd></td><td>Slip</td><td>Changes which part of the source plays, keeping position and length.</td></tr>
+      <tr><td><kbd>U</kbd></td><td>Slide</td><td>Moves a clip between its neighbours; they adjust around it.</td></tr>
+      <tr><td><kbd>C</kbd></td><td>Blade</td><td>Click to cut. <kbd>Shift</kbd>+<kbd>C</kbd> cuts every unlocked track at the playhead.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>Tracks</h3>
+  <ul>
+    <li><span class="ui">M</span> mutes and <span class="ui">S</span> solos a track; the lock icon protects it from edits. <span class="ui">Add A4</span> adds another audio track (up to A8).</li>
+    <li>The arrow at the left of a track header collapses it to save space.</li>
+    <li>Waveforms show on narration, clip sound and every audio clip.</li>
+  </ul>
+  <h3>Markers and beats</h3>
+  <ul>
+    <li><span class="ui">Marker</span> adds a named bookmark at the playhead; <span class="ui">Range</span> marks the selected clip or scene as a span. Click a marker's dot to change its colour.</li>
+    <li><span class="ui">♪ Beats…</span> finds the beat of your music and adds markers on every beat or bar. With <span class="ui">Snap</span> on, cuts snap to them.</li>
+    <li>Right-click an audio clip and choose <span class="ui">Add marker on this clip</span> for a marker that moves with the clip.</li>
+  </ul>
+  <h3>Undo</h3>
+  <p><kbd>Ctrl</kbd>+<kbd>Z</kbd> undoes and <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd> redoes timeline edits. For bigger rollbacks, use <a href="#projects">restore points</a>.</p>
+</section>
+
+<!-- ============================================================ -->
+<section class="ch" id="audio" style="--c:var(--a3)">
+  <div class="ch-head"><span>Chapter 9 · A2–A8</span><h2>Music and audio mixing</h2></div>
+  <p class="lead">Three kinds of sound mix into the final video: narration (A1), each video's own sound (A2) and free audio clips (A3–A8), plus one music bed for the whole project.</p>
+  <h3>Background music</h3>
+  <ol class="steps">
+    <li>Open the <span class="ui">Audio</span> tab and scroll to <span class="ui">Music &amp; finishing</span>.</li>
+    <li>Choose a music file, set its volume and fades.</li>
+    <li>Set <span class="ui">Duck</span> to lower the music automatically while someone speaks.</li>
+    <li><span class="ui">Fit music</span> trims or loops the track to the video length; <span class="ui">beat sync</span> lines cuts up with the beat.</li>
+  </ol>
+  <figure><img src="images/music-finishing.png" alt="Music and finishing panel with volume, ducking, fades and loudness" loading="lazy"><figcaption>Music &amp; finishing: music bed, ducking, fit to length and loudness levelling.</figcaption></figure>
+  <h3>Sound effects and extra music (A3–A8)</h3>
+  <p>The Audio tab groups controls into <span class="ui">Trim &amp; listen</span>, <span class="ui">Level &amp; fades</span> and <span class="ui">Voice cleanup &amp; style</span>. Preview speed and Hear original file affect listening only. Mute narration restores its previous volume when switched off. Cleanup presets preserve trim and fades; render to hear voice effects.</p>
+  <p>Music &amp; finishing groups background music, timeline clips and final loudness. Voice first, Balanced and Music forward set music level and ducking. Timeline clip controls include an exact start time, soft fades and duplication onto the next audio track; these edits support Undo/Redo.</p>
+  <p><strong>Voice censoring:</strong> In Audio, Clip Audio or the selected timeline clip, enter From/To times from the original file and choose Bleep or Mute. Add a range, listen or render to check it, and remove it to restore the original sound. Trimming and splitting keep ranges attached to the source. Censoring one track leaves other tracks audible and does not hide caption words. Narration Play clip auditions censoring; render video/timeline clips to audition the exact result.</p>
+  <p>For narration with linked auto-caption word timings, open Find words in timed narration. Enter words separated by commas or lines, review the matches, then Add reviewed matches. The transcript must belong to the selected narration source; regenerate old captions if word matching is unavailable. Matches may need timing adjustment after listening. No speech-recognition request runs from the censor controls.</p>
+  <p>Drop MP3, WAV, M4A, AAC, OGG or FLAC files on an audio track. Select a clip to set its volume, trims and fades in the Audio tab.</p>
+  <ul>
+    <li><span class="ui">Lower under voice (auto-ducking)</span> makes the clip quieter whenever narration or clip sound plays. <span class="ui">Use this on every clip on A3</span> applies it to the whole track.</li>
+    <li><span class="ui">Volume envelope</span> adds keyframes that ramp the level up or down over time; the line shows on the clip.</li>
+    <li><span class="ui">Group selected clips</span> (<kbd>Ctrl</kbd>+<kbd>G</kbd>) moves clips together.</li>
+  </ul>
+  <h3>Clip sound (A2)</h3>
+  <p>Click a video's A2 block to open <span class="ui">Clip Audio</span>: volume, mute, fades and ducking under narration for that video's own sound. Right-click to detach it to A3 and cut it freely.</p>
+  <div class="tip"><strong>Tip.</strong> Tick <span class="ui">Level loudness for YouTube (-14 LUFS)</span> so your video plays at the volume YouTube expects.</div>
+</section>
+
+<!-- ============================================================ -->
+<section class="ch" id="effects" style="--c:var(--fx)">
+  <div class="ch-head"><span>Chapter 10</span><h2>Effects and looks</h2></div>
+  <p class="lead">The Effects tab gives each scene a look: a colour grade, film treatment or creative effect, each with its own settings.</p>
+  <ol class="steps">
+    <li>Open <span class="ui">Effects</span>. Hover a look tile to preview it on the picture; click to apply.</li>
+    <li>Set <span class="ui">Effect strength</span>, then fine-tune under <span class="ui">Effect settings</span> (for example warmth, grain or glitch speed).</li>
+    <li>Use <span class="ui">Adjust</span> for light, colour and detail, or import a <span class="ui">Color LUT</span> (.cube).</li>
+    <li>Click <span class="ui">Render effect preview</span> to see the exact result.</li>
+  </ol>
+  <figure><img src="images/effects-settings.png" alt="Effects tab with a selected look, effect strength and per-effect settings" loading="lazy"><figcaption>36 effects have their own settings, shown under the tiles.</figcaption></figure>
+  <h3>More effects, in groups</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>Group</th><th>Effects</th></tr></thead>
+    <tbody>
+      <tr><td>Colour grading</td><td>Split toning, Colour wheels</td></tr>
+      <tr><td>Light &amp; lens</td><td>Lens flare, Light leaks</td></tr>
+      <tr><td>Camera &amp; motion</td><td>Camera shake, Wiggle, 3D photo (parallax)</td></tr>
+      <tr><td>Point things out</td><td>Annotations (arrows, circles, boxes, callouts), Spotlight, Map route</td></tr>
+      <tr><td>Layout &amp; privacy</td><td>Split screen, Blur or pixelate areas</td></tr>
+      <tr><td>Scene intro</td><td>Countdown intro</td></tr>
+      <tr><td>Combine &amp; reuse looks</td><td>Effect stack (order and bypass), Look presets (save, import and export packs)</td></tr>
+    </tbody>
+  </table></div>
+  <p>Click a group to open it. A group opens by itself and shows "1 on" when one of its effects is active.</p>
+  <figure><img src="images/effect-stack-presets.png" alt="Effect stack and look presets" loading="lazy"><figcaption>Effect stack and look presets: reorder effects, then save the whole look for other scenes.</figcaption></figure>
+</section>
+
+<!-- ============================================================ -->
+<section class="ch" id="overlays" style="--c:var(--fx)">
+  <div class="ch-head"><span>Chapter 11</span><h2>Stickers and overlays</h2></div>
+  <p class="lead">Overlays are extra layers on top of the scene: stickers, emoji, logos, picture-in-picture videos and titles made as images.</p>
+  <ol class="steps">
+    <li>Open <span class="ui">Overlays</span>. Under <span class="ui">Stickers &amp; emoji</span>, search or browse 400 items and click one to add it.</li>
+    <li>Drag it on the preview to place it; drag a corner to resize.</li>
+    <li>Set its entrance and exit (<span class="ui">Fade, Slide, Rise, Zoom pop</span>), show-from and until times, and a loop motion (<span class="ui">Float, Bob, Pendulum</span>).</li>
+  </ol>
+  <figure><img src="images/stickers-library.png" alt="Sticker and emoji library with categories and search" loading="lazy"><figcaption>The sticker library is built in, so it works offline and looks the same on every computer.</figcaption></figure>
+  <p><span class="ui">Picture in picture</span> adds another image or video as a framed layer. <span class="ui">Move &amp; green screen</span> removes a green or blue background (chroma key).</p>
+</section>
+
+<!-- ============================================================ -->
+<section class="ch" id="keyframes" style="--c:var(--fx)">
+  <div class="ch-head"><span>Chapter 12</span><h2>Keyframe animation</h2></div>
+  <p class="lead">Keyframes make a title, sticker or overlay move, grow, turn or fade over time. You set how it looks at two or more moments; SceneForge animates the change between them.</p>
+  <div class="diagram" aria-label="Diagram: two keyframes on a layer, the layer moves between them">
+    <svg viewBox="0 0 720 150" role="img" aria-label="A title moves from left to right between keyframe 1 at 0.5 s and keyframe 2 at 2.5 s">
+      <line x1="40" y1="110" x2="680" y2="110" stroke="var(--line)" stroke-width="2"/>
+      <text x="40" y="138" font-size="13" fill="var(--muted)" font-family="JetBrains Mono, monospace">0 s</text>
+      <text x="636" y="138" font-size="13" fill="var(--muted)" font-family="JetBrains Mono, monospace">4 s</text>
+      <rect x="120" y="102" width="16" height="16" transform="rotate(45 128 110)" fill="var(--t1)"/>
+      <rect x="440" y="102" width="16" height="16" transform="rotate(45 448 110)" fill="var(--t1)"/>
+      <text x="128" y="92" text-anchor="middle" font-size="13" fill="var(--ink)" font-family="Familjen Grotesk, sans-serif" font-weight="600">Keyframe 1 · 0.5 s</text>
+      <text x="448" y="92" text-anchor="middle" font-size="13" fill="var(--ink)" font-family="Familjen Grotesk, sans-serif" font-weight="600">Keyframe 2 · 2.5 s</text>
+      <rect x="78" y="22" width="100" height="34" rx="6" fill="none" stroke="var(--fx)" stroke-width="2"/>
+      <text x="128" y="45" text-anchor="middle" font-size="15" fill="var(--ink)" font-family="Familjen Grotesk, sans-serif" font-weight="700">TITLE</text>
+      <rect x="398" y="22" width="100" height="34" rx="6" fill="var(--fx)" fill-opacity=".14" stroke="var(--fx)" stroke-width="2"/>
+      <text x="448" y="45" text-anchor="middle" font-size="15" fill="var(--ink)" font-family="Familjen Grotesk, sans-serif" font-weight="700">TITLE</text>
+      <path d="M186 39 H386" stroke="var(--fx)" stroke-width="2" stroke-dasharray="5 5"/>
+      <path d="M380 33 L390 39 L380 45" fill="none" stroke="var(--fx)" stroke-width="2"/>
+      <text x="286" y="30" text-anchor="middle" font-size="12.5" fill="var(--muted)" font-family="Atkinson Hyperlegible, sans-serif">SceneForge fills in the movement</text>
+    </svg>
+  </div>
+  <h3>Animate a title or sticker</h3>
+  <ol class="steps">
+    <li>Select the scene and open the layer: a title in the <span class="ui">Text</span> tab, or a sticker or overlay in <span class="ui">Overlays</span>. Its <span class="ui">Keyframes</span> strip is at the bottom of the layer's settings.</li>
+    <li>On the timeline ruler, click where the movement should <strong>start</strong>. The strip shows <span class="ui">Playhead</span> with that time, measured from the start of the layer.</li>
+    <li>Place the layer where it should start: drag an image overlay on the preview; for text, use the controls for <span class="ui">X</span>, <span class="ui">Y</span> and size. Click <span class="ui">Add keyframe at playhead</span>. A diamond appears on the strip.</li>
+    <li>Click the ruler again where the movement should <strong>end</strong>, for example two seconds later.</li>
+    <li>Move, resize, rotate or fade the layer to how it should end, then click <span class="ui">Add keyframe at playhead</span> again. Now there are two diamonds.</li>
+    <li>Click <span class="ui">Render scene</span> and play it. The layer moves smoothly between the two keyframes.</li>
+  </ol>
+  <div class="warn"><strong>One keyframe does not move anything.</strong> A single diamond only fixes the layer's look; you need at least two keyframes at different times for movement.</div>
+  <h3>Reading the keyframe strip</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>You see</th><th>It means</th></tr></thead>
+    <tbody>
+      <tr><td><span class="ui">1/32</span></td><td>Keyframes on this layer, out of 32 allowed.</td></tr>
+      <tr><td><span class="ui">Playhead 0.41s</span></td><td>Where the timeline playhead is, counted from the start of this layer.</td></tr>
+      <tr><td>Red line on the strip</td><td>The playhead's position along the layer.</td></tr>
+      <tr><td>Diamond (yellow when selected)</td><td>A keyframe. Click it to jump the preview there.</td></tr>
+      <tr><td><span class="ui">Update keyframe at playhead</span></td><td>Shown when the playhead sits on a keyframe: saves your changes into that keyframe.</td></tr>
+      <tr><td><span class="ui">t</span> box</td><td>The keyframe's exact time in seconds; type to move it.</td></tr>
+      <tr><td><span class="ui">Linear / Ease in / Ease out / Ease in-out</span></td><td>How the movement speeds up or slows down as it arrives at this keyframe. Ease in-out looks the most natural.</td></tr>
+      <tr><td><span class="ui">X 50 · Y 39 · Size 58 · Rot 0 · Op 100</span></td><td>The layer's position (percent of the frame), size, rotation in degrees and opacity at this keyframe.</td></tr>
+      <tr><td>↻ and 🗑</td><td>Replace this keyframe with the current values, or delete it. The ✕ at the top clears all keyframes.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="tip"><strong>Tip.</strong> Once a layer has keyframes, its position and size controls change the keyframe at the playhead. Image overlays can also be dragged; text titles use the X, Y and Font size controls. To fade in, set <span class="ui">Op</span> to 0 on the first keyframe and 100 on the second.</div>
+</section>
+
+<!-- ============================================================ -->
+<section class="ch" id="creative" style="--c:var(--fx)">
+  <div class="ch-head"><span>Chapter 13</span><h2>Cutout and special titles</h2></div>
+  <p class="lead">Three tools in the Overlays tab create looks that usually need a pro editor.</p>
+  <h3>Text behind the subject</h3>
+  <p><span class="ui">Subject cutout · AI beta</span> cuts the person or object out of the picture so captions and titles pass behind them.</p>
+  <ol class="steps">
+    <li>Use a scene with one still image (Camera movement: <span class="ui">Static</span>) or one video clip up to 20 seconds at normal speed.</li>
+    <li>Pick a <span class="ui">Model</span>: <span class="ui">Best general · IS-Net</span> for most pictures, <span class="ui">People</span> for whole bodies, <span class="ui">Fast</span> for video.</li>
+    <li>Click <span class="ui">Put text behind subject</span> (or <span class="ui">…moving subject</span> for video), then render the scene.</li>
+  </ol>
+  <p>If a thin halo of background remains, move <span class="ui">Edge</span> to shrink by 1–3 px. <span class="ui">Remove background → Media Pool</span> saves the cutout as a transparent PNG instead.</p>
+  <figure><img src="images/subject-cutout.png" alt="Subject cutout panel with the result preview and the rendered scene with text behind the presenter" loading="lazy"><figcaption>The word passes behind the presenter after the cutout.</figcaption></figure>
+  <h3>Textured title</h3>
+  <p>Fills big letters with a texture: one of nine built-in patterns (lava, neon, gold, chrome, marble, ice, fire, pixel, galaxy), any picture in your Media Pool, or a texture made from a prompt by your image engine. Set font, size, glow and outline, then <span class="ui">Add textured title</span>.</p>
+  <figure><img src="images/textured-title.png" alt="Textured title panel with the word NEON in the Neon pattern" loading="lazy"><figcaption>A textured title is added as a layer you can move and animate.</figcaption></figure>
+  <h3>Video inside text</h3>
+  <p>Covers the screen with a solid colour and cuts your title out of it, so the scene's video plays inside the letters, like a documentary year or place title.</p>
+  <ol class="steps">
+    <li>Use a scene with a video or picture, open <span class="ui">Overlays → Video inside text</span> and type the title (for example 1942).</li>
+    <li>Choose the font, <span class="ui">Card colour</span>, <span class="ui">Letter size</span>, position, outline and card opacity. Long titles shrink to fit the screen.</li>
+    <li>Optional: tick <span class="ui">Put the person or object in front of the title</span> to run the cutout so the subject stands in front of the card.</li>
+    <li>Click <span class="ui">Add video-inside-text title</span>, then render.</li>
+  </ol>
+  <figure><img src="images/video-in-text.png" alt="Video inside text panel with a red card preview showing 1942" loading="lazy"><figcaption>The preview shows the real proportions of the card and letters.</figcaption></figure>
+</section>
+
+<!-- ============================================================ -->
+<section class="ch" id="cleanup" style="--c:var(--a1)">
+  <div class="ch-head"><span>Chapter 14</span><h2>Creator time-savers</h2></div>
+  <div class="grid2">
+    <div class="card"><h4>Remove silences</h4><p>Right-click narration, a video clip or an audio clip and choose <span class="ui">Remove silences…</span>. Adjust threshold and padding, review the list and time saved, then apply. One undo reverses it.</p></div>
+    <div class="card"><h4>Remove filler words</h4><p><span class="ui">Remove filler words…</span> finds um, uh, hmm, "you know", "I mean" and Arabic fillers from the caption transcript. Untick any you want to keep.</p></div>
+    <div class="card"><h4>Auto-reframe to 9:16</h4><p><span class="ui">File → Create vertical 9:16 version</span> follows the subject in every shot. Per shot, Motion offers Center, Follow subject or Manual.</p></div>
+    <div class="card"><h4>Sample project</h4><p><span class="ui">Try a sample project</span> on the Projects page shows every major feature in a ready-made project.</p></div>
+  </div>
+</section>
+
+<!-- ============================================================ -->
+<section class="ch" id="ai" style="--c:var(--ai)">
+  <div class="ch-head"><span>Chapter 15</span><h2>AI engines</h2></div>
+  <p class="lead">You can make a whole video without any AI. Where AI helps, SceneForge uses free local models first and cloud services only when you choose them.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Task</th><th>Free on your computer</th><th>Optional cloud (your key)</th></tr></thead>
+    <tbody>
+      <tr><td>Captions</td><td>Whisper</td><td>OpenAI Whisper, ElevenLabs Scribe</td></tr>
+      <tr><td>Background removal, reframe</td><td>U²-Net, IS-Net</td><td>–</td></tr>
+      <tr><td>Voice isolation</td><td>MDX-Net</td><td>–</td></tr>
+      <tr><td>Voices</td><td>Kokoro, Chatterbox (in Docker)</td><td>OpenAI, ElevenLabs</td></tr>
+      <tr><td>Images</td><td>Stable Diffusion WebUI</td><td>OpenAI, Gemini, Cloudflare, Together, Hugging Face</td></tr>
+      <tr><td>Text to video</td><td>ComfyUI</td><td>Google Veo, Runway</td></tr>
+    </tbody>
+  </table></div>
+  <ul>
+    <li><span class="ui">AI Engines</span> in the menu bar explains each engine and opens <span class="ui">Add or change API keys</span>. Keys are stored in your system's credential store, never in project files.</li>
+    <li>Every paid request shows an estimated cost and waits for your confirmation.</li>
+    <li><span class="ui">Help → AI models…</span> shows the downloaded models, their disk use, and lets you delete or re-download them.</li>
+  </ul>
+  <figure><img src="images/text-to-video.png" alt="Generate video panel with a cloud model selected and a cost estimate" loading="lazy"><figcaption>Generate video: choose a local or cloud model; cloud models show the cost before anything runs.</figcaption></figure>
+  <figure><img src="images/local-voices.png" alt="Local voice engines panel for Kokoro and Chatterbox" loading="lazy"><figcaption>Local voices run in Docker and can be started from inside the app.</figcaption></figure>
+</section>
+
+<!-- ============================================================ -->
+<section class="ch" id="export" style="--c:var(--out)">
+  <div class="ch-head"><span>Chapter 16</span><h2>Export and share</h2></div>
+  <ol class="steps">
+    <li>Click <span class="ui">Export video</span> at the top right.</li>
+    <li>Pick a preset. Open <span class="ui">Advanced</span> to change resolution, quality or the <span class="ui">Encoder</span> (Auto, CPU or GPU).</li>
+    <li>Click <span class="ui">Export</span>. When it finishes, the share dialog offers the file location and next steps for each platform.</li>
+  </ol>
+  <div class="tbl"><table>
+    <thead><tr><th>Preset</th><th>Output</th></tr></thead>
+    <tbody>
+      <tr><td>YouTube</td><td>1080p · 30 fps · H.264</td></tr>
+      <tr><td>YouTube 4K</td><td>2160p · H.264 High</td></tr>
+      <tr><td>TikTok · Reels · Shorts</td><td>1080×1920 · 30 fps</td></tr>
+      <tr><td>Instagram feed</td><td>1080p · H.264</td></tr>
+      <tr><td>Small file</td><td>720p · H.265, for sharing</td></tr>
+      <tr><td>For editing</td><td>ProRes MOV (large)</td></tr>
+      <tr><td>Animated GIF</td><td>No sound, short clips</td></tr>
+      <tr><td>Audio only</td><td>MP3, voice and music</td></tr>
+    </tbody>
+  </table></div>
+  <p>Captions can also be exported as <span class="ui">SRT</span> or <span class="ui">VTT</span> files for YouTube. With an NVIDIA graphics card, GPU export is several times faster; if it fails, SceneForge finishes on the CPU automatically.</p>
+  <figure><img src="images/export-dialog.png" alt="Export dialog with platform presets" loading="lazy"><figcaption>The Export dialog. Empty starter scenes are skipped.</figcaption></figure>
+</section>
+
+<!-- ============================================================ -->
+<section class="ch" id="prefs" style="--c:var(--muted)">
+  <div class="ch-head"><span>Chapter 17</span><h2>Workspaces and preferences</h2></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Workspace</th><th>Use it for</th></tr></thead>
+    <tbody>
+      <tr><td>Edit</td><td>The standard layout: scenes, preview, scene settings and timeline.</td></tr>
+      <tr><td>Color</td><td>Wider scene settings on the Effects tab, shorter timeline.</td></tr>
+      <tr><td>Audio</td><td>Taller timeline and the Audio tab; the preview gets smaller.</td></tr>
+      <tr><td>Review</td><td>Large preview with scene settings hidden.</td></tr>
+    </tbody>
+  </table></div>
+  <p>Switch with the <span class="ui">Workspace</span> menu at the top or <span class="ui">View</span> menu. <span class="ui">Theme</span> sets the look (dark, Daylight and more). <span class="ui">File → Preferences…</span> (<kbd>Ctrl</kbd>+<kbd>,</kbd>) sets density, accent colour, reduced motion and defaults. Drag the line between the preview and the timeline to resize them.</p>
+</section>
+
+<!-- ============================================================ -->
+<section class="ch" id="keys" style="--c:var(--muted)">
+  <div class="ch-head"><span>Chapter 18</span><h2>Keyboard shortcuts</h2></div>
+  <p>Shortcuts work while you are not typing in a text field. On macOS, use <kbd>⌘</kbd> instead of <kbd>Ctrl</kbd>.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>Keys</th><th>Action</th></tr></thead>
+    <tbody>
+      <tr><td><kbd>Space</kbd></td><td>Play or pause the timeline</td></tr>
+      <tr><td><kbd>J</kbd> <kbd>K</kbd> <kbd>L</kbd></td><td>Back 5 s, pause, play (L again for 2× and 4×)</td></tr>
+      <tr><td><kbd>←</kbd> <kbd>→</kbd></td><td>Previous / next frame</td></tr>
+      <tr><td><kbd>Shift</kbd>+<kbd>←</kbd> <kbd>→</kbd></td><td>Previous / next scene</td></tr>
+      <tr><td><kbd>Home</kbd> <kbd>End</kbd></td><td>Timeline start / end</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+wheel</td><td>Zoom the timeline or the preview</td></tr>
+      <tr><td><kbd>V</kbd> <kbd>A</kbd> <kbd>B</kbd> <kbd>N</kbd> <kbd>Y</kbd> <kbd>U</kbd> <kbd>C</kbd></td><td>Select, track select, ripple, roll, slip, slide, blade</td></tr>
+      <tr><td><kbd>Shift</kbd>+<kbd>C</kbd></td><td>Cut every unlocked audio track at the playhead</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>Z</kbd> / <kbd>Ctrl</kbd>+<kbd>Y</kbd> or <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>Z</kbd></td><td>Undo / redo</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>C</kbd> <kbd>X</kbd> <kbd>V</kbd></td><td>Copy, cut, paste</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>D</kbd></td><td>Duplicate</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>G</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>G</kbd></td><td>Group / ungroup audio clips</td></tr>
+      <tr><td><kbd>Delete</kbd> / <kbd>Shift</kbd>+<kbd>Delete</kbd></td><td>Delete / ripple-delete</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>N</kbd> / <kbd>Ctrl</kbd>+<kbd>O</kbd></td><td>New project / open project</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>A</kbd></td><td>Select all scenes; on an audio track, select all unlocked audio clips</td></tr>
+      <tr><td><kbd>S</kbd></td><td>Split the focused scene, image, text or audio clip at the playhead</td></tr>
+      <tr><td><kbd>M</kbd></td><td>Add a named marker at the playhead</td></tr>
+      <tr><td><kbd>+</kbd> / <kbd>-</kbd></td><td>Zoom the timeline in / out</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>S</kbd></td><td>Save current edits and a restore point</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>E</kbd></td><td>Open Export video</td></tr>
+      <tr><td><kbd>Ctrl</kbd>+<kbd>/</kbd> or <kbd>?</kbd></td><td>Open searchable keyboard shortcuts (also in Help)</td></tr>
+      <tr><td><kbd>Esc</kbd></td><td>Close a dialog or menu</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<!-- ============================================================ -->
+<section class="ch" id="help" style="--c:var(--muted)">
+  <div class="ch-head"><span>Chapter 19</span><h2>Troubleshooting</h2></div>
+  <div class="tbl"><table>
+    <thead><tr><th>Problem</th><th>What to do</th></tr></thead>
+    <tbody>
+      <tr><td>Windows says "Windows protected your PC"</td><td>Click <span class="ui">More info → Run anyway</span>. The installer is safe but not code-signed yet.</td></tr>
+      <tr><td>Local captions do not start</td><td>In the Text tab click <span class="ui">Check local captions</span>. It tests the model and can repair it. The first run needs internet once to download the model.</td></tr>
+      <tr><td>The preview looks different from the render</td><td>The editing preview is approximate. Click <span class="ui">Render scene</span> for the exact result.</td></tr>
+      <tr><td>A scene shows a still while playing</td><td>It is not rendered yet. Click <span class="ui">Render missing scenes</span>.</td></tr>
+      <tr><td>Text behind subject is refused</td><td>The scene needs one image with Static camera movement, or one video clip of up to 20 s at normal speed.</td></tr>
+      <tr><td>I want an earlier version back</td><td><span class="ui">File → Restore points…</span> and <span class="ui">Open this version</span>.</td></tr>
+      <tr><td>Something else went wrong</td><td>Click <span class="ui">show details</span> on the red message, then <span class="ui">Help → Collect diagnostics</span> and attach the files to a <a href="https://github.com/EzioDEVio/SceneForge/issues">GitHub issue</a>. They contain no API keys and no media.</td></tr>
+    </tbody>
+  </table></div>
+  <p class="foot">SceneForge Studio is free, open-source software (GPL-3.0). Source code, releases and issue tracker: <a href="https://github.com/EzioDEVio/SceneForge">github.com/EzioDEVio/SceneForge</a>. Emoji graphics by Twemoji (CC-BY 4.0).</p>
+</section>
+<section id="finishing-touches"><h2>Finishing touches</h2><p>In Effects, use Quick access → Vignette · Bars · Sharpen, or open More effects → Finishing touches. Search effects also finds these additional groups. Edge vignette darkens the picture edges; Cinema bars adds black bars inside the existing frame; Detail sharpening brings out fine detail. Each has an on/off switch and amount slider. Render for the exact result. All three participate in effect-stack ordering, bypass and saved look presets. Existing effect groups remain available.</p></section>
+<section id="story-tools">
+  <h2>Story tools: scripts, beats, stabilization and templates</h2>
+  <p>Open these tools from the <span class="ui">Edit</span> menu. Changes must finish saving before you open a tool.</p>
+  <ul>
+    <li><strong>Script → Scenes:</strong> Paste your script or open a TXT/Markdown file. Split at blank lines, or use English/Arabic scene headings for structured scripts. Choose <span class="ui">Preview scenes</span>, review or edit narration, then add the batch. The tool closes and opens the first new scene for editing; existing scenes stay in place. Leave optional setup off to add pictures and voices later, or enable <span class="ui">Prepare pictures, narration, captions &amp; motion</span>. Select Media Pool pictures or a connected local Stable Diffusion engine; choose local narration, caption style, image motion and optional rendering. Chatterbox supports Arabic narration; Kokoro is offered for English. Estimated script caption boxes need timing review; local Whisper transcription requires an installed model. Review prompts and narration before adding. Existing scenes stay unchanged, and failed setup steps leave the new scenes editable. Close the tool, then Undo/Redo affects the whole added batch without generating again.</li>
+    <li><strong>AutoCut:</strong> Select a scene with pictures. Choose Timeline markers for cuts you placed with Marker, or choose existing beat markers, the music bed, or a timeline audio clip. Choose every marker/beat, every 2, or every 4. Preview cut times, source thumbnails and a scrubbed sequence before applying. This sequence preview shows source frames; render after Apply to verify motion and sound. Pictures repeat in order while narration, captions and overlay timing stay in place. Videos restart at their current in-point; beat intervals must fit the trimmed excerpt. AutoCut needs an unlocked Picture track and sequential media without countdowns, ramps or freeze frames. Render the scene to see the result. Undo restores its original clips.</li>
+    <li><strong>Stabilize video:</strong> Reduces small handheld movements in the selected scene's video clips. Start with movement range 50, apply, close the tool, then render the scene to see the result. Export uses the same processing. Images and audio timing stay unchanged. Mirrored edges fill movement gaps. Turn stabilization off or use Undo to restore the previous setting.</li>
+    <li><strong>Project templates:</strong> Name and save a project's setup, then use it here or on the Projects page to create a separate editable project. Scenes, text, timing, effects and media references are retained. Templates stay on this computer and rely on the original media files. Deleting a template keeps projects already made from it.</li>
+  </ul>
+</section>
+</main>
+</div>
+
+<script>
+(function(){
+  var links=[].slice.call(document.querySelectorAll('#toc a'));
+  var find=document.getElementById('find');
+  var sections=links.map(function(a){return document.querySelector(a.getAttribute('href'));});
+  // Topic filter: match chapter titles and their text.
+  find.addEventListener('input',function(){
+    var q=find.value.trim().toLowerCase();
+    links.forEach(function(a,i){var s=sections[i];var hit=!q||a.textContent.toLowerCase().indexOf(q)>=0||(s&&s.textContent.toLowerCase().indexOf(q)>=0);a.parentNode.hidden=!hit;});
+  });
+  find.addEventListener('keydown',function(e){if(e.key==='Enter'){var first=links.find(function(a){return !a.parentNode.hidden;});if(first){location.hash=first.getAttribute('href');}}});
+  // Highlight the chapter in view.
+  if('IntersectionObserver' in window){
+    var io=new IntersectionObserver(function(es){es.forEach(function(e){if(e.isIntersecting){links.forEach(function(a){a.classList.toggle('on',a.getAttribute('href')==='#'+e.target.id);});}});},{rootMargin:'-20% 0px -70% 0px'});
+    sections.forEach(function(s){if(s)io.observe(s);});
+  }
+})();
+</script>

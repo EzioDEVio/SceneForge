@@ -1,5 +1,95 @@
 # Changelog
 
+## 0.9.3 source recovery — October 5, 2026 (not published)
+
+- Reconstructed editor stages from the owner's Stage 1–5 HTML reports and visual review after the earlier source checkpoint was unavailable. This is a fresh implementation, not a recovered copy of the lost commits.
+- Atomic Motion/Effects drafts and real render previews; Apply, Cancel, retry and shared Undo/Redo, with isolated preview metadata.
+- Inspector sections and scope labels, laptop toolbar wrapping, keyboard menu navigation, light-theme caption readability and a fixed Text preview footer.
+- Shared plane/ship/car/pin artwork, destination preview, four additional movements and centered zoom correction.
+- Script import opens the first new scene; AutoCut source thumbnails and scrub preview; effective GIF size/rate and project-FPS export labels.
+- Version alignment and offline release/archive gates; Windows, native vault and installer validation remain pending.
+
+## Prepared: caption emoji and access review — October 4, 2026
+- All 322 bundled caption emoji, colour browsing, category/search and removal.
+- Effects shortcuts and search across additional groups make vignette/bars/sharpen and map route easier to find.
+- Route appearance presets, Add stop, Reverse journey, coordinates, keyboard editing/removal and shared Undo/Redo.
+- Selected overlay controls precede the sticker catalogue; section shortcuts and readable narrow-panel layout.
+- Fixed old effect save responses replacing newer local edits; route editing handles appear only in Effects.
+- Source review only; another build/checkpoint ZIP requires the owner's OK.
+
+
+## 0.9.3 — Companion preview, caption emoji and censorship (unreleased)
+
+- Move independent video/image/text draft previews beside the main monitor. Keep controls in Media/Text with Minimize, Restore and Close; preserve unsaved drafts. Use the current scene still as the placement backdrop.
+- Add per-caption timed colour emoji from bundled artwork, left/right placement, persistence and export rendering.
+- Add source-timed Bleep/Mute ranges for narration, video sound and timeline audio. Offer reviewed English/Arabic word matching from a linked narration transcript, with no new provider calls. Preserve source timing across trim/split; timeline censorship shares Undo/Redo.
+- Add adjustable edge vignette, cinema bars and detail sharpening in a styled Finishing touches group; support render, stack order/bypass and portable presets.
+- Verify real audio samples, rendered emoji timing, individual effect pixels/bypass, and browser controls. No new build or ZIP: owner approval is required before packaging.
+
+## 0.9.3 — Combined owner-review adjustments (unreleased)
+
+- Stack actual videos on the six overlay tracks, with source trim, placement, muted-by-default sound, playback and export mixing. Preserve source position across splits and skipped empty scenes.
+- Group Audio controls and add listening options, narration mute, cleanup and music mix presets, precise timeline audio start, duplication and soft fades. Keep existing processing and Undo/Redo.
+- Add optional Script → Scenes setup using selected media or connected local engines, narration, caption boxes or local transcription, styles, motion and rendering. Retain editable scenes on failed steps and restore completed setup on Redo without regenerating.
+- Retain AutoCut timeline marker fixes, grouped speed controls and accurate Saved / Apply changes feedback. Improve light-theme control contrast.
+- Validate frontend, real browser workflows and real FFmpeg video layers. No Windows validation or installed-model generation is claimed. Combined build awaits the owner’s OK; Sections E and F remain pending. See `STATUS_v0.9.3_COMBINED_REVIEW.md`.
+
+## 0.9.3 — AutoCut marker-source adjustment (unreleased)
+
+- Include ordinary timeline markers in AutoCut as a separate counted source, and select them by default when no detected beat markers exist. Keep music/audio detection and detected beat markers available. Explain that pictures are the media being cut while audio supplies detected beats.
+- Verify manual-marker preview, exact clip durations, Apply and Undo in Chromium; also verify generated script scenes open and accept media.
+
+## 0.9.3 — Section D checkpoint (unreleased)
+
+- Add local video stabilization using FFmpeg deshake, with a movement-range slider, matching rendered preview/export, and Undo/Redo.
+- Add AutoCut preview and a single undoable picture-sequence edit using timeline beat markers or locally detected music beats. Preserve scene length, narration, captions and overlay timing; respect Picture locks and reject stale previews.
+- Add reusable project templates stored locally, available in the editor and on the Projects page. New projects receive independent IDs and remapped media references; templates survive deletion of the source project.
+- Add Script → Scenes: TXT/Markdown files or pasted text, English/Arabic headings or blank-line paragraph splitting, editable narration preview, and batch Undo/Redo when appending scenes. Preserve original text and citation references.
+- Add real API/render regressions and Chromium coverage; keep all previous features and source versions pending the final release step.
+
+## 0.9.3 — Windows review fixes (unreleased)
+
+- Read captions from a short filename in each FFmpeg subprocess's temporary folder, addressing the 279-character subtitle paths in the owner's Windows failure logs without changing project data locations or the global working directory.
+- Darken beige caption boxes and fix caption-number/action contrast in both themes.
+- Add sliders with exact values and a live draft preview before Apply changes for independent image/text clips.
+- Style both text-card groups and explain whole-video clips versus scene titles with animation/keyframes. Preserve all earlier tools.
+- Add deep-path/concurrent-render and browser contrast/draft-preview regressions. See `STATUS_v0.9.3_REVIEW_FIXES.md` for validation and the Windows retest.
+
+## 0.9.3 — Release verification checkpoint (unreleased)
+
+- Add a final tagged-release job that waits for the build matrix and checks the actual draft's Windows installer, blockmap and update metadata, plus the Linux AppImage, deb and update metadata.
+- Fail verification for missing, duplicate, empty or unfinished uploads; match installer names to the desktop version and its existing electron-builder configuration. Reject already-published releases.
+- Retain Windows blockmaps in downloadable workflow artifacts and add offline release-gate regressions to normal CI.
+- Report readiness in the workflow summary without publishing or changing the draft. Windows and Linux build/installed-app tests must also pass.
+
+Section C is implemented and tested offline. Its live GitHub run awaits an approved tag/build. Sections D–F remain pending; the earlier image/text overlay changes still need the owner's Windows review. Product versions remain unchanged until final release preparation.
+
+## 0.9.3 — Independent overlay checkpoint (unreleased)
+
+- Add up to six image/text tracks above the existing captions, picture and audio lanes. Files dropped on these tracks are independent overlays, with their own timing, rather than replacement scenes.
+- Add images at the playhead with a real file picker; drag images from Media Pool or local folders onto an upper track.
+- Add draggable Text, Text box and outlined Text+ cards inside Text → Text overlays. Click a card to insert it at the playhead.
+- Move clips freely in time and between overlay tracks, trim either edge, and drag image/text placement in the preview.
+- Add actual text, font, alignment, colour, size, timing, track, width, placement, rotation and opacity controls, with short help and Apply changes. Save pending edits before a restore point or export.
+- Preview and full export use the same text rasters. Layers span scenes; skipped empty starter scenes retain placement over the intended footage.
+- Support Undo/Redo, copy/cut/paste, duplicate, split and delete for overlay clips. Show working shortcuts in the Help list and clip menu.
+- Give timed captions beige boxes with readable text in the timeline and editor; preserve caption render styles.
+- Add real FFmpeg/API and Chromium regression checks without removing or relaxing earlier tests.
+
+Sections C–F remain pending. The owner reported the A–B Windows smoke checks passed; this overlay checkpoint still needs their Windows review.
+
+## 0.9.3 — A–B checkpoint (unreleased)
+
+- Empty scene blocks on the timeline open an image/video file picker. Multiple files are added to that scene through the existing undoable upload operation.
+- Title cards keep their controls open during editing. Dismissal uses Cancel, the close button, Escape, or a click directly on the backdrop. Keyboard focus stays in the dialog.
+- Video inside text uses YOUR TITLE on a neutral card, with a PARIS / 1969 example and matching placeholder. The backend render behaviour is unchanged.
+- Text keyframe guidance describes the working X, Y and Font size controls. Image overlays retain preview dragging.
+- Keyboard shortcuts are searchable under Help, Ctrl+/ and ?. Real shortcut labels appear in menus, tooltips and context menus; S splits and C selects the blade tool.
+- Add Ctrl+A selection, M markers, Ctrl+S restore points, Ctrl+E export settings and +/- timeline zoom. Undo/redo retain their existing handlers. Typing and open dialogs block editor shortcuts.
+- Add a real Chromium/FastAPI regression test and run it in CI, alongside the existing frontend and backend checks.
+
+Sections C–F of the owner’s request are still pending. Product version numbers remain at their supplied values until the final release preparation.
+
 ## M1.1 — user-reported fixes and UX improvements (post-M1 alpha feedback)
 
 Based on real Windows testing feedback. Verified live against a running

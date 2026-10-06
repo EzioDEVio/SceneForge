@@ -41,7 +41,7 @@ MAX_NAME = 60
 MAX_DESCRIPTION = 200
 # Portable look settings. Applying a preset replaces exactly these keys on the scene.
 PRESET_LOOK_KEYS = ("adjust", "tone", "wheels", "film", "glitch", "focus", "mosaic", "rgbsplit",
-                    "leak", "flare", "wiggle", "shake", "fx_order", "fx_bypass", "fx_params")
+                    "leak", "flare", "wiggle", "shake", "vignette", "letterbox", "sharpen", "fx_order", "fx_bypass", "fx_params")
 MEDIA_KEYS = {"overlays", "route", "annotations", "redact", "spotlight", "lut", "layout", "parallax", "countdown"}
 _lock = threading.Lock()
 

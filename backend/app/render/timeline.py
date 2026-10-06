@@ -26,7 +26,7 @@ import json
 
 from app.db.models import Scene
 
-RENDERER_VERSION = "sceneforge-render-2.3-crop"
+RENDERER_VERSION = "sceneforge-render-2.5-route-labels"
 
 
 def _hash_obj(obj) -> str:

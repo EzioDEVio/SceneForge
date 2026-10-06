@@ -9,6 +9,7 @@ const dom=new JSDOM('<!doctype html><html><body></body></html>',{url:'http://loc
 for(const k of ['window','document','navigator','HTMLElement','HTMLInputElement','HTMLTextAreaElement','Event','MouseEvent','CustomEvent','KeyboardEvent','File','FileReader','FormData']) Object.defineProperty(globalThis,k,{value:dom.window[k],configurable:true});
 Object.defineProperty(globalThis,'localStorage',{value:dom.window.localStorage,configurable:true});
 globalThis.IS_REACT_ACT_ENVIRONMENT=true;
+dom.window.HTMLElement.prototype.scrollIntoView=function(){}; // Layout scrolling is covered by real Chromium.
 dom.window.HTMLCanvasElement.prototype.getContext=()=>null; // jsdom has no canvas; FilmPreview handles null
 if(!dom.window.PointerEvent){dom.window.PointerEvent=class PointerEvent extends dom.window.MouseEvent{constructor(t,i={}){super(t,i);this.pointerId=i.pointerId??1;this.pointerType=i.pointerType??'mouse';}};}  // jsdom lacks PointerEvent: keep clientX/clientY
 globalThis.requestAnimationFrame=cb=>setTimeout(()=>cb(Date.now()),0);globalThis.cancelAnimationFrame=id=>clearTimeout(id);
@@ -82,17 +83,19 @@ globalThis.fetch=async(path,init={})=>{
  else if(/\/api\/voice-takes\/[^/]+\/select$/.test(path)){const id=path.split('/')[3];const sc=project.scenes.find(s=>s.voice_takes.some(t=>t.id===id));sc.voice_takes.forEach(t=>t.accepted=t.id===id);result={ok:true};}
  else if(/\/api\/voice-takes\/[^/]+\/edit$/.test(path)){const id=path.split('/')[3];const take=project.scenes.flatMap(x=>x.voice_takes).find(v=>v.id===id);take.edit_json={...take.edit_json,...body};take.effective_duration_ms=(take.edit_json.out_ms??take.measured_duration_ms)-(take.edit_json.in_ms||0);result=take;}
  else if(/\/api\/assets\/[^/]+\/waveform/.test(path))result={duration_ms:5200,peaks:Array.from({length:600},(_,i)=>Math.abs(Math.sin(i/9))),peak:1};
-  else if(/\/api\/scenes\/[^/]+\/shots$/.test(path)&&method==='POST'){const sc=project.scenes.find(s=>s.id===path.split('/')[3]);const mediaType=body.asset_id==='pool-vid'?'video':'image';const shot={id:'shot-'+next++,asset_id:body.asset_id,asset:{id:body.asset_id,type:mediaType,width:mediaType==='video'?1280:640,height:mediaType==='video'?720:360},order_index:sc.shots.length,fit:'cover',motion_json:{type:'static'},crop_json:null,source_in_ms:0};shot.asset.original_filename=body.asset_id==='pool-vid'?'clip.mp4':'map.png';sc.shots.push(shot);result=shot;}
+  else if(/\/api\/scenes\/[^/]+\/shots$/.test(path)&&method==='POST'){const sc=project.scenes.find(s=>s.id===path.split('/')[3]);const mediaType=body.asset_id==='pool-vid'?'video':'image';const shot={id:'shot-'+next++,asset_id:body.asset_id,asset:{id:body.asset_id,type:mediaType,width:mediaType==='video'?1280:640,height:mediaType==='video'?720:360},order_index:sc.shots.length,is_selected:true,fit:'cover',motion_json:{type:'static'},crop_json:null,source_in_ms:0};shot.asset.original_filename=body.asset_id==='pool-vid'?'clip.mp4':'map.png';sc.shots.push(shot);result=shot;}
  else if(path.endsWith('/generate-image'))result={id:'generated-image'};
  else if(path.endsWith('/scene-order')) {project.scenes=body.scene_ids.map((id,index)=>{const scene=project.scenes.find(s=>s.id===id);scene.order_index=index;return scene;});result={ok:true};}
  else if(path===`/api/projects/${project.id}/scenes`&&method==='POST') {
   const s=clone(fixture.scenes[1]);s.id='new-'+next++;s.title='New scene';project.scenes.push(s);result=s;
  }
- else if(/^\/api\/shots\/[^/]+\/reframe$/.test(path)&&method==='PUT'){const id=path.split('/')[3];const shot=project.scenes.flatMap(s=>s.shots).find(s=>s.id===id);shot.crop_json={...(shot.crop_json||{x:0,y:0,width:1,height:1}),reframe:body.mode==='follow'?{mode:'follow',x:.3,track:[[0,.3],[2000,.6]],method:'matte'}:{mode:body.mode,x:body.x??.5}};shot.fit='cover';result=shot;}
+ else if(/^\/api\/shots\/[^/]+\/reframe$/.test(path)&&method==='PUT'){const id=path.split('/')[3];const source=project.scenes.flatMap(s=>s.shots).find(s=>s.id===id);const shot=body.preview_only?clone(source):source;shot.crop_json={...(shot.crop_json||{x:0,y:0,width:1,height:1}),reframe:body.mode==='follow'?{mode:'follow',x:.3,track:[[0,.3],[2000,.6]],method:'matte'}:{mode:body.mode,x:body.x??.5}};shot.fit='cover';result=shot;}
  else if(path==='/api/system/encoders')result={gpu:{available:true,vendor:'nvidia',name:'NVIDIA Test GPU',h264:'h264_nvenc',hevc:'hevc_nvenc'},encoders:{},notes:[],choices:['auto','cpu','gpu'],default:'auto'};
  else if(path===`/api/projects/${project.id}/reframe`&&method==='POST')result={job_id:'rf-1',project_id:project.id,total:2};
  else if(path==='/api/reframe/jobs/rf-1')result={job_id:'rf-1',project_id:project.id,source_project_id:project.id,status:'succeeded',stage:'done',progress:100,done:2,total:2,warnings:['clip.mp4: no clear subject found; the frame stays centred.'],error:null};
+ else if(/^\/api\/scenes\/[^/]+\/editor-state$/.test(path)&&method==='POST'){if(oldBackend)return {ok:false,status:404,json:async()=>({detail:'This SceneForge backend is out of date. Start the newest source folder.'})};if(failNextPatch){failNextPatch=false;return {ok:false,status:503,json:async()=>({detail:'Save failed for test'})};}const sc=project.scenes.find(s=>s.id===path.split('/')[3]);const patch=body.scene||{};Object.assign(sc,Object.fromEntries(Object.entries(patch).filter(([k])=>!['font','look','overlays','transition_in'].includes(k))));for(const [key,column] of [['font','font_json'],['look','look_json'],['overlays','overlays_json'],['transition_in','transition_in_json']])if(key in patch)sc[column]=body.replace?clone(patch[key]):{...sc[column],...patch[key]};for(const row of body.shots||[]){const sh=sc.shots.find(s=>s.id===row.id);for(const [key,value] of Object.entries(row.patch))sh[({motion:'motion_json',crop:'crop_json',speed:'speed_json'})[key]||key]=value;}if(sc.look_json)for(const k of Object.keys(sc.look_json))if(sc.look_json[k]===null)delete sc.look_json[k];sc.revision=(sc.revision||0)+1;result=sc;}
  else if(path.startsWith('/api/scenes/shots/')&&method==='PATCH') {const id=path.split('/').at(-1);const shot=project.scenes.flatMap(s=>s.shots).find(s=>s.id===id);Object.assign(shot,body);if(body.motion)shot.motion_json=body.motion;if(body.audio)shot.audio_json=body.audio;result=shot;}
+ else if(/^\/api\/scenes\/[^/]+$/.test(path)&&method==='GET') {result=project.scenes.find(s=>s.id===path.split('/').at(-1));}
  else if(path.startsWith('/api/scenes/')&&method==='PATCH') {
   await new Promise(r=>setTimeout(r,25));
   if(failNextPatch){failNextPatch=false;return {ok:false,status:503,statusText:'Unavailable',json:async()=>({detail:'Save failed for test'})};}
@@ -112,9 +115,13 @@ globalThis.fetch=async(path,init={})=>{
 let passed=0;
 // 0.9.0: the Effects tab sorts effects into collapsible groups; open them all (stays open via sessionStorage).
 async function openFxGroups(){for(const b of [...document.querySelectorAll('button.fx-group-head[aria-expanded="false"]')])fireEvent.click(b);await new Promise(r=>setTimeout(r,0));}
+// Inspect actual transport bodies for both legacy single writes and atomic editor transactions.
+const payload=r=>r?.path?.endsWith('/editor-state')?{...r.body.scene,...(r.body.shots?.[0]?.patch||{})}:r?.body;
+const isParameterWrite=r=>r.method==='PATCH'||r.method==='POST'&&r.path.endsWith('/editor-state');
 const check=(name,condition=true)=>{assert.ok(condition,name);console.log('PASS '+name);passed++;};
 const visibleEditor=()=>within(screen.getByRole('region',{name:/Edit /}));
-const saved=()=>waitFor(()=>assert.equal(screen.getByRole('status').textContent,'All changes saved'));
+// Parameter regressions explicitly commit the new draft before checking persisted data.
+const saved=async()=>{await new Promise(resolve=>setTimeout(resolve,0));const apply=document.querySelector('.scene-editor:not([hidden]) .editor-draft-actions .btn-primary');if(apply&&!apply.disabled){fireEvent.click(apply);}await waitFor(()=>assert.equal(document.querySelector('.save-indicator')?.textContent||screen.getAllByRole('status').find(n=>/All changes saved|Saving changes|Save failed/.test(n.textContent))?.textContent,'All changes saved'));};
 try{
  render(React.createElement(App));
  await screen.findByRole('button',{name:/Editor MVP1 regression Open project/});
@@ -164,6 +171,7 @@ try{
  check('original library tabs remain and AI Engines is not duplicated in the Scenes pane',!!screen.getByRole('button',{name:'Scenes',exact:true})&&!!screen.getByRole('button',{name:'Media Pool',exact:true})&&!!screen.getByRole('button',{name:'Transitions',exact:true})&&!within(document.querySelector('.library-tabs')).queryByRole('button',{name:'AI Engines'})&&!!document.querySelector('.library-tabs button[aria-pressed]'));
  check('original top-level AI Engines and Help menus are restored',!!within(document.querySelector('.editor-menubar')).getByRole('button',{name:'AI Engines',exact:true})&&!!within(document.querySelector('.editor-menubar')).getByRole('button',{name:'Help',exact:true}));
  await user.click(within(document.querySelector('.editor-menubar')).getByRole('button',{name:'AI Engines',exact:true}));
+ await user.click(screen.getByRole('button',{name:'AI help & setup',exact:true}));
  check('top-level AI Engines menu opens the provider guide',!!screen.getByRole('dialog',{name:'AI engines & providers'}));
  await user.click(screen.getByRole('button',{name:'Close'}));
  await user.click(screen.getByRole('button',{name:'Help',exact:true}));
@@ -227,7 +235,7 @@ try{
  await user.click(screen.getByRole('button',{name:'Pan left',exact:true}));await saved();
  check('motion selection updates the selected media',project.scenes.find(s=>s.id===firstId).shots[0].motion_json.type==='pan_left');
  await user.click(screen.getByRole('tab',{name:'Effects',exact:true}));await openFxGroups();
- await user.type(screen.getByRole('textbox',{name:'Search effects'}),'warm');
+ await user.type(screen.getByRole('searchbox',{name:'Search effects'}),'warm');
  check('effect search narrows visible choices',screen.getAllByRole('button',{name:'Warm',exact:true}).length===1&&!screen.queryByRole('button',{name:'Cool',exact:true}));
  await user.click(screen.getByRole('button',{name:'Warm',exact:true}));await saved();
  check('effect selection persists',project.scenes.find(s=>s.id===firstId).effect_preset==='warm');
@@ -237,52 +245,52 @@ try{
  fireEvent.change(within(fxPanel).getByRole('slider',{name:'Effect warmth'}),{target:{value:'85'}});
  check('changing an effect setting updates the live preview before saving',visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('sepia('));
  await saved();
- check('saving an effect setting sends look.fx_params for that preset',requests.some(r=>r.method==='PATCH'&&r.body?.look?.fx_params?.warm?.warmth===85)&&project.scenes.find(s=>s.id===firstId).look_json.fx_params.warm.warmth===85);
+ check('saving an effect setting sends look.fx_params for that preset',requests.some(r=>isParameterWrite(r)&&payload(r)?.look?.fx_params?.warm?.warmth===85)&&project.scenes.find(s=>s.id===firstId).look_json.fx_params.warm.warmth===85);
  await user.click(within(fxPanel).getByRole('button',{name:/Reset to default/}));await saved();
  check('Reset to default clears the preset settings',!project.scenes.find(s=>s.id===firstId).look_json.fx_params);
- await user.clear(screen.getByRole('textbox',{name:'Search effects'}));
+ await user.clear(screen.getByRole('searchbox',{name:'Search effects'}));
  const filterHeading=screen.getByRole('heading',{name:'Color filters · 8 additions'});
  const creativeHeading=screen.getByRole('heading',{name:'Creative effects · 2 additions'});
  check('the eight color filters are grouped separately',filterHeading.parentElement.querySelectorAll('.effect-tile').length===8);
  check('two creative effects are grouped separately from color looks',creativeHeading.parentElement.querySelectorAll('.effect-tile').length===2);
- await user.type(screen.getByRole('textbox',{name:'Search effects'}),'Chromatic split');
+ await user.type(screen.getByRole('searchbox',{name:'Search effects'}),'Chromatic split');
  await user.click(screen.getByRole('button',{name:'Chromatic split',exact:true}));await saved();
  check('chromatic split selects its own scene effect',project.scenes.find(s=>s.id===firstId).effect_preset==='chromatic_split');
- await user.clear(screen.getByRole('textbox',{name:'Search effects'}));
- await user.type(screen.getByRole('textbox',{name:'Search effects'}),'Golden hour');
+ await user.clear(screen.getByRole('searchbox',{name:'Search effects'}));
+ await user.type(screen.getByRole('searchbox',{name:'Search effects'}),'Golden hour');
  await user.click(screen.getByRole('button',{name:'Golden hour',exact:true}));await saved();
  check('new color filters apply as their own render preset',project.scenes.find(s=>s.id===firstId).effect_preset==='golden_hour');
- await user.clear(screen.getByRole('textbox',{name:'Search effects'}));
+ await user.clear(screen.getByRole('searchbox',{name:'Search effects'}));
  await user.click(screen.getByRole('button',{name:'Original',exact:true}));await saved();
  check('Original has no Effect settings panel',!screen.queryByRole('region',{name:'Effect settings'}));
  fireEvent.change(screen.getByRole('slider',{name:'Exposure'}),{target:{value:'35'}});
  fireEvent.change(screen.getByRole('slider',{name:'Temperature'}),{target:{value:'-40'}});
  check('adjustment preview updates before saving',visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('brightness')&&visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('url(#sf-wb-'));
  await saved();
- check('adjustment sliders save together as one look',requests.some(r=>r.method==='PATCH'&&r.body?.look?.adjust?.exposure===35&&r.body.look.adjust.temperature===-40));
+ check('adjustment sliders save together as one look',requests.some(r=>isParameterWrite(r)&&payload(r)?.look?.adjust?.exposure===35&&payload(r).look.adjust.temperature===-40));
  fireEvent.doubleClick(screen.getByRole('slider',{name:'Exposure'}));await saved();
- check('double-click resets a slider',requests.filter(r=>r.body?.look?.adjust).at(-1).body.look.adjust.exposure===undefined&&requests.filter(r=>r.body?.look?.adjust).at(-1).body.look.adjust.temperature===-40);
+ check('double-click resets a slider',payload(requests.filter(r=>payload(r)?.look?.adjust).at(-1)).look.adjust.exposure===undefined&&payload(requests.filter(r=>payload(r)?.look?.adjust).at(-1)).look.adjust.temperature===-40);
  check('glitch controls hidden unless Glitch is chosen',!screen.queryByRole('group',{name:'Glitch controls'})&&!screen.queryByRole('slider',{name:'Glitch speed'}));
- await user.clear(screen.getByRole('textbox',{name:'Search effects'}));
+ await user.clear(screen.getByRole('searchbox',{name:'Search effects'}));
  await user.click(screen.getByRole('button',{name:'Glitch',exact:true}));await saved();
  await user.click(await screen.findByRole('radio',{name:'Chunky'}));
  fireEvent.change(screen.getByRole('slider',{name:'Glitch speed'}),{target:{value:'2.5'}});await saved();
- check('glitch speed and block size save',requests.some(r=>r.body?.look?.glitch?.block==='large'&&r.body.look.glitch.speed===2.5));
+ check('glitch speed and block size save',requests.some(r=>payload(r)?.look?.glitch?.block==='large'&&payload(r).look.glitch.speed===2.5));
  // Old film section
  const filmSwitch=screen.getByRole('switch',{name:'Old film damage'});
  check('old film is off by default',!filmSwitch.checked&&!screen.queryByRole('slider',{name:'Film Scratches'}));
- await user.clear(screen.getByRole('textbox',{name:'Search effects'}));await user.click(screen.getByRole('button',{name:'Original',exact:true}));await saved();
+ await user.clear(screen.getByRole('searchbox',{name:'Search effects'}));await user.click(screen.getByRole('button',{name:'Original',exact:true}));await saved();
  fireEvent.change(screen.getByRole('slider',{name:'Contrast'}),{target:{value:'20'}});await saved();
  await user.click(screen.getByRole('button',{name:'WWII newsreel'}));await saved();
- check('WWII newsreel style saves B&W, 18 fps, heavy scratches',requests.some(r=>r.body?.look?.film?.tone==='bw'&&r.body.look.film.fps===18&&r.body.look.film.scratches===75));
+ check('WWII newsreel style saves B&W, 18 fps, heavy scratches',requests.some(r=>payload(r)?.look?.film?.tone==='bw'&&payload(r).look.film.fps===18&&payload(r).look.film.scratches===75));
  check('the style turns the old film switch on and shows its controls',screen.getByRole('switch',{name:'Old film damage'}).checked&&!!screen.getByRole('slider',{name:'Film Scratches'}));
  check('the preview filter stays valid with the Original look (no "none" mixed in)',!visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('none'));
  check('live old-film preview is drawn over the picture',!!document.querySelector('.preview-canvas canvas.film-preview')&&visibleEditor().getByRole('img',{name:/Source media/}).style.filter.includes('grayscale(1)'));
  fireEvent.change(screen.getByRole('slider',{name:'Film Dust & hair'}),{target:{value:'90'}});
  await user.click(screen.getByRole('radio',{name:'16'}));await user.click(screen.getByRole('radio',{name:'Sepia'}));await saved();
- check('dust, frame rate and tone changes save',requests.some(r=>r.body?.look?.film?.dust===90&&r.body.look.film.fps===16&&r.body.look.film.tone==='sepia'));
+ check('dust, frame rate and tone changes save',requests.some(r=>payload(r)?.look?.film?.dust===90&&payload(r).look.film.fps===16&&payload(r).look.film.tone==='sepia'));
  await user.click(screen.getByRole('switch',{name:'Old film damage'}));await saved();
- check('switching old film off removes it and its preview',requests.some(r=>r.body?.look&&'film' in r.body.look&&r.body.look.film===null)&&!document.querySelector('canvas.film-preview'));
+ check('switching old film off removes it and its preview',requests.some(r=>payload(r)?.look&&'film' in payload(r).look&&payload(r).look.film===null)&&!document.querySelector('canvas.film-preview'));
  const tSelect=screen.getAllByRole('combobox').find(c=>[...c.options||[]].some(o=>o.value==='film_burn'));
  check('film burn and the curated transition set are offered',!!tSelect&&[...tSelect.options].length>=20);
  check('LUT import control is offered',!!screen.getByRole('button',{name:/Import .cube/})&&!!screen.getByRole('combobox',{name:'Color LUT'}));
@@ -292,26 +300,28 @@ try{
  await screen.findByText(/2 LUTs imported · 2 other files skipped \(only \.cube is supported\)/);
  check('importing a folder imports every .cube and reports the rest',requests.filter(r=>r.path.startsWith('/api/assets/lut?')).length===3);
  check('a broken LUT in the folder is reported by name',!!screen.getByText(/Could not import 1: broken\.cube: Expected 35937 entries/));
- await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.body?.look?.lut?.asset_id?.startsWith('lut-'))));
+ await saved();await waitFor(()=>assert.ok(requests.some(r=>isParameterWrite(r)&&payload(r)?.look?.lut?.asset_id?.startsWith('lut-'))));
  check('the first imported LUT is applied to the scene',true);
  check('both imported LUTs are offered in the picker',within(screen.getByRole('combobox',{name:'Color LUT'})).getAllByRole('option').length===3);
  oldBackend=true;
  const lutOptions=within(screen.getByRole('combobox',{name:'Color LUT'})).getAllByRole('option');
  await user.selectOptions(screen.getByRole('combobox',{name:'Color LUT'}),lutOptions[2].value);
- await screen.findByText(/The LUT was not saved because this SceneForge backend is out of date/);
+ fireEvent.click(document.querySelector('.editor-draft-actions .btn-primary'));
+ await screen.findByText(/This SceneForge backend is out of date/);
  check('an old backend that ignores the LUT is reported, not silently accepted',true);
  oldBackend=false;
  await user.selectOptions(screen.getByRole('combobox',{name:'Color LUT'}),'');await saved();
- check('after a failed save, the next LUT change still saves',requests.filter(r=>r.method==='PATCH'&&r.body?.look&&'lut' in r.body.look).at(-1).body.look.lut===null&&screen.getByRole('status').textContent==='All changes saved');
+ check('after a failed save, the next LUT change still saves',payload(requests.filter(r=>isParameterWrite(r)&&payload(r)?.look&&'lut' in payload(r).look).at(-1)).look.lut===null&&screen.getByRole('status').textContent==='All changes saved');
  await user.click(screen.getByRole('tab',{name:'Motion',exact:true}));
  const curve=screen.queryByRole('combobox',{name:'Motion speed curve'});
- if(curve){fireEvent.change(curve,{target:{value:'ease_out'}});await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.body?.motion?.easing==='ease_out')),{timeout:2000});await saved();}
- check('motion speed curve saves with the shot motion',!!curve&&requests.some(r=>r.method==='PATCH'&&r.body?.motion?.easing==='ease_out'));
+ if(curve){fireEvent.change(curve,{target:{value:'ease_out'}});await saved();
+ await waitFor(()=>assert.ok(requests.some(r=>isParameterWrite(r)&&payload(r)?.motion?.easing==='ease_out')),{timeout:2000});await saved();}
+ check('motion speed curve saves with the shot motion',!!curve&&requests.some(r=>isParameterWrite(r)&&payload(r)?.motion?.easing==='ease_out'));
  await user.click(within(screen.getByRole('radiogroup',{name:'Reframe mode'})).getByRole('radio',{name:'Follow subject'}));
- await waitFor(()=>assert.ok(requests.some(r=>r.method==='PUT'&&/\/api\/shots\/[^/]+\/reframe$/.test(r.path)&&r.body.mode==='follow')));await saved();
+ await waitFor(()=>assert.ok(requests.some(r=>r.method==='PUT'&&/\/api\/shots\/[^/]+\/reframe$/.test(r.path)&&payload(r).mode==='follow')));await saved();
  await waitFor(()=>assert.ok(/Following the subject \(cutout matte\)/.test(screen.getByRole('group',{name:'Reframe'}).textContent)));
  await user.click(within(screen.getByRole('radiogroup',{name:'Reframe mode'})).getByRole('radio',{name:'Manual'}));await saved();
- check('per-clip Reframe: Follow subject analyses the clip, Manual offers a position slider',requests.some(r=>r.method==='PUT'&&r.body?.mode==='manual'&&r.body.x===0.3)&&!!await screen.findByRole('slider',{name:'Reframe position slider'}));
+ check('per-clip Reframe: Follow subject analyses the clip, Manual offers a position slider',requests.some(r=>r.method==='PUT'&&payload(r)?.mode==='manual'&&payload(r).x===0.3)&&!!await screen.findByRole('slider',{name:'Reframe position slider'}));
  await user.click(screen.getByRole('tab',{name:'Text',exact:true}));
  // Captions Pro
  const captionStyleGrid=screen.getAllByRole('group',{name:'Caption styles'}).find(el=>el.classList.contains('caption-presets'));
@@ -326,13 +336,13 @@ try{
  check('caption style groups filter the picker (Karaoke)',capGrid().querySelectorAll('button').length===14&&!!screen.getByRole('button',{name:'Apply Karaoke pink box caption style'})&&!screen.queryByRole('button',{name:'Apply Classic caption style'}));
  await user.click(within(screen.getByRole('group',{name:'Caption style groups'})).getByRole('button',{name:/^All/}));
  await user.click(screen.getByRole('button',{name:'Apply Viral bold caption style'}));await saved();
- check('a caption style preset applies font, case, phrases and box highlight',requests.some(r=>r.body?.font?.family==='Anton'&&r.body.font.case==='upper'&&r.body.font.split==='phrases'&&r.body.font.karaoke_style==='box'));
+ check('a caption style preset applies font, case, phrases and box highlight',requests.some(r=>payload(r)?.font?.family==='Anton'&&payload(r).font.case==='upper'&&payload(r).font.split==='phrases'&&payload(r).font.karaoke_style==='box'));
  await user.click(screen.getByRole('button',{name:'Italic'}));await saved();
- check('italic toggle saves',requests.some(r=>r.body?.font?.italic===true));
+ check('italic toggle saves',requests.some(r=>payload(r)?.font?.italic===true));
  await user.click(within(screen.getByRole('radiogroup',{name:'Vertical'})).getByRole('radio',{name:'Top'}));await saved();
- check('caption position saves',requests.some(r=>r.body?.font?.position==='top'));
+ check('caption position saves',requests.some(r=>payload(r)?.font?.position==='top'));
  await user.click(screen.getByRole('checkbox',{name:'Background box'}));await saved();
- check('background box saves',requests.some(r=>r.body?.font?.background==='box'));
+ check('background box saves',requests.some(r=>payload(r)?.font?.background==='box'));
  check('the caption preview is drawn on the picture',!!document.querySelector('.preview-canvas .caption-preview'));
  await user.click(screen.getByRole('button',{name:'Apply Classic caption style'}));await saved();
  const acc=screen.getByRole('region',{name:'Auto captions'});
@@ -344,7 +354,7 @@ try{
  await user.selectOptions(within(acc).getByRole('combobox',{name:'Caption audio source'}),'clips');
  await user.click(within(acc).getByRole('button',{name:/Generate captions/}));
  await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/auto-captions'))));
- check('Auto captions card can regenerate from the video sound with chosen language and phrase length',requests.some(r=>r.path.endsWith('/auto-captions')&&r.body.language==='ar'&&r.body.phrase_words===2&&r.body.source==='clips')&&!!(await within(acc).findByText(/language: en/)));
+ check('Auto captions card can regenerate from the video sound with chosen language and phrase length',requests.some(r=>r.path.endsWith('/auto-captions')&&payload(r).language==='ar'&&payload(r).phrase_words===2&&payload(r).source==='clips')&&!!(await within(acc).findByText(/language: en/)));
  project.scenes[0].shots[0].asset.type='image';
  await user.click(screen.getByRole('button',{name:'Apply Classic caption style'}));await saved();
  await waitFor(()=>assert.ok(screen.getByRole('button',{name:'Edit caption segment: hello from'})));
@@ -358,11 +368,11 @@ try{
  await new Promise(resolve=>setTimeout(resolve,180));
  check('clicking a caption clip opens Text and focuses its individual text box',document.activeElement?.getAttribute?.('aria-label')==='Caption segment 1 text');
  await user.clear(screen.getByRole('textbox',{name:'Caption segment 1 text'}));await user.type(screen.getByRole('textbox',{name:'Caption segment 1 text'}),'hello from today');await saved();
- check('editing a caption segment preserves its timing and saves its wording',requests.some(r=>r.body?.font?.caption_segments?.some(s=>s.id==='cap-1'&&s.text==='hello from today'&&s.start_ms===0&&s.end_ms===600)));
+ check('editing a caption segment preserves its timing and saves its wording',requests.some(r=>payload(r)?.font?.caption_segments?.some(s=>s.id==='cap-1'&&s.text==='hello from today'&&s.start_ms===0&&s.end_ms===600)));
  await user.click(screen.getByRole('button',{name:'Split caption 1'}));await saved();
- check('caption segments can be split into shorter editable clips',requests.some(r=>r.body?.font?.caption_segments?.length===3));
+ check('caption segments can be split into shorter editable clips',requests.some(r=>payload(r)?.font?.caption_segments?.length===3));
  await user.selectOptions(screen.getByRole('combobox',{name:'Caption text direction'}),'rtl');await saved();
- check('right-to-left caption direction saves to the scene',requests.some(r=>r.body?.font?.caption_direction==='rtl'));
+ check('right-to-left caption direction saves to the scene',requests.some(r=>payload(r)?.font?.caption_direction==='rtl'));
  await user.type(screen.getByRole('searchbox',{name:'Search captions'}),'speech');
  check('caption search narrows the clip list',!!screen.queryByRole('textbox',{name:'Caption segment 3 text'})&&document.querySelectorAll('.caption-segment-card').length===1);
  await user.click(screen.getByRole('button',{name:'Next caption'}));await new Promise(resolve=>setTimeout(resolve,100));
@@ -372,19 +382,19 @@ try{
  check('long caption lists can be collapsed and expanded',!!screen.getByRole('button',{name:'Expand all captions'})&&!screen.queryByRole('textbox',{name:'Caption segment 1 text'}));
  await user.click(screen.getByRole('button',{name:'Expand all captions'}));
  await saved();
- check('Auto captions applies the chosen caption style after transcribing',requests.some(r=>r.body?.font?.family==='Anton'&&r.body.font.karaoke_style==='box'&&r.body.font.highlight_color==='#FF3B3B'));
+ check('Auto captions applies the chosen caption style after transcribing',requests.some(r=>payload(r)?.font?.family==='Anton'&&payload(r).font.karaoke_style==='box'&&payload(r).font.highlight_color==='#FF3B3B'));
  await user.click(screen.getByRole('button',{name:'Apply Classic caption style'}));await saved();
  await user.selectOptions(screen.getByRole('combobox',{name:'Caption animation'}),'letters-pop');await saved();
- check('caption animation saves from the Text tab',requests.some(r=>r.body?.font?.caption_animation==='letters-pop'));
+ check('caption animation saves from the Text tab',requests.some(r=>payload(r)?.font?.caption_animation==='letters-pop'));
  await user.click(screen.getAllByRole('button',{name:'Add Text+',exact:true})[0]);await saved();
- check('Text+ creates an advanced letter-pop title overlay',requests.some(r=>(r.body?.font?.layers||[]).some(l=>l.animation==='letters-pop'&&l.text==='Text+ title')));
+ check('Text+ creates an advanced letter-pop title overlay',requests.some(r=>(payload(r)?.font?.layers||[]).some(l=>l.animation==='letters-pop'&&l.text==='Text+ title')));
  await user.click(screen.getByRole('checkbox',{name:'Word-by-word highlight'}));await saved();
- check('word-by-word highlight saves and turns captions on',requests.some(r=>r.body?.font?.karaoke===true&&r.body.font.captions_enabled===true));
+ check('word-by-word highlight saves and turns captions on',requests.some(r=>payload(r)?.font?.karaoke===true&&payload(r).font.captions_enabled===true));
  check('highlight colour picker appears',!!screen.getByLabelText('Highlight colour'));
  await user.click(screen.getByRole('tab',{name:'Audio',exact:true}));
  await user.click(screen.getByRole('checkbox',{name:'Level loudness for YouTube'}));
- await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.path===`/api/projects/${project.id}`&&r.body?.finishing?.loudnorm===true)));
- await waitFor(()=>assert.ok(requests.some(r=>r.body?.finishing?.loudnorm===true)));
+ await waitFor(()=>assert.ok(requests.some(r=>isParameterWrite(r)&&r.path===`/api/projects/${project.id}`&&payload(r)?.finishing?.loudnorm===true)));
+ await waitFor(()=>assert.ok(requests.some(r=>payload(r)?.finishing?.loudnorm===true)));
  check('YouTube loudness saves on the project (the whole-video countdown switch is gone)',!screen.queryByRole('checkbox',{name:'Countdown leader'}));
  check('restore old photo is offered for image scenes',(await (async()=>{await user.click(screen.getByRole('tab',{name:'Media',exact:true}));const b=screen.queryByRole('button',{name:/Restore old photo/});await user.click(screen.getByRole('tab',{name:'Audio',exact:true}));return !!b;})()));
  // Effects pack controls
@@ -392,7 +402,7 @@ try{
  await user.click(screen.getByRole('switch',{name:'Camera shake'}));
 check('the timeline stays usable while an effect change is saving (no flicker)',!screen.getByRole('button',{name:/Add part/}).disabled&&!screen.getByRole('switch',{name:'Spotlight'}).disabled);
  await user.click(screen.getByRole('checkbox',{name:'Impact zoom'}));await saved();
- const lk=()=>requests.filter(r=>r.method==='PATCH'&&r.body?.look).map(r=>r.body.look);
+ const lk=()=>requests.filter(r=>isParameterWrite(r)&&payload(r)?.look).map(r=>payload(r).look);
  check('camera shake with impact zoom saves',lk().some(l=>l.shake?.impact===true&&l.shake.amount===40));
  await user.click(screen.getByRole('switch',{name:'Spotlight'}));await saved();
  check('spotlight saves and previews over the picture',lk().some(l=>l.spotlight?.shape==='ellipse')&&!!document.querySelector('.scenefx-preview .fx-layer'));
@@ -418,9 +428,9 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  check('reset clears the effect order and bypass',lk().some(l=>l.fx_order===null&&l.fx_bypass===null));
  // Look presets: built-in tile applies through the scene update; packs import from a file
  const noir=await screen.findByRole('button',{name:/Apply look preset Noir/});
- await user.click(noir);
- await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.body?.effect_preset==='noir')));
- const applied=requests.filter(r=>r.method==='PATCH'&&r.body?.effect_preset==='noir').at(-1).body;
+ await user.click(noir);await saved();
+ await waitFor(()=>assert.ok(requests.some(r=>isParameterWrite(r)&&payload(r)?.effect_preset==='noir')));
+ const applied=payload(requests.filter(r=>isParameterWrite(r)&&payload(r)?.effect_preset==='noir').at(-1));
  check('applying a look preset sets the effect and replaces the portable look keys',applied.effect_intensity===100&&applied.look.adjust.contrast===25&&applied.look.shake===null&&applied.look.leak===null&&!('redact' in applied.look));
  const packFile=new File([JSON.stringify({format:'sceneforge-look-pack',version:1,presets:[{name:'Shared warm',effect_preset:'warm',effect_intensity:60,look:{}}]})],'shared.sflook',{type:''});
  await user.upload(screen.getByLabelText('Import look pack file'),packFile);
@@ -468,7 +478,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  check('typing a stop label is not interrupted by saves (field stays enabled and focused)',!lab.disabled&&document.activeElement===lab&&lab.value==='قادس Cadiz');
  lab.blur();await saved();
  check('route icon, curve and stop labels save (Arabic included)',lk().some(l=>l.route?.marker==='plane'&&l.route.curve===true&&l.route.labels?.[0]==='قادس Cadiz'));
- await user.click(screen.getByRole('button',{name:'Done editing points'}));
+ const donePoints=screen.queryByRole('button',{name:'Done editing points'});if(donePoints)await user.click(donePoints);
  check('finishing route editing hides the point editor',!document.querySelector('.route-canvas'));
  await user.click(screen.getByRole('switch',{name:'Map route'}));await user.click(screen.getByRole('switch',{name:'3D photo (parallax)'}));await user.click(screen.getByRole('switch',{name:'Colour wheels'}));await saved();
  // Paste media from anywhere into the active scene; text fields keep normal paste
@@ -501,7 +511,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  check('graphic sticker categories list the drawn speech bubbles',!!screen.getByRole('button',{name:'Add Thinking cloud sticker'})&&!screen.queryByRole('button',{name:'Add Heart sticker'}));
  await user.click(stickerTabs().getByRole('button',{name:/^All/}));
  await user.selectOptions(screen.getByRole('combobox',{name:'Add overlay from media'}),'pool-img');await saved();
- const ovSave=()=>requests.filter(r=>r.method==='PATCH'&&r.body?.overlays).at(-1)?.body.overlays;
+ const ovSave=()=>payload(requests.filter(r=>isParameterWrite(r)&&payload(r)?.overlays).at(-1))?.overlays;
  check('adding a media layer saves its role and default placement',ovSave()?.length===1&&ovSave()[0].asset_id==='pool-img'&&ovSave()[0].kind==='media'&&ovSave()[0].width===34&&ovSave()[0].anim_in==='fade');
  const item=await screen.findByRole('button',{name:/Overlay 1: map\.png\. Drag to move/});
  check('the overlay appears on the preview, sized to its 4:3 picture',item.dataset.box==='34x25.5@72,30r0'&&!!screen.getByRole('slider',{name:'Resize overlay 1'}));
@@ -539,7 +549,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getByRole('button',{name:'Delete overlay 3'}));await user.click(screen.getByRole('button',{name:'Delete overlay 2'}));await user.click(screen.getByRole('button',{name:'Delete overlay 1'}));await saved();
  dom.window.HTMLCanvasElement.prototype.getContext=originalCanvasContext;
  fireEvent.change(screen.getByLabelText('Upload custom sticker'),{target:{files:[new File(['png'],'transparent-sticker.png',{type:'image/png'})]}});
- await waitFor(()=>assert.ok(requests.some(r=>r.path.startsWith('/api/assets/upload')&&r.body.get('file')?.name==='transparent-sticker.png')));
+ await waitFor(()=>assert.ok(requests.some(r=>r.path.startsWith('/api/assets/upload')&&payload(r).get('file')?.name==='transparent-sticker.png')));
  await waitFor(()=>assert.ok(screen.getByRole('button',{name:'Add uploaded sticker transparent-sticker.png'})));
  await waitFor(()=>assert.ok(ovSave()?.some(o=>o.width===18&&o.asset_id.startsWith('up-'))));
  check('custom PNG sticker uploads to the project and is reusable from its sticker list',ovSave().some(o=>o.width===18&&o.asset_id.startsWith('up-')));
@@ -549,7 +559,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.type(screen.getByRole('textbox',{name:'Textured title text'}),'LAVA');
  await user.selectOptions(screen.getByRole('combobox',{name:'Texture pattern'}),'neon');
  await user.click(screen.getByRole('button',{name:'Add textured title'}));
- await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/textured-title')&&r.body?.text==='LAVA'&&r.body?.texture?.preset==='neon')));
+ await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/textured-title')&&payload(r)?.text==='LAVA'&&payload(r)?.texture?.preset==='neon')));
  check('textured title sends the text and chosen pattern',true);
  await user.click(screen.getByRole('tab',{name:'Effects',exact:true}));await openFxGroups();
  await user.click(screen.getByRole('button',{name:'Original',exact:true}));await saved();
@@ -557,18 +567,18 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  const audioData=(name)=>({types:['Files'],files:[new File(['audio'],name,{type:'audio/mpeg'})],items:[],dropEffect:'',getData:()=>''});
  fireEvent.drop(a3,{dataTransfer:audioData('music-a.mp3'),clientX:100});
  await waitFor(()=>assert.equal(project.finishing_json?.audio_clips?.length,1));
- check('dropping an MP3 on A3 imports it as a visible project timeline clip',requests.some(r=>r.method==='PATCH'&&r.body?.finishing?.audio_clips?.[0]?.name==='music-a.mp3')&&!!screen.getByRole('button',{name:'Select audio clip music-a.mp3'}));
+ check('dropping an MP3 on A3 imports it as a visible project timeline clip',requests.some(r=>isParameterWrite(r)&&payload(r)?.finishing?.audio_clips?.[0]?.name==='music-a.mp3')&&!!screen.getByRole('button',{name:'Select audio clip music-a.mp3'}));
  fireEvent.drop(a3,{dataTransfer:audioData('music-b.mp3'),clientX:160});
  await waitFor(()=>assert.equal(project.finishing_json?.audio_clips?.length,2));
  check('multiple project audio clips are saved and stacked on A3',project.finishing_json.audio_clips.length===2&&!!screen.getByRole('button',{name:'Select audio clip music-b.mp3'}));
  const audioBlock=screen.getByRole('button',{name:'Select audio clip music-a.mp3'});
  fireEvent.pointerDown(audioBlock,{pointerId:1,clientX:100});fireEvent.pointerMove(window,{pointerId:1,clientX:155});fireEvent.pointerUp(window,{pointerId:1,clientX:155});
- await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.body?.finishing?.audio_clips?.some(c=>c.name==='music-a.mp3'&&c.start_ms>0))));
+ await waitFor(()=>assert.ok(requests.some(r=>isParameterWrite(r)&&payload(r)?.finishing?.audio_clips?.some(c=>c.name==='music-a.mp3'&&c.start_ms>0))));
  check('project audio clip can be dragged to a new time on the timeline',project.finishing_json.audio_clips.find(c=>c.name==='music-a.mp3').start_ms>0);
  await user.click(screen.getByRole('button',{name:'Select audio clip music-a.mp3'}));
  check('selecting an A3 clip opens the Audio inspector controls',screen.getByRole('tab',{name:'Audio',exact:true}).getAttribute('aria-selected')==='true'&&!!screen.getByRole('slider',{name:'Timeline audio clip volume'}));
  fireEvent.change(screen.getByRole('slider',{name:'Timeline audio clip volume'}),{target:{value:'70'}});
- await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.body?.finishing?.audio_clips?.some(c=>c.name==='music-a.mp3'&&c.volume===70))));
+ await waitFor(()=>assert.ok(requests.some(r=>isParameterWrite(r)&&payload(r)?.finishing?.audio_clips?.some(c=>c.name==='music-a.mp3'&&c.volume===70))));
  check('project audio clip volume control saves independently',project.finishing_json.audio_clips.find(c=>c.name==='music-a.mp3').volume===70);
  await user.click(screen.getByRole('checkbox',{name:'Lower this clip under voice'}));
  await waitFor(()=>assert.ok(project.finishing_json.audio_clips.find(c=>c.name==='music-a.mp3').duck===60));
@@ -652,7 +662,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getByRole('button',{name:'Select scene 1: Part-1'}));
  fireEvent.drop(narration,dt([new File(['RIFF'],'voiceover.wav',{type:'audio/wav'}),new File(['x'],'notes.txt')]));
  await waitFor(()=>assert.ok(requests.some(r=>r.path===`/api/scenes/${firstScene}/voice-takes/upload`)));
- await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.path===`/api/scenes/${firstScene}`&&r.body?.timing_mode==='audio_driven')));
+ await waitFor(()=>assert.ok(requests.some(r=>isParameterWrite(r)&&r.path===`/api/scenes/${firstScene}`&&payload(r)?.timing_mode==='audio_driven')));
  check('dropping audio on a scene uploads it as that scene’s sound and matches the clip to it',project.scenes.find(s=>s.id===firstScene)?.voice_takes.some(t=>t.accepted));
  await waitFor(()=>assert.match(screen.getByText(/voiceover\.wav added/).textContent,/Skipped unsupported: notes\.txt/));
  check('drop results are reported, including skipped files',true);
@@ -669,7 +679,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getByRole('menuitem',{name:/^Detach clip sound to timeline audio/}));
  await waitFor(()=>assert.equal(project.finishing_json.audio_clips.length,audioCount+1));
  await saved();
- check('detaching a video clip’s sound puts it on A3 and mutes the embedded sound (keeps the video)',project.finishing_json.audio_clips.some(c=>c.asset_id==='detached-audio')&&project.scenes.flatMap(s=>s.shots).find(x=>x.asset?.original_filename==='clip.mp4')?.audio_json?.mute===true&&requests.some(r=>r.path.endsWith('/detach-audio')&&r.body?.source==='shot'&&r.body?.duration_ms>0));
+ check('detaching a video clip’s sound puts it on A3 and mutes the embedded sound (keeps the video)',project.finishing_json.audio_clips.some(c=>c.asset_id==='detached-audio')&&project.scenes.flatMap(s=>s.shots).find(x=>x.asset?.original_filename==='clip.mp4')?.audio_json?.mute===true&&requests.some(r=>r.path.endsWith('/detach-audio')&&payload(r)?.source==='shot'&&payload(r)?.duration_ms>0));
  await user.click(screen.getByRole('button',{name:'Undo timeline edit'}));
  await waitFor(()=>assert.equal(project.scenes.flatMap(s=>s.shots).find(x=>x.asset?.original_filename==='clip.mp4')?.audio_json?.mute,false));
  check('undo restores the clip sound and removes the detached audio clip',!project.finishing_json.audio_clips.some(c=>c.asset_id==='detached-audio'));
@@ -680,10 +690,10 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
   await user.click(within(screen.getByRole('menu',{name:'Timeline clip actions'})).getByRole('menuitem',{name:'Remove silences…'}));
   const panel=await screen.findByRole('dialog',{name:'Clean up'});
   await within(panel).findByRole('checkbox',{name:new RegExp(`Remove ${target.track||'A3'} · ${tname} at 0\\.10s`)});
-  check('Remove silences… opens the Clean up panel with detected ranges and the time saved',requests.some(r=>r.path==='/api/silence/detect'&&r.body.asset_id===target.asset_id&&r.body.threshold_db===-38&&r.body.min_silence_ms===600&&r.body.padding_ms===120)&&/1 silence selected · 1 cut · saves 0\.20s/.test(within(panel).getByText(/selected ·/).textContent));
+  check('Remove silences… opens the Clean up panel with detected ranges and the time saved',requests.some(r=>r.path==='/api/silence/detect'&&payload(r).asset_id===target.asset_id&&payload(r).threshold_db===-38&&payload(r).min_silence_ms===600&&payload(r).padding_ms===120)&&/1 silence selected · 1 cut · saves 0\.20s/.test(within(panel).getByText(/selected ·/).textContent));
   fireEvent.change(within(panel).getByRole('slider',{name:'Silence threshold'}),{target:{value:'-25'}});
   await waitFor(()=>assert.equal(within(panel).getAllByRole('checkbox').length,2));
-  check('moving the threshold slider detects again live',requests.some(r=>r.path==='/api/silence/detect'&&r.body.threshold_db===-25));
+  check('moving the threshold slider detects again live',requests.some(r=>r.path==='/api/silence/detect'&&payload(r).threshold_db===-25));
   await user.click(within(panel).getByRole('checkbox',{name:/at 0\.60s/}));
   await user.click(within(panel).getByRole('button',{name:'Apply 1 cut'}));
   const near=(a,b)=>Math.abs(a-b)<=17;  // cut points snap to the project frame (30 fps)
@@ -699,24 +709,24 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
   await within(scenePanel).findByRole('checkbox',{name:/Remove Clip sound at 0\.10s/});
   await user.click(within(scenePanel).getByRole('button',{name:'Apply 2 cuts'}));  // the -25 dB threshold is kept between uses
   await waitFor(()=>assert.ok(requests.some(r=>/\/api\/cleanup\/scenes\/[^/]+\/jump-cut$/.test(r.path))));
-  check('a scene jump cut sends the scene-time ranges to the backend in one request',requests.some(r=>r.path===`/api/cleanup/scenes/${project.scenes[0].id}/jump-cut`&&JSON.stringify(r.body.cuts)==='[[100,300],[600,700]]')&&requests.some(r=>r.path==='/api/silence/detect'&&r.body.scene_id===project.scenes[0].id&&r.body.source==='clips'));
+  check('a scene jump cut sends the scene-time ranges to the backend in one request',requests.some(r=>r.path===`/api/cleanup/scenes/${project.scenes[0].id}/jump-cut`&&JSON.stringify(payload(r).cuts)==='[[100,300],[600,700]]')&&requests.some(r=>r.path==='/api/silence/detect'&&payload(r).scene_id===project.scenes[0].id&&payload(r).source==='clips'));
   await saved();
   const narrationClip=screen.getAllByRole('button').filter(b=>b.className.includes('narration-clip')&&b.className.includes('has-take'))[0];
   fireEvent.contextMenu(narrationClip,{clientX:40,clientY:40});
   await user.click(screen.getByRole('menuitem',{name:'Remove filler words from narration…'}));
   const fillerPanel=await screen.findByRole('dialog',{name:'Clean up'});
   await within(fillerPanel).findByText('hello [um] from speech');
-  check('filler review lists each match with context, using the editable word list (like/so off)',requests.some(r=>r.path==='/api/fillers/detect'&&r.body.source==='narration'&&r.body.words.includes('um')&&r.body.words.includes('يعني')&&!r.body.words.includes('like')));
+  check('filler review lists each match with context, using the editable word list (like/so off)',requests.some(r=>r.path==='/api/fillers/detect'&&payload(r).source==='narration'&&payload(r).words.includes('um')&&payload(r).words.includes('يعني')&&!payload(r).words.includes('like')));
   const before=project.finishing_json.audio_clips.length;
   await user.click(within(fillerPanel).getByRole('button',{name:'Apply 1 cut'}));
   await waitFor(()=>assert.equal(project.finishing_json.audio_clips.length,before+2));
   const narr=project.finishing_json.audio_clips.filter(c=>c.asset_id==='detached-audio');
-  check('removing narration fillers moves the narration to A3 and cuts the filler there',requests.some(r=>r.path.endsWith('/detach-audio')&&r.body.source==='narration')&&narr.length===2&&near(narr[0].source_out_ms,110)&&near(narr[1].source_in_ms,390)&&narr[1].start_ms===narr[0].start_ms+narr[0].source_out_ms);
+  check('removing narration fillers moves the narration to A3 and cuts the filler there',requests.some(r=>r.path.endsWith('/detach-audio')&&payload(r).source==='narration')&&narr.length===2&&near(narr[0].source_out_ms,110)&&near(narr[1].source_in_ms,390)&&narr[1].start_ms===narr[0].start_ms+narr[0].source_out_ms);
   await user.click(screen.getByRole('button',{name:'Undo timeline edit'}));
   await waitFor(()=>assert.equal(project.finishing_json.audio_clips.length,before));
   check('undo puts the narration back in one step',!project.finishing_json.audio_clips.some(c=>c.asset_id==='detached-audio'));}
  await user.click(screen.getByRole('button',{name:'Mute clip sound for clip.mp4'}));
- await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.path.includes('/shots/')&&r.body?.audio?.mute===true)));
+ await waitFor(()=>assert.ok(requests.some(r=>isParameterWrite(r)&&r.path.includes('/shots/')&&payload(r)?.audio?.mute===true)));
  await saved();
  check('timeline quick mute saves the embedded clip-audio state with undo support',project.scenes.flatMap(s=>s.shots).find(x=>x.asset?.original_filename==='clip.mp4')?.audio_json?.mute===true&&!!screen.getByRole('button',{name:'Undo timeline edit'}));
  await user.click(screen.getByRole('button',{name:'Undo timeline edit'}));
@@ -730,12 +740,12 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await waitFor(()=>assert.equal(screen.getByRole('tab',{name:'Clip Audio',exact:true}).getAttribute('aria-selected'),'true'));
  check('A2 source-audio clip opens separate Clip Audio controls',!!screen.getByRole('region',{name:'Clip sound'})&&!!screen.getByRole('checkbox',{name:'Mute clip sound'})&&!screen.getByRole('tab',{name:'Motion',exact:true}).getAttribute('aria-selected').includes('true'));
  const clipVolume=screen.getByRole('slider',{name:'Clip volume'});fireEvent.pointerDown(clipVolume,{pointerId:1});fireEvent.change(clipVolume,{target:{value:'65'}});fireEvent.pointerUp(clipVolume,{pointerId:1});
- await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.path.includes('/shots/')&&r.body?.audio?.volume===65)));check('clip-audio volume slider saves the released value',true);
- const fadeIn=screen.getByRole('slider',{name:'Clip audio fade in'});fireEvent.pointerDown(fadeIn,{pointerId:1});fireEvent.change(fadeIn,{target:{value:'500'}});fireEvent.pointerUp(fadeIn,{pointerId:1});await waitFor(()=>assert.ok(requests.some(r=>r.method==='PATCH'&&r.path.includes('/shots/')&&r.body?.audio?.fade_in_ms===500),JSON.stringify(requests.filter(r=>r.path.includes('/shots/')).slice(-6))));check('clip audio fade-in saves during a consecutive slider edit',true);
+ await waitFor(()=>assert.ok(requests.some(r=>isParameterWrite(r)&&r.path.includes('/shots/')&&payload(r)?.audio?.volume===65)));check('clip-audio volume slider saves the released value',true);
+ const fadeIn=screen.getByRole('slider',{name:'Clip audio fade in'});fireEvent.pointerDown(fadeIn,{pointerId:1});fireEvent.change(fadeIn,{target:{value:'500'}});fireEvent.pointerUp(fadeIn,{pointerId:1});await waitFor(()=>assert.ok(requests.some(r=>isParameterWrite(r)&&r.path.includes('/shots/')&&payload(r)?.audio?.fade_in_ms===500),JSON.stringify(requests.filter(r=>r.path.includes('/shots/')).slice(-6))));check('clip audio fade-in saves during a consecutive slider edit',true);
  const pool={id:'pool-audio',type:'audio',original_filename:'music.mp3'};
  fireEvent.drop(narration,{dataTransfer:{types:['application/x-sceneforge-assets'],getData:()=>JSON.stringify([pool])}});
- await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/voice-takes/from-asset')&&r.body.asset_id==='pool-audio')));
- await waitFor(()=>assert.ok(requests.filter(r=>r.method==='PATCH'&&r.body?.timing_mode==='audio_driven').length>=2));
+ await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/voice-takes/from-asset')&&payload(r).asset_id==='pool-audio')));
+ await waitFor(()=>assert.ok(requests.filter(r=>isParameterWrite(r)&&payload(r)?.timing_mode==='audio_driven').length>=2));
  check('dragging audio from the Media Pool onto a scene attaches it and matches the clip',true);
  // Audio clip editor: open from the timeline, edit, remove without losing the picture.
  const pool2=project.scenes[0].voice_takes.find(v=>v.id.startsWith('take-')&&v.audio_asset);pool2.accepted=true;project.scenes[0].voice_takes.filter(v=>v!==pool2).forEach(v=>v.accepted=false);
@@ -748,11 +758,11 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  check('the editor draws the waveform with trim handles',!!within(editor).getByRole('slider',{name:'Trim start'})&&!!within(editor).getByRole('slider',{name:'Trim end'}));
  fireEvent.change(within(editor).getByRole('slider',{name:'Audio volume'}),{target:{value:'60'}});
  fireEvent.change(within(editor).getByRole('spinbutton',{name:'Audio start seconds'}),{target:{value:'1.5'}});
- await waitFor(()=>assert.ok(requests.some(r=>r.path===`/api/voice-takes/${pool2.id}/edit`&&r.body.volume===60&&r.body.in_ms===1500)),{timeout:2000});
+ await waitFor(()=>assert.ok(requests.some(r=>r.path===`/api/voice-takes/${pool2.id}/edit`&&payload(r).volume===60&&payload(r).in_ms===1500)),{timeout:2000});
  check('volume and trim changes save to the take',true);
  within(editor).getByRole('slider',{name:'Trim end'}).focus();
  await user.keyboard('{ArrowLeft}');
- await waitFor(()=>assert.ok(requests.some(r=>r.path===`/api/voice-takes/${pool2.id}/edit`&&r.body.out_ms===5100)),{timeout:2000});
+ await waitFor(()=>assert.ok(requests.some(r=>r.path===`/api/voice-takes/${pool2.id}/edit`&&payload(r).out_ms===5100)),{timeout:2000});
  check('trim handles move with the arrow keys',true);
  await waitFor(()=>assert.ok(project.scenes[0].voice_takes.find(v=>v.id===pool2.id).edit_json.in_ms===1500));
  const shotsBefore=project.scenes[0].shots.length, scenesBefore=project.scenes.length;
@@ -762,7 +772,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await waitFor(()=>assert.ok(requests.slice(requestsBeforeRemove).some(r=>r.path===`/api/scenes/${project.scenes[0].id}/voice-takes/clear-selection`)));
  await waitFor(()=>assert.ok(!project.scenes[0].voice_takes.some(v=>v.accepted)));
  check('Remove from scene takes the audio off but keeps the picture',project.scenes[0].shots.length===shotsBefore&&project.scenes.length===scenesBefore&&!project.scenes[0].voice_takes.some(v=>v.accepted));
- check('removing audio keeps the scene length by switching to fixed timing',requests.some(r=>r.method==='PATCH'&&r.path===`/api/scenes/${project.scenes[0].id}`&&r.body.timing_mode==='fixed'&&r.body.requested_duration_ms>1000));
+ check('removing audio keeps the scene length by switching to fixed timing',requests.some(r=>isParameterWrite(r)&&r.path===`/api/scenes/${project.scenes[0].id}`&&payload(r).timing_mode==='fixed'&&payload(r).requested_duration_ms>1000));
  pool2.accepted=true;await act(async()=>{window.dispatchEvent(new Event('focus'));});
  await user.click(screen.getByRole('tab',{name:'Media',exact:true}));await user.click(screen.getByRole('tab',{name:'Audio',exact:true}));
  const lane2=screen.getAllByRole('button').filter(b=>b.className.includes('narration-clip'))[0];
@@ -878,6 +888,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  check('appearance preferences persist locally without project defaults',prefs.theme==='light'&&prefs.accent==='blue'&&prefs.density==='comfortable'&&prefs.reduceMotion&&!('defaultAspect' in prefs)&&!('defaultFps' in prefs)&&!screen.queryByRole('combobox',{name:'Default project aspect ratio'})&&!screen.queryByRole('combobox',{name:'Default frame rate'}));
  await user.click(screen.getByRole('button',{name:'Close',exact:true}));
  await user.click(screen.getByRole('button',{name:'AI Engines',exact:true}));
+ await user.click(screen.getByRole('button',{name:'AI providers · API keys',exact:true}));
  const engineDialog=await screen.findByRole('dialog',{name:'AI engines & providers'});
  await user.click(within(engineDialog).getByRole('button',{name:'Open Settings to add or change keys'}));
  check('provider settings open from the existing AI Engines guide',screen.getByRole('heading',{name:'AI engines · Manage providers'})&&!screen.queryByRole('tab',{name:'AI providers'}));
@@ -904,7 +915,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.type(screen.getByPlaceholderText(/Describe your subject/),'A green landscape');
  await user.click(within(screen.getByRole('dialog')).getByRole('button',{name:'Generate image'}));
  await screen.findByRole('button',{name:'Use this image'});
- check('image studio sends chosen provider and composition',requests.some(r=>r.path.endsWith('/generate-image')&&r.body.provider_id==='provider-gemini'&&r.body.size==='1536x1024'));
+ check('image studio sends chosen provider and composition',requests.some(r=>r.path.endsWith('/generate-image')&&payload(r).provider_id==='provider-gemini'&&payload(r).size==='1536x1024'));
  await user.click(screen.getByRole('button',{name:'Close',exact:true}));
  await user.click(screen.getByRole('button',{name:'Zoom preview in'}));
  const pc=()=>[...document.querySelectorAll('.preview-canvas')].find(el=>el.offsetParent!==null||el.closest('.scene-editor:not([hidden])'));
@@ -929,7 +940,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  check('Ctrl+click selects several parts with a tick and shows the batch bar',document.querySelectorAll('.picture-clip.multi').length>=2&&/parts selected/.test(bb.textContent));
  await user.click(within(bb).getByRole('button',{name:/Apply to/}));
  await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/apply-to'))));
- check('Apply copies the chosen settings to the other selected parts',requests.some(r=>r.path.endsWith('/apply-to')&&r.body.parts.includes('effects')&&r.body.parts.includes('captions')&&r.body.targets.length>=1));
+ check('Apply copies the chosen settings to the other selected parts',requests.some(r=>r.path.endsWith('/apply-to')&&payload(r).parts.includes('effects')&&payload(r).parts.includes('captions')&&payload(r).targets.length>=1));
  await user.click(within(bb).getByRole('button',{name:'Clear selection'}));
  check('clearing the selection hides the batch bar',!screen.queryByRole('region',{name:'Selected parts'}));
  await user.click(screen.getByRole('button',{name:/^Export video$/}));
@@ -941,15 +952,15 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.selectOptions(within(exd).getByRole('combobox',{name:'Export encoder'}),'gpu');
  check('export dialog shows a size estimate and caption file links',/About/.test(exd.textContent)&&!!within(exd).getByRole('link',{name:'SRT'}));
  await user.click(within(exd).getByRole('button',{name:/^Export$/}));
- await waitFor(()=>assert.ok(requests.some(r=>r.path.includes('/export')&&r.body?.settings?.format==='mp4_h265')));
- check('Export sends the chosen preset and advanced settings',requests.some(r=>r.path.includes('/export')&&r.body.settings.format==='mp4_h265'&&r.body.settings.resolution==='720p'&&r.body.settings.fps===60));
- check('Export dialog shows the detected GPU and sends the chosen encoder',requests.some(r=>r.path.includes('/export')&&r.body.settings.encoder==='gpu'));
+ await waitFor(()=>assert.ok(requests.some(r=>r.path.includes('/export')&&payload(r)?.settings?.format==='mp4_h265')));
+ check('Export sends the chosen preset and advanced settings',requests.some(r=>r.path.includes('/export')&&payload(r).settings.format==='mp4_h265'&&payload(r).settings.resolution==='720p'&&payload(r).settings.fps===60));
+ check('Export dialog shows the detected GPU and sends the chosen encoder',requests.some(r=>r.path.includes('/export')&&payload(r).settings.encoder==='gpu'));
  await user.click(screen.getByRole('button',{name:'File',exact:true}));await user.click(screen.getByRole('button',{name:/Create vertical 9:16 version \(auto-reframe\)/}));
  const rfd=await screen.findByRole('dialog',{name:'Create vertical version'});
  check('auto-reframe dialog says it copies the project and works best with one main subject',/copy/.test(rfd.textContent)&&/one main subject/.test(rfd.textContent));
  await user.click(within(rfd).getByRole('button',{name:/Create vertical 9:16 version/}));
  await within(rfd).findByRole('button',{name:'Open vertical project'},{timeout:3000});
- check('auto-reframe starts the copy job, shows progress and notes, then offers to open the new project',requests.some(r=>r.method==='POST'&&r.path.endsWith('/reframe')&&r.body.aspect==='9:16')&&/Done: 2 clips reframed/.test(rfd.textContent)&&/no clear subject/.test(rfd.textContent));
+ check('auto-reframe starts the copy job, shows progress and notes, then offers to open the new project',requests.some(r=>r.method==='POST'&&r.path.endsWith('/reframe')&&payload(r).aspect==='9:16')&&/Done: 2 clips reframed/.test(rfd.textContent)&&/no clear subject/.test(rfd.textContent));
  await user.click(within(rfd).getByRole('button',{name:'Stay here'}));
  // Duplicate / copy / paste
  const clipsBefore=project.scenes.length;
@@ -967,7 +978,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  fireEvent.contextMenu(tgtNarr,{clientX:120,clientY:220});
  await user.click(await screen.findByRole('menuitem',{name:/Paste .* audio here/}));
  await waitFor(()=>assert.ok(requests.some(r=>r.path===`/api/scenes/${target.id}/paste-audio`)));
- check('copy audio from one scene and paste it into another',requests.some(r=>r.path===`/api/scenes/${target.id}/paste-audio`&&r.body.take_id===withAudio.voice_takes.find(v=>v.accepted).id));
+ check('copy audio from one scene and paste it into another',requests.some(r=>r.path===`/api/scenes/${target.id}/paste-audio`&&payload(r).take_id===withAudio.voice_takes.find(v=>v.accepted).id));
  // restore the mock project for the checks that follow
  project.scenes=project.scenes.filter(x=>!x.id.startsWith('dup-')&&!x.id.startsWith('cd-'));
  for(const x of project.scenes){x.voice_takes=x.voice_takes.filter(v=>!v.id.startsWith('pt-'));x.voice_takes.forEach(v=>v.accepted=v.id===acceptedBefore[x.id]);}
@@ -1052,6 +1063,14 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
   check('the sheet groups Playback, Timeline tools, Edit and Projects shortcuts',['Playback','Timeline tools','Edit','Projects and app'].every(g=>within(sheet).getByRole('region',{name:g}))&&row('Ctrl+Z')&&row('Ctrl+N')&&row('Space')&&row('Home End')&&row('Shift+Delete'));
   await user.keyboard('{Escape}');
   check('Esc closes the shortcut sheet',!screen.queryByRole('dialog',{name:'Keyboard shortcuts'}));
+  fireEvent.keyDown(document.body,{key:'/',ctrlKey:true});
+  const searchable=await screen.findByRole('dialog',{name:'Keyboard shortcuts'});
+  const search=within(searchable).getByRole('searchbox',{name:'Search keyboard shortcuts'});
+  await user.type(search,'restore');
+  check('Ctrl+/ opens searchable shortcuts and finds Ctrl+S restore points',searchable.querySelectorAll('.shortcut-row').length===1&&within(searchable).getByText('Ctrl+S'));
+  await user.clear(search);await user.type(search,'no-such-shortcut');
+  check('shortcut search explains an empty result',!!within(searchable).getByRole('status'));
+  await user.keyboard('{Escape}');
   const script=visibleEditor().getByRole('textbox',{name:'Narration script'});fireEvent.keyDown(script,{key:'?'});
   check('"?" while typing does not open the sheet',!screen.queryByRole('dialog',{name:'Keyboard shortcuts'}));
   await user.click(screen.getByRole('button',{name:'Help',exact:true}));await user.click(screen.getByRole('button',{name:/Keyboard shortcuts/}));
@@ -1121,7 +1140,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
    await user.click(visibleEditor().getByRole('button',{name:'Add Text'}));
    act(()=>{window.dispatchEvent(new CustomEvent('sceneforge-seek',{detail:{sceneId:a.id,timeMs:500}}));});
    await user.click(visibleEditor().getByRole('button',{name:`Add keyframe at playhead for Layer ${layerNo}`}));
-   const sentLayer=()=>requests.filter(r=>r.method==='PATCH'&&r.path===`/api/scenes/${a.id}`&&r.body?.font?.layers?.[layerNo-1]?.keyframes).at(-1)?.body.font.layers[layerNo-1];
+   const sentLayer=()=>payload(requests.filter(r=>isParameterWrite(r)&&(r.path===`/api/scenes/${a.id}`||r.path===`/api/scenes/${a.id}/editor-state`)&&payload(r)?.font?.layers?.[layerNo-1]?.keyframes).at(-1))?.font.layers[layerNo-1];
    await waitFor(()=>assert.ok(sentLayer()),{timeout:4000});
    const k=sentLayer().keyframes;
    check('Add keyframe at playhead sends the text layer keyframe (layer time, current values)',k.length===1&&k[0].t_ms===500&&k[0].x===50&&k[0].y===25&&k[0].size===64&&k[0].ease==='linear'&&!!visibleEditor().getByRole('button',{name:'Keyframe 1 at 0.50s'}));
@@ -1132,7 +1151,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
    const ovNo=(a.overlays_json||[]).length+1;
    act(()=>{window.dispatchEvent(new CustomEvent('sceneforge-seek',{detail:{sceneId:a.id,timeMs:1200}}));});
    await user.click(visibleEditor().getByRole('button',{name:`Add keyframe at playhead for Overlay ${ovNo}`}));
-   const sentOv=()=>requests.filter(r=>r.method==='PATCH'&&r.path===`/api/scenes/${a.id}`&&r.body?.overlays?.[ovNo-1]?.keyframes).at(-1)?.body.overlays[ovNo-1];
+   const sentOv=()=>payload(requests.filter(r=>isParameterWrite(r)&&(r.path===`/api/scenes/${a.id}`||r.path===`/api/scenes/${a.id}/editor-state`)&&payload(r)?.overlays?.[ovNo-1]?.keyframes).at(-1))?.overlays[ovNo-1];
    await waitFor(()=>assert.ok(sentOv()),{timeout:4000});
    check('Add keyframe at playhead sends the overlay keyframe with position, size, rotation and opacity',sentOv().keyframes.length===1&&sentOv().keyframes[0].t_ms===1200&&['x','y','width','rotation','opacity'].every(key=>Number.isFinite(sentOv().keyframes[0][key])));
   }finally{window.HTMLMediaElement.prototype.play=realPlay;}

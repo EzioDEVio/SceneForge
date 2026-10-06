@@ -7,6 +7,7 @@ The route is drawn once into a transparent clip (cached) and overlaid in the
 scene pass; after drawing it stays on screen.
 """
 from __future__ import annotations
+from app.render.font_runtime import FontRuntimeError, load_font
 
 import hashlib
 import math
@@ -80,8 +81,11 @@ def _label_font(original: str, size: int):
     from PIL import ImageFont
     from app.config import RESOURCE_DIR
     name = "NotoNaskhArabic-Bold.ttf" if _ARABIC.search(original or "") else "NotoSans-Bold.ttf"
+    fonts = next((base / 'assets/fonts' for base in (Path(RESOURCE_DIR), Path(__file__).resolve().parents[3]) if (base / 'assets/fonts' / name).is_file()), Path(RESOURCE_DIR) / 'assets/fonts')
     try:
-        return ImageFont.truetype(str(Path(RESOURCE_DIR) / "assets/fonts" / name), size, layout_engine=ImageFont.Layout.BASIC)
+        return load_font(str(fonts / name), size, layout_engine=ImageFont.Layout.BASIC)
+    except FontRuntimeError:
+        raise
     except Exception:
         return ImageFont.load_default()
 
@@ -124,7 +128,7 @@ def _rotate(poly, angle, cx, cy):
 def route_clip(route: dict, w: int, h: int, fps: int, cache: Path) -> str:
     """Transparent clip of the route being drawn (draw_ms long, plus 0.4 s for the last pin)."""
     from PIL import Image, ImageDraw, ImageFilter
-    key = hashlib.sha256(f"v6|{w}x{h}|{fps}|{sorted((k, str(v)) for k, v in route.items())}".encode()).hexdigest()[:20]
+    key = hashlib.sha256(f"v9-destination-upright|{w}x{h}|{fps}|{sorted((k, str(v)) for k, v in route.items())}".encode()).hexdigest()[:20]
     cache.mkdir(parents=True, exist_ok=True)
     out = cache / f"route_{key}.mov"
     if out.exists():
@@ -142,9 +146,9 @@ def route_clip(route: dict, w: int, h: int, fps: int, cache: Path) -> str:
     lw = max(1, int(route["width"] * H / 1080))
     col = tuple(int(route["color"][i:i + 2], 16) for i in (1, 3, 5))
     n = int(round((route["draw_ms"] + 400) / 1000 * fps))
-    draw_frames = max(1, int(round(route["draw_ms"] / 1000 * fps)))
+    draw_frames = max(1, int(round(route["draw_ms"] / 1000 * fps)) - 1)
     labels = [_label_text(t) for t in (route.get("labels") or [])]
-    size = max(10, int(H * 0.034))
+    label_size = max(10, int(H * 0.034))
     ease = lambda f: 0.5 - 0.5 * math.cos(math.pi * min(1.0, f / draw_frames))
     # Frame at which each stop is reached; pins pop and labels fade in from then, by the clock
     # (progress stops increasing once drawing ends, so it cannot time the last stop).
@@ -188,13 +192,26 @@ def route_clip(route: dict, w: int, h: int, fps: int, cache: Path) -> str:
                 ImageDraw.Draw(glow).ellipse([hx - lw * 2.2, hy - lw * 2.2, hx + lw * 2.2, hy + lw * 2.2], fill=col + (200,))
                 img = Image.alpha_composite(glow.filter(ImageFilter.GaussianBlur(lw * 1.2)), img)
                 d = ImageDraw.Draw(img)
-            if marker in ("plane", "ship", "car"):
-                poly = _rotate(_icon(marker, max(lw * 4.5, H * 0.05)), ang, hx, hy)
-                d.polygon(poly, fill=(255, 255, 255, 255), outline=(20, 20, 20, 255), width=max(1, lw // 4))
-            elif marker == "pin":
-                r = max(lw * 2.2, H * 0.018)
-                d.ellipse([hx - r, hy - 2.6 * r, hx + r, hy - 0.6 * r], fill=(255, 255, 255, 255), outline=col + (255,), width=max(2, lw // 2))
-                d.polygon([(hx - r * 0.55, hy - 1.2 * r), (hx + r * 0.55, hy - 1.2 * r), (hx, hy)], fill=(255, 255, 255, 255))
+            if marker in ('plane', 'ship', 'car', 'pin'):
+                from app.render.route_artwork import ICON_DIR
+                icon_path = ICON_DIR / (marker + '.png')
+                icon_size = max(16, round(max(lw * 9, H * .10)))
+                with Image.open(icon_path) as source:
+                    icon = source.convert('RGBA').resize((icon_size, icon_size), Image.Resampling.LANCZOS)
+                if marker != 'pin':
+                    if marker in ('car', 'ship'):
+                        from PIL import ImageOps
+                        right = math.cos(ang) >= 0
+                        if (marker == 'car' and right) or (marker == 'ship' and not right):
+                            icon = ImageOps.mirror(icon)
+                        bearing = math.degrees(ang)
+                        if bearing > 90: bearing -= 180
+                        elif bearing < -90: bearing += 180
+                        icon = icon.rotate(-bearing, resample=Image.Resampling.BICUBIC, expand=True)
+                    else:
+                        icon = icon.rotate(-45 - math.degrees(ang), resample=Image.Resampling.BICUBIC, expand=True)
+                img.paste(icon, (round(hx - icon.width / 2), round(hy - (icon.height if marker == 'pin' else icon.height / 2))), icon)
+                d = ImageDraw.Draw(img)
             elif not route.get("arrow", True):
                 d.ellipse([hx - lw, hy - lw, hx + lw, hy + lw], fill=(255, 255, 255, 255))
         if route["pins"]:
@@ -215,19 +232,27 @@ def route_clip(route: dict, w: int, h: int, fps: int, cache: Path) -> str:
             d.polygon([tip, (bx_ + math.cos(ang + 2.5) * a * 0.75, by_ + math.sin(ang + 2.5) * a * 0.75),
                        (bx_ + math.cos(ang - 2.5) * a * 0.75, by_ + math.sin(ang - 2.5) * a * 0.75)], fill=col + (255,))
         for k, (text, (px, py), when) in enumerate(zip(labels, stops, stop_when)):
-            if not text or f < reach[k]:
+            if not text:
                 continue
             age = (f - reach[k]) / fps
-            alpha = int(255 * min(1.0, age / 0.3))
+            # Endpoints must be readable on their arrival frame, including a scene
+            # ending exactly at draw_ms. Intermediate stops retain their fade.
+            alpha = 220 if f < reach[k] else (255 if k in (0, len(stops) - 1) else max(220, int(255 * min(1.0, age / 0.3))))
             layer = Image.new("RGBA", (W, H), (0, 0, 0, 0)); ld = ImageDraw.Draw(layer)
-            font = _label_font(route["labels"][k], size)
-            tw, th = ld.textbbox((0, 0), text, font=font)[2:]
+            font = _label_font(route["labels"][k], label_size)
+            bounds = ld.textbbox((0, 0), text, font=font)
+            tw, th = bounds[2] - bounds[0], bounds[3] - bounds[1]
+            if tw > W - 24:
+                font = _label_font(route["labels"][k], max(1, int(label_size * (W - 24) / tw)))
+                bounds = ld.textbbox((0, 0), text, font=font)
+                tw, th = bounds[2] - bounds[0], bounds[3] - bounds[1]
             bx, by = px - tw / 2 - 8, py - lw * 2.6 - th - 16
             last_below = k == len(stops) - 1 and route.get("arrow", True) and end_up   # keep the final arrowhead clear
             by = py + lw * 2.6 + 6 if (by <= 4 or last_below) else by   # below the stop near the top edge, or under the arrow
             bx = min(max(4, bx), W - tw - 20)
+            by = min(max(4, by), H - th - 14)
             ld.rounded_rectangle([bx, by, bx + tw + 16, by + th + 10], radius=8, fill=(15, 15, 20, int(alpha * 0.8)))
-            ld.text((bx + 8, by + 3), text, font=font, fill=(255, 255, 255, alpha))
+            ld.text((bx + 8 - bounds[0], by + 3 - bounds[1]), text, font=font, fill=(255, 255, 255, alpha))
             img = Image.alpha_composite(img, layer)
         frames.append(np.asarray(img))
     tmp = out.with_name(f"{out.stem}.{os.getpid()}.{uuid.uuid4().hex[:8]}.tmp.mov")

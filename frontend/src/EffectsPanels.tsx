@@ -1,3 +1,4 @@
+import {routeIconUrl} from "./RouteArtwork";
 import React, {useEffect, useState} from 'react';
 import {Vibrate, Focus, EyeOff, Sun, Blend, Plus, Trash2, Palette, LayoutGrid, Route as RouteIcon, Box as BoxIcon, MousePointerClick, Undo2, PenLine, Timer, ChevronDown} from 'lucide-react';
 import type {Look, Scene} from './api';
@@ -86,23 +87,33 @@ function Pills<T extends string>({label, value, options, onChange, disabled}: {l
   </div></div>;
 }
 
+const EffectSearch = React.createContext('');
+export function EffectsAccess({onNavigate}:{onNavigate:()=>void}) {
+ const jump=(group:string,title?:string)=>{onNavigate();window.dispatchEvent(new CustomEvent('sceneforge-open-effect-group',{detail:group}));requestAnimationFrame(()=>{const root=document.querySelector('.scene-editor:not([hidden])');const target=root?.querySelector(title?`[data-effect-title="${title}"]`:`[data-effect-group="${group}"]`);target?.scrollIntoView({block:'start',behavior:'auto'});(target?.querySelector('button,input') as HTMLElement|null)?.focus({preventScroll:true});});};
+ return <nav className="effects-access" aria-label="Effect shortcuts"><strong>Quick access</strong><div className="button-row"><button className="btn" onClick={()=>jump('finish')}>Vignette · Bars · Sharpen</button><button className="btn" onClick={()=>jump('explain','Map route')}>Map route</button><button className="btn" onClick={()=>jump('layout')}>Split screen & privacy</button><button className="btn" onClick={()=>jump('reuse')}>Stack & presets</button></div><p className="hint">Search includes additional effect groups. Render to check the final effect.</p></nav>;
+}
+
 /** A collapsible category on the Effects tab (0.9.0). Opens by itself when one of its effects is on. */
 export function FxGroup({id, title, Icon, description, items, active, children}: {id: string; title: string; Icon: typeof Sun; description: string; items?: string; active: number; children: React.ReactNode}) {
   const [open, setOpen] = useState(() => {try {const v = sessionStorage.getItem(`sf.fxgroup.${id}`); return v === null ? active > 0 : v === '1';} catch {return active > 0;}});
+  const query=React.useContext(EffectSearch).trim().toLowerCase();
+  useEffect(()=>{const listener=(e:Event)=>{if((e as CustomEvent).detail===id)setOpen(true);};window.addEventListener('sceneforge-open-effect-group',listener);return()=>window.removeEventListener('sceneforge-open-effect-group',listener);},[id]);
   const toggle = (next: boolean) => {setOpen(next); try {sessionStorage.setItem(`sf.fxgroup.${id}`, next ? '1' : '0');} catch {/* ignore */}};
-  return <section className={`fx-group ${open ? 'open' : ''}`} aria-label={`${title} effects`}>
-    <button className="fx-group-head" aria-expanded={open} onClick={() => toggle(!open)}>
+  if(query&&!`${title} ${items||''} ${description}`.toLowerCase().includes(query))return null;
+  const expanded=open||!!query;
+  return <section data-effect-group={id} className={`fx-group ${expanded ? 'open' : ''}`} aria-label={`${title} effects`}>
+    <button className="fx-group-head" aria-expanded={expanded} onClick={() => toggle(!expanded)}>
       <span className="fx-group-icon"><Icon size={16}/></span>
       <span className="fx-group-text"><strong>{title}</strong><small>{description}</small>{items && <em>{items}</em>}</span>
       {active > 0 && <span className="fx-group-badge">{active} on</span>}
       <ChevronDown size={15} className="fx-group-chevron"/>
     </button>
-    {open && <div className="fx-group-body">{children}</div>}
+    {expanded && <div className="fx-group-body">{children}</div>}
   </section>;
 }
 
 function Section({title, Icon, on, onToggle, hint, children, disabled}: {title: string; Icon: typeof Sun; on: boolean; onToggle: (on: boolean) => void; hint: string; children: React.ReactNode; disabled: boolean}) {
-  return <section className="look-section" aria-label={title}>
+  return <section data-effect-title={title} className="look-section" aria-label={title}>
     <div className="look-heading"><h3><Icon size={15}/> {title}</h3><FeatureHelp compact title={title} description={hint} steps="Turn this feature on, adjust its controls, then preview or render the scene. Changes are saved with this scene."/>
       <label className="switch-label"><input type="checkbox" role="switch" aria-label={title} checked={on} disabled={disabled} onChange={e => onToggle(e.target.checked)}/> {on ? 'On' : 'Off'}</label></div>
     <p className="hint">{hint}</p>
@@ -121,40 +132,41 @@ const Timing = ({v, set, disabled, name}: {v: {start_ms: number; end_ms: number 
     <label>Until (s)<input aria-label={`${name} end seconds`} type="number" min={0} step={0.1} placeholder="scene end" value={v.end_ms === null ? '' : (v.end_ms / 1000).toFixed(1)} disabled={disabled} onChange={e => set({end_ms: e.target.value === '' ? null : Math.max(v.start_ms + 100, Math.round(Number(e.target.value) * 1000))})}/></label>
   </div>;
 
-/** A text field that keeps its own text while typing and saves after a short pause or on
- *  leaving the field. It is never disabled by a background save, so typing is not
- *  interrupted (a disabled input loses focus and drops keystrokes). */
+/** Labels belong to the local draft immediately: Apply and Reverse must include the
+ *  final keystroke. Applying the draft remains a separate, undoable save. */
 function StopLabelInput({index, value, onCommit}: {index: number; value: string; onCommit: (text: string) => void}) {
-  const [text, setText] = useState(value);
-  const focused = React.useRef(false);
-  const timer = React.useRef<ReturnType<typeof setTimeout>>();
-  const latest = React.useRef(onCommit); latest.current = onCommit;
-  useEffect(() => {if (!focused.current) setText(value);}, [value]);
-  useEffect(() => () => {if (timer.current) clearTimeout(timer.current);}, []);
-  const commit = (t: string) => {if (timer.current) clearTimeout(timer.current); if (t !== value) latest.current(t);};
-  return <input aria-label={`Label for stop ${index + 1}`} maxLength={40} dir="auto" placeholder={`Stop ${index + 1} name (optional)`} value={text}
-    onFocus={() => {focused.current = true;}} onBlur={() => {focused.current = false; commit(text);}}
+  return <input aria-label={`Label for stop ${index + 1}`} maxLength={40} dir="auto" placeholder={`Stop ${index + 1} name (optional)`} value={value}
     onKeyDown={e => {if (e.key === 'Enter') (e.target as HTMLInputElement).blur();}}
-    onChange={e => {const t = e.target.value; setText(t); if (timer.current) clearTimeout(timer.current); timer.current = setTimeout(() => commit(t), 700);}}/>;
+    onChange={e => onCommit(e.target.value)}/>;
 }
 
 /** Scene effects: camera shake, spotlight, blur/pixelate regions, light leaks, split toning. */
-export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEditing, onRouteEditing, onAddMedia, liveAnnotations, vertical}: {scene: Scene; disabled: boolean; onDraft: (look: Look) => void;
+export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEditing, onRouteEditing, onAddMedia, liveAnnotations, vertical, query=''}: {query?:string;scene: Scene; disabled: boolean; onDraft: (look: Look) => void;
   liveRoute?: RouteFx | null; routeEditing?: boolean; onRouteEditing?: (on: boolean) => void; onAddMedia?: () => void; liveAnnotations?: Annotation[]; vertical?: boolean}) {
   const look = (scene.look_json || {}) as any;
-  const pick = (l: any) => ({countdown: l.countdown || null, annotations: l.annotations || [], shake: l.shake || null, spotlight: l.spotlight || null, redact: l.redact || [], leak: l.leak || null, flare: l.flare || null, wiggle: l.wiggle || null, tone: l.tone || null, wheels: l.wheels || null, layout: l.layout || null, parallax: l.parallax || null});
+  const pick = (l: any) => ({vignette:l.vignette||null,letterbox:l.letterbox||null,sharpen:l.sharpen||null,countdown: l.countdown || null, annotations: l.annotations || [], shake: l.shake || null, spotlight: l.spotlight || null, redact: l.redact || [], leak: l.leak || null, flare: l.flare || null, wiggle: l.wiggle || null, tone: l.tone || null, wheels: l.wheels || null, layout: l.layout || null, parallax: l.parallax || null});
   const [st, setSt] = useState(pick(look));
-  useEffect(() => {setSt(pick((scene.look_json || {}) as any));}, [scene.id]);
+  const dirty=React.useRef<Record<string,string>>({}),sourceScene=React.useRef(scene.id);
+  useEffect(() => {
+    const incoming=pick((scene.look_json||{}) as any);
+    if(sourceScene.current!==scene.id){sourceScene.current=scene.id;dirty.current={};setSt(incoming);return;}
+    // Older save responses must not replace controls the user has just edited.
+    setSt(current=>{const next={...current};for(const [key,value] of Object.entries(incoming)){
+      if(key in dirty.current){if(dirty.current[key]!==JSON.stringify(value))continue;delete dirty.current[key];}
+      (next as any)[key]=value;
+    }return next;});
+  }, [scene.id,JSON.stringify(look)]);
   const route: RouteFx | null = liveRoute === undefined ? (look.route || null) : liveRoute;
   const videoOrImages = scene.shots.length;
-  const put = (key: string, value: any) => {setSt(s => ({...s, [key]: value})); onDraft({[key]: value === null || (Array.isArray(value) && !value.length) ? null : value} as any);};
+  const put = (key: string, value: any) => {dirty.current[key]=JSON.stringify(value);setSt(s => ({...s, [key]: value})); onDraft({[key]: value === null || (Array.isArray(value) && !value.length) ? null : value} as any);};
   const {shake, spotlight: sp, redact, leak, tone, wheels, layout, parallax: plx} = st;
   const flare: Flare | null = (st as any).flare, wiggle: Wiggle | null = (st as any).wiggle;
   // The live list (shared with the on-picture handles) wins, so dragging and sliders never overwrite each other.
   const annots: Annotation[] = liveAnnotations ?? ((st as any).annotations || []);
   const setAnnot = (i: number, p: Partial<Annotation>) => put('annotations', annots.map((a, k) => k === i ? {...a, ...p} : a));
   const onCount = (xs: unknown[]) => xs.filter(Boolean).length;
-  return <div className="look-panel scene-fx-panel">
+  return <EffectSearch.Provider value={query}><div className="look-panel scene-fx-panel">
+    <FxGroup id="finish" items="Edge vignette · Cinema bars · Detail sharpening" title="Finishing touches" Icon={Focus} description="Guide attention, add a cinema frame or bring out fine detail." active={onCount([st.vignette,st.letterbox,st.sharpen])}>{([['vignette','Edge vignette','Darken picture edges to guide attention.'],['letterbox','Cinema bars','Add black bars inside the frame; export dimensions stay the same. Captions remain above the bars.'],['sharpen','Detail sharpening','Bring out fine detail; low amounts suit faces. Render to see the exact sharpening.']] as const).map(([id,label,help])=><section key={id} className="audio-card"><label className="switch-label"><input type="checkbox" aria-label={label} checked={!!st[id]} disabled={disabled} onChange={e=>put(id,e.target.checked?{amount:50}:null)}/>{label}</label><p className="hint">{help}</p>{st[id]&&<Row label={`${label} amount`} value={st[id].amount} min={0} max={100} onChange={amount=>put(id,{amount})} disabled={disabled}/>}</section>)}</FxGroup>
     <FxGroup id="colour" items="Split toning · Colour wheels" title="Colour grading" Icon={Palette} description="Change the mood of the picture with colour tints." active={onCount([!!tone, !!wheels])}>
     <Section title="Split toning" Icon={Blend} on={!!tone} onToggle={on => put('tone', on ? {...TONE} : null)} disabled={disabled} hint="Tint shadows and highlights with two colours, like a film grade. Shows in the preview.">
       {tone && <>
@@ -216,7 +228,7 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
     </Section>
     </FxGroup>
     <FxGroup id="explain" items="Annotations · Spotlight · Map route" title="Point things out" Icon={PenLine} description="Draw arrows, circles, routes or a spotlight to guide the viewer." active={onCount([annots.length > 0, !!sp, !!route])}>
-    <section className="look-section" aria-label="Annotations">
+    <section data-effect-title="Annotations" className="look-section" aria-label="Annotations">
       <div className="look-heading"><h3><PenLine size={15}/> Annotations</h3><span className="hint">{annots.length}/10</span></div>
       <p className="hint">Arrows, circles, underlines, boxes and callouts that draw themselves on screen to point things out. Shown on the preview; render to see them draw.</p>
       <div className="annot-add" role="group" aria-label="Add annotation">
@@ -251,22 +263,27 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
         <Timing v={sp} set={p => put('spotlight', {...sp, ...p})} disabled={disabled} name="Spotlight"/>
       </>}
     </Section>
-    <Section title="Map route" Icon={RouteIcon} on={!!route} onToggle={on => {onDraft({route: on ? {...ROUTE, points: [[20, 70], [50, 45], [78, 35]]} : null} as any); onRouteEditing?.(on);}} disabled={disabled} hint="A line that draws itself across the picture, with pins at each stop, like an army's march or a trade route.">
+    <Section title="Map route" Icon={RouteIcon} on={!!route} onToggle={on => {onDraft({route: on ? {...ROUTE, points: [[20, 70], [50, 45], [78, 35]]} : null} as any); onRouteEditing?.(on);}} disabled={disabled} hint="Draw a journey over your own map image or video. Add a map in Media first; this tool does not fetch maps. Pins, labels and a moving icon follow your stops.">
       {route && <>
+        <div className="route-presets" role="group" aria-label="Route appearance presets">{([['flight','Flight','plane','#58B6FF',true,'dashed'],['road','Road trip','car','#FFD166',true,'solid'],['sea','Sea journey','ship','#67D8D0',true,'dashed'],['march','Historical march','dot','#E8413C',false,'solid']] as const).map(([id,label,marker,color,curve,style])=><button className="btn" key={id} disabled={disabled} onClick={()=>onDraft({route:{...route,marker,color,curve,style}} as any)}>{label}</button>)}</div>
+        <p className="hint">Presets change appearance while keeping your stops, labels and timing.</p>
+        <div className="button-row"><button className="btn" disabled={disabled||route.points.length>=20} onClick={()=>onDraft({route:{...route,points:[...route.points,[50,50]],labels:[...route.points.map((_,i)=>(route.labels||[])[i]||''), '']}} as any)}>Add stop</button><button className="btn" disabled={disabled} onClick={()=>onDraft({route:{...route,points:[...route.points].reverse(),labels:route.points.map((_,i)=>(route.labels||[])[i]||'').reverse()}} as any)}>Reverse journey</button></div>
         <button className={`btn ${routeEditing ? 'primary' : ''}`} aria-pressed={!!routeEditing} disabled={disabled} onClick={() => onRouteEditing?.(!routeEditing)}><MousePointerClick size={14}/> {routeEditing ? 'Done editing points' : 'Edit points on the preview'}</button>
-        <p className="hint">{routeEditing ? 'Click the preview to add a stop; drag a stop to move it.' : `${route.points.length} stops.`}</p>
-        <div className="button-row"><button className="text-btn" disabled={disabled || route.points.length <= 2} onClick={() => onDraft({route: {...route, points: route.points.slice(0, -1)}} as any)}><Undo2 size={12}/> Remove last stop</button></div>
+        <p className="hint">{routeEditing ? 'Click the preview to add; drag to move. Tab to a stop, use arrow keys (Shift for larger steps), or Delete to remove.' : `${route.points.length} stops.`}</p>
+        <div className="button-row"><button className="text-btn" disabled={disabled || route.points.length <= 2} onClick={() => onDraft({route: removeRouteStop(route,route.points.length-1)} as any)}><Undo2 size={12}/> Remove last stop</button></div>
         <div className="adjust-row changed"><label>Colour</label><input type="color" aria-label="Route colour" value={route.color} disabled={disabled} onChange={e => onDraft({route: {...route, color: e.target.value.toUpperCase()}} as any)}/><span/><span/></div>
         <Row label="Line width" value={route.width} min={2} max={30} unit="px" onChange={width => onDraft({route: {...route, width}} as any)} disabled={disabled}/>
         <Pills label="Line" value={route.style} options={[['solid', 'Solid'], ['dashed', 'Dashed']]} onChange={style => onDraft({route: {...route, style}} as any)} disabled={disabled}/>
         <label className="switch-label finishing-toggle"><input type="checkbox" aria-label="Route pins" checked={route.pins} disabled={disabled} onChange={e => onDraft({route: {...route, pins: e.target.checked}} as any)}/> Pins at each stop</label>
         <label className="switch-label finishing-toggle"><input type="checkbox" aria-label="Route arrowhead" checked={route.arrow !== false} disabled={disabled} onChange={e => onDraft({route: {...route, arrow: e.target.checked}} as any)}/> Arrowhead at the end of the line</label>
         <label className="switch-label finishing-toggle"><input type="checkbox" aria-label="Curved route" checked={!!route.curve} disabled={disabled} onChange={e => onDraft({route: {...route, curve: e.target.checked}} as any)}/> Smooth curved path</label>
-        <Pills label="Moving icon" value={route.marker || 'none'} options={[['none', 'None'], ['dot', 'Dot'], ['plane', 'Plane'], ['ship', 'Ship'], ['car', 'Car'], ['pin', 'Pin']]} onChange={marker => onDraft({route: {...route, marker}} as any)} disabled={disabled}/>
+        <div role="radiogroup" aria-label="Moving icon" className="route-artwork-options">{['none','dot','plane','ship','car','pin'].map(marker=><button key={marker} role="radio" aria-checked={route.marker===marker} disabled={disabled} onClick={()=>{onDraft({route:{...route,marker}} as any);onRouteEditing?.(false);}}>{marker==='none'&&<span className="route-marker-none" aria-hidden="true">∅</span>}{marker==='dot'&&<span className="route-marker-dot" aria-hidden="true" style={{background:route.color}}/>}{['plane','ship','car','pin'].includes(marker)&&<img src={routeIconUrl(marker)} alt="" width={40} height={40}/>}<span>{marker[0].toUpperCase()+marker.slice(1)}</span></button>)}</div>
         <fieldset className="adjust-group route-labels"><legend>Stop labels</legend>
-          {route.points.map((_, i) => <label key={i} className="route-label-row"><span className="step-no">{i + 1}</span>
+          {route.points.map((point, i) => <div key={i} className="route-stop-card"><label className="route-label-row"><span className="step-no">{i + 1}</span>
             <StopLabelInput index={i} value={(route.labels || [])[i] || ''}
-              onCommit={text => {const labels = [...(route.labels || [])]; while (labels.length < route.points.length) labels.push(''); labels[i] = text; onDraft({route: {...route, labels: labels.slice(0, route.points.length)}} as any);}}/></label>)}
+              onCommit={text => {const labels = route.points.map((_,k)=>(route.labels||[])[k]||''); labels[i] = text; onDraft({route: {...route, labels}} as any);}}/></label>
+            <div className="route-stop-position">{(['Left–right','Up–down'] as const).map((label,axis)=><label key={label}>{label} %<input type="number" aria-label={`Route stop ${i+1} ${label}`} min={0} max={100} step={1} value={point[axis]} disabled={disabled} onChange={e=>onDraft({route:{...route,points:route.points.map((p,k)=>k===i?p.map((v,a)=>a===axis?Math.max(0,Math.min(100,Number(e.target.value)||0)):v):p)}} as any)}/></label>)}<button className="icon-btn" aria-label={`Remove route stop ${i+1}`} disabled={disabled||route.points.length<=2} onClick={()=>onDraft({route:removeRouteStop(route,i)} as any)}><Trash2 size={14}/></button></div>
+          </div>)}
           <p className="hint">Names appear when the line reaches each stop, e.g. cities or dates.</p>
         </fieldset>
         <div className="audio-times">
@@ -297,7 +314,7 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
     </Section>
     </FxGroup>
     <FxGroup id="intro" items="Countdown intro" title="Scene intro" Icon={Timer} description="A countdown that plays before this scene." active={onCount([!!(st as any).countdown])}>
-    <section className="look-section" aria-label="Countdown intro">
+    <section data-effect-title="Countdown intro" className="look-section" aria-label="Countdown intro">
       <div className="look-heading"><h3><Timer size={15}/> Countdown intro</h3>
         <button role="switch" aria-checked={!!(st as any).countdown} aria-label="Countdown intro" className={`fx-switch ${(st as any).countdown ? 'on' : ''}`} disabled={disabled}
           onClick={() => put('countdown', (st as any).countdown ? null : {style: 'film', seconds: 5, beep: 'each', tone: 'bw', color: '#8F7CF0'})}><span/></button></div>
@@ -311,7 +328,7 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
       </>;})()}
     </section>
     </FxGroup>
-  </div>;
+  </div></EffectSearch.Provider>;
 }
 
 /** Live approximations over the editor preview. */
@@ -329,6 +346,8 @@ export function SceneFxPreview({look, shots = [], filter, aspect = 16 / 9}: {loo
     grid4: [[0, 0, 50, 50], [50, 0, 50, 50], [0, 50, 50, 50], [50, 50, 50, 50]]} as Record<string, [number, number, number, number][]>)[layout.type];
   const gapPct = layout ? layout.gap / 1080 * 100 / 2 : 0;
   return <div className="scenefx-preview" aria-hidden="true">
+    {look.vignette&&!look.fx_bypass?.includes('vignette')&&<div className="finish-vignette" style={{position:'absolute',inset:0,background:`radial-gradient(ellipse at center,transparent 30%,rgba(0,0,0,${look.vignette.amount/125}) 100%)`}}/>}
+    {look.letterbox&&!look.fx_bypass?.includes('letterbox')&&<><div style={{position:'absolute',left:0,right:0,top:0,height:`${look.letterbox.amount*.18}%`,background:'black'}}/><div style={{position:'absolute',left:0,right:0,bottom:0,height:`${look.letterbox.amount*.18}%`,background:'black'}}/></>}
     {layout && shots.length >= 2 && <div className="fx-layout" style={{background: layout.bg, filter}}>
       {cells.slice(0, shots.length).map(([x, y, w, h], i) => <div key={i} className="fx-cell" style={{left: `calc(${x}% + ${x > 0 ? gapPct : 0}%)`, top: `calc(${y}% + ${y > 0 ? gapPct * 16 / 9 : 0}%)`,
         width: `calc(${w}% - ${gapPct}%)`, height: `calc(${h}% - ${gapPct * 16 / 9}%)`, backgroundImage: `url(/api/assets/${shots[i].asset_id}/thumbnail?w=640)`}}/>)}
@@ -359,6 +378,18 @@ export function SceneFxPreview({look, shots = [], filter, aspect = 16 / 9}: {loo
 }
 
 
+export function removeRouteStop(route:RouteFx,index:number):RouteFx {
+ if(route.points.length<=2)return route;
+ return {...route,points:route.points.filter((_,i)=>i!==index),labels:route.points.map((_,i)=>(route.labels||[])[i]||'').filter((_,i)=>i!==index)};
+}
+export function routeStopKey(route:RouteFx,index:number,key:string,shift=false):RouteFx {
+ if(key==='Delete'||key==='Backspace')return removeRouteStop(route,index);
+ const axis=key==='ArrowLeft'||key==='ArrowRight'?0:key==='ArrowUp'||key==='ArrowDown'?1:-1;
+ if(axis<0)return route;
+ const step=(key==='ArrowLeft'||key==='ArrowUp'?-1:1)*(shift?5:1);
+ return {...route,points:route.points.map((p,i)=>i===index?p.map((v,a)=>a===axis?Math.max(0,Math.min(100,v+step)):v):p)};
+}
+
 /** Route point editing on the preview: click to add a stop, drag to move. */
 export function RouteCanvas({route, onChange}: {route: RouteFx; onChange: (r: RouteFx, save: boolean) => void}) {
   const box = React.useRef<HTMLDivElement>(null);
@@ -375,7 +406,7 @@ export function RouteCanvas({route, onChange}: {route: RouteFx; onChange: (r: Ro
     window.addEventListener('pointermove', move); window.addEventListener('pointerup', up);
   }
   return <div ref={box} className="route-canvas" aria-label="Route editor: click to add a stop" onPointerDown={add}>
-    {route.points.map((p, i) => <span key={i} className="route-point" role="button" aria-label={`Route stop ${i + 1}`} tabIndex={0} style={{left: `${p[0]}%`, top: `${p[1]}%`, background: route.color}} onPointerDown={e => drag(i, e)}>{i + 1}</span>)}
+    {route.points.map((p, i) => <span key={i} className="route-point" role="button" aria-label={`Route stop ${i + 1}`} tabIndex={0} title="Arrow keys move · Shift moves faster · Delete removes" onKeyDown={e=>{if(['ArrowLeft','ArrowRight','ArrowUp','ArrowDown','Delete','Backspace'].includes(e.key)){e.preventDefault();e.stopPropagation();const next=routeStopKey(route,i,e.key,e.shiftKey);if(next!==route)onChange(next,true);}}} style={{left: `${p[0]}%`, top: `${p[1]}%`, background: route.color}} onPointerDown={e => drag(i, e)}>{i + 1}</span>)}
   </div>;
 }
 

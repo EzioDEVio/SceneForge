@@ -136,6 +136,11 @@ def restore_snapshot(db: Session, project_id: str, snap_id: str) -> Project:
         rows, meta = data["rows"], data.get("meta", {})
     except (OSError, ValueError, KeyError):
         raise SnapshotError("That restore point could not be read.") from None
+    return restore_rows(db, rows, meta)
+
+
+def restore_rows(db: Session, rows: dict, meta: dict, title: str | None = None) -> Project:
+    """Instantiate saved rows with fresh IDs; shared by restore points and templates."""
     ids: dict[str, str] = {}
     for key in ("project",):
         ids[rows[key]["id"]] = str(uuid.uuid4())
@@ -155,7 +160,7 @@ def restore_snapshot(db: Session, project_id: str, snap_id: str) -> Project:
         stamp = datetime.fromisoformat(when).astimezone().strftime("%b %d %H:%M")
     except ValueError:
         stamp = "earlier"
-    title = f"{rows['project'].get('title') or 'Project'} (restored {stamp})"[:255]
+    title = title or f"{rows['project'].get('title') or 'Project'} (restored {stamp})"[:255]
     project = build(Project, rows["project"], title=title, revision=1)
     db.add(project)
     db.flush()

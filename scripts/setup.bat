@@ -24,11 +24,7 @@ echo [OK] python, node, ffmpeg, ffprobe all found on PATH.
 echo.
 
 echo Setting up backend (Python virtual environment)...
-cd /d "%~dp0..\backend"
-if not exist ".venv" python -m venv .venv
-call .venv\Scripts\activate.bat
-python -m pip install --upgrade pip
-pip install -r requirements.txt
+python "%~dp0windows_runtime.py" setup
 if errorlevel 1 goto :pip_failed
 echo [OK] Backend dependencies installed.
 echo.
@@ -49,14 +45,14 @@ pause
 exit /b 0
 
 :no_python
-echo [ERROR] Python was not found on PATH. Install Python 3.11+ from
+echo [ERROR] Python was not found on PATH. Install Python 3.12 from
 echo         https://www.python.org/downloads/ and re-run this script.
 echo         IMPORTANT: check "Add python.exe to PATH" during install.
 pause
 exit /b 1
 
 :no_node
-echo [ERROR] Node.js was not found on PATH. Install Node 20+ LTS from
+echo [ERROR] Node.js was not found on PATH. Install Node 22.12+ LTS from
 echo         https://nodejs.org/ and re-run this script.
 pause
 exit /b 1

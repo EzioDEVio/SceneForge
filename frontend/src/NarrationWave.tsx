@@ -11,7 +11,7 @@ export function NarrationWave({take}: {take: VoiceTake}) {
   if (!wave || !src) return null;
   const e = take.edit_json || {};
   const from = (e.in_ms || 0) / src, to = (e.out_ms ?? src) / src;
-  return <WavePath peaks={wave.peaks} from={from} to={to} height={30} className="narration-wave"/>;
+  return <span className="narration-wave-wrap" style={{position:'relative',display:'block',height:30}}><WavePath peaks={wave.peaks} from={from} to={to} height={30} className="narration-wave"/>{(e.censor||[]).map((r,i)=>{const start=Math.max(r.start_ms/src,from),end=Math.min(r.end_ms/src,to);return end>start?<span key={i} className="audio-censor-band" aria-label={`${r.mode} narration range`} style={{position:'absolute',top:0,bottom:0,left:(start-from)/(to-from)*100+'%',width:(end-start)/(to-from)*100+'%',background:'#aa77dd55',pointerEvents:'none'}}/>:null;})}</span>;
 }
 
 /**

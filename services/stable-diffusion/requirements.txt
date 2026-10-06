@@ -1,0 +1,8 @@
+fastapi==0.115.11
+uvicorn==0.34.0
+diffusers==0.32.2
+transformers==4.49.0
+accelerate==1.4.0
+safetensors==0.5.3
+numpy==1.26.4
+Pillow==11.1.0

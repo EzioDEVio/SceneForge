@@ -42,14 +42,22 @@ def status():
     except Exception: pass
     if _process and _process.poll() is None:
         return {'state':'starting' if time.time()-_started<300 else 'failed','ready':False,'message':'Loading model…' if time.time()-_started<300 else 'Startup exceeded five minutes. View the log; the process is still running.'}
+    from app.managed_ai import preferences
+    if _started and time.time()-_started<600 and 'stable_diffusion' in preferences().get('components',[]):
+        return {'state':'starting','ready':False,'message':'Loading installed Stable Diffusion. Check AI Engines for setup progress.'}
     return {'state':'failed' if _process else 'stopped','ready':False,'message':'Stable Diffusion API is unavailable. Start the engine or inspect the startup log.'}
 
 def start():
     global _process,_started
     with _lock:
         state=status()
-        if state['ready'] or (_process and _process.poll() is None): return state
+        if state['ready'] or state['state']=='starting' or (_process and _process.poll() is None): return state
         if os.name!='nt': return {'state':'failed','ready':False,'message':'Automatic launch is available on Windows. Start your local API manually on this platform.'}
+        from app import managed_ai
+        if 'stable_diffusion' in managed_ai.preferences().get('components',[]):
+            _started=time.time()
+            threading.Thread(target=managed_ai.autostart,kwargs={'force':True,'services':['stable_diffusion']},daemon=True).start()
+            return {'state':'starting','ready':False,'message':'Starting installed Stable Diffusion. CPU model loading can take several minutes.'}
         root=Path(settings()['folder'])
         if not (root/'webui-user.bat').is_file():
             return {'state':'failed','ready':False,'message':f'webui-user.bat not found in {root}. Select your installation folder in Local engine setup, then save and start.'}

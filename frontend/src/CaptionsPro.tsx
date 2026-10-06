@@ -68,9 +68,11 @@ export function captionCss(f: F, scale = 1): React.CSSProperties {
 
 /** Live caption preview on the editor picture: first phrase (or whole text) with the chosen
  *  style, position and a sample word highlight. The render is exact; this is close. */
-export function CaptionPreview({font, text, projectW, projectH}: {font: F; text: string; projectW: number; projectH: number}) {
+export function CaptionPreview({font, text, projectW, projectH,time=0}: {font: F; text: string; projectW: number; projectH: number;time?:number}) {
   if (!font.captions_enabled || !text.trim() || font.typewriter) return null;
-  const words = text.trim().split(/\s+/);
+  const segment=(font.caption_segments||[]).find((s:any)=>time>=s.start_ms&&time<s.end_ms);
+  if(font.caption_segments?.length&&!segment)return null;
+  const words:string[] = String(segment?.text||text).trim().split(/\s+/);
   const shown = font.split === 'phrases' ? words.slice(0, Math.max(1, Number(font.phrase_words || 3))) : words;
   const hiIdx = font.karaoke ? Math.min(1, shown.length - 1) : -1;
   const hi = font.highlight_color || '#FFD84D';
@@ -84,14 +86,14 @@ export function CaptionPreview({font, text, projectW, projectH}: {font: F; text:
     ...(pos === 'top' ? {top: `${base + Number(font.offset_y || 0)}%`} : pos === 'middle' ? {top: '50%', transform: 'translateY(-50%)'} : {bottom: `${base + Number(font.offset_y || 0)}%`}),
   };
   return <div className="caption-preview" aria-hidden="true" style={{position: 'absolute', zIndex: 5, pointerEvents: 'none', ...style, background: 'transparent', padding: 0}} dir="auto">
-    <span style={{...captionCss(font, 0.9), fontSize: 'inherit', display: 'inline', boxDecorationBreak: 'clone', WebkitBoxDecorationBreak: 'clone', lineHeight: 1.35}}>
+    <span style={{...captionCss(font, 0.9), fontSize: 'inherit', display: 'inline', position:'relative', boxDecorationBreak: 'clone', WebkitBoxDecorationBreak: 'clone', lineHeight: 1.35}}>
       {shown.map((w, i) => {
         const cur = i === hiIdx, st = font.karaoke_style || 'fill';
         const wStyle: React.CSSProperties = !cur ? {} : st === 'box' ? {background: hi, borderRadius: '0.25em', padding: '0 0.18em', color: font.color || '#fff'}
           : st === 'underline' ? {color: hi, textDecoration: 'underline'} : st === 'pop' ? {color: hi, fontSize: '1.2em'} : st === 'glow' ? {color: hi, textShadow: `0 0 0.35em ${hi}`} : {color: hi};
         return <React.Fragment key={i}><span style={wStyle}>{w}</span>{i < shown.length - 1 ? ' ' : ''}</React.Fragment>;
       })}
-    </span>
+    {segment?.emoji&&<img className="caption-emoji-preview" alt="" src={`/api/stickers/${encodeURIComponent(segment.emoji)}/image`} style={{position:'absolute',width:'1.25em',height:'1.25em',objectFit:'contain',top:0,...(segment.emoji_side==='left'?{right:'100%'}:{left:'100%'})}}/>}</span>
   </div>;
 }
 

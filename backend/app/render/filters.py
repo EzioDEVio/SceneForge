@@ -27,6 +27,10 @@ _MOTION_PRESETS: dict[str, tuple[float, float, float, float, float, float]] = {
     MotionType.DIAGONAL_DOWN: (0.3, 0.3, 1.25, 0.7, 0.7, 1.25),
     MotionType.PUSH_LEFT: (0.65, 0.5, 1.05, 0.3, 0.5, 1.35),
     MotionType.PULL_RIGHT: (0.3, 0.5, 1.35, 0.65, 0.5, 1.05),
+    'push_right': (.3,.5,1.05,.65,.5,1.35),
+    'pull_left': (.65,.5,1.35,.3,.5,1.05),
+    'rise_left': (.7,.7,1.25,.3,.3,1.25),
+    'drop_left': (.7,.3,1.25,.3,.7,1.25),
     MotionType.CLOSE_UP: (0.5, 0.5, 1.0, 0.5, 0.5, 1.4),
 }
 
@@ -107,8 +111,10 @@ def build_cover_motion_chain(
     # in the chain are the *animated* scaled size from stage 2 — ffmpeg
     # resolves iw/ih per-frame automatically, so this tracks the zoom
     # without Python needing to know the numeric baseline size.
-    x_expr = f"clip({fx}*iw-{out_w}/2,0,iw-{out_w})"
-    y_expr = f"clip({fy}*ih-{out_h}/2,0,ih-{out_h})"
+    cw = "iw" if z0 == z1 else f"(ceil((iw/{z0})*({zt})/2)*2)"
+    ch = "ih" if z0 == z1 else f"(ceil((ih/{z0})*({zt})/2)*2)"
+    x_expr = f"clip({fx}*{cw}-{out_w}/2,0,{cw}-{out_w})"
+    y_expr = f"clip({fy}*{ch}-{out_h}/2,0,{ch}-{out_h})"
 
     stage_a = f"scale={out_w}:{out_h}:force_original_aspect_ratio=increase"
     stage_b = f"scale=w='ceil(iw*({zt})/2)*2':h='ceil(ih*({zt})/2)*2':eval=frame"

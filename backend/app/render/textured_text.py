@@ -13,6 +13,7 @@ OpenType features beyond joining (e.g. some ligatures, mark positioning in Amiri
 are therefore approximate.
 """
 from __future__ import annotations
+from app.render.font_runtime import load_font
 
 import re
 from pathlib import Path
@@ -21,10 +22,21 @@ PRESETS = ("lava", "neon", "gold", "chrome", "marble", "ice", "fire", "pixel", "
 FONTS = {
     "Anton": "Anton-Regular.ttf", "Bebas Neue": "BebasNeue-Regular.ttf", "Poppins": "Poppins-Bold.ttf",
     "Noto Sans": "NotoSans-Bold.ttf", "Pacifico": "Pacifico-Regular.ttf", "Lalezar": "Lalezar-Regular.ttf",
+    "Noto Sans Arabic": "NotoSansArabic-Regular.ttf", "Amiri": "Amiri-Bold.ttf",
+    'DejaVu Sans': 'DejaVuSans.ttf',
+    'DejaVu Serif': 'DejaVuSerif.ttf',
+    'DejaVu Sans Mono': 'DejaVuSansMono.ttf',
+    'Latin Modern Sans': 'lmsans10-regular.otf',
+    'Latin Modern Roman': 'lmroman10-regular.otf',
+    'Latin Modern Mono': 'lmmono10-regular.otf',
+    'Latin Modern Roman Slanted': 'lmromanslant10-regular.otf',
+    'Latin Modern Sans Demi Cond': 'lmsansdemicond10-regular.otf',
+    'Latin Modern Mono Caps': 'lmmonocaps10-regular.otf',
     "Tajawal": "Tajawal-Bold.ttf", "Noto Naskh Arabic": "NotoNaskhArabic-Bold.ttf",
 }
 # Latin-only display faces get an Arabic partner when the text contains Arabic.
 _ARABIC_FALLBACK = {"Anton": "Lalezar", "Bebas Neue": "Lalezar", "Poppins": "Tajawal", "Noto Sans": "Noto Naskh Arabic", "Pacifico": "Lalezar"}
+_ARABIC_FALLBACK.update({f: 'Noto Naskh Arabic' for f in FONTS if f.startswith(('DejaVu', 'Latin Modern'))})
 _ARABIC = re.compile(r"[؀-ۿݐ-ݿࢠ-ࣿﭐ-﷿ﹰ-﻿]")
 MAX_CHARS = 80
 
@@ -178,7 +190,7 @@ def render_textured_text(text: str, texture, font: str = "Anton", size: int = 16
     oc, gc = _rgb(outline_color), _rgb(glow_color)
     arabic = bool(_ARABIC.search(text))
     try:
-        fnt = ImageFont.truetype(str(_font_path(font, arabic)), size, layout_engine=ImageFont.Layout.BASIC)
+        fnt = load_font(str(_font_path(font, arabic)), size, layout_engine=ImageFont.Layout.BASIC)
     except OSError as e:
         raise TexturedTextError(f"The font could not be loaded: {e}")
     shaped = "\n".join(_shape(line) for line in text.splitlines() if line.strip())
@@ -246,7 +258,7 @@ def render_knockout_card(text: str, width: int, height: int, font: str = "Anton"
     scale = height / 1080                        # size and outline are given at 1080p
     px, ol, sp = max(12, int(size * scale)), int(round(outline * scale)), int(round(spacing * scale))
     try:
-        fnt = ImageFont.truetype(str(_font_path(font, arabic)), px, layout_engine=ImageFont.Layout.BASIC)
+        fnt = load_font(str(_font_path(font, arabic)), px, layout_engine=ImageFont.Layout.BASIC)
     except OSError as e:
         raise TexturedTextError(f"The font could not be loaded: {e}")
     lines = [_shape(line) for line in text.splitlines() if line.strip()]
@@ -263,7 +275,7 @@ def render_knockout_card(text: str, width: int, height: int, font: str = "Anton"
     if widest > room > 0:
         px = max(12, int(px * room / widest))
         sp = int(round(sp * room / widest))
-        fnt = ImageFont.truetype(str(_font_path(font, arabic)), px, layout_engine=ImageFont.Layout.BASIC)
+        fnt = load_font(str(_font_path(font, arabic)), px, layout_engine=ImageFont.Layout.BASIC)
 
     def line_width(line: str) -> int:  # noqa: F811  (re-measured with the fitted font)
         if not sp or arabic:

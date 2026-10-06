@@ -66,7 +66,21 @@ try:
  with tempfile.TemporaryDirectory(prefix='sceneforge-combined-') as tmp:
     tmp=pathlib.Path(tmp)
     with open(tmp/'server.log','w') as log:
-      proc=subprocess.Popen([sys.executable,'-m','uvicorn','app.main:app','--port','8139'],cwd=ROOT/'backend',env={**os.environ,'SCENEFORGE_DATA_DIR':str(tmp)},stdout=log,stderr=log)
+      # Test-only in-memory vault: CI has no unlocked native credential store.
+      # Provider keys remain opaque references through the real API/security code.
+      child = """
+from app.security import secrets
+class FixtureVault:
+    def __init__(self): self.values = {}
+    def set_password(self, service, key, value): self.values[(service,key)] = value
+    def get_password(self, service, key): return self.values.get((service,key))
+    def delete_password(self, service, key): self.values.pop((service,key),None)
+fixture_vault = FixtureVault()
+secrets.vault = lambda: fixture_vault
+import uvicorn
+uvicorn.run('app.main:app',host='127.0.0.1',port=8139)
+"""
+      proc=subprocess.Popen([sys.executable,'-c',child],cwd=ROOT/'backend',env={**os.environ,'SCENEFORGE_DATA_DIR':str(tmp)},stdout=log,stderr=log)
       try:
         for _ in range(100):
             try:
@@ -78,7 +92,9 @@ try:
         with sqlite3.connect(tmp/'sceneforge.db') as db:db.execute('UPDATE projects SET width=640,height=360 WHERE id=?',(pid,))
         scenes=call('GET','/api/projects/'+pid)['scenes'];sid=scenes[0]['id']
         res=requests.post(base+f'/api/projects/{pid}/export?skip_empty=true',timeout=10)
-        check('all-empty export rejected before creating a job',res.status_code==400 and 'at least one' in res.text)
+        check('all-empty export rejected before creating a job',res.status_code==400 and res.json()['detail']=='Add media to the timeline before exporting.')
+        with sqlite3.connect(tmp/'sceneforge.db') as db:
+            check('empty export creates no durable job', db.execute('SELECT count(*) FROM render_jobs').fetchone()[0] == 0)
         asset=call('POST',f'/api/assets/upload?project_id={pid}',files={'file':('fixture.png',png,'image/png')})
         for s in scenes[:2]:
             call('POST',f'/api/scenes/{s["id"]}/shots',json={'asset_id':asset['id']})

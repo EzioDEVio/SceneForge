@@ -13,6 +13,7 @@ import os
 import signal
 import subprocess
 from dataclasses import dataclass
+from pathlib import Path
 
 from app.config import FFMPEG_BIN, FFPROBE_BIN
 
@@ -115,6 +116,7 @@ def run_ffmpeg(
     log_path: str | None = None,
     on_progress=None,
     cancel_check=None,
+    cwd: str | Path | None = None,
 ) -> None:
     """Run ffmpeg with -progress piped to stdout so we can report real,
     stage-accurate progress (not a simulated bar). `args` must NOT include
@@ -163,6 +165,7 @@ def run_ffmpeg(
                 bufsize=1,
                 preexec_fn=preexec_fn,
                 creationflags=creationflags,
+                cwd=cwd,
             )
         except FileNotFoundError as exc:
             raise FFmpegError(
@@ -181,7 +184,17 @@ def run_ffmpeg(
                     on_progress(key, value)
             proc.wait()
         finally:
-            pass
+            # Cancellation/progress errors must reap the child before returning.
+            # Otherwise its pipes/process can linger into the next render.
+            if proc.poll() is None:
+                terminate_process_tree(proc)
+            try:
+                proc.wait(timeout=5)
+            except subprocess.TimeoutExpired:
+                proc.kill()
+                proc.wait(timeout=5)
+            if proc.stdout is not None:
+                proc.stdout.close()
         if proc.returncode not in (0, None):
             stderr_fh.flush()
             stderr_text = open(log_path, encoding="utf-8", errors="replace").read()
@@ -203,6 +216,7 @@ def terminate_process_tree(proc: subprocess.Popen) -> None:
             subprocess.run(
                 ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
                 capture_output=True,
+                timeout=5,
             )
         else:
             os.killpg(os.getpgid(proc.pid), signal.SIGKILL)

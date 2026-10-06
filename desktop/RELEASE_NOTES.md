@@ -1,3 +1,12 @@
+# SceneForge Studio 0.9.3 — source review, release pending
+
+- Reconstructed editor stages from the owner's Stage 1–5 HTML reports and visual review after the earlier source checkpoint was unavailable. This is a fresh implementation, not a recovered copy of the lost commits.
+- Atomic Motion/Effects drafts and real render previews; Apply, Cancel, retry and shared Undo/Redo, with isolated preview metadata.
+- Inspector sections and scope labels, laptop toolbar wrapping, keyboard menu navigation, light-theme caption readability and a fixed Text preview footer.
+- Shared plane/ship/car/pin artwork, destination preview, four additional movements and centered zoom correction.
+- Script import opens the first new scene; AutoCut source thumbnails and scrub preview; effective GIF size/rate and project-FPS export labels.
+- Version alignment and offline release/archive gates; Windows, native vault and installer validation remain pending.
+
 # SceneForge Studio 0.9.2
 
 A quick fix for Video inside text. Everything in 0.9.1 is included.

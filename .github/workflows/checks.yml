@@ -18,8 +18,23 @@ jobs:
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg gnome-keyring dbus-x11
       - run: python -m pip install -r backend/requirements.txt httpx
       - run: npm --prefix frontend ci
+      - run: python scripts/check_release_versions.py
       - run: npm --prefix frontend run build
       - run: npm --prefix frontend test
+      - name: Release file verification regressions (offline)
+        run: python -m unittest discover -s desktop/tests -p 'test_release*.py' -v
+      - name: Isolated editor draft renderer regressions
+        run: |
+          python tests/integration/test_editor_drafts.py
+          python tests/integration/test_recovered_motion.py
+          python tests/integration/test_route_owner_fixes.py
+          python tests/integration/test_autocut_continuous.py
+      - name: Install editor browser test tooling
+        run: |
+          npm --prefix tests/browser ci
+          npm --prefix tests/browser exec -- playwright install --with-deps chromium
+      - name: Timeline upload, title-card, shortcut and overlay browser regressions
+        run: npm --prefix tests/browser test
       - name: Credential migration and combined render checks with native vault
         run: |
           dbus-run-session -- bash -e -c '
@@ -40,6 +55,7 @@ jobs:
             python tests/integration/test_text_motion.py
             python tests/integration/test_v06.py
             python tests/integration/test_caption_segments.py
+            python tests/integration/test_caption_long_path.py
             python tests/integration/test_effect_presets_addon.py
             python tests/integration/test_effects_rc6.py
             python tests/integration/test_effect_params.py
@@ -62,4 +78,11 @@ jobs:
             python tests/integration/test_090_features.py
             python tests/integration/test_091_fixes.py
             python tests/integration/test_keyframes_playback.py
+            python tests/integration/test_timeline_layers.py
+            python tests/integration/test_video_layers.py
+            python tests/integration/test_censor_caption_fx.py
+            python tests/integration/test_story_tools.py
+            python tests/integration/test_free_timeline.py
+            python tests/integration/test_owner_font_preview.py
+            python tests/integration/test_managed_ai.py
           '
