@@ -1,0 +1,276 @@
+{
+  "version": "0.9.3",
+  "date": "2026-10-06",
+  "integration_sweep": [
+    {
+      "test": "tests/integration/test_editor_drafts.py",
+      "status": "pass",
+      "seconds": 2.0
+    },
+    {
+      "test": "tests/integration/test_recovered_motion.py",
+      "status": "pass",
+      "seconds": 0.7
+    },
+    {
+      "test": "tests/integration/test_route_owner_fixes.py",
+      "status": "pass",
+      "seconds": 5.7
+    },
+    {
+      "test": "tests/integration/test_autocut_continuous.py",
+      "status": "pass",
+      "seconds": 2.5
+    },
+    {
+      "test": "tests/integration/test_combined.py",
+      "status": "pass",
+      "seconds": 13.4
+    },
+    {
+      "test": "tests/integration/test_editor_plus.py",
+      "status": "pass",
+      "seconds": 1.1
+    },
+    {
+      "test": "tests/integration/test_hosted_adapters.py",
+      "status": "pass",
+      "seconds": 0.9
+    },
+    {
+      "test": "tests/integration/test_timeline.py",
+      "status": "pass",
+      "seconds": 6.2
+    },
+    {
+      "test": "tests/integration/test_text_thumbs.py",
+      "status": "pass",
+      "seconds": 1.7
+    },
+    {
+      "test": "tests/integration/test_looks.py",
+      "status": "pass",
+      "seconds": 24.0
+    },
+    {
+      "test": "tests/integration/test_audio_edit.py",
+      "status": "pass",
+      "seconds": 5.2
+    },
+    {
+      "test": "tests/integration/test_old_film.py",
+      "status": "pass",
+      "seconds": 36.7
+    },
+    {
+      "test": "tests/integration/test_overlays.py",
+      "status": "pass",
+      "seconds": 19.2
+    },
+    {
+      "test": "tests/integration/test_effects_pack.py",
+      "status": "pass",
+      "seconds": 18.1
+    },
+    {
+      "test": "tests/integration/test_batch_b.py",
+      "status": "pass",
+      "seconds": 19.4
+    },
+    {
+      "test": "tests/integration/test_text_motion.py",
+      "status": "pass",
+      "seconds": 3.5
+    },
+    {
+      "test": "tests/integration/test_v06.py",
+      "status": "pass",
+      "seconds": 17.7,
+      "initial_status": "fail",
+      "rerun_evidence": "stability-v06-rerun.log",
+      "note": "Exact expected sound settings updated for normalized censor: []; all46checks pass on full rerun."
+    },
+    {
+      "test": "tests/integration/test_caption_segments.py",
+      "status": "pass",
+      "seconds": 0.2
+    },
+    {
+      "test": "tests/integration/test_caption_long_path.py",
+      "status": "pass",
+      "seconds": 0.8
+    },
+    {
+      "test": "tests/integration/test_effect_presets_addon.py",
+      "status": "pass",
+      "seconds": 0.4
+    },
+    {
+      "test": "tests/integration/test_effects_rc6.py",
+      "status": "pass",
+      "seconds": 9.2
+    },
+    {
+      "test": "tests/integration/test_effect_params.py",
+      "status": "pass",
+      "seconds": 7.4
+    },
+    {
+      "test": "tests/integration/test_fx_stack_presets.py",
+      "status": "pass",
+      "seconds": 8.6
+    },
+    {
+      "test": "tests/integration/test_share_location.py",
+      "status": "pass",
+      "seconds": 0.8
+    },
+    {
+      "test": "tests/integration/test_video_generation.py",
+      "status": "pass",
+      "seconds": 1.0
+    },
+    {
+      "test": "tests/integration/test_local_transcribe.py",
+      "status": "pass",
+      "seconds": 0.3
+    },
+    {
+      "test": "tests/integration/test_stale_jobs.py",
+      "status": "pass",
+      "seconds": 1.5
+    },
+    {
+      "test": "tests/integration/test_rc6_timeline_audio.py",
+      "status": "pass",
+      "seconds": 3.4
+    },
+    {
+      "test": "tests/integration/test_cutout.py",
+      "status": "pass",
+      "seconds": 19.4
+    },
+    {
+      "test": "tests/integration/test_video_cutout.py",
+      "status": "pass",
+      "seconds": 46.8
+    },
+    {
+      "test": "tests/integration/test_voice_isolation.py",
+      "status": "pass",
+      "seconds": 47.3
+    },
+    {
+      "test": "tests/integration/test_textured_title.py",
+      "status": "pass",
+      "seconds": 3.1
+    },
+    {
+      "test": "tests/integration/test_library_rc9.py",
+      "status": "pass",
+      "seconds": 9.6
+    },
+    {
+      "test": "tests/integration/test_rc8_audio.py",
+      "status": "pass",
+      "seconds": 3.4
+    },
+    {
+      "test": "tests/integration/test_rc9_timeline.py",
+      "status": "pass",
+      "seconds": 3.3
+    },
+    {
+      "test": "tests/integration/test_071_usability.py",
+      "status": "pass",
+      "seconds": 1.4
+    },
+    {
+      "test": "tests/integration/test_reframe_gpu.py",
+      "status": "pass",
+      "seconds": 32.4
+    },
+    {
+      "test": "tests/integration/test_cleanup.py",
+      "status": "pass",
+      "seconds": 5.0
+    },
+    {
+      "test": "tests/integration/test_090_features.py",
+      "status": "pass",
+      "seconds": 18.3
+    },
+    {
+      "test": "tests/integration/test_091_fixes.py",
+      "status": "pass",
+      "seconds": 8.0
+    },
+    {
+      "test": "tests/integration/test_keyframes_playback.py",
+      "status": "pass",
+      "seconds": 11.8
+    },
+    {
+      "test": "tests/integration/test_timeline_layers.py",
+      "status": "pass",
+      "seconds": 12.0
+    },
+    {
+      "test": "tests/integration/test_video_layers.py",
+      "status": "pass",
+      "seconds": 6.4
+    },
+    {
+      "test": "tests/integration/test_censor_caption_fx.py",
+      "status": "pass",
+      "seconds": 5.7
+    },
+    {
+      "test": "tests/integration/test_story_tools.py",
+      "status": "pass",
+      "seconds": 4.9
+    },
+    {
+      "test": "tests/integration/test_owner_font_preview.py",
+      "status": "pass",
+      "seconds": 5.3
+    }
+  ],
+  "additional_integration": {
+    "free_timeline": "pass",
+    "managed_ai": "pass",
+    "stability_stress": "pass",
+    "finishing": "pass:29 checks",
+    "credentials": "blocked: D-Bus socket denied by execution environment"
+  },
+  "browser_harnesses": 9,
+  "browser_status": "pass",
+  "frontend_test_groups": 14,
+  "frontend_status": "pass",
+  "desktop_test_cases": 18,
+  "desktop_status": "pass",
+  "release_gate_test_cases": 31,
+  "release_gate_status": "pass",
+  "nsis_test_cases": 3,
+  "nsis_status": "pass",
+  "production_frontend_build": "pass",
+  "stress": {
+    "source_fixtures": "generated two-second videos with embedded audio",
+    "output_size": "320x180",
+    "scene_excerpts": 60,
+    "video_tracks": 6,
+    "sequential_saves": 80,
+    "reads": 120,
+    "concurrent_read_clients": 8,
+    "consecutive_actual_exports": 8,
+    "output_duration_seconds": 4,
+    "elapsed_seconds": 43.8
+  },
+  "source_sha256": {
+    "frontend/src/App.tsx": "40fefcc9448ffbc68ca1b795a3221041bd69f1adee0d9871e2bf4325b0a10e55",
+    "backend/app/managed_ai.py": "dc925270f2cfd981529923d84fcd7801627f2505ae2c2e9f11bec96808b2bf71"
+  },
+  "final_integration_script_count": 50,
+  "packaged_at_validation": false,
+  "pushed_at_validation": false
+}

@@ -848,7 +848,10 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.clear(visibleEditor().getByRole('textbox',{name:'Narration script'}));
  await user.type(visibleEditor().getByRole('textbox',{name:'Narration script'}),'Recoverable draft');
  await waitFor(()=>assert.equal(screen.getByRole('status').textContent,'Save failed'),{timeout:2500});
- check('save failure keeps the draft and blocks export',visibleEditor().getByRole('textbox',{name:'Narration script'}).value==='Recoverable draft'&&screen.getByRole('button',{name:'Export video'}).disabled);
+ failNextPatch=true;
+ await user.click(screen.getByRole('button',{name:'Export video'}));
+ await waitFor(()=>assert.ok(screen.getAllByRole('alert').some(el=>el.textContent.includes('Could not finish saving'))));
+ check('save failure keeps the draft and blocks export with recovery guidance',visibleEditor().getByRole('textbox',{name:'Narration script'}).value==='Recoverable draft'&&!screen.queryByRole('dialog',{name:'Export video'}));
  await user.click(screen.getByRole('button',{name:'Retry text save / dismiss'}));await saved();
  check('failed save can be retried',project.scenes.find(s=>s.id===firstId).spoken_text==='Recoverable draft');
  await user.clear(screen.getByRole('textbox',{name:'Project name',exact:true}));

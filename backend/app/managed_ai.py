@@ -9,6 +9,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import threading
 import time
 import requests
@@ -50,7 +51,14 @@ def report(message, **patch):
         tmp = DATA_DIR/'ai-install-status.tmp'
         tmp.write_text(json.dumps(_state), encoding='utf-8')
         tmp.replace(DATA_DIR/'ai-install-status.json')
-    print('[Local AI] ' + message, flush=True)
+    line = '[Local AI] ' + message
+    try:
+        print(line, flush=True)
+    except UnicodeEncodeError:
+        # Frozen Windows installers may have a legacy console encoding. Docker
+        # progress contains Unicode; displaying it must never abort installation.
+        encoding = getattr(sys.stdout, 'encoding', None) or 'utf-8'
+        print(line.encode(encoding, errors='backslashreplace').decode(encoding), flush=True)
 
 def run(args, timeout=3600):
     # A timed command cannot leave its installers/children running unseen.
@@ -142,6 +150,8 @@ def warmup(component,args):
         try:
             with session() as s:
                 r=s.post(f'http://127.0.0.1:{port}/warmup',timeout=(5,3600),allow_redirects=False)
+                if r.status_code == 404:
+                    raise RuntimeError(f'{component} on port {port} does not support model setup. Stop the older engine using that port in Docker Desktop, then click Retry to start the bundled engine. Existing model downloads are retained')
                 r.raise_for_status()
         except Exception as exc:errors.append(exc)
     worker=threading.Thread(target=load,daemon=True);worker.start()

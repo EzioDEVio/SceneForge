@@ -2,7 +2,7 @@
   "name": "sceneforge-browser-tests",
   "private": true,
   "scripts": {
-    "test": "node release093.cjs && node timeline_layers.cjs && node story_tools.cjs && node combined_tools.cjs && node recovered_stages.cjs && node owner_fixes.cjs && node mouse_selection.cjs && node free_timeline.cjs",
+    "test": "node release093.cjs && node timeline_layers.cjs && node story_tools.cjs && node combined_tools.cjs && node recovered_stages.cjs && node owner_fixes.cjs && node mouse_selection.cjs && node free_timeline.cjs && node stability_actions.cjs",
     "test:legacy": "node workspace.cjs && node playback23.cjs && node titles24.cjs && node designer25.cjs"
   },
   "devDependencies": {

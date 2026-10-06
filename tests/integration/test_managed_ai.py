@@ -62,3 +62,21 @@ for error in ['CUDA out of memory','HTTP 403 forbidden','weights shape mismatch'
         else:raise AssertionError('Non-transient failure should remain visible')
         assert warm.call_count==1
 print('PASS one transient retry; memory, permissions and model errors retain exact cause without repeat')
+
+# The owner's frozen Windows log recorded a charmap failure while printing
+# Docker download progress. Persist Unicode losslessly and print safely.
+import io
+encoded_output=io.BytesIO()
+legacy_console=io.TextIOWrapper(encoded_output,encoding='cp1252',errors='strict')
+with patch.object(m.sys,'stdout',legacy_console):
+    m.report('Downloading ███ voice نموذج')
+assert m.state()['log'][-1]=='Downloading ███ voice نموذج'
+assert b'Downloading' in encoded_output.getvalue()
+print('PASS Unicode download output cannot abort setup on a legacy Windows console')
+with patch.object(m,'session') as session,patch.object(m,'health',return_value={'service':'chatterbox','model_ready':False}):
+    session.return_value.__enter__.return_value.post.return_value.status_code=404
+    try:m.warmup('chatterbox',['docker','compose'])
+    except RuntimeError as error:
+        assert 'Stop the older engine' in str(error) and 'port 8881' in str(error)
+    else:raise AssertionError('An incompatible engine must not be reported ready')
+print('PASS incompatible older engine gives a recovery action and cannot be reported ready')

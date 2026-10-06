@@ -724,7 +724,7 @@ function PartRow({layerActions,scene:savedScene, project, index, total, active, 
       writes.current--;
       if (alive.current) {
         setSaving(writes.current > 0);
-        onSaveState(scene.id, !ok ? "Save failed" : writes.current || Object.keys(pending.current).length ? "Saving…" : "Saved");
+        onSaveState(scene.id, !ok ? "Save failed" : writes.current || Object.keys(pending.current).length ? "Saving…" : Object.keys(editsRef.current.scene).length||editsRef.current.shots.length ? "Draft · not saved" : "Saved");
       }
       return ok;
     });
@@ -1256,7 +1256,7 @@ export default function App() {
     await action(async()=>{await api.pasteAudio(targetId,clip.id);await refresh();setImportStatus(`Pasted ${clip.label}. Adjust its volume and fades in the Audio tab.`);});
   }
   const failed = Object.values(states).some(s => s === "Save failed");
-  const status = failed ? "Save failed" : dirty ? "Saving changes…" : "All changes saved";
+  const status = failed ? "Save failed" : Object.values(states).some(s=>s.startsWith("Draft")) ? "Draft changes · Apply or Cancel" : states.timelineLayer==="Unsaved" ? "Overlay changes · Apply to save" : dirty ? "Saving changes…" : "All changes saved";
   const selected = project?.scenes.find(s => s.id === selectedId) || project?.scenes[0];
   const closeRef=useRef<(saveChanges:boolean,exiting:boolean)=>Promise<{ready:boolean;reason?:string}>>(async()=>({ready:false,reason:'save-failed'}));
   closeRef.current=async(saveChanges,exiting)=>{
@@ -1284,16 +1284,45 @@ export default function App() {
   useEffect(() => {
     if(exportJob && ["succeeded","failed","cancelled"].includes(exportJob.status)) void refresh().catch(e => setError(e.message));
   },[exportJob?.status]);
+  const preparingProjectAction=useRef(false);
+  async function prepareProjectAction():Promise<boolean>{
+    if(preparingProjectAction.current)return false;
+    preparingProjectAction.current=true;
+    try{
+      const draft=projectRef.current?.scenes.find(scene=>statesRef.current[scene.id]?.startsWith('Draft'));
+      if(draft){
+        setSelectedId(draft.id);
+        window.dispatchEvent(new CustomEvent('sceneforge-open-tab',{detail:{sceneId:draft.id,tab:'Motion'}}));
+        setError(`Apply or Cancel the Motion/Effects changes in “${draft.title}” before switching timelines or exporting.`);
+        return false;
+      }
+      if(!(await saveBeforeClose())||!(await saveTitle())){
+        setError('Could not finish saving. Retry any failed save or wait for the scene render to finish. Your edits are retained.');
+        return false;
+      }
+      for(let i=0;i<40&&(Object.values(statesRef.current).some(v=>v!=="Saved")||hasActiveWrites());i++)await new Promise(r=>setTimeout(r,250));
+      if(Object.values(statesRef.current).some(v=>v!=="Saved")||hasActiveWrites()){
+        setError('Changes have not finished saving. Apply pending changes or retry a failed save before continuing.');return false;
+      }
+      setError(null);return true;
+    }finally{preparingProjectAction.current=false;}
+  }
+  async function openFreeTimeline(){
+    if(busy||exporting||!(await prepareProjectAction()))return;
+    const current=projectRef.current;if(!current)return;
+    setFreeSourceView(false);
+    if(!current.finishing_json?.free_timeline?.enabled)await updateFreeTimeline({free_timeline:current.finishing_json?.free_timeline?{...current.finishing_json.free_timeline,enabled:true}:seedFree(current)},'enable free timeline');
+  }
+  async function openExportDialog(){if(!busy&&!exporting&&await prepareProjectAction())setExportOpen(true);}
   async function renderFullVideo(settings?: Record<string, unknown>){
     if(!project||busy||exporting)return;
-    // Background saves no longer lock the timeline; wait for them before exporting.
-    for(let i=0;i<40&&Object.values(statesRef.current).some(v=>v!=="Saved");i++)await new Promise(r=>setTimeout(r,250));
-    if(Object.values(statesRef.current).some(v=>v!=="Saved")){setImportStatus("Changes are still saving. Try Render full video again in a moment.");return;}
-    await action(async()=>{const free=project.finishing_json?.free_timeline;const placed=new Set(free?.clips.map(c=>c.scene_id));const empty=project.scenes.filter(s=>!s.shots.length&&(!free?.enabled||placed.has(s.id)));
-      if(!project.scenes.some(s=>s.shots.length)&&!free?.enabled)return;
+    if(!(await prepareProjectAction()))return;
+    const current=projectRef.current;if(!current)return;
+    await action(async()=>{const free=current.finishing_json?.free_timeline;const placed=new Set(free?.clips.map(c=>c.scene_id));const empty=current.scenes.filter(s=>!s.shots.length&&(!free?.enabled||placed.has(s.id)));
+      if(!current.scenes.some(s=>s.shots.length)&&!free?.enabled){setError('Add an image or video before rendering the full video.');return;}
       if(empty.length&&!await askConfirm(`Skip ${empty.length} empty scene(s) and render all scenes with media?`))return;
-      setExportPanel(true);setExportExpanded(false);setExportScenes(structuredClone(project.scenes));setExportLayers(structuredClone(project.finishing_json?.layer_clips||[]));
-      setExportJobId((await api.exportProject(project.id,empty.length>0,settings||{quality:'draft'})).job_id);
+      setExportPanel(true);setExportExpanded(false);setExportScenes(structuredClone(current.scenes));setExportLayers(structuredClone(current.finishing_json?.layer_clips||[]));
+      setExportJobId((await api.exportProject(current.id,empty.length>0,settings||{quality:'draft'})).job_id);
     });
   }
   async function refresh() {
@@ -1378,7 +1407,7 @@ export default function App() {
     const k=e.key.toLowerCase();
     if(k==='n'||k==='o'){e.preventDefault();if(!busy&&!exporting)void goToProjects(k==='n'?'new':'open');}
     else if(k==='s'&&!e.shiftKey&&project){e.preventDefault();void saveRestorePoint();}
-    else if(k==='e'&&!e.shiftKey&&project){e.preventDefault();if(!busy&&!exporting&&!dirty&&project.scenes.length)setExportOpen(true);}
+    else if(k==='e'&&!e.shiftKey&&project){e.preventDefault();void openExportDialog();}
     else if(k===','&&!e.shiftKey&&project){e.preventDefault();openSettings('preferences');}
     else if(k==='a'&&e.shiftKey&&project){e.preventDefault();setInfoPanel({panel:'ai'});}
   };
@@ -1401,7 +1430,7 @@ export default function App() {
       <div className="brand"><span className="brand-mark"><Film size={19}/></span><span>SceneForge</span></div>
       <span className="toolbar-divider"/>
       <div className="project-identity"><input aria-label="Project name" value={titleDraft} onChange={e=>{setTitleDraft(e.target.value); setStates(prev=>({...prev,title:"Unsaved changes"}));}} onBlur={()=>void saveTitle()}/><span role="status" className={`save-status ${failed ? "save-error" : ""}`}>{busy ? "Saving…" : status}</span></div>
-      <div className="toolbar-end"><button className="btn back-projects" disabled={busy} onClick={()=>void goToProjects('open')} title="Save current changes and return to your projects"><ArrowLeft size={14}/> Projects</button><select aria-label="Project aspect ratio" value={project.aspect} disabled={busy||exporting} onChange={e=>action(async()=>{await api.updateProject(project.id,{aspect:e.target.value}); await refresh();})}>{ASPECTS.map(a=><option key={a}>{a}</option>)}</select><label className="workspace-switcher" title={workspacePreset(preferences.workspace).description}><LayoutDashboard size={14}/><span>Workspace</span><select aria-label="Workspace" value={preferences.workspace} onChange={e=>switchWorkspace(e.target.value as WorkspaceId)}>{WORKSPACES.map(w=><option key={w.id} value={w.id}>{w.label}</option>)}</select></label><div className="theme-control"><button className="theme-toggle" aria-label={`Theme: ${THEMES.find(x=>x.id===preferences.theme)?.label}`} aria-haspopup="menu" aria-expanded={themeMenuOpen} title="Choose editor theme" onClick={()=>setThemeMenuOpen(open=>!open)}>{preferences.theme==='light'?<Sun size={16}/>:<Moon size={16}/>}<span>Theme</span><ChevronDown size={13}/></button>{themeMenuOpen&&<div className="theme-popover" role="menu" aria-label="Editor theme">{THEMES.map(item=><button key={item.id} role="menuitemradio" aria-checked={preferences.theme===item.id} onClick={()=>{updatePreferences({theme:item.id});setThemeMenuOpen(false);}}><i className={`theme-swatch ${item.id}`}/>{item.label}{preferences.theme===item.id&&<CheckCircle2 size={14}/>}</button>)}</div>}</div><button className="btn video-gen-launch" disabled={busy||exporting} onClick={()=>setVideoGenOpen(true)}><Clapperboard size={15}/>Generate video</button><button className="btn btn-primary export-launch" title="Export video (Ctrl+E)" disabled={exporting||dirty||busy||!project.scenes.length} onClick={()=>setExportOpen(true)}><Upload size={15}/>{exporting ? `Exporting ${Math.round(exportJob?.progress||0)}%` : "Export video"}</button></div>
+      <div className="toolbar-end"><button className="btn back-projects" disabled={busy} onClick={()=>void goToProjects('open')} title="Save current changes and return to your projects"><ArrowLeft size={14}/> Projects</button><select aria-label="Project aspect ratio" value={project.aspect} disabled={busy||exporting} onChange={e=>action(async()=>{await api.updateProject(project.id,{aspect:e.target.value}); await refresh();})}>{ASPECTS.map(a=><option key={a}>{a}</option>)}</select><label className="workspace-switcher" title={workspacePreset(preferences.workspace).description}><LayoutDashboard size={14}/><span>Workspace</span><select aria-label="Workspace" value={preferences.workspace} onChange={e=>switchWorkspace(e.target.value as WorkspaceId)}>{WORKSPACES.map(w=><option key={w.id} value={w.id}>{w.label}</option>)}</select></label><div className="theme-control"><button className="theme-toggle" aria-label={`Theme: ${THEMES.find(x=>x.id===preferences.theme)?.label}`} aria-haspopup="menu" aria-expanded={themeMenuOpen} title="Choose editor theme" onClick={()=>setThemeMenuOpen(open=>!open)}>{preferences.theme==='light'?<Sun size={16}/>:<Moon size={16}/>}<span>Theme</span><ChevronDown size={13}/></button>{themeMenuOpen&&<div className="theme-popover" role="menu" aria-label="Editor theme">{THEMES.map(item=><button key={item.id} role="menuitemradio" aria-checked={preferences.theme===item.id} onClick={()=>{updatePreferences({theme:item.id});setThemeMenuOpen(false);}}><i className={`theme-swatch ${item.id}`}/>{item.label}{preferences.theme===item.id&&<CheckCircle2 size={14}/>}</button>)}</div>}</div><button className="btn video-gen-launch" disabled={busy||exporting} onClick={()=>setVideoGenOpen(true)}><Clapperboard size={15}/>Generate video</button><button className="btn btn-primary export-launch" title="Export video (Ctrl+E)" disabled={exporting||busy||(!project.scenes.length&&!project.finishing_json?.free_timeline?.enabled)} onClick={()=>void openExportDialog()}><Upload size={15}/>{exporting ? `Exporting ${Math.round(exportJob?.progress||0)}%` : "Export video"}</button></div>
     </header>
     {titleCard&&<TitleDesigner width={project.width} height={project.height} busy={busy} onClose={()=>setTitleCard(false)} onCreate={d=>void addTitleCard(d)}/>}
     {project&&!storyTab&&multi.length>1&&selected&&<BatchBar source={selected} scenes={project.scenes.filter(x=>multi.includes(x.id))} onClear={()=>setMulti([])} onDone={()=>void refresh()}/>}
@@ -1409,7 +1438,7 @@ export default function App() {
     {reframeOpen&&project&&<ReframeProjectDialog project={project} onClose={()=>setReframeOpen(false)} onOpen={id=>{setReframeOpen(false);void openProject(id);}}/>}
     {videoGenOpen&&project&&<VideoGenerationPanel project={project} selectedSceneId={selected?.id||null} onClose={()=>setVideoGenOpen(false)} onOpenSettings={()=>openSettings('providers')} onAdd={addGeneratedVideoToTimeline} onCaptions={captionGeneratedScene}/>}
     {exporting&&exportJob&&<ProgressCard floating title="Exporting video" stage={exportJob.stage} progress={exportJob.progress||0} status={exportJob.status} onCancel={()=>void api.cancelJob(exportJob.id).catch(()=>{})}/>}
-    {(error||exportJob?.status==="failed")&&<div role="alert" className="error-box"><details><summary>Operation failed — show details</summary><pre>{error||exportJob?.error}</pre></details><button className="text-btn" onClick={()=>{setError(null);if(exportJob?.status==='failed')setExportJobId(null);}}>Dismiss</button></div>}
+    {(error||exportJob?.status==="failed")&&<div role="alert" className="error-box">{error?<p>{error}</p>:<details><summary>Export failed — show details</summary><pre>{exportJob?.error}</pre></details>}<button className="text-btn" onClick={()=>{setError(null);if(exportJob?.status==='failed')setExportJobId(null);}}>Dismiss</button></div>}
     <div className="editor-menubar">
       {['File','AI Engines','Edit','View','Help'].map(name=><div className="editor-menu" key={name}><button aria-expanded={menu===name} onClick={()=>setMenu(menu===name?'':name)}>{name}</button>{menu===name&&<div className="editor-menu-items">
        {name==='AI Engines'&&<><button onClick={()=>{setMenu('');setInfoPanel({panel:'ai',section:'cloud'});}}>AI providers · API keys</button><button onClick={()=>{setMenu('');setInfoPanel({panel:'ai',section:'sd'});}}>Local image engines</button><button onClick={()=>{setMenu('');setInfoPanel({panel:'ai',section:'voices'});}}>Local voice engines</button><button onClick={()=>{setMenu('');setInfoPanel({panel:'ai'});}}>AI help &amp; setup</button></>}
@@ -1441,7 +1470,7 @@ export default function App() {
         <div id="sequence-viewer"/>
       </main>
     </div>
-    {project.finishing_json?.free_timeline?.enabled&&!freeSourceView?<FreeTimeline project={project} disabled={busy||exporting} onEdit={updateFreeTimeline} onSelectScene={setSelectedId} layerActions={layerActions} onSelectAudio={setSelectedAudioClipId} onUndo={undoTimeline} onRedo={redoTimeline} canUndo={!!history.length} canRedo={!!future.length} onExport={()=>void renderFullVideo()} onRefresh={refresh} onViewSources={()=>setFreeSourceView(true)}/>:<><div className="free-timeline-switch">{freeSourceView&&project.finishing_json?.free_timeline?.enabled&&<><p role="status">Original source scenes · Free timeline cuts stay saved and are used for export. Source edits affect every linked excerpt.</p><button disabled={busy||exporting||dirty} onClick={()=>void updateFreeTimeline({free_timeline:{...project.finishing_json!.free_timeline!,enabled:false}},"use scene assembly for export")}>Use Scene assembly for export</button></>}<button disabled={busy||exporting||dirty} title="Place scene excerpts, images, video, text and audio anywhere on project tracks. Existing scene order stays available." onClick={()=>{setFreeSourceView(false);if(!project.finishing_json?.free_timeline?.enabled)void updateFreeTimeline({free_timeline:project.finishing_json?.free_timeline?{...project.finishing_json.free_timeline,enabled:true}:seedFree(project)},'enable free timeline');}}>Free timeline · move clips anywhere</button></div>
+    {project.finishing_json?.free_timeline?.enabled&&!freeSourceView?<FreeTimeline project={project} disabled={busy||exporting} onEdit={updateFreeTimeline} onSelectScene={setSelectedId} layerActions={layerActions} onSelectAudio={setSelectedAudioClipId} onUndo={undoTimeline} onRedo={redoTimeline} canUndo={!!history.length} canRedo={!!future.length} onExport={()=>void renderFullVideo()} onRefresh={refresh} onViewSources={()=>setFreeSourceView(true)}/>:<><div className="free-timeline-switch">{freeSourceView&&project.finishing_json?.free_timeline?.enabled&&<><p role="status">Original source scenes · Free timeline cuts stay saved and are used for export. Source edits affect every linked excerpt.</p><button disabled={busy||exporting||dirty} onClick={()=>void updateFreeTimeline({free_timeline:{...project.finishing_json!.free_timeline!,enabled:false}},"use scene assembly for export")}>Use Scene assembly for export</button></>}<button disabled={busy||exporting} title="Place scene excerpts, images, video, text and audio anywhere on project tracks. Existing scene order stays available." onClick={()=>void openFreeTimeline()}>Free timeline · move clips anywhere</button></div>
     <ProjectTimeline exportLayers={exportLayers} layerActions={layerActions} onSelectAll={()=>setMulti(project.scenes.map(s=>s.id))} onDetachAudio={(sceneId,source,placeMs,shotId,durationMs)=>void detachAudio(sceneId,source,placeMs,shotId,durationMs)} onUpdateTimeline={(next,options)=>void updateTimelineSettings(next,options)} notice={importStatus} onDropFiles={(id,files,insert)=>void dropFilesOnTimeline(id,files,insert)} onDropAssets={(id,assets,insert)=>void dropAssetsOnTimeline(id,assets,insert)} onDuration={resizeDuration} onTrimShot={(sceneId,shotId,sourceIn,sourceOut)=>{const shot=project.scenes.find(s=>s.id===sceneId)?.shots.find(x=>x.id===shotId);if(shot){const before={source_in_ms:shot.source_in_ms,source_out_ms:shot.source_out_ms};void record("trim video clip",()=>api.updateShot(shotId,before),()=>api.updateShot(shotId,{source_in_ms:sourceIn,source_out_ms:sourceOut}));}}} onRender={()=>void renderFullVideo()} onRefresh={()=>refresh()} exportScenes={exportScenes} exportAsset={exportJob?.status==="succeeded"?exportJob.artifact_asset_id:null} project={project} selectedId={selected?.id||""} selectedAudioClipId={selectedAudioClipId} onAudioClipSelect={setSelectedAudioClipId} onUpdateAudioClips={clips=>void updateProjectAudioClips(clips)} disabled={busy||exporting} onSelect={setSelectedId} onAdd={addPart} multi={multi} onSelectScenes={ids=>{setMulti(ids);if(ids[0])setSelectedId(ids[0]);}} onMulti={(id,mode)=>{if(!project)return;setMulti(m=>{if(mode==='clear')return [];const base=m.length?m:(selected?[selected.id]:[]);if(mode==='toggle')return base.includes(id)?base.filter(x=>x!==id):[...base,id];const ids=project.scenes.map(x=>x.id),a=ids.indexOf(selected?.id||id),b=ids.indexOf(id);return ids.slice(Math.min(a,b),Math.max(a,b)+1);});}} clipboard={clip} onClipboard={c=>{setClip(c);setImportStatus(c.kind==='scene'?`Copied scene “${c.label}”. Select a scene and press Ctrl+V (or right-click → Paste) to paste it after that scene.`:`Copied ${c.label}. Select another scene's narration and press Ctrl+V to paste.`);}} onDuplicate={id=>void duplicateScene(id)} onPaste={id=>void pasteClip(id)} onReorder={ids=>record('scene order',()=>api.reorderScenes(project.id,project.scenes.map(s=>s.id)),()=>api.reorderScenes(project.id,ids))} onUpdate={(id,patch)=>record('transition',()=>api.updateScene(id,{transition_in:project.scenes.find(s=>s.id===id)!.transition_in_json}),()=>api.updateScene(id,patch))} onDelete={()=>selected&&void deleteScene(selected.id)} onDeleteScene={id=>void deleteScene(id)} onToggleClipAudio={(shotId,audio)=>{const shot=project.scenes.flatMap(s=>s.shots).find(x=>x.id===shotId);if(!shot)return;const before=shot.audio_json||{volume:100,mute:false,duck:true};void record('toggle clip sound',()=>api.updateShot(shotId,{audio:before}),()=>api.updateShot(shotId,{audio}));}} onAudio={()=>audioImportRef.current?.click()} onRemoveAudio={()=>selected&&void removeNarration(selected)} onRemoveSceneAudio={id=>{const s=project.scenes.find(x=>x.id===id);if(s)void removeNarration(s);}} onUndo={undoTimeline} onRedo={redoTimeline} canUndo={!!history.length} canRedo={!!future.length} onSplit={(at,baked)=>{if(!selected)return;const snapshot=selected;let rightId="";void record("split scene",async()=>{if(rightId)await api.deleteScene(rightId);await api.restoreScene(snapshot.id,snapshot);setEditorEpoch(v=>v+1);setSelectedId(snapshot.id);},async()=>{const right=await api.splitScene(snapshot.id,at,baked);rightId=right.id;setEditorEpoch(v=>v+1);setSelectedId(right.id);});}}/>
     </>}
     {settingsOpen&&<SettingsPanel key={settingsInitialTab} priority={videoGenOpen} initialTab={settingsInitialTab} onClose={()=>setSettingsOpen(false)} preferences={preferences} onPreferencesChange={updatePreferences} disabled={busy||exporting}/>}

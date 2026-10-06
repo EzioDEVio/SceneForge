@@ -78,9 +78,9 @@ snapshot=c.get(f"/api/scenes/{split_scene['id']}").json()
 right=c.post(f"/api/scenes/{split_scene['id']}/split",json={'at_ms':1000})
 assert right.status_code==200,right.text
 right_scene=c.get(f"/api/scenes/{right.json()['id']}").json()
-check('splitting a source video carries its audio settings and cuts audio at the same source offset',right_scene['shots'][0]['audio_json']=={'volume':70,'mute':False,'duck':True,'fade_in_ms':350,'fade_out_ms':600} and right_scene['shots'][0]['source_in_ms']==1000 and right_scene['shots'][0]['duration_ms']==2000)
+check('splitting a source video carries its audio settings and cuts audio at the same source offset',right_scene['shots'][0]['audio_json']=={'censor':[],'volume':70,'mute':False,'duck':True,'fade_in_ms':350,'fade_out_ms':600} and right_scene['shots'][0]['source_in_ms']==1000 and right_scene['shots'][0]['duration_ms']==2000)
 restored=c.post(f"/api/scenes/{split_scene['id']}/restore",json=snapshot)
-check('undo split restores original scene and shot IDs with clip sound settings',restored.status_code==200 and restored.json()['id']==split_scene['id'] and restored.json()['shots'][0]['id']==split_shot['id'] and restored.json()['shots'][0]['audio_json']=={'volume':70,'mute':False,'duck':True,'fade_in_ms':350,'fade_out_ms':600})
+check('undo split restores original scene and shot IDs with clip sound settings',restored.status_code==200 and restored.json()['id']==split_scene['id'] and restored.json()['shots'][0]['id']==split_shot['id'] and restored.json()['shots'][0]['audio_json']=={'censor':[],'volume':70,'mute':False,'duck':True,'fade_in_ms':350,'fade_out_ms':600})
 c.delete(f"/api/scenes/{right.json()['id']}")
 order=[s['id'] for s in c.get(f'/api/projects/{vid}').json()['scenes']]
 c.put(f'/api/projects/{vid}/scene-order',json={'scene_ids':order})
