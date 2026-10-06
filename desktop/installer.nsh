@@ -1,3 +1,7 @@
+# electron-builder includes this file for both installer and uninstaller builds.
+# The AI page and its callbacks belong only to the installer; leaving them in
+# BUILD_UNINSTALLER produces NSIS warning 6010 (fatal with warnings-as-errors).
+!ifndef BUILD_UNINSTALLER
 !include "nsDialogs.nsh"
 !include "LogicLib.nsh"
 Var SFWhisper
@@ -95,3 +99,4 @@ FunctionEnd
     ${EndIf}
   ${EndIf}
 !macroend
+!endif # BUILD_UNINSTALLER
