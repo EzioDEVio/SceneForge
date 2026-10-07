@@ -28,6 +28,6 @@ export const workspacePreset = (id: string | undefined): WorkspacePreset => WORK
 export const isWorkspaceId = (v: unknown): v is WorkspaceId => WORKSPACES.some(w => w.id === v);
 
 /** Default timeline height (the Edit layout). */
-export const defaultTimelineHeight = () => Math.min(330, (typeof window === 'undefined' ? 900 : window.innerHeight) * .37);
+export const defaultTimelineHeight = () => Math.min(310, (typeof window === 'undefined' ? 900 : window.innerHeight) * .33);
 export const timelineHeightFor = (preset: WorkspacePreset) =>
   preset.timelineShare === null ? defaultTimelineHeight() : Math.max(250, Math.round((typeof window === 'undefined' ? 900 : window.innerHeight) * preset.timelineShare));

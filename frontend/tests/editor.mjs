@@ -874,8 +874,9 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  closeReady=true;
  await user.selectOptions(screen.getByRole('combobox',{name:'Project aspect ratio'}),'9:16');await saved();
  check('project aspect selection saves',project.aspect==='9:16');
- await user.click(screen.getByRole('button',{name:'Theme: Graphite Night'}));
- check('editor theme menu offers day and additional studio themes',screen.getByRole('menuitemradio',{name:/Daylight/})&&screen.getByRole('menuitemradio',{name:/Midnight Blue/})&&screen.getByRole('menuitemradio',{name:/Warm Studio/}));
+ check("Director's Desk is the default editor theme",document.documentElement.dataset.theme==='desk');
+ await user.click(screen.getByRole('button',{name:"Theme: Director's Desk"}));
+ check('editor theme menu keeps the earlier themes alongside the new default',screen.getByRole('menuitemradio',{name:/Graphite Night/})&&screen.getByRole('menuitemradio',{name:/Daylight/})&&screen.getByRole('menuitemradio',{name:/Midnight Blue/})&&screen.getByRole('menuitemradio',{name:/Warm Studio/}));
  await user.click(screen.getByRole('menuitemradio',{name:/Daylight/}));
  check('theme control at the upper right applies Daylight immediately',document.documentElement.dataset.theme==='light');
  await user.click(screen.getByRole('button',{name:'File',exact:true}));

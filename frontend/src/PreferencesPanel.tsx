@@ -4,7 +4,7 @@ import type {AppPreferences} from './preferences';
 
 type Props={value:AppPreferences;onChange:(patch:Partial<AppPreferences>)=>void};
 const ACCENTS:{id:AppPreferences['accent'];name:string;color:string}[]=[
-  {id:'violet',name:'Violet',color:'#9783ff'},{id:'blue',name:'Blue',color:'#62a8ff'},{id:'teal',name:'Teal',color:'#43c8b5'},
+  {id:'cyan',name:'Cyan',color:'#57C7DD'},{id:'violet',name:'Violet',color:'#9783ff'},{id:'blue',name:'Blue',color:'#62a8ff'},{id:'teal',name:'Teal',color:'#43c8b5'},
 ];
 
 export function PreferencesPanel({value,onChange}:Props) {

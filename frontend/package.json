@@ -7,9 +7,12 @@
     "dev": "vite --port 5173",
     "build": "tsc -b && vite build",
     "preview": "vite preview",
-    "test": "node tests/editor.mjs && node tests/units.mjs && node tests/timeline.mjs && node tests/video_generation.mjs && node tests/share_dialog.mjs && node tests/keyframes.mjs && node tests/inspector_feedback.mjs && node tests/script_scene_setup.mjs && node tests/censor_controls.mjs && node tests/accessibility_controls.mjs && node tests/owner_fixes.mjs && node tests/free_timeline.mjs && node tests/provider_connections.mjs && node tests/friendly_editing.mjs"
+    "test": "node tests/editor.mjs && node tests/units.mjs && node tests/timeline.mjs && node tests/video_generation.mjs && node tests/share_dialog.mjs && node tests/keyframes.mjs && node tests/inspector_feedback.mjs && node tests/script_scene_setup.mjs && node tests/censor_controls.mjs && node tests/accessibility_controls.mjs && node tests/owner_fixes.mjs && node tests/free_timeline.mjs && node tests/provider_connections.mjs && node tests/friendly_editing.mjs && node tests/preferences_look.mjs"
   },
   "dependencies": {
+    "@fontsource/ibm-plex-mono": "^5.3.0",
+    "@fontsource/ibm-plex-sans": "^5.3.0",
+    "@fontsource/ibm-plex-sans-arabic": "^5.3.0",
     "lucide-react": "^1.46.0",
     "react": "^18.3.1",
     "react-dom": "^18.3.1"

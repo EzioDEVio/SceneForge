@@ -10,6 +10,23 @@ import "./cleanup.css";
 import "./keyframes.css";
 import "./recovery.css";
 import "./friendly.css";
+import "@fontsource/ibm-plex-sans/latin-400.css";
+import "@fontsource/ibm-plex-sans/latin-500.css";
+import "@fontsource/ibm-plex-sans/latin-600.css";
+import "@fontsource/ibm-plex-sans-arabic/arabic-400.css";
+import "@fontsource/ibm-plex-sans-arabic/arabic-600.css";
+import "@fontsource/ibm-plex-mono/latin-500.css";
+import "./desk.css";
+
+// Theme changes apply instantly: suspend colour transitions for the frame in which
+// data-theme or data-accent changes, so controls never sit half-way between themes.
+if (typeof MutationObserver !== "undefined") {
+  new MutationObserver(() => {
+    const root = document.documentElement;
+    root.classList.add("theme-switching");
+    requestAnimationFrame(() => requestAnimationFrame(() => root.classList.remove("theme-switching")));
+  }).observe(document.documentElement, {attributes: true, attributeFilter: ["data-theme", "data-accent"]});
+}
 
 class ErrorBoundary extends React.Component<{ children: React.ReactNode }, { error: Error | null }> {
   constructor(props: { children: React.ReactNode }) {

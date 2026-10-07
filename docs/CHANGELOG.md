@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.9.3 RC3 — Director's Desk look (October 7, 2026, not published)
+
+Stage 1 of the new design: the look, with no change in how anything works.
+
+- **Director's Desk is the new default theme**: slate-blue panels, one cyan accent, 7 px rounded buttons and boxes, IBM Plex Sans/Arabic/Mono bundled for offline use (OFL). Graphite Night, Daylight, Midnight Blue and Warm Studio remain under Theme. People still on the old default move to the new look once; a theme chosen on purpose is kept.
+- **Icon tabs everywhere**: library tabs (Scenes, Media Pool, Transitions), every menu item, and the timeline edit tools (icons with their shortcut letter).
+- **Section shortcuts**: the "Jump to section" dropdown and Go button are replaced by a scrollable row of icon shortcuts that follows the section you are reading.
+- **More room for the preview**: one-line narration bar (expands on Expand), a shorter default timeline, compact one-row timeline toolbars on laptop screens, and a wider settings panel so all tabs fit without "More".
+- Section headings in Scene settings read as boxes; clips, tracks and dialogs use the same palette.
+- Fixes found while restyling: theme switches are instant (no half-dark controls mid-transition); the cyan accent becomes a readable teal on Daylight; Free timeline buttons, fields and clip labels on Daylight were dark-on-dark and are now readable.
+- Tests: `frontend/tests/preferences_look.mjs` (default theme and one-time move); updated the theme-default and section-shortcut checks.
+
 ## 0.9.3 owner fix — export left out the video (October 7, 2026, not published)
 
 - **Export contained only the text overlay.** When Free timeline is switched on it copies only the scenes that already have media. A scene that gets its picture or video later was never added, and export (which uses the Free timeline, even while you view the original source scenes) silently left it out, including its sound and captions. Export now names the missing scenes and asks: **Add to the end and export**, **Export without them**, **Use Scene assembly instead**, or Cancel.
