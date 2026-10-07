@@ -143,6 +143,11 @@ def image_ready():
             return r.status_code==200 and isinstance(r.json(),dict) and isinstance(r.json().get('sd_model_checkpoint'),str)
     except (requests.RequestException,ValueError):return False
 
+class _EngineMismatch(Exception):
+    def __init__(self, status_code):
+        super().__init__(f'HTTP {status_code}');self.status_code=status_code
+
+
 def warmup(component,args):
     port=7860 if component=='stable_diffusion' else 8881
     errors=[]
@@ -150,8 +155,8 @@ def warmup(component,args):
         try:
             with session() as s:
                 r=s.post(f'http://127.0.0.1:{port}/warmup',timeout=(5,3600),allow_redirects=False)
-                if r.status_code == 404:
-                    raise RuntimeError(f'{component} on port {port} does not support model setup. Stop the older engine using that port in Docker Desktop, then click Retry to start the bundled engine. Existing model downloads are retained')
+                if r.status_code in (404, 405):
+                    errors.append(_EngineMismatch(r.status_code));return
                 r.raise_for_status()
         except Exception as exc:errors.append(exc)
     worker=threading.Thread(target=load,daemon=True);worker.start()
@@ -165,6 +170,19 @@ def warmup(component,args):
                     size=int(result.stdout.split()[0]);report(f'{component}: {size/1_000_000:.1f} MB cached; downloading/loading model.')
             except (ValueError,IndexError,OSError,subprocess.TimeoutExpired):pass
     if errors:
+        # HTTP 404/405 from /warmup means the process on this port is an older or
+        # different engine (owner log 2026-10-06), not a failed model download. Say so
+        # directly, do not blame the model, and do not let warmup_with_retry retry it.
+        response = getattr(errors[0], 'response', None)
+        code = errors[0].status_code if isinstance(errors[0], _EngineMismatch) else getattr(response, 'status_code', None)
+        if code in (404, 405):
+            detail = (f'{component} service on port {port} does not support the required '
+                      f'POST /warmup endpoint (HTTP {code}). '
+                      'An older or different engine is probably using that port. Stop the older engine '
+                      'in Docker Desktop, then click Retry to start the bundled engine. '
+                      'Cached models are retained.')
+            report(detail)
+            raise RuntimeError(detail) from errors[0]
         detail = str((health(component) or {}).get('last_error') or errors[0])[:600]
         report(component + ' warmup failed: ' + detail)
         raise RuntimeError(component + ' model loading failed: ' + detail + '. Retry resumes cached downloads.') from errors[0]

@@ -4,7 +4,7 @@ import subprocess
 import requests
 
 BASE = "http://127.0.0.1:8123"
-FIXTURE_DIR = "/home/claude/sceneforge/examples/fixture_assets"
+FIXTURE_DIR = __import__("os").path.join(__import__("os").path.dirname(__import__("os").path.abspath(__file__)), "..", "..", "examples", "fixture_assets")
 
 checks = []
 

@@ -50,10 +50,21 @@ lc=np.where(alone.max(axis=0)>128)[0];w=lc.max()-lc.min()
 seg=img[:,cols.min():cols.min()+w+1];ref_seg=alone[:,lc.min():lc.min()+w+1]
 rows=np.where(ref_seg.max(axis=1)>128)[0];mrows=np.where(seg.max(axis=1)>128)[0]
 shift=mrows.max()-rows.max()
-aligned=np.roll(ref_seg,shift,axis=0);ink=(aligned>64)|(seg>64)
 # Masked difference over inked pixels: ~60 when the Latin word is there
 # (anti-aliasing), ~170 when Arabic glyphs occupy the left edge instead.
-check('Arabic-first mixed caption is RTL: its Latin tail sits at the left edge',np.abs(aligned-seg)[ink].mean()<110)
+# libass/HarfBuzz builds can place the in-context word a pixel or two away
+# from the standalone render, so take the best alignment within +-3 px.
+def best_diff(a,b):
+ best=1e9
+ for dy in range(-3,4):
+  for dx in range(-3,4):
+   m=np.roll(np.roll(a,shift+dy,axis=0),dx,axis=1);ink=(m>64)|(b>64)
+   best=min(best,np.abs(m-b)[ink].mean())
+ return best
+check('Arabic-first mixed caption is RTL: its Latin tail sits at the left edge',best_diff(ref_seg,seg)<110)
+# Control: the Arabic run (right edge of the line) must NOT match the Latin word.
+arab=img[:,cols.max()-w:cols.max()+1]
+check('control: the right edge of the mixed caption is not the Latin word',best_diff(ref_seg,arab)>130)
 
 # --- thumbnails ------------------------------------------------------------
 client=TestClient(app).__enter__()  # runs startup (creates tables)

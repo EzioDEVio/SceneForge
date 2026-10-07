@@ -1,11 +1,12 @@
 """Verify real, moving progress reporting during a single long shot render
+# Legacy M1 live harness: needs a running backend on 127.0.0.1:8123 and SF_LIVE_DATA_DIR set to that server's SCENEFORGE_DATA_DIR.
 (the root cause of "Generate looks frozen"), plus the createProject
 full-detail fix (checked via the POST response shape it depends on)."""
 import time
 import requests
 
 BASE = "http://127.0.0.1:8123"
-FIXTURE_DIR = "/home/claude/sceneforge/examples/fixture_assets"
+FIXTURE_DIR = __import__("os").path.join(__import__("os").path.dirname(__import__("os").path.abspath(__file__)), "..", "..", "examples", "fixture_assets")
 
 checks = []
 
@@ -27,7 +28,7 @@ check("get_project_has_scenes", "scenes" in full and len(full["scenes"]) == 3)
 
 pid = created["id"]
 import sqlite3
-conn = sqlite3.connect("/tmp/sf_progress_test/sceneforge.db")
+conn = sqlite3.connect(__import__("os").path.join(__import__("os").environ["SF_LIVE_DATA_DIR"], "sceneforge.db"))
 conn.execute("UPDATE projects SET width=960, height=540 WHERE id=?", (pid,))
 conn.commit()
 conn.close()

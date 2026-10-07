@@ -19,6 +19,7 @@ Prints a machine-readable JSON summary at the end.
 from __future__ import annotations
 
 import json
+import os
 import subprocess
 import sys
 import time
@@ -27,7 +28,7 @@ from pathlib import Path
 import requests
 
 BASE = "http://127.0.0.1:8123"
-FIXTURE_DIR = Path(__file__).parent / "fixture_assets"
+FIXTURE_DIR = Path(__file__).resolve().parents[2] / "examples" / "fixture_assets"
 
 results = {"checks": [], "failures": []}
 
@@ -84,7 +85,7 @@ def main():
     # just at a resolution this machine can finish in reasonable time.
     # Real throughput at full 1080p was benchmarked separately (see report).
     import sqlite3
-    db_path = "/tmp/sf_smoketest/sceneforge.db"
+    db_path = os.path.join(os.environ["SF_LIVE_DATA_DIR"], "sceneforge.db")
     conn = sqlite3.connect(db_path)
     conn.execute("UPDATE projects SET width=640, height=360 WHERE id=?", (project_id,))
     conn.commit()

@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.9.3 release-candidate review — October 7, 2026 (not published; awaiting owner approval)
+
+- Merged the handoff's warmup diagnosis into the newer GitHub baseline (ab85c7f): HTTP 404/405 from `POST /warmup` is reported as an older or different engine on that port, is never retried, and never blames the model download. Kept the explicit status check so an incompatible engine can never be reported ready (a first merge attempt regressed this; caught by `test_managed_ai.py` and fixed).
+- Added `test_managed_ai_warmup.py` to CI and the crash-log review document.
+- Made the Arabic-first RTL caption check tolerant of 1–3 px HarfBuzz/libass placement differences, and added a control so it still fails if the Latin word is not at the left edge. The rendered caption was inspected visually and is correct.
+- Updated the stale `test_designer25` provider mock (`state` field) and made the nine legacy `*_live.py` harnesses portable (repository fixture path and `SF_LIVE_DATA_DIR` instead of hard-coded machine paths).
+- Verification only on Linux. Windows installer, native Windows credential store, GPU and real model downloads remain untested.
+
 ## 0.9.3 source recovery — October 5, 2026 (not published)
 
 - Reconstructed editor stages from the owner's Stage 1–5 HTML reports and visual review after the earlier source checkpoint was unavailable. This is a fresh implementation, not a recovered copy of the lost commits.

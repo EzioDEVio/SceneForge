@@ -85,5 +85,6 @@ jobs:
             python tests/integration/test_free_timeline.py
             python tests/integration/test_owner_font_preview.py
             python tests/integration/test_managed_ai.py
+            python tests/integration/test_managed_ai_warmup.py
             python tests/integration/test_stability_stress.py
           '

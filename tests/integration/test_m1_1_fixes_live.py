@@ -1,4 +1,5 @@
 """Focused verification of the two backend fixes made this session:
+# Legacy M1 live harness: needs a running backend on 127.0.0.1:8123 and SF_LIVE_DATA_DIR set to that server's SCENEFORGE_DATA_DIR.
   1. A newly created voice take is auto-accepted (no longer silently muted).
   2. timing_mode='fixed' + requested_duration_ms actually controls the
      rendered part's duration, overriding narration length.
@@ -7,7 +8,7 @@ import subprocess
 import requests
 
 BASE = "http://127.0.0.1:8123"
-FIXTURE_DIR = "/home/claude/sceneforge/examples/fixture_assets"
+FIXTURE_DIR = __import__("os").path.join(__import__("os").path.dirname(__import__("os").path.abspath(__file__)), "..", "..", "examples", "fixture_assets")
 
 checks = []
 
@@ -22,7 +23,7 @@ project = requests.post(f"{BASE}/api/projects", json={"title": "Fix verify", "as
 pid = project["id"]
 
 import sqlite3
-conn = sqlite3.connect("/tmp/sf_verify/sceneforge.db")
+conn = sqlite3.connect(__import__("os").path.join(__import__("os").environ["SF_LIVE_DATA_DIR"], "sceneforge.db"))
 conn.execute("UPDATE projects SET width=480, height=270 WHERE id=?", (pid,))
 conn.commit()
 conn.close()

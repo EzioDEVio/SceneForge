@@ -20,7 +20,7 @@ with TestClient(app) as c:
 from types import SimpleNamespace
 with tempfile.TemporaryDirectory() as install:
  pathlib.Path(install,'webui-user.bat').write_text('@echo off')
- with patch.object(local_images,'os',SimpleNamespace(name='nt',environ={'SCENEFORGE_SD_DIR':install})),patch.object(local_images,'status',return_value={'ready':False}),patch.object(local_images.socket,'create_connection',side_effect=OSError),patch.object(local_images.subprocess,'CREATE_NO_WINDOW',0,create=True),patch.object(local_images.subprocess,'Popen') as launch:
+ with patch.object(local_images,'os',SimpleNamespace(name='nt',environ={'SCENEFORGE_SD_DIR':install})),patch.object(local_images,'status',return_value={'ready':False,'state':'stopped'}),patch.object(local_images.socket,'create_connection',side_effect=OSError),patch.object(local_images.subprocess,'CREATE_NO_WINDOW',0,create=True),patch.object(local_images.subprocess,'Popen') as launch:
   launch.return_value.poll.return_value=None
   assert local_images.start()['state']=='starting'
   assert launch.call_args.args[0]==['cmd.exe','/d','/c','webui-user.bat']

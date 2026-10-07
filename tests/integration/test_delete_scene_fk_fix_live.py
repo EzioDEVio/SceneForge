@@ -1,16 +1,17 @@
 """Verify the fix: deleting a scene/part that has an associated
+# Legacy M1 live harness: needs a running backend on 127.0.0.1:8123 and SF_LIVE_DATA_DIR set to that server's SCENEFORGE_DATA_DIR.
 RenderJob (i.e. was ever Generated) no longer crashes with a foreign
 key constraint violation."""
 import requests
 
 BASE = "http://127.0.0.1:8123"
-FIXTURE_DIR = "/home/claude/sceneforge/examples/fixture_assets"
+FIXTURE_DIR = __import__("os").path.join(__import__("os").path.dirname(__import__("os").path.abspath(__file__)), "..", "..", "examples", "fixture_assets")
 
 project = requests.post(f"{BASE}/api/projects", json={"title": "Delete test", "aspect": "16:9"}).json()
 pid = project["id"]
 
 import sqlite3
-conn = sqlite3.connect("/tmp/sf_delete_test/sceneforge.db")
+conn = sqlite3.connect(__import__("os").path.join(__import__("os").environ["SF_LIVE_DATA_DIR"], "sceneforge.db"))
 conn.execute("UPDATE projects SET width=480, height=270 WHERE id=?", (pid,))
 conn.commit()
 conn.close()
