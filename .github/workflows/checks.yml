@@ -83,6 +83,7 @@ jobs:
             python tests/integration/test_censor_caption_fx.py
             python tests/integration/test_story_tools.py
             python tests/integration/test_free_timeline.py
+            python tests/integration/test_free_timeline_export_coverage.py
             python tests/integration/test_owner_font_preview.py
             python tests/integration/test_managed_ai.py
             python tests/integration/test_managed_ai_warmup.py

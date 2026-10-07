@@ -160,6 +160,13 @@ def delete_scene(scene_id: str, db: Session = Depends(get_db)):
     # than deleting the history outright.
     for job in db.query(RenderJob).filter(RenderJob.scene_id == scene_id).all():
         job.scene_id = None
+    # Free-timeline excerpts of this scene would otherwise point at nothing:
+    # export would fail and every later timeline save would be rejected.
+    fin = dict(project.finishing_json or {})
+    free = fin.get("free_timeline")
+    if isinstance(free, dict) and any(c.get("scene_id") == scene_id for c in free.get("clips", [])):
+        fin["free_timeline"] = {**free, "clips": [c for c in free.get("clips", []) if c.get("scene_id") != scene_id]}
+        project.finishing_json = fin
     db.delete(scene)
     db.flush()
     remaining = sorted((s for s in project.scenes if s.id != scene_id), key=lambda s: s.order_index)

@@ -735,3 +735,7 @@ html[data-theme="light"] .studio-shell .audio-card input[type=range]{accent-colo
 @media(max-width:700px){.story-setup-grid{grid-template-columns:1fr}}
 
 .audio-card .audio-times{display:flex;flex-wrap:wrap;gap:8px}.audio-card .audio-times label{min-width:0}.audio-card .audio-times .btn{margin-left:auto}
+
+/* Several-outcome prompts (askChoice): one full-width button per line, primary first. */
+.editor-confirm.editor-choice .button-row{display:flex;flex-direction:column;align-items:stretch;gap:8px}
+.editor-confirm.editor-choice .button-row .btn{justify-content:center;width:100%}

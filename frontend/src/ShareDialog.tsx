@@ -29,7 +29,13 @@ export function ShareDialog({assetId,fileName,onClose,onReveal}:{assetId:string;
   function open(url:string){const d=(window as any).sceneforgeDesktop;if(d?.openExternal)void d.openExternal(url);else window.open(url,'_blank','noopener,noreferrer');}
   async function reveal(){
     if(onReveal){try{await onReveal(assetId);return;}catch(e:any){setError(e?.message||'Could not open the export folder.');}}
-    setError('In browser mode, use Download and open your browser’s Downloads folder.');
+    // Browser mode: the SceneForge server runs on this computer and can open the folder.
+    try{
+      const r=await fetch(`/api/assets/${assetId}/reveal`,{method:'POST',headers:{'X-SceneForge-Action':'reveal'}});
+      if(r.ok)return;
+      const body=await r.json().catch(()=>({}));
+      setError(body?.detail||'Could not open the export folder. Use Download instead.');
+    }catch{setError('Could not reach SceneForge to open the folder. Use Download instead.');}
   }
   return <div className="info-backdrop share-backdrop" onMouseDown={e=>e.target===e.currentTarget&&onClose()}>
     <section className="info-panel wide share-dialog" role="dialog" aria-modal="true" aria-label="Share exported video">

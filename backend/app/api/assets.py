@@ -102,6 +102,35 @@ def asset_location(asset_id: str, db: Session = Depends(get_db)):
     return {"path": str(path), "name": asset.original_filename}
 
 
+@router.post("/{asset_id}/reveal")
+def reveal_asset(asset_id: str, request: Request, db: Session = Depends(get_db)):
+    """Open the folder holding an exported video, for browser mode on the same computer.
+
+    Only for loopback clients and same-app pages: the custom header forces a CORS
+    preflight, which other websites fail, and only render outputs can be revealed.
+    """
+    import subprocess, sys
+    if request.headers.get("x-sceneforge-action") != "reveal":
+        raise HTTPException(403, "Missing SceneForge action header")
+    if (request.client.host if request.client else "") not in ("127.0.0.1", "::1", "localhost", "testclient"):
+        raise HTTPException(403, "Folders can only be opened on the computer running SceneForge")
+    origin = request.headers.get("origin")
+    if origin and origin not in ("http://127.0.0.1:8000", "http://localhost:8000", "http://127.0.0.1:5173", "http://localhost:5173"):
+        raise HTTPException(403, "Folders can only be opened from SceneForge")
+    location = asset_location(asset_id, db)
+    path = location["path"]
+    try:
+        if sys.platform.startswith("win"):
+            subprocess.Popen(["explorer.exe", f"/select,{path}"])
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", "-R", path])
+        else:
+            subprocess.Popen(["xdg-open", str(Path(path).parent)])
+    except OSError as exc:
+        raise HTTPException(500, f"Could not open the folder ({exc}). The file is at {path}") from exc
+    return {"opened": True, **location}
+
+
 @router.get("/{asset_id}/stream")
 def stream_asset(asset_id: str, request: Request, db: Session = Depends(get_db), download: int = 0):
     asset = db.get(Asset, asset_id)

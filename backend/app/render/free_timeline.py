@@ -11,10 +11,17 @@ def clean_free_timeline(raw, project_id, db):
         raise FinishingError('Free timeline needs an enabled switch and clips.')
     clips=raw.get('clips',[])
     if not isinstance(clips,list) or len(clips)>128:raise FinishingError('Use up to 128 scene clips.')
+    from app.db.models import Project
+    project=db.get(Project,project_id)
+    saved={(c.get('id'),c.get('scene_id')) for c in (((project.finishing_json if project else None) or {}).get('free_timeline') or {}).get('clips',[]) if isinstance(c,dict)}
     out=[];ids=set()
     for c in clips:
         if not isinstance(c,dict) or set(c)-{'id','scene_id','start_ms','source_in_ms','duration_ms','track'}:raise FinishingError('Unsupported free scene clip setting.')
-        ident=c.get('id');scene=db.get(Scene,c.get('scene_id'))
+        ident=c.get('id');scene=db.get(Scene,c.get('scene_id')) if isinstance(c.get('scene_id'),str) else None
+        # An already-saved excerpt whose scene was later deleted is a dead reference,
+        # not a user choice: drop it rather than reject every later save. New or
+        # unknown scene ids are still rejected below.
+        if scene is None and (c.get('id'),c.get('scene_id')) in saved:continue
         if not isinstance(ident,str) or not 1<=len(ident)<=80 or ident in ids:raise FinishingError('Each free clip needs a unique id.')
         if not scene or scene.project_id!=project_id:raise FinishingError('Choose a source scene in this project.')
         ids.add(ident);v={'id':ident,'scene_id':scene.id}

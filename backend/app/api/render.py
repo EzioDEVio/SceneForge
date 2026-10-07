@@ -48,6 +48,12 @@ def export_project_endpoint(project_id: str, skip_empty: bool = False, body: dic
     if not project:
         raise HTTPException(404, "Project not found")
     free = (project.finishing_json or {}).get("free_timeline") or {}
+    scene_ids = {s.id for s in project.scenes}
+    if free.get("enabled") and any(c.get("scene_id") not in scene_ids for c in free.get("clips", [])):
+        # Projects saved before scene deletion pruned the free timeline.
+        free = {**free, "clips": [c for c in free.get("clips", []) if c.get("scene_id") in scene_ids]}
+        project.finishing_json = {**(project.finishing_json or {}), "free_timeline": free}
+        db.commit()
     if not project.scenes and not free.get("enabled"):
         raise HTTPException(400, "Project has no parts to export.")
     wanted = {c["scene_id"] for c in free.get("clips", [])} if free.get("enabled") else None

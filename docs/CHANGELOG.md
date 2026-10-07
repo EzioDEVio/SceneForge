@@ -1,5 +1,12 @@
 # Changelog
 
+## 0.9.3 owner fix — export left out the video (October 7, 2026, not published)
+
+- **Export contained only the text overlay.** When Free timeline is switched on it copies only the scenes that already have media. A scene that gets its picture or video later was never added, and export (which uses the Free timeline, even while you view the original source scenes) silently left it out, including its sound and captions. Export now names the missing scenes and asks: **Add to the end and export**, **Export without them**, **Use Scene assembly instead**, or Cancel.
+- Deleting a scene now removes its Free-timeline excerpts. Projects saved before this fix drop those dead excerpts on the next save or export instead of failing; a clip that names an unknown scene is still rejected.
+- **Open file location** now works when SceneForge runs in a browser: the local SceneForge server opens the folder (Explorer on Windows). It is limited to exported videos, to this computer, and to the SceneForge page itself.
+- New checks: `tests/integration/test_free_timeline_export_coverage.py` and `tests/browser/free_export_choice.cjs` (added to the browser suite).
+
 ## 0.9.3 release-candidate review — October 7, 2026 (not published; awaiting owner approval)
 
 - Merged the handoff's warmup diagnosis into the newer GitHub baseline (ab85c7f): HTTP 404/405 from `POST /warmup` is reported as an older or different engine on that port, is never retried, and never blames the model download. Kept the explicit status check so an incompatible engine can never be reported ready (a first merge attempt regressed this; caught by `test_managed_ai.py` and fixed).

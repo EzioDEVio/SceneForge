@@ -10,7 +10,7 @@ import {EditorDraftPreview} from "./EditorDraftPreview";
 import {StoryTools,type StoryTab} from "./StoryTools";
 import {TimelineTextTools,TextToolCard,LayerInspector,LayerPreview,useLayerTime,LAYER_TIME,LayerActions,LayerKind} from "./TimelineLayers";
 import type {TimelineLayerClip} from "./api";
-import {askConfirm} from "./dialogs";
+import {askConfirm,askChoice} from "./dialogs";
 import {registerCloseSave,saveBeforeClose} from "./closeGuard";
 import {hasActiveWrites, BUILD_ID} from "./api";
 import { previewFontFamily, BUNDLED_FAMILIES } from "./fonts";
@@ -1318,7 +1318,31 @@ export default function App() {
     if(!project||busy||exporting)return;
     if(!(await prepareProjectAction()))return;
     const current=projectRef.current;if(!current)return;
-    await action(async()=>{const free=current.finishing_json?.free_timeline;const placed=new Set(free?.clips.map(c=>c.scene_id));const empty=current.scenes.filter(s=>!s.shots.length&&(!free?.enabled||placed.has(s.id)));
+    let free=current.finishing_json?.free_timeline;
+    if(free?.enabled){
+      // The free timeline is what export uses. Scenes that received media after it was
+      // opened are not on it, so say so instead of silently exporting without them.
+      const placedIds=new Set(free.clips.map(c=>c.scene_id));
+      const missing=current.scenes.filter(s=>s.shots.length&&!placedIds.has(s.id));
+      if(missing.length){
+        const names=missing.map((s,i)=>s.title||`Scene ${current.scenes.indexOf(s)+1||i+1}`).join(', ');
+        const choice=await askChoice(`Export uses your Free timeline, and it does not include: ${names}. Only what is placed on the Free timeline will be exported.`,[
+          {label:'Export without them',value:'as-is'},
+          {label:'Use Scene assembly instead',value:'assembly'},
+          {label:'Add to the end and export',value:'append',primary:true}]);
+        if(!choice)return;
+        if(choice==='append'){
+          let at=free.clips.reduce((n,c)=>Math.max(n,c.start_ms+c.duration_ms),0);
+          const added=sequenceClips(current.scenes).filter(c=>missing.includes(c.scene)).map(c=>{const clip={id:crypto.randomUUID(),scene_id:c.scene.id,start_ms:Math.round(at),source_in_ms:0,duration_ms:Math.max(100,Math.round(c.duration)),track:5};at+=clip.duration_ms;return clip;});
+          free={...free,clips:[...free.clips,...added]};
+          if(!await updateFreeTimeline({free_timeline:free},'add scenes to free timeline'))return;
+        }else if(choice==='assembly'){
+          free={...free,enabled:false};
+          if(!await updateFreeTimeline({free_timeline:free},'use scene assembly for export'))return;
+        }
+      }
+    }
+    await action(async()=>{const placed=new Set(free?.clips.map(c=>c.scene_id));const empty=current.scenes.filter(s=>!s.shots.length&&(!free?.enabled||placed.has(s.id)));
       if(!current.scenes.some(s=>s.shots.length)&&!free?.enabled){setError('Add an image or video before rendering the full video.');return;}
       if(empty.length&&!await askConfirm(`Skip ${empty.length} empty scene(s) and render all scenes with media?`))return;
       setExportPanel(true);setExportExpanded(false);setExportScenes(structuredClone(current.scenes));setExportLayers(structuredClone(current.finishing_json?.layer_clips||[]));

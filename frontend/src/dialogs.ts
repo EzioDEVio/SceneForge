@@ -20,3 +20,22 @@ function ask(message:string, initial?:string):Promise<string|null> {
 }
 export async function askConfirm(message:string){return (await ask(message))!==null;}
 export function askText(message:string,initial:string){return ask(message,initial);}
+
+// Several labelled outcomes; resolves to the chosen value, or null for Cancel/Escape.
+export function askChoice(message:string,choices:{label:string;value:string;primary?:boolean}[]):Promise<string|null>{
+  if(typeof HTMLDialogElement==='undefined'||!HTMLDialogElement.prototype.showModal){
+    const pick=choices.find(c=>c.primary)||choices[0];return Promise.resolve(confirm(message+'\n\nOK: '+pick.label)?pick.value:null);
+  }
+  return new Promise(resolve=>{
+    const previous=document.activeElement as HTMLElement|null;
+    const dialog=document.createElement('dialog');dialog.className='editor-confirm editor-choice';
+    const form=document.createElement('form');form.method='dialog';
+    const text=document.createElement('p');text.textContent=message;form.append(text);
+    const actions=document.createElement('div');actions.className='button-row';
+    const cancel=document.createElement('button');cancel.textContent='Cancel';cancel.value='';cancel.className='btn';
+    for(const c of [...choices].sort((a,b)=>Number(!!b.primary)-Number(!!a.primary))){const b=document.createElement('button');b.textContent=c.label;b.value=c.value;b.className=c.primary?'btn btn-primary':'btn';actions.append(b);}
+    actions.append(cancel);form.append(actions);dialog.append(form);document.body.append(dialog);
+    dialog.addEventListener('close',()=>{const v=dialog.returnValue||null;dialog.remove();if(previous?.isConnected)previous.focus();resolve(v);},{once:true});
+    dialog.showModal();cancel.focus();
+  });
+}
