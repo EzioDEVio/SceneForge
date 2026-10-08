@@ -2,7 +2,7 @@
 
 ## 0.9.4-beta.1 — owner remarks on RC3 (October 8, 2026, beta pre-release)
 
-Version labels move to 0.9.4-beta.1 because v0.9.3 is already tagged. Beta: offered only to users who turned on beta updates. Not yet tested on Windows: installer, Open file location in Explorer, Credential Manager.
+Version labels move to 0.9.4-beta.1 because v0.9.3 is already tagged. Release workflow fix: one draft is created before the parallel builds (they had raced and made two releases, and a beta version was published as a pre-release instead of staying a draft); the release check now also requires the pre-release flag for beta versions. Beta: offered only to users who turned on beta updates. Not yet tested on Windows: installer, Open file location in Explorer, Credential Manager.
 
 - **Creative titles open in their own window.** Overlays → Creative titles → *Video inside text* or *Textured title* opens a dialog with a live preview beside the settings and tabs for Create, Position & size, Frame, Move & green screen and Timing & animation, so nothing needs scrolling. The preview updates as you type; once added, drag the layer on the picture to place it. Existing creative layers have an Adjust button. The rendered *Preview video inside text* now plays inside the dialog instead of behind it.
 - **Censor words is easy to find again.** The Audio tab opens with a "Censor words (bleep or mute)" card that jumps to the narration, the video's own sound or a timeline audio clip.

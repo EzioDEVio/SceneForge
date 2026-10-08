@@ -69,10 +69,14 @@ def verify(package: dict, tag: str, releases: list[dict], get_assets=api_pages,
         raise VerificationError("Release tag does not match desktop/package.json")
     matches = [release for release in releases if release.get("tag_name") == tag]
     if len(matches) != 1:
-        raise VerificationError("Expected exactly one release for the current tag")
+        raise VerificationError(f"Expected exactly one release for the current tag, found {len(matches)}. "
+                                "Delete the extra releases for this tag on GitHub, then re-run the workflow")
     release = matches[0]
     if release.get("draft") is not True:
         raise VerificationError("Release is already published; this check requires a draft")
+    if bool(release.get("prerelease")) != ("-" in package["version"]):
+        raise VerificationError("Pre-release flag does not match the version: a version with a "
+                                "suffix must be a pre-release, and a plain version must not be")
     release_id = release.get("id")
     if type(release_id) is not int or release_id <= 0:
         raise VerificationError("Invalid release identifier")

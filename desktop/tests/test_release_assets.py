@@ -39,6 +39,23 @@ class ReleaseAssetsTest(unittest.TestCase):
     def test_complete_draft(self):
         self.assertEqual(self.verify(), self.names)
 
+    def test_beta_draft_must_be_marked_prerelease(self):
+        # GitHub builds write latest.yml even for betas; electron-updater falls back to it.
+        self.package["version"] = "0.9.4-beta.1"
+        names = gate.expected_assets(self.package)
+        self.assertIn("latest.yml", names)
+        assets = [{"name": n, "state": "uploaded", "size": 1} for n in names]
+        draft = {"tag_name": "v0.9.4-beta.1", "draft": True, "id": 18}
+        with self.assertRaisesRegex(gate.VerificationError, "Pre-release flag"):
+            gate.verify(self.package, "v0.9.4-beta.1", [draft], lambda e: assets, "EzioDEVio/SceneForge")
+        self.assertEqual(gate.verify(self.package, "v0.9.4-beta.1", [{**draft, "prerelease": True}],
+                                     lambda e: assets, "EzioDEVio/SceneForge"), names)
+
+    def test_duplicate_releases_for_one_tag_fail(self):
+        self.releases.append({"tag_name": "v0.9.3", "draft": True, "id": 19})
+        with self.assertRaisesRegex(gate.VerificationError, "exactly one"):
+            self.verify()
+
     def test_each_required_file_missing(self):
         for name in self.names:
             with self.subTest(name=name):

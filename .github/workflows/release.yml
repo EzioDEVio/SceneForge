@@ -25,8 +25,44 @@ concurrency:
   group: release-${{ github.ref }}
   cancel-in-progress: false
 jobs:
+  # Create the one draft release for a tag BEFORE the parallel builds start. Without
+  # this, each build job raced to create its own release (two "0.9.4-beta.1" releases),
+  # and a beta version made electron-builder publish a pre-release instead of a draft.
+  prepare-release:
+    name: Create the draft release
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-24.04
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v6
+      - name: Create a draft (pre-release for versions with a suffix) unless one exists
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          version=$(node -p "require('./desktop/package.json').version")
+          if [ "v$version" != "$GITHUB_REF_NAME" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match desktop/package.json version $version"; exit 1
+          fi
+          existing=$(gh api --paginate "repos/$GITHUB_REPOSITORY/releases?per_page=100" \
+            --jq ".[] | select(.tag_name == \"$GITHUB_REF_NAME\") | \"\(.id) draft=\(.draft)\"")
+          count=$(printf '%s' "$existing" | grep -c . || true)
+          if [ "$count" -gt 1 ]; then
+            echo "::error::$count releases already use $GITHUB_REF_NAME. Delete the extra ones, then re-run."; exit 1
+          fi
+          if [ "$count" -eq 1 ]; then
+            case "$existing" in *draft=true) echo "Using the existing draft: $existing"; exit 0;; esac
+            echo "::error::A published release already uses $GITHUB_REF_NAME. Use a new version."; exit 1
+          fi
+          pre=""; case "$version" in *-*) pre="--prerelease";; esac
+          gh release create "$GITHUB_REF_NAME" --draft $pre --verify-tag \
+            --title "SceneForge Studio $version" \
+            --notes "Draft created by the Release workflow. Publish only after every job is green and the owner approves."
+
   build:
     name: ${{ matrix.name }}
+    needs: prepare-release
+    # Branch and manual builds skip prepare-release; still run them.
+    if: ${{ !failure() && !cancelled() }}
     runs-on: ${{ matrix.os }}
     timeout-minutes: 60
     continue-on-error: ${{ matrix.experimental }}
@@ -59,7 +95,9 @@ jobs:
           if [ "v$version" != "$GITHUB_REF_NAME" ]; then
             echo "::error::Tag $GITHUB_REF_NAME does not match desktop/package.json version $version"; exit 1
           fi
-          case "$version" in *-*) echo "EP_PRE_RELEASE=true" >> "$GITHUB_ENV";; esac
+          # Always upload into the draft made by prepare-release (EP_PRE_RELEASE would publish
+          # a pre-release straight away). The draft carries the pre-release flag for betas.
+          echo "EP_DRAFT=true" >> "$GITHUB_ENV"
       - name: Install build tools
         run: |
           python -m pip install -r desktop/requirements-build.txt
@@ -148,7 +186,7 @@ jobs:
 
   verify-release:
     name: Verify draft release files
-    needs: build
+    needs: [prepare-release, build]
     # Run even after a failed build; uploaded files alone must not imply readiness.
     if: ${{ always() && startsWith(github.ref, 'refs/tags/v') }}
     runs-on: ubuntu-24.04
