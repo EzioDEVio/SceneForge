@@ -665,6 +665,59 @@ XFADE_NAMES = {
 }
 
 
+# Assembling many scenes in one FFmpeg run keeps every input's decoded frames
+# queued in the filter graph: a 30-scene 1080p export used ~6 GB and was killed
+# (on a PC without a hard limit it swaps and the whole computer freezes). Larger
+# projects are therefore assembled in batches into high-quality intermediates
+# (PCM audio, so no AAC priming drift), which are then joined with the
+# transitions that fall between batches. Timing and transitions are unchanged.
+EXPORT_BATCH = 8
+
+
+def _export_codec_args(intermediate: bool) -> list[str]:
+    if intermediate:
+        return ["-c:v", "libx264", "-preset", "veryfast", "-crf", "12", "-pix_fmt", "yuv420p",
+                "-c:a", "pcm_s16le", "-ar", "48000", "-ac", "2"]
+    # Widely playable delivery format: some transitions compute in full colour, which made
+    # libx264 pick High 4:4:4 (Windows Photos / Media Player cannot open it).
+    return ["-c:v", "libx264", "-preset", X264_PRESET, "-crf", X264_CRF, "-pix_fmt", "yuv420p",
+            "-profile:v", "high", "-movflags", "+faststart",
+            "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2"]
+
+
+def _render_export_batched(project, scenes, scene_paths, transitions, ctx, progress_cb, intermediate):
+    from types import SimpleNamespace
+    groups = [list(range(a, min(a + EXPORT_BATCH, len(scenes)))) for a in range(0, len(scenes), EXPORT_BATCH)]
+    durations = [probe(scene_paths[s.id]).duration_ms or 0 for s in scenes]
+    seg_paths: dict[str, str] = {}
+    seg_scenes, seg_transitions = [], []
+    made: list[str] = []
+    try:
+        for g, idx in enumerate(groups):
+            if ctx.cancel_check():
+                raise RuntimeError("cancelled")
+            inner = [transitions[i - 1] if i - 1 < len(transitions) else {"type": TransitionType.CUT, "duration_ms": 0} for i in idx[1:]]
+            seg = _render_export_core(project, [scenes[i] for i in idx], scene_paths, inner, ctx, None, True)
+            made.append(seg)
+            key = f"__segment_{g}"
+            seg_paths[key] = seg
+            seg_scenes.append(SimpleNamespace(id=key))
+            if g:
+                # The transition into this batch's first scene, clamped against the two
+                # real scenes it joins (not the much longer segments).
+                first = idx[0]
+                tr = dict(transitions[first - 1]) if first - 1 < len(transitions) else {"type": TransitionType.CUT, "duration_ms": 0}
+                if tr.get("type", TransitionType.CUT) != TransitionType.CUT:
+                    tr["duration_ms"] = min(tr.get("duration_ms", 0), durations[first - 1] // 2, durations[first] // 2)
+                seg_transitions.append(tr)
+            if progress_cb:
+                progress_cb("export", int(90 * (g + 1) / (len(groups) + 1)))
+        return _render_export_core(project, seg_scenes, seg_paths, seg_transitions, ctx, progress_cb, intermediate)
+    finally:
+        for m in made:
+            Path(m).unlink(missing_ok=True)
+
+
 def _render_export_core(
     project: Project,
     scenes: list[Scene],
@@ -672,13 +725,19 @@ def _render_export_core(
     transitions: list[dict],
     ctx: RenderContext,
     progress_cb=None,
+    intermediate: bool = False,
 ) -> str:
     """Concatenate rendered parts (scene_paths[scene.id]) honoring
     per-boundary transitions ('cut' | 'dissolve' | 'fade_through_black').
     Dissolve/fade consume only the silent lead/trail handles baked into
     each part, so narration audio is never overlapped (spec section 11)."""
+    if len(scenes) > EXPORT_BATCH:
+        return _render_export_batched(project, scenes, scene_paths, transitions, ctx, progress_cb, intermediate)
     work_dir = Path(TMP_DIR) / f"export_{project.id}_{uuid.uuid4().hex[:8]}"
     work_dir.mkdir(parents=True, exist_ok=True)
+    final_dir = Path(TMP_DIR) if intermediate else Path(RENDERS_DIR)
+    ext = ".mkv" if intermediate else ".mp4"
+    codec = _export_codec_args(intermediate)
     try:
         paths = [scene_paths[s.id] for s in scenes]
         durations = [probe(p).duration_ms or 0 for p in paths]
@@ -693,10 +752,9 @@ def _render_export_core(
                           f'[{i}:a]aresample=48000,aformat=sample_fmts=fltp:channel_layouts=stereo,apad,atrim=duration={seconds:.3f},asetpts=PTS-STARTPTS[a{i}]']
                 pads += [f'[v{i}][a{i}]']
             graph.append(''.join(pads) + f'concat=n={len(paths)}:v=1:a=1[vout][aout]')
-            out_path = str(Path(RENDERS_DIR) / f"export_{project.id}_{uuid.uuid4().hex[:8]}.mp4")
+            out_path = str(final_dir / f"export_{project.id}_{uuid.uuid4().hex[:8]}{ext}")
             run_ffmpeg([*inputs, '-filter_complex', ';'.join(graph), '-map', '[vout]', '-map', '[aout]',
-                        '-c:v', 'libx264', '-preset', X264_PRESET, '-crf', X264_CRF, '-pix_fmt', 'yuv420p', '-profile:v', 'high',
-                        '-movflags', '+faststart', '-c:a', 'aac', '-b:a', '192k', '-ar', '48000', '-ac', '2', out_path], cancel_check=ctx.cancel_check)
+                        *codec, out_path], cancel_check=ctx.cancel_check)
             if progress_cb: progress_cb('export', 100)
             return out_path
 
@@ -749,17 +807,18 @@ def _render_export_core(
             v_label, a_label = vout, aout
             cumulative_ms = cumulative_ms - dur_ms + durations[i]
 
+        if intermediate:
+            # Crossfades leave the audio ~0.1 s longer than the picture. A batch must end
+            # both tracks together, or joining batches inserts that gap into the video.
+            filter_parts.append(f"[{a_label}]apad,atrim=duration={cumulative_ms / 1000:.3f}[aseg]")
+            a_label = "aseg"
         graph = ";".join(filter_parts)
-        out_path = str(Path(RENDERS_DIR) / f"export_{project.id}_{uuid.uuid4().hex[:8]}.mp4")
+        out_path = str(final_dir / f"export_{project.id}_{uuid.uuid4().hex[:8]}{ext}")
         args = [
             *inputs,
             "-filter_complex", graph,
             "-map", f"[{v_label}]", "-map", f"[{a_label}]",
-            "-c:v", "libx264", "-preset", X264_PRESET, "-crf", X264_CRF,
-            # Widely playable delivery format: some transitions compute in full colour, which made
-            # libx264 pick High 4:4:4 (Windows Photos / Media Player cannot open it).
-            "-pix_fmt", "yuv420p", "-profile:v", "high", "-movflags", "+faststart",
-            "-c:a", "aac", "-b:a", "192k", "-ar", "48000", "-ac", "2",
+            *codec,
             out_path,
         ]
         run_ffmpeg(args, cancel_check=ctx.cancel_check)

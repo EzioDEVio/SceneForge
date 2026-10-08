@@ -34,17 +34,18 @@ import {ProgressCard} from "./ProgressCard";
 import {BatchBar} from "./BatchBar";
 import {ExportDialog} from "./ExportDialog";
 import {ReframeProjectDialog} from "./ReframePanel";
-import {TypewriterPanel} from "./TypewriterPanel";
+import {TypewriterPanel, TypewriterShortcut} from "./TypewriterPanel";
 import {TextTemplatePicker} from "./TextTemplates";
 import {RestorePoints, useAutoSnapshots} from "./RestorePoints";
 import {ShareDialog} from "./ShareDialog";
 import VideoGenerationPanel from "./VideoGenerationPanel";
 import {FeatureHelp} from "./FeatureHelp";
 import {LocalEngineStarter} from "./LocalServices";
-import {SubjectCutoutPanel, TexturedTitlePanel, VideoInTextPanel} from "./CreativeTools";
+import {SubjectCutoutPanel} from "./CreativeTools";
+import {CreativeStudio, creativeKindOf, type CreativeKind} from "./CreativeStudio";
 import {PreferencesPanel} from "./PreferencesPanel";
 import {applyPreferences,readPreferences,writePreferences,type AppPreferences} from "./preferences";
-import {SceneEffectsPanel, EffectsAccess, FxGroup, SceneFxPreview, RouteCanvas, AnnotationCanvas} from "./EffectsPanels";
+import {SceneEffectsPanel, EffectsAccess, EffectCategories, FX_CATEGORIES, type FxCategory, FxGroup, SceneFxPreview, RouteCanvas, AnnotationCanvas} from "./EffectsPanels";
 import {EffectSettings, fxPreviewFilter, useEffectSchema} from "./EffectControls";
 import {SpeedControls, ClipSoundControls} from "./SpeedControls";
 import type {CaptionSegment,Overlay,ProjectAudioClip} from "./api";
@@ -60,7 +61,7 @@ import {
   Download, Play, Loader2, Trash2, X, Plus, Upload, Sparkles, Volume2,
   FileText, ImageIcon, Clock, Palette, Type, Wand2, Film, Settings, Key, Check,
   LayoutDashboard, ChevronRight, ChevronDown, Layers, Copy, PanelLeftClose, PanelLeftOpen, Search, CheckCircle2, Timer, Clapperboard, Moon, Sun,
-  Package, FolderOpen, Shuffle, Mic, HelpCircle, History, Bookmark, Smartphone, Music, Redo2, Undo2, Zap, LayoutTemplate,
+  Package, VolumeX, FolderOpen, Shuffle, Mic, HelpCircle, History, Bookmark, Smartphone, Music, Redo2, Undo2, Zap, LayoutTemplate,
 } from "lucide-react";
 import { api, subscribeJob, Project, Scene, Shot, Job, VoiceTake, ProviderProfile, Asset, VoiceOption } from "./api";
 
@@ -81,6 +82,7 @@ const THEMES:{id:AppPreferences['theme'];label:string}[]=[
 const MOTION_ICONS:Record<string,typeof ZoomIn>={zoom_in:ZoomIn,zoom_out:ZoomOut,close_up:Crosshair,pan_left:ArrowLeft,pan_right:ArrowRight,pan_up:ArrowUp,pan_down:ArrowDown,diagonal_up:ArrowUp,diagonal_down:ArrowDown,push_left:ZoomIn,pull_right:ZoomOut,push_right:ZoomIn,pull_left:ZoomOut,rise_left:ArrowUpLeft,drop_left:ArrowDownLeft,static:MoreHorizontal};
 const MOTIONS=CAMERA_MOTIONS.map(([key,label])=>({key,label,Icon:MOTION_ICONS[key]}));
 
+const LOOK_GROUPS = [{id: 'all', label: 'All'}, {id: 'classic', label: 'Classic'}, {id: 'filter', label: 'Color filters'}, {id: 'pack', label: 'Film & lens'}, {id: 'creative', label: 'Creative'}];
 const EFFECTS: { key: string; label: string; swatch: string; group?:'filter'|'creative'|'pack'; help?:string }[] = [
   { key: "original", label: "Original", swatch: "none" },
   { key: "black_and_white", label: "B & W", swatch: "grayscale(1)" },
@@ -550,6 +552,21 @@ function TextLayers({scene,onChange,focusLayer}:{scene:Scene;onChange:(layers:No
   </section>;
 }
 
+/** Always-visible entry point to the three places words can be bleeped or muted. */
+function CensorGuide({hasNarration,hasVideo,onClipAudio}:{hasNarration:boolean;hasVideo:boolean;onClipAudio:()=>void}){
+  const [note,setNote]=useState('');
+  const jump=(title:string,after=0)=>setTimeout(()=>{const body=document.querySelector('.scene-editor:not([hidden]) .inspector-body') as HTMLElement|null;
+    const h=Array.from(body?.querySelectorAll<HTMLElement>('h3,h4')||[]).find(n=>n.textContent?.trim()===title);
+    if(body&&h){body.scrollTo({top:body.scrollTop+h.getBoundingClientRect().top-body.getBoundingClientRect().top-8,behavior:'smooth'});h.focus?.({preventScroll:true});}},after);
+  return <section className="audio-card censor-guide"><h3><VolumeX size={15} aria-hidden/> Censor words (bleep or mute)</h3>
+    <p className="hint">Replace swear words or names with a bleep or silence. Pick which sound to censor:</p>
+    <div className="censor-guide-actions">
+      <button className="btn" onClick={()=>{if(hasNarration){setNote('');jump('Voice censoring');}else setNote('This scene has no narration yet. Generate or upload a voice below, then censor it here.');}}><Mic size={14} aria-hidden/> Narration</button>
+      <button className="btn" onClick={()=>{if(hasVideo){setNote('');onClipAudio();jump('Voice censoring',350);}else setNote('This scene has no video clip, so it has no clip sound to censor.');}}><Film size={14} aria-hidden/> Video’s own sound</button>
+      <button className="btn" onClick={()=>{setNote('Select a clip under Timeline audio clips below; its Voice censoring box appears with the clip settings.');jump('Timeline audio clips');}}><Music size={14} aria-hidden/> Timeline audio clip</button>
+    </div>{note&&<p className="hint censor-guide-note" role="status">{note}</p>}
+  </section>;
+}
 type InspectorTab = "Media" | "Motion" | "Effects" | "Overlays" | "Text" | "Audio" | "Clip Audio";
 const INSPECTOR_GUIDE:Record<InspectorTab,{description:string;steps:string}>={
   Media:{description:'Import and arrange still images and video clips for the selected scene. The Media Pool keeps source files available across scenes.',steps:'Import or generate media, select a thumbnail to choose it, then drag it onto the timeline or use the scene controls. Choose Fill to cover the frame or Fit to preserve the whole image.'},
@@ -612,12 +629,18 @@ function PartRow({layerActions,scene:savedScene, project, index, total, active, 
   const [captionSegments,setCaptionSegments]=useState<CaptionSegment[]>(scene.font_json.caption_segments||[]);
   const [draftLayers,setDraftLayers]=useState(scene.font_json.layers||[]);
   const [search, setSearch] = useState("");
+  const [fxCat, setFxCat] = useState<FxCategory>(() => {try {const v = sessionStorage.getItem("sf.fxcat"); return (FX_CATEGORIES.some(c => c.id === v) ? v : "looks") as FxCategory;} catch {return "looks";}});
+  const [lookGroup, setLookGroup] = useState("all");
+  const chooseFxCat = (c: FxCategory) => {setFxCat(c); setSearch(""); try {sessionStorage.setItem("sf.fxcat", c);} catch {/* ignore */} requestAnimationFrame(() => {const b = document.querySelector<HTMLElement>(".scene-editor:not([hidden]) .inspector-body"); if (b) b.scrollTop = 0;});};
+  // Quick-access shortcuts open a group under More effects.
+  useEffect(() => {const open = () => setFxCat("more"); window.addEventListener("sceneforge-open-effect-group", open); return () => window.removeEventListener("sceneforge-open-effect-group", open);}, []);
   const soundRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [jobId, setJobId] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState<"source" | "render">(scene.rendered_asset_id ? "render" : "source");
   const [selectedShotId, setSelectedShotId] = useState(scene.shots[0]?.id || "");
+  const [creative,setCreative]=useState<{kind:CreativeKind;editIndex?:number}|null>(null);
   const [zoom, setZoom] = useState(100);
   // Inspection zoom (magnify and pan the preview to check details); 1 = fit.
   const [safeZones, setSafeZones] = useState(false);
@@ -653,6 +676,9 @@ function PartRow({layerActions,scene:savedScene, project, index, total, active, 
     return flush();
   };
   useEffect(()=>registerCloseSave(scene.id,()=>closeSaveRef.current()),[scene.id]);
+  // The project-level prompt ("Apply and continue" / "Discard and continue") resolves this scene's draft.
+  useEffect(()=>{const h=(e:Event)=>{const d=(e as CustomEvent<{sceneId:string;action:'apply'|'cancel'}>).detail;if(d?.sceneId!==scene.id)return;if(d.action==='apply')void applyEditor();else cancelEditor();};
+    window.addEventListener('sceneforge-resolve-draft',h);return()=>window.removeEventListener('sceneforge-resolve-draft',h);});
   const shot = scene.shots.find(s => s.id === selectedShotId) || scene.shots[0];
   useEffect(()=>{
     const handler=(event:Event)=>{const {sceneId,timeMs}=(event as CustomEvent).detail;if(sceneId!==scene.id)return;
@@ -814,6 +840,8 @@ function PartRow({layerActions,scene:savedScene, project, index, total, active, 
   });
   const liveAdjust = ((pending.current.look as any)?.adjust ?? scene.look_json?.adjust) || undefined;
   const pendingLook = (pending.current.look as any) || {};
+  const fxLook: any = {...(scene.look_json || {}), ...pendingLook};
+  const fxOn = {looks: scene.effect_preset !== "original", film: !!fxLook.film, adjust: Object.values(fxLook.adjust || {}).some(Boolean) || !!fxLook.lut};
   const liveRoute = ('route' in pendingLook ? pendingLook.route : (scene.look_json as any)?.route) || null;
   const liveAnnots = (('annotations' in pendingLook ? pendingLook.annotations : (scene.look_json as any)?.annotations) || []) as any[];
   const wbFilterId = `sf-wb-${scene.id}`;
@@ -921,12 +949,20 @@ function PartRow({layerActions,scene:savedScene, project, index, total, active, 
             {shot && <label className="control-label">Frame fit<select aria-label="Frame fit" value={shot.fit} disabled={false} onChange={e => {const fit = e.currentTarget.value; setPreviewMode("source"); void run(()=>saveParameters({scene:{},shots:[{id:shot.id,patch:{fit}}]},"frame fit"));}}><option value="cover">Fill frame (crop)</option><option value="contain">Fit inside frame (show entire image)</option></select><span className="hint">Fit preserves the whole image with bars where needed. Fill crops the edges to cover the frame.</span></label>}
           </>}
           {tab === "Motion" && <>{shot&&<FramingControls key={shot.id} shot={shot} save={run} onDraft={patch=>draftShot(shot.id,patch)}/>}<h3>Camera movement</h3><p className="hint">Applied to {shot ? `media ${scene.shots.indexOf(shot)+1}` : "selected media"}. {shot?.fit !== "cover" ? "Motion requires Fill frame; Fit inside frame keeps the entire image still." : "Render to preview the movement."}</p><div className="motion-box">{MOTIONS.map(({key,label,Icon}) => <button key={key} className={`motion-btn ${activeMotion === key ? "selected" : ""}`} aria-pressed={activeMotion === key} disabled={!shot || shot.fit !== "cover"} onClick={() => draftShot(shot.id,{motion:{type:key,easing:(shot.motion_json as any)?.easing||"ease_in_out"}})}><Icon size={19}/><span>{label}</span></button>)}</div>{shot&&shot.asset?.type==="video"&&<SpeedControls key={"sp"+shot.id} shot={shot} disabled={false} save={speed=>draftShot(shot.id,{speed})}/ >}{shot&&<label className="control-label">Speed curve<select aria-label="Motion speed curve" value={(shot.motion_json as any)?.easing||"ease_in_out"} disabled={shot.fit!=="cover"} onChange={e=>{const easing=e.target.value; /* read now: the controlled select resets before the queued save runs */ draftShot(shot.id,{motion:{...(shot.motion_json||{type:"static"}),easing}});}}><option value="ease_in_out">Smooth (ease in and out)</option><option value="ease_in">Ease in (starts slow)</option><option value="ease_out">Ease out (ends slow)</option><option value="linear">Constant speed</option></select></label>}</>}
-          {tab === "Effects" && <><h3>Image looks and effects</h3><EffectsAccess onNavigate={()=>setSearch("")}/><p className="hint">Preview on the canvas; click an option to apply it to this scene.</p><label className="search-control"><Search size={15}/><input type="search" aria-label="Search effects" placeholder="Search effects…" value={search} onChange={e => setSearch(e.target.value)}/></label><p className="hint looks-hint">Hover a look to preview it on the picture · click to apply</p><div className="filter-catalog"><section className="effect-category"><h4>Color filters · 8 additions</h4><p className="hint">Distinct color grades for a fast, consistent treatment.</p><div className="effects-grid">{renderEffectTiles(EFFECTS.filter(f=>f.group==='filter'))}</div></section><section className="effect-category"><h4>Creative effects · 2 additions</h4><p className="hint">Chromatic split separates color edges; Motion trail blends adjacent frames to accent movement.</p><div className="effects-grid">{renderEffectTiles(EFFECTS.filter(f=>f.group==='creative'))}</div></section><section className="effect-category"><h4>Film grades &amp; lens effects</h4><p className="hint">Film-style grades and halation are FFmpeg approximations, not stock emulations. Focus blur, Tilt-shift and Mosaic have their own settings below.</p><div className="effects-grid">{renderEffectTiles(EFFECTS.filter(f=>f.group==='pack'))}</div></section><section className="effect-category"><h4>Image looks and film treatments</h4><div className="effects-grid">{renderEffectTiles(EFFECTS.filter(f=>!f.group))}</div></section></div>{!EFFECTS.some(f => f.label.toLowerCase().includes(search.toLowerCase())) && <p className="hint">No matching image looks. Check additional effect groups below.</p>}<p className="hint">Thumbnails are approximate. Glitch tears the whole frame in bursts; choose its speed and block size below. Render to check the exact result.</p><button className="btn" disabled={!shot||isGenerating} onClick={render}><Play size={14}/> Render effect preview</button><label className="control-label">Effect strength · {scene.effect_intensity}%<input aria-label="Effect strength" type="range" min={0} max={100} step={5} disabled={scene.effect_preset==="original"} key={scene.effect_intensity} defaultValue={scene.effect_intensity} onChange={e=>draft({effect_intensity:Number(e.target.value)})} onBlur={()=>void flush()}/></label><button className="text-btn" disabled={scene.effect_preset === "original"} onClick={() => {setPreviewMode("source"); void update({effect_preset:"original"});}}>Reset to original</button><EffectSettings key={`fxp-${scene.id}-${lookEpoch}`} preset={scene.effect_preset} look={{...(scene.look_json || {}), ...pendingLook}} disabled={false} onDraft={look=>draft({look})}/><LookPanel key={`look-${lookEpoch}`} scene={scene} disabled={false} onDraft={look=>draft({look})} onSaveNow={async look=>{setPreviewMode("source");
+          {tab === "Effects" && <div className="fx-tab" data-fxcat={search.trim()?"all":fxCat}><EffectCategories value={fxCat} onChange={chooseFxCat} on={fxOn} searching={!!search.trim()}/><label className="search-control"><Search size={15}/><input type="search" aria-label="Search effects" placeholder="Search effects…" value={search} onChange={e => setSearch(e.target.value)}/></label><div className="fx-cat-looks" data-fx-cat="looks"><h3>Looks</h3><p className="hint looks-hint">Hover a look to preview it on the picture · click to apply it to this scene</p><div className="look-chips" role="group" aria-label="Show looks">{LOOK_GROUPS.map(g=><button key={g.id} type="button" className="chip" aria-pressed={lookGroup===g.id} onClick={()=>setLookGroup(g.id)}>{g.label}</button>)}</div><div className="filter-catalog"><section className="effect-category" hidden={!search.trim()&&lookGroup!=="all"&&lookGroup!=="classic"}><h4>Classic looks and film treatments</h4><div className="effects-grid">{renderEffectTiles(EFFECTS.filter(f=>!f.group))}</div></section><section className="effect-category" hidden={!search.trim()&&lookGroup!=="all"&&lookGroup!=="filter"}><h4>Color filters</h4><p className="hint">Distinct color grades for a fast, consistent treatment.</p><div className="effects-grid">{renderEffectTiles(EFFECTS.filter(f=>f.group==='filter'))}</div></section><section className="effect-category" hidden={!search.trim()&&lookGroup!=="all"&&lookGroup!=="pack"}><h4>Film grades &amp; lens effects</h4><p className="hint">Film-style grades and halation are FFmpeg approximations, not stock emulations. Focus blur, Tilt-shift and Mosaic have their own settings below.</p><div className="effects-grid">{renderEffectTiles(EFFECTS.filter(f=>f.group==='pack'))}</div></section><section className="effect-category" hidden={!search.trim()&&lookGroup!=="all"&&lookGroup!=="creative"}><h4>Creative effects</h4><p className="hint">Chromatic split separates color edges; Motion trail blends adjacent frames to accent movement.</p><div className="effects-grid">{renderEffectTiles(EFFECTS.filter(f=>f.group==='creative'))}</div></section></div>{!EFFECTS.some(f => f.label.toLowerCase().includes(search.toLowerCase())) && <p className="hint">No matching image looks. Check additional effect groups below.</p>}<p className="hint">Thumbnails are approximate. Glitch tears the whole frame in bursts; choose its speed and block size below. Render to check the exact result.</p><button className="btn" disabled={!shot||isGenerating} onClick={render}><Play size={14}/> Render effect preview</button><label className="control-label">Effect strength · {scene.effect_intensity}%<input aria-label="Effect strength" type="range" min={0} max={100} step={5} disabled={scene.effect_preset==="original"} key={scene.effect_intensity} defaultValue={scene.effect_intensity} onChange={e=>draft({effect_intensity:Number(e.target.value)})} onBlur={()=>void flush()}/></label><button className="text-btn" disabled={scene.effect_preset === "original"} onClick={() => {setPreviewMode("source"); void update({effect_preset:"original"});}}>Reset to original</button><EffectSettings key={`fxp-${scene.id}-${lookEpoch}`} preset={scene.effect_preset} look={{...(scene.look_json || {}), ...pendingLook}} disabled={false} onDraft={look=>draft({look})}/></div><LookPanel key={`look-${lookEpoch}`} scene={scene} disabled={false} onDraft={look=>draft({look})} onSaveNow={async look=>{setPreviewMode("source");
   draft({look});
-}}/><div className="fx-groups-heading"><h3><Layers size={15}/> More effects</h3><p className="hint">Open a group below, search by name, or use Quick access above.</p></div><SceneEffectsPanel key={`fx-${lookEpoch}`} scene={scene} query={search} disabled={false} onDraft={look=>draft({look})} liveRoute={liveRoute} routeEditing={routeEditing} onRouteEditing={setRouteEditing} liveAnnotations={liveAnnots} vertical={project.height>project.width*1.2} onAddMedia={() => fileRef.current?.click()}/><FxGroup id="reuse" items="Effect stack · Look presets" title="Combine & reuse looks" Icon={Package} description="Change the order effects are applied in, and save or load ready-made looks." active={0}><EffectStack look={{...(scene.look_json || {}), ...((pending.current.look as any) || {})}} disabled={false} onDraft={look=>draft({look})}/><LookPresets scene={scene} disabled={isGenerating} flush={flush} onRecord={onRecord} onDraft={patch=>editMotionEffects({scene:patch})} onApplied={()=>setLookEpoch(e=>e+1)}/></FxGroup></>}
-          {tab === "Text" && <><AutoCaptions scene={scene} onDone={sc => {setCaptions(sc.subtitle_text);setCaptionSegments(sc.font_json.caption_segments||[]);void refresh();}} onStyle={f => update({font: f})}/><TextLayers key={`tl-${draftLayers.length}`} scene={{...scene,font_json:{...scene.font_json,layers:draftLayers}}} onChange={layers=>{setDraftLayers(layers);draft({font:{layers}});}} focusLayer={textFocus}/>{captionSegments.length>0?<><CaptionSegmentsEditor segments={captionSegments} onChange={changeCaptionSegments} direction={(scene.font_json.caption_direction||'auto') as CaptionDirection} onDirectionChange={direction=>void update({font:{caption_direction:direction}})} activeSegmentId={textFocus?.startsWith('caption:')?textFocus.slice(8):null} onFocusSegment={id=>setTextFocus(`caption:${id}`)}/><button className="text-btn" onClick={()=>{setCaptionSegments([]);setCaptions(text);draft({subtitle_text:text,font:{caption_segments:[]}});}}><Copy size={13}/> Copy narration to captions</button></>:<><div className="caption-manual-heading"><h3>On-screen captions</h3><label className="caption-direction-control">Direction<select aria-label="Caption text direction" value={scene.font_json.caption_direction||'auto'} onChange={e=>void update({font:{caption_direction:e.target.value}})}><option value="auto">Auto</option><option value="rtl">Right to left</option><option value="ltr">Left to right</option></select></label></div><p className="hint">Caption text is independent of narration. Add a caption here or generate timed clips above.</p><textarea aria-label="On-screen captions" dir={(scene.font_json.caption_direction||'auto') as CaptionDirection} className="caption-box" value={captions} onChange={e => {setCaptions(e.target.value); draft({subtitle_text:e.target.value,font:{caption_segments:[]}});}} onBlur={() => void flush()} placeholder="Write the text to appear on your video…"/><button className="text-btn" onClick={() => {setCaptions(text); draft({subtitle_text:text,font:{caption_segments:[]}});}}><Copy size={13}/> Copy narration to captions</button></>}<fieldset><CaptionStylePanel scene={scene} onChange={f => {if(f.typewriter&&!captions.trim()&&text.trim()){setCaptions(text);draft({subtitle_text:text});}void update({font:f});}}/></fieldset><TypewriterPanel scene={scene} captions={captions} narration={text} update={update} onCopyNarration={()=>{setCaptions(text);draft({subtitle_text:text});}} onUploadSound={()=>soundRef.current?.click()}/><p className="hint">Render text preview to see captions, titles and the typewriter (with its sound) together. Titles have their own typewriter option under the title’s Animation.</p></>}
+}}/><div className="fx-cat-more" data-fx-cat="more"><div className="fx-groups-heading"><h3><Layers size={15}/> More effects</h3><p className="hint">Open a group below, or search by name.</p></div><EffectsAccess onNavigate={()=>setSearch("")}/><SceneEffectsPanel key={`fx-${lookEpoch}`} scene={scene} query={search} disabled={false} onDraft={look=>draft({look})} liveRoute={liveRoute} routeEditing={routeEditing} onRouteEditing={setRouteEditing} liveAnnotations={liveAnnots} vertical={project.height>project.width*1.2} onAddMedia={() => fileRef.current?.click()}/><FxGroup id="reuse" items="Effect stack · Look presets" title="Combine & reuse looks" Icon={Package} description="Change the order effects are applied in, and save or load ready-made looks." active={0}><EffectStack look={{...(scene.look_json || {}), ...((pending.current.look as any) || {})}} disabled={false} onDraft={look=>draft({look})}/><LookPresets scene={scene} disabled={isGenerating} flush={flush} onRecord={onRecord} onDraft={patch=>editMotionEffects({scene:patch})} onApplied={()=>setLookEpoch(e=>e+1)}/></FxGroup></div></div>}
+          {tab === "Text" && <><TypewriterShortcut scene={scene} captions={captions} narration={text} update={update} onCopyNarration={()=>{setCaptions(text);draft({subtitle_text:text});}}/><AutoCaptions scene={scene} onDone={sc => {setCaptions(sc.subtitle_text);setCaptionSegments(sc.font_json.caption_segments||[]);void refresh();}} onStyle={f => update({font: f})}/><TextLayers key={`tl-${draftLayers.length}`} scene={{...scene,font_json:{...scene.font_json,layers:draftLayers}}} onChange={layers=>{setDraftLayers(layers);draft({font:{layers}});}} focusLayer={textFocus}/>{captionSegments.length>0?<><CaptionSegmentsEditor segments={captionSegments} onChange={changeCaptionSegments} direction={(scene.font_json.caption_direction||'auto') as CaptionDirection} onDirectionChange={direction=>void update({font:{caption_direction:direction}})} activeSegmentId={textFocus?.startsWith('caption:')?textFocus.slice(8):null} onFocusSegment={id=>setTextFocus(`caption:${id}`)}/><button className="text-btn" onClick={()=>{setCaptionSegments([]);setCaptions(text);draft({subtitle_text:text,font:{caption_segments:[]}});}}><Copy size={13}/> Copy narration to captions</button></>:<><div className="caption-manual-heading"><h3>On-screen captions</h3><label className="caption-direction-control">Direction<select aria-label="Caption text direction" value={scene.font_json.caption_direction||'auto'} onChange={e=>void update({font:{caption_direction:e.target.value}})}><option value="auto">Auto</option><option value="rtl">Right to left</option><option value="ltr">Left to right</option></select></label></div><p className="hint">Caption text is independent of narration. Add a caption here or generate timed clips above.</p><textarea aria-label="On-screen captions" dir={(scene.font_json.caption_direction||'auto') as CaptionDirection} className="caption-box" value={captions} onChange={e => {setCaptions(e.target.value); draft({subtitle_text:e.target.value,font:{caption_segments:[]}});}} onBlur={() => void flush()} placeholder="Write the text to appear on your video…"/><button className="text-btn" onClick={() => {setCaptions(text); draft({subtitle_text:text,font:{caption_segments:[]}});}}><Copy size={13}/> Copy narration to captions</button></>}<fieldset><CaptionStylePanel scene={scene} onChange={f => {if(f.typewriter&&!captions.trim()&&text.trim()){setCaptions(text);draft({subtitle_text:text});}void update({font:f});}}/></fieldset><TypewriterPanel scene={scene} captions={captions} narration={text} update={update} onCopyNarration={()=>{setCaptions(text);draft({subtitle_text:text});}} onUploadSound={()=>soundRef.current?.click()}/><p className="hint">Render text preview to see captions, titles and the typewriter (with its sound) together. Titles have their own typewriter option under the title’s Animation.</p></>}
           {tab === "Clip Audio" && shot?.asset?.type === "video" && <><ClipSoundControls key={"cs"+shot.id} shot={shot} save={audio=>{const before=shot.audio_json||{volume:100,mute:false,duck:true};void onRecord("clip sound",()=>api.updateShot(shot.id,{audio:before}),()=>api.updateShot(shot.id,{audio}));}}><ClipSoundVoiceIsolation project={project} scene={scene} shot={shot} onRecord={onRecord} onSelectAudioClip={onSelectAudioClip}/></ClipSoundControls><p className="hint">These controls affect the selected video's embedded audio track. Narration and music remain under Audio.</p></>}
-          {tab === "Overlays" && <><OverlayPanel scene={scene} overlays={overlays} selected={ovSelected} onSelect={setOvSelected} onChange={changeOverlays} disabled={false}/><SubjectCutoutPanel scene={scene} disabled={isGenerating} onDone={async()=>{setOvDraft(null);await refresh();window.dispatchEvent(new Event('sceneforge-media-changed'));}}/><TexturedTitlePanel scene={scene} disabled={isGenerating} onDone={async()=>{setOvDraft(null);await refresh();}}/><VideoInTextPanel scene={scene} disabled={isGenerating} onDone={async()=>{setOvDraft(null);await refresh();}}/></>}{tab === "Audio" && <div className="audio-workspace">{acceptedTake?.audio_asset && <AudioClipEditor key={acceptedTake.id} scene={scene} take={acceptedTake} disabled={false} onChanged={refresh} onRemove={()=>void removeNarration(scene)}/>}<FinishingPanel project={project} disabled={false} onChanged={refresh} selectedClipId={selectedAudioClipId} onSelectClip={onSelectAudioClip} onUpdateAudioClips={onUpdateAudioClips}/><section className="audio-card"><h3>Voice & narration</h3><p className="hint">Connect a local speech component or upload a recording. Select a take before rendering.</p><VoicePanel scene={{...scene,spoken_text:text}} onChanged={refresh} beforeGenerate={flush}/></section></div>}
+          {tab === "Overlays" && <><OverlayPanel scene={scene} overlays={overlays} selected={ovSelected} onSelect={setOvSelected} onChange={changeOverlays} disabled={false}/><SubjectCutoutPanel scene={scene} disabled={isGenerating} onDone={async()=>{setOvDraft(null);await refresh();window.dispatchEvent(new Event('sceneforge-media-changed'));}}/><section className="creative-card creative-launchers" aria-label="Creative titles"><h3><Sparkles size={15} aria-hidden/> Creative titles</h3>
+            <p className="hint">Opens a full editor with a live preview: create the title, then place, frame, move and time it in one window.</p>
+            <div className="creative-launch-grid">
+              <button className="creative-launch" disabled={isGenerating} onClick={()=>setCreative({kind:'videoText'})}><Type size={20} aria-hidden/><b>Video inside text</b><small>Your video plays through the letters</small></button>
+              <button className="creative-launch" disabled={isGenerating} onClick={()=>setCreative({kind:'textured'})}><Palette size={20} aria-hidden/><b>Textured title</b><small>Lava, gold, chrome, your own image…</small></button>
+            </div>
+            {overlays.some(o=>creativeKindOf(o))&&<div className="creative-existing"><span className="hint">In this scene:</span>{overlays.map((o,i)=>{const k=creativeKindOf(o);return k&&<button key={o.id} className="btn" onClick={()=>setCreative({kind:k,editIndex:i})}>{k==='videoText'?<Type size={13} aria-hidden/>:<Palette size={13} aria-hidden/>} Adjust {k==='videoText'?'video inside text':'textured title'} (layer {i+1})</button>;})}</div>}
+          </section></>}
+          {creative&&<CreativeStudio kind={creative.kind} editIndex={creative.editIndex} scene={scene} project={project} overlays={overlays} disabled={isGenerating} onChangeOverlays={changeOverlays} onDone={async()=>{setOvDraft(null);await refresh();}} onClose={()=>setCreative(null)}/>}{tab === "Audio" && <div className="audio-workspace"><CensorGuide hasNarration={!!acceptedTake?.audio_asset} hasVideo={scene.shots.some(s=>s.asset?.type==="video")} onClipAudio={()=>{const v=scene.shots.find(s=>s.asset?.type==="video");if(v)setSelectedShotId(v.id);setTab("Clip Audio");}}/>{acceptedTake?.audio_asset && <AudioClipEditor key={acceptedTake.id} scene={scene} take={acceptedTake} disabled={false} onChanged={refresh} onRemove={()=>void removeNarration(scene)}/>}<FinishingPanel project={project} disabled={false} onChanged={refresh} selectedClipId={selectedAudioClipId} onSelectClip={onSelectAudioClip} onUpdateAudioClips={onUpdateAudioClips}/><section className="audio-card"><h3>Voice & narration</h3><p className="hint">Connect a local speech component or upload a recording. Select a take before rendering.</p><VoicePanel scene={{...scene,spoken_text:text}} onChanged={refresh} beforeGenerate={flush}/></section></div>}
           <section className="timing-section"><h3><Clock size={15}/> Scene duration</h3><label className="control-label">Timing mode<select aria-label="Timing mode" value={scene.timing_mode} disabled={false} onChange={e => update({timing_mode:e.target.value})}><option value="audio_driven">Match narration</option><option value="fixed">Fixed duration</option></select></label>
           {scene.timing_mode === "fixed" && <label className="control-label">Seconds<input aria-label="Scene duration in seconds" type="number" min={1} max={120} step={0.5} defaultValue={(scene.requested_duration_ms || 5000)/1000} key={scene.requested_duration_ms} onBlur={e => {const v=Math.max(1,Math.min(120,Number(e.target.value)||5)); if (v*1000 !== scene.requested_duration_ms) void update({requested_duration_ms:Math.round(v*1000)});}}/></label>}
           <p className="hint">{scene.timing_mode === "fixed" ? "Narration is trimmed or padded to fit this length." : "Uses the selected narration take, including lead and trail padding."}</p></section>
@@ -1230,9 +1266,27 @@ export default function App() {
   const savingRestoreRef=useRef(false);
   const [videoGenOpen,setVideoGenOpen]=useState(false);
   const [projectMode, setProjectMode] = useState<'new'|'open'>('open');
+  /** Unapplied Motion/Effects drafts: ask once, then apply or discard them. Returns false to stay. */
+  async function resolveDrafts(doing:string):Promise<boolean>{
+    const drafts=(projectRef.current?.scenes||[]).filter(scene=>statesRef.current[scene.id]?.startsWith('Draft'));
+    if(!drafts.length)return true;
+    const names=drafts.map(d=>`“${d.title}”`).join(', ');
+    const choice=await askChoice(`Motion or Effects changes in ${names} are not applied yet. What should happen to them before ${doing}?`,[
+      {label:'Discard and continue',value:'cancel'},{label:'Apply and continue',value:'apply',primary:true}]);
+    if(!choice){setSelectedId(drafts[0].id);window.dispatchEvent(new CustomEvent('sceneforge-open-tab',{detail:{sceneId:drafts[0].id,tab:'Motion'}}));setError(`Apply or Cancel the Motion/Effects changes in “${drafts[0].title}” before ${doing}.`);return false;}
+    for(const d of drafts)window.dispatchEvent(new CustomEvent('sceneforge-resolve-draft',{detail:{sceneId:d.id,action:choice}}));
+    for(let i=0;i<80&&drafts.some(d=>statesRef.current[d.id]?.startsWith('Draft'));i++)await new Promise(r=>setTimeout(r,150));
+    if(drafts.some(d=>statesRef.current[d.id]?.startsWith('Draft'))){setSelectedId(drafts[0].id);setError(`Could not ${choice==='apply'?'apply':'discard'} the changes in ${names}. They are still shown in the Motion/Effects panel.`);return false;}
+    return true;
+  }
   /** Back to the project list (to start a new project or open another), after saves finish. */
   async function goToProjects(mode:'new'|'open'){
-    if(project&&!(await saveBeforeClose())){setError('Could not save the current edits. Keep the project open and retry.');return;}
+    if(project&&!(await resolveDrafts('leaving this project')))return;
+    if(project){
+      // An apply/discard just resolved finishes its save a moment before the editor redraws.
+      let saved=false;for(let i=0;i<12&&!(saved=await saveBeforeClose());i++)await new Promise(r=>setTimeout(r,250));
+      if(!saved){setError('A scene is still rendering or saving. Wait for it to finish (or stop the render), then go to Projects again. Your edits are kept.');return;}
+    }
     if(project&&!(await saveTitle()))return;
     for(let i=0;i<40&&(Object.values(statesRef.current).some(v=>v!=="Saved")||hasActiveWrites());i++)await new Promise(r=>setTimeout(r,250));
     if(Object.values(statesRef.current).some(v=>v!=="Saved")||hasActiveWrites()){setError('The current edits are still saving. Wait for the saved status, then return to projects.');return;}
@@ -1289,20 +1343,18 @@ export default function App() {
     if(preparingProjectAction.current)return false;
     preparingProjectAction.current=true;
     try{
-      const draft=projectRef.current?.scenes.find(scene=>statesRef.current[scene.id]?.startsWith('Draft'));
-      if(draft){
-        setSelectedId(draft.id);
-        window.dispatchEvent(new CustomEvent('sceneforge-open-tab',{detail:{sceneId:draft.id,tab:'Motion'}}));
-        setError(`Apply or Cancel the Motion/Effects changes in “${draft.title}” before switching timelines or exporting.`);
-        return false;
-      }
-      if(!(await saveBeforeClose())||!(await saveTitle())){
+      if(!(await resolveDrafts('switching timelines or exporting')))return false;
+      let saved=false;for(let i=0;i<12&&!(saved=await saveBeforeClose());i++)await new Promise(r=>setTimeout(r,250));
+      if(!saved||!(await saveTitle())){
         setError('Could not finish saving. Retry any failed save or wait for the scene render to finish. Your edits are retained.');
         return false;
       }
       for(let i=0;i<40&&(Object.values(statesRef.current).some(v=>v!=="Saved")||hasActiveWrites());i++)await new Promise(r=>setTimeout(r,250));
       if(Object.values(statesRef.current).some(v=>v!=="Saved")||hasActiveWrites()){
-        setError('Changes have not finished saving. Apply pending changes or retry a failed save before continuing.');return false;
+        const pending=projectRef.current?.scenes.find(scene=>(statesRef.current[scene.id]||'Saved')!=='Saved');
+        if(pending){setSelectedId(pending.id);setError(`“${pending.title}” has not finished saving (${statesRef.current[pending.id]}). Your edits are kept. It is now selected: wait a moment or use Retry there, then try again.`);}
+        else setError('SceneForge is still saving your last change. Your edits are kept. Try again in a moment.');
+        return false;
       }
       setError(null);return true;
     }finally{preparingProjectAction.current=false;}

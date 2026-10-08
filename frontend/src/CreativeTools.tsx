@@ -113,7 +113,10 @@ export function SubjectCutoutPanel({scene, disabled, onDone}: {scene: Scene; dis
   </section>;
 }
 
-export function TexturedTitlePanel({scene, disabled, onDone}: {scene: Scene; disabled: boolean; onDone: () => void | Promise<void>}) {
+export type TexturedSettings = {text: string; source: 'preset' | 'pool' | 'prompt'; preset: string; pool_id: string; font: string; font_size: number; glow: number; outline: number};
+export type KnockoutSettings = {text: string; font: string; font_size: number; background: string; opacity: number; outline: number; outline_color: string; y: number};
+
+export function TexturedTitlePanel({scene, disabled, onDone, onSettings}: {scene: Scene; disabled: boolean; onDone: () => void | Promise<void>; onSettings?: (s: TexturedSettings) => void}) {
   const [text, setText] = React.useState('');
   const [source, setSource] = React.useState<'preset' | 'pool' | 'prompt'>('preset');
   const [preset, setPreset] = React.useState('lava');
@@ -128,6 +131,7 @@ export function TexturedTitlePanel({scene, disabled, onDone}: {scene: Scene; dis
   const [providers, setProviders] = React.useState<ProviderProfile[]>([]);
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState('');
+  React.useEffect(() => {onSettings?.({text, source, preset, pool_id: poolId, font, font_size: size, glow, outline});}, [text, source, preset, poolId, font, size, glow, outline]);
   React.useEffect(() => {
     api.listAssets(scene.project_id).then(a => setImages(a.filter(x => x.type === 'image'))).catch(() => {});
     api.listProviders().then(p => setProviders(p.filter(x => x.capability === 'image'))).catch(() => {});
@@ -166,7 +170,7 @@ export function TexturedTitlePanel({scene, disabled, onDone}: {scene: Scene; dis
  *  picture plays through the title (the classic documentary "1942" / place-name look).
  *  0.9.2: the title shrinks to fit the frame, the preview shows the real proportions, and an
  *  optional step puts the person or object in front of the card (AI subject cutout). */
-export function VideoInTextPanel({scene, disabled, onDone}: {scene: Scene; disabled: boolean; onDone: () => void | Promise<void>}) {
+export function VideoInTextPanel({scene, disabled, onDone, onSettings}: {scene: Scene; disabled: boolean; onDone: () => void | Promise<void>; onSettings?: (s: KnockoutSettings) => void}) {
   const [text, setText] = React.useState('');
   const [font, setFont] = React.useState('Anton');
   const [size, setSize] = React.useState(260);
@@ -179,6 +183,7 @@ export function VideoInTextPanel({scene, disabled, onDone}: {scene: Scene; disab
   const [busy, setBusy] = React.useState(false);
   const [msg, setMsg] = React.useState('');
   const [fitted, setFitted] = React.useState(false);
+  React.useEffect(() => {onSettings?.({text, font, font_size: size, background, opacity, outline, outline_color: outlineColor, y});}, [text, font, size, background, opacity, outline, outlineColor, y]);
   const box = React.useRef<HTMLDivElement>(null);
   const label = React.useRef<HTMLSpanElement>(null);
   const hasMedia = scene.shots.length > 0;

@@ -10,7 +10,8 @@ export function KnockoutPreview({sceneId, settings, disabled}: {sceneId: string;
   const [signature, setSignature] = useState(''), [retry, setRetry] = useState(0);
   const ticket = useRef(0), activeJob = useRef('');
   const current = JSON.stringify(settings);
-  const host = document.querySelector('.scene-editor:not([hidden]) [data-companion-preview]');
+  // Inside the Video inside text dialog the rendered preview shows in the dialog, not behind it.
+  const host = document.querySelector('.creative-studio [data-companion-preview]') || document.querySelector('.scene-editor:not([hidden]) [data-companion-preview]');
   const running = starting || !!jobId && (!job || ['queued', 'running', 'cancelling'].includes(job.status));
   useEffect(() => () => {ticket.current++; if (activeJob.current) void api.cancelJob(activeJob.current).catch(() => {});}, [sceneId]);
   useEffect(() => {

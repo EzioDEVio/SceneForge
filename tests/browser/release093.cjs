@@ -57,6 +57,9 @@ for(const action of ['Cancel','Close title card','outside']){
  await dialog.waitFor({state:'detached'});
 }
 await page.getByRole('tab',{name:'Overlays',exact:true}).click();
+// 0.9.3 RC4: creative titles open in their own dialog with a live preview and settings tabs.
+await page.getByRole('button',{name:/^Video inside text/}).click();
+const koDialog=page.getByRole('dialog',{name:'Video inside text',exact:true});await koDialog.waitFor();
 const title=page.getByRole('textbox',{name:'Video inside text title',exact:true});
 await title.waitFor();assert.equal(await title.getAttribute('placeholder'),'e.g. PARIS or 1969');
 assert.equal(await page.locator('.ko-preview').innerText(),'YOUR TITLE');
@@ -72,6 +75,7 @@ const typingSceneCount=await page.locator('.picture-clip').count(),typingZoom=aw
 for(const k of ['s','m','Space','+','-','Delete','?'])await page.keyboard.press(k);
 assert.equal(await page.locator('.picture-clip').count(),typingSceneCount);assert.equal(await page.getByRole('slider',{name:'Timeline zoom',exact:true}).inputValue(),typingZoom);
 assert.equal(await page.locator('dialog.editor-confirm').count(),0);assert.equal(await page.getByRole('dialog',{name:'Keyboard shortcuts'}).count(),0);
+await page.keyboard.press('Escape');await koDialog.waitFor({state:'detached'});
 // A nested contenteditable child must also count as typing.
 await page.evaluate(()=>{const edit=document.createElement('div');edit.contentEditable='true';edit.id='typing-guard-fixture';edit.innerHTML='<span>Editable text</span>';document.body.append(edit);edit.focus();const selection=window.getSelection(),range=document.createRange();range.selectNodeContents(edit.firstChild);range.collapse(false);selection.removeAllRanges();selection.addRange(range);});
 await page.keyboard.press('Control+e');await page.keyboard.press('Control+/');
@@ -116,6 +120,7 @@ console.log('PASS B: typing guards; Ctrl+/ and ? searchable help; Ctrl+A; +/-; M
 
 await page.getByRole('button',{name:'Storyboard scene 2',exact:true}).click();
 await page.getByRole('tab',{name:'Overlays',exact:true}).click();
+await page.getByRole('button',{name:/^Video inside text/}).click();await koDialog.waitFor();
 const koTitle=page.getByRole('textbox',{name:'Video inside text title',exact:true});await koTitle.fill('PREVIEW');
 await page.getByLabel('Video inside text font',{exact:true}).selectOption('DejaVu Sans');
 const sourceForPreview=await api('/scenes/'+p.scenes[1].id,undefined,'GET');
@@ -130,6 +135,7 @@ await page.screenshot({path:path.join(root,'docs/qa/owner-knockout-preview.png')
 await koTitle.fill('CHANGED');await koPreview.getByRole('status').filter({hasText:'Settings changed'}).waitFor();
 await koPreview.getByRole('button',{name:'Close video inside text preview',exact:true}).click();await koPreview.waitFor({state:'detached'});
 assert.equal(await koTitle.inputValue(),'CHANGED');
+await koDialog.getByRole('button',{name:'Done',exact:true}).click();await koDialog.waitFor({state:'detached'});
 console.log('PASS real video-inside-text companion render, playable media, stale-settings hint, Close and no saved mutation');
 assert.deepEqual(errors,[]);console.log('PASS A: scene-specific multi-file chooser and persistence; title typing/presets and Cancel/close/Esc/outside; friendly knockout example');
 }catch(e){console.error(e,logs.slice(-3000));process.exitCode=1;}finally{await browser?.close();server?.kill();devServer?.kill();}})();

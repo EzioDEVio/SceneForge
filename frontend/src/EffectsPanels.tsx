@@ -1,6 +1,6 @@
 import {routeIconUrl} from "./RouteArtwork";
 import React, {useEffect, useState} from 'react';
-import {Vibrate, Focus, EyeOff, Sun, Blend, Plus, Trash2, Palette, LayoutGrid, Route as RouteIcon, Box as BoxIcon, MousePointerClick, Undo2, PenLine, Timer, ChevronDown} from 'lucide-react';
+import {Vibrate, Focus, EyeOff, Sun, Blend, Plus, Trash2, Palette, LayoutGrid, Route as RouteIcon, Box as BoxIcon, MousePointerClick, Undo2, PenLine, Timer, ChevronDown, Film, SlidersHorizontal, Wand2} from 'lucide-react';
 import type {Look, Scene} from './api';
 import {FeatureHelp} from './FeatureHelp';
 
@@ -85,6 +85,24 @@ function Pills<T extends string>({label, value, options, onChange, disabled}: {l
   return <div className="film-option"><span>{label}</span><div className="segmented" role="radiogroup" aria-label={label}>
     {options.map(([v, l]) => <button key={v} role="radio" aria-checked={value === v} className={value === v ? 'selected' : ''} disabled={disabled} onClick={() => onChange(v)}>{l}</button>)}
   </div></div>;
+}
+
+export type FxCategory = 'looks' | 'film' | 'adjust' | 'more';
+export const FX_CATEGORIES: {id: FxCategory; label: string; Icon: typeof Sun; hint: string}[] = [
+  {id: 'looks', label: 'Looks', Icon: Palette, hint: 'Colour looks, film grades and lens effects'},
+  {id: 'film', label: 'Old film', Icon: Film, hint: 'Scratches, dust, flicker and projector wobble'},
+  {id: 'adjust', label: 'Adjust & LUT', Icon: SlidersHorizontal, hint: 'Light, colour and detail sliders, and .cube LUTs'},
+  {id: 'more', label: 'More effects', Icon: Wand2, hint: 'Vignette, camera, annotations, map route, split screen, intro, presets'},
+];
+/** One row of icon tabs at the top of Effects: shows one category at a time (all of them while searching). */
+export function EffectCategories({value, onChange, on, searching}: {value: FxCategory; onChange: (c: FxCategory) => void; on: Partial<Record<FxCategory, boolean>>; searching: boolean}) {
+  const key = (e: React.KeyboardEvent, i: number) => {const d = ({ArrowRight: 1, ArrowLeft: -1} as Record<string, number>)[e.key]; if (!d) return; e.preventDefault();
+    const next = FX_CATEGORIES[(i + d + FX_CATEGORIES.length) % FX_CATEGORIES.length]; onChange(next.id);
+    (e.currentTarget.parentElement?.querySelector(`[data-fx-tab="${next.id}"]`) as HTMLElement | null)?.focus();};
+  return <div className="fx-categories" role="tablist" aria-label="Effect categories">
+    {FX_CATEGORIES.map(({id, label, Icon, hint}, i) => <button key={id} type="button" role="tab" data-fx-tab={id} aria-selected={!searching && value === id} tabIndex={value === id ? 0 : -1}
+      title={hint} onClick={() => onChange(id)} onKeyDown={e => key(e, i)}><Icon size={17} aria-hidden/><span>{label}</span>{on[id] && <i className="fx-on-dot" aria-label="in use"/>}</button>)}
+  </div>;
 }
 
 const EffectSearch = React.createContext('');

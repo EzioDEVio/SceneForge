@@ -11,7 +11,7 @@ const {render,screen,within}=await import('@testing-library/react');
 const checks=[];let revealId='';let opened='';window.open=url=>{opened=url;};
 render(React.createElement(ShareDialog,{assetId:'asset-123',fileName:'SceneForge-export.mp4',onClose:()=>{},onReveal:async id=>{revealId=id;}}));
 assert.ok(screen.getByRole('dialog',{name:'Share exported video'}));checks.push('share dialog opens after export');
-assert.equal(screen.getByRole('link',{name:/Download video/}).getAttribute('download'),'');checks.push('dialog offers direct download');
+assert.equal(screen.getByRole('link',{name:/Download video/}).getAttribute('download'),'SceneForge-export.mp4');checks.push('dialog offers direct download with the export file name');
 for(const platform of ['YouTube','TikTok','Instagram','Facebook'])assert.ok([...document.querySelectorAll('.share-destination')].find(card=>card.textContent.includes(platform))?.querySelector('button'));
 checks.push('platform cards show upload next steps');
 assert.ok(screen.getByText(/unverified API projects have upload restrictions/i));

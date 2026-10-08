@@ -28,7 +28,7 @@ export function InspectorSections({tab,sceneTitle,media,active}:{tab:string;scen
    const refresh=()=>{const nodes=Array.from(el.querySelectorAll<HTMLElement>('h3,h4,legend')).filter(n=>n.textContent?.trim()&&n.getBoundingClientRect().height>0);
      const next=nodes.map((node,i)=>{node.dataset.inspectorSection=`section-${tab}-${i}`;node.tabIndex=-1;node.setAttribute('aria-label',node.textContent!.trim());node.dataset.scope=tab==='Audio'&&/music|timeline|finishing/i.test(node.textContent||'')?'Entire project':tab==='Motion'||tab==='Media'||tab==='Clip Audio'?`Selected media ${media}`:'Selected scene';return {id:node.dataset.inspectorSection,title:node.textContent!.trim()};});
      setSections(old=>JSON.stringify(old)===JSON.stringify(next)?old:next);
-   };refresh();const observer=new window.MutationObserver(refresh);observer.observe(el,{childList:true,subtree:true});return()=>observer.disconnect();
+   };refresh();const observer=new window.MutationObserver(refresh);observer.observe(el,{childList:true,subtree:true,attributes:true,attributeFilter:['data-fxcat','hidden']});return()=>observer.disconnect();
  },[tab,media,active]);
  // Highlight the section currently at the top of the scrolled panel.
  useEffect(()=>{const el=body();if(!el)return;

@@ -26,7 +26,7 @@ fs.mkdirSync(qa,{recursive:true});
 const read=()=>api('/scenes/'+sid,undefined,'GET');
 const saved=()=>page.locator('.save-status').filter({hasText:'All changes saved'}).waitFor();
 const editor=page.locator('.scene-editor:not([hidden])');
-await page.getByRole('tab',{name:'Effects',exact:true}).click();
+await page.getByRole('tab',{name:'Effects',exact:true}).click();await page.getByRole('tab',{name:/More effects/}).click();
 while(await page.locator('button.fx-group-head[aria-expanded="false"]').count())await page.locator('button.fx-group-head[aria-expanded="false"]').first().click();
 await page.getByRole('switch',{name:'Map route',exact:true}).click();
 await page.getByLabel('Label for stop 1',{exact:true}).fill('Spain');await page.getByLabel('Label for stop 2',{exact:true}).fill('Rome');await page.getByLabel('Label for stop 3',{exact:true}).fill('London');

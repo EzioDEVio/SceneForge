@@ -38,6 +38,39 @@ _event_queues: dict[str, "queue.Queue"] = {}
 _active_jobs: set[str] = set()
 
 
+def _render_slot_count() -> int:
+    """How many FFmpeg renders may run at once. Each FFmpeg already uses every core,
+    so running many in parallel only overloads the computer (the editor and the PC
+    freeze) without finishing sooner. Override with SCENEFORGE_RENDER_SLOTS."""
+    import os
+    try:
+        forced = int(os.environ.get("SCENEFORGE_RENDER_SLOTS", "0"))
+    except ValueError:
+        forced = 0
+    return forced if forced > 0 else max(1, min(3, (os.cpu_count() or 2) // 4))
+
+
+_render_slots = threading.BoundedSemaphore(_render_slot_count())
+
+
+def _wait_for_render_slot(job_id: str, ctx: RenderContext) -> bool:
+    """Queue behind running renders. Returns False if cancelled while waiting."""
+    if _render_slots.acquire(blocking=False):
+        return True
+    _emit(job_id, {"stage": "waiting for another render to finish", "progress": 0})
+    while not ctx.cancel_requested:
+        if _render_slots.acquire(timeout=0.5):
+            return True
+    return False
+
+
+# Progress-only events reach live subscribers at once but are written to the
+# database at most twice a second; milestones (status, stage, warnings, errors)
+# are always written and kept in the job's event history.
+_PROGRESS_WRITE_INTERVAL_S = 0.5
+_last_progress_write: dict[str, float] = {}
+
+
 def active_job_ids() -> set[str]:
     """Return jobs that are executing in this backend process.
 
@@ -121,13 +154,24 @@ def _get_queue(job_id: str) -> "queue.Queue":
 
 
 def _emit(job_id: str, event: dict) -> None:
+    import time
     _get_queue(job_id).put(event)
+    milestone = any(k in event for k in ("status", "error", "warning")) or event.get("progress") == 100
+    now = time.monotonic()
+    with _lock:
+        last = _last_progress_write.get(job_id, 0.0)
+        if not milestone and "stage" not in event and now - last < _PROGRESS_WRITE_INTERVAL_S:
+            return
+        _last_progress_write[job_id] = now
+        if "status" in event and event["status"] in (JobStatus.SUCCEEDED, JobStatus.FAILED, JobStatus.CANCELLED):
+            _last_progress_write.pop(job_id, None)
     with session_scope() as db:
         job = db.get(RenderJob, job_id)
         if job:
-            events = list(job.events_json or [])
-            events.append(event)
-            job.events_json = events[-200:]  # bounded log
+            if milestone or "stage" in event:
+                events = list(job.events_json or [])
+                events.append(event)
+                job.events_json = events[-200:]  # bounded log
             if "status" in event:
                 job.status = event["status"]
             if "stage" in event:
@@ -162,6 +206,12 @@ def _run_part_job(job_id: str, project_id: str, scene_id: str, draft_snapshot=No
     ctx = RenderContext()
     with _lock:
         _contexts[job_id] = ctx
+    if not _wait_for_render_slot(job_id, ctx):
+        _emit(job_id, {"status": JobStatus.CANCELLED, "stage": "cancelled before it started"})
+        with _lock:
+            _contexts.pop(job_id, None)
+            _active_jobs.discard(job_id)
+        return
     _emit(job_id, {"status": JobStatus.RUNNING, "stage": "starting", "progress": 1})
     try:
         with session_scope() as db:
@@ -222,6 +272,7 @@ def _run_part_job(job_id: str, project_id: str, scene_id: str, draft_snapshot=No
         status = JobStatus.CANCELLED if ctx.cancel_requested else JobStatus.FAILED
         _emit(job_id, {"status": status, "stage": "error", "error": f"{exc}\n{traceback.format_exc()[-2000:]}"})
     finally:
+        _render_slots.release()
         with _lock:
             _contexts.pop(job_id, None)
             _active_jobs.discard(job_id)
@@ -231,6 +282,12 @@ def _run_export_job(job_id: str, project_id: str, selected_ids: list[str] | None
     ctx = RenderContext()
     with _lock:
         _contexts[job_id] = ctx
+    if not _wait_for_render_slot(job_id, ctx):
+        _emit(job_id, {"status": JobStatus.CANCELLED, "stage": "cancelled before it started"})
+        with _lock:
+            _contexts.pop(job_id, None)
+            _active_jobs.discard(job_id)
+        return
     _emit(job_id, {"status": JobStatus.RUNNING, "stage": "checking parts", "progress": 1})
     try:
         from app.config import RENDERS_DIR
@@ -323,6 +380,7 @@ def _run_export_job(job_id: str, project_id: str, selected_ids: list[str] | None
         status = JobStatus.CANCELLED if ctx.cancel_requested else JobStatus.FAILED
         _emit(job_id, {"status": status, "stage": "error", "error": f"{exc}\n{traceback.format_exc()[-2000:]}"})
     finally:
+        _render_slots.release()
         with _lock:
             _contexts.pop(job_id, None)
             _active_jobs.discard(job_id)

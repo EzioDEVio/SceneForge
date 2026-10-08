@@ -87,7 +87,7 @@ export function OverlayCanvas({sceneId, overlays, frameAspect, selected, onSelec
       return <div key={o.id} className={`overlay-item ${i === selected ? 'selected' : ''}`} style={style} data-box={`${o.width}x${+heightCqw.toFixed(2)}@${o.x},${o.y}r${o.rotation}`} role="button" tabIndex={0}
         aria-label={`Overlay ${i + 1}${a ? `: ${a.original_filename}` : ''}. Drag to move.`} onPointerDown={e => drag(i, 'move', e)}
         onKeyDown={e => {const step = e.shiftKey ? 5 : 1; const k = {ArrowLeft: [-step, 0], ArrowRight: [step, 0], ArrowUp: [0, -step], ArrowDown: [0, step]}[e.key]; if (k) {e.preventDefault(); onChange(i, {x: +clamp(o.x + k[0], -20, 120).toFixed(2), y: +clamp(o.y + k[1], -20, 120).toFixed(2)}, true);}}}>
-        {a?.type === 'video' ? <video src={api.assetStreamUrl(o.asset_id)} muted loop autoPlay playsInline/> : <img src={api.assetThumbUrl(o.asset_id, 640)} alt="" draggable={false}/>}
+        {a?.type === 'video' ? <video src={api.assetStreamUrl(o.asset_id)} muted loop autoPlay playsInline/> : <img src={api.assetStreamUrl(o.asset_id)} alt="" draggable={false} decoding="async"/>}
         {i === selected && <span className="overlay-handle" role="slider" aria-label={`Resize overlay ${i + 1}`} aria-valuenow={o.width} aria-valuemin={3} aria-valuemax={100} onPointerDown={e => drag(i, 'resize', e)}/>}
       </div>;
     })}

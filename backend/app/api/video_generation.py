@@ -97,14 +97,14 @@ def local_system():
 
 
 @router.post("/local/workflows/{model_id}")
-async def import_local_workflow(model_id: str, file: UploadFile = File(...)):
+def import_local_workflow(model_id: str, file: UploadFile = File(...)):
     try:
         path = video.workflow_path(model_id)
     except video.VideoGenerationError as exc:
         raise HTTPException(404, str(exc))
     if Path(file.filename or "").suffix.lower() != ".json":
         raise HTTPException(400, "Choose the ComfyUI workflow JSON file saved using Save (API Format).")
-    raw = await file.read(2 * 1024 * 1024 + 1)
+    raw = file.file.read(2 * 1024 * 1024 + 1)
     if len(raw) > 2 * 1024 * 1024:
         raise HTTPException(413, "Workflow files must be 2 MB or smaller.")
     try:

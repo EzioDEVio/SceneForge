@@ -101,7 +101,7 @@
 /* each section heading reads as the lid of a box */
 :root[data-theme="desk"] .inspector-body h3[data-inspector-section],:root[data-theme="desk"] .inspector-body h4[data-inspector-section]{background:var(--d-panel);border:1px solid var(--d-line);border-radius:8px;padding:7px 10px;margin:16px 0 10px;font-size:13px;font-weight:600}
 :root[data-theme="desk"] .inspector-body>:first-child h3[data-inspector-section],:root[data-theme="desk"] .inspector-body>h3[data-inspector-section]:first-child{margin-top:4px}
-:root[data-theme="desk"] .motion-btn,:root[data-theme="desk"] .effect-tile,:root[data-theme="desk"] .voice-take,:root[data-theme="desk"] .caption-preset,:root[data-theme="desk"] .overlay-item,:root[data-theme="desk"] .media-tile{background:var(--d-panel);border:1px solid var(--d-line);border-radius:7px;color:var(--d-text)}
+:root[data-theme="desk"] .motion-btn,:root[data-theme="desk"] .effect-tile,:root[data-theme="desk"] .voice-take,:root[data-theme="desk"] .caption-preset,:root[data-theme="desk"] .media-tile{background:var(--d-panel);border:1px solid var(--d-line);border-radius:7px;color:var(--d-text)}
 :root[data-theme="desk"] .motion-btn:hover,:root[data-theme="desk"] .effect-tile:hover,:root[data-theme="desk"] .caption-preset:hover{border-color:#4E6580;background:var(--d-raise)}
 :root[data-theme="desk"] .motion-btn.selected,:root[data-theme="desk"] .effect-tile.selected,:root[data-theme="desk"] .caption-preset.selected,:root[data-theme="desk"] .export-preset.selected,:root[data-theme="desk"] .fit-choice .segmented button.selected{background:var(--d-cyan-soft);border-color:var(--d-cyan);color:var(--d-cyan-ink)}
 :root[data-theme="desk"] .feature-help-trigger{color:var(--d-dim)}
@@ -230,3 +230,69 @@ html.theme-switching *,html.theme-switching *::before,html.theme-switching *::af
 :root[data-theme="light"] .free-timeline button[aria-pressed=true]{background:#dff2f5;border-color:var(--blue);color:#0B4F5C}
 :root[data-theme="light"] .free-timeline select,:root[data-theme="light"] .free-timeline input:not([type=range]){background:#fff;border-color:#cbd1dc;color:#242936}
 .free-clip,.free-clip *{color:#fff;text-shadow:0 1px 2px rgba(0,0,0,.7)}
+.share-file-meta{display:grid;gap:2px;min-width:0}
+.share-path{font-family:var(--d-mono,ui-monospace,monospace);font-size:11px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;user-select:all}
+.share-status{margin:8px 0 0;padding:8px 10px;border-radius:7px;background:color-mix(in srgb,var(--blue,#57C7DD) 14%,transparent);border:1px solid color-mix(in srgb,var(--blue,#57C7DD) 45%,transparent);font-size:12.5px}
+.share-status.form-error{background:color-mix(in srgb,#E36C7A 14%,transparent);border-color:#E36C7A}
+.share-file-meta .text-btn{justify-self:start;display:inline-flex;align-items:center;gap:4px;padding:0}
+:root[data-theme="desk"] .share-file-icon{background:var(--d-cyan-soft);color:var(--d-cyan)}
+.censor-guide h3{display:flex;align-items:center;gap:7px}
+.censor-guide-actions{display:flex;flex-wrap:wrap;gap:6px}
+.censor-guide-actions .btn{display:inline-flex;align-items:center;gap:6px}
+.censor-guide-note{margin-top:8px}
+
+/* ---- Creative titles: launcher card and full editor dialog ---- */
+.creative-launchers h3{display:flex;align-items:center;gap:7px;margin:0 0 4px}
+.creative-launch-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:8px 0}
+.creative-launch{display:flex;flex-direction:column;align-items:flex-start;gap:3px;padding:12px;border:1px solid var(--line,#444a56);border-radius:9px;background:var(--surface,#2a2d35);color:var(--text,#eef0f6);text-align:left;cursor:pointer}
+.creative-launch:hover:not(:disabled){border-color:var(--blue,#9783ff)}
+.creative-launch svg{color:var(--blue,#9783ff)}
+.creative-launch small{color:var(--muted,#a7afbf);font-size:11.5px}
+.creative-existing{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-top:6px}
+.creative-existing .btn{display:inline-flex;align-items:center;gap:5px;font-size:12px}
+.cs-backdrop{z-index:70;display:grid;place-items:center;padding:16px}
+.creative-studio{width:min(1240px,96vw)!important;max-width:none!important;height:min(820px,94vh);display:flex;flex-direction:column;padding:0!important;overflow:hidden}
+.creative-studio>header{display:flex;align-items:center;gap:10px;padding:12px 16px;border-bottom:1px solid var(--line,#444a56)}
+.creative-studio>header .info-close{margin-left:auto}
+.cs-body{flex:1;min-height:0;display:grid;grid-template-columns:minmax(0,1.35fr) minmax(340px,1fr)}
+.cs-preview-col{padding:14px;display:flex;flex-direction:column;gap:8px;min-height:0;overflow:auto;border-right:1px solid var(--line,#444a56)}
+.cs-stage{position:relative;width:100%;max-height:100%;background:#000;border-radius:6px;overflow:hidden;container-type:size;align-self:center}
+.cs-picture{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
+.cs-empty{position:absolute;inset:0;display:grid;place-items:center;color:#9aa;padding:20px;text-align:center}
+.cs-knockout{position:absolute;inset:0;width:100%;height:100%}
+.cs-textured{position:absolute;inset:0;display:grid;place-items:center}
+.cs-textured span{font-weight:700;line-height:1;white-space:nowrap;max-width:92%}
+.cs-overlays{position:absolute;inset:0}
+.cs-settings-col{display:flex;flex-direction:column;min-height:0}
+.cs-tabs{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));border-bottom:1px solid var(--line,#444a56)}
+.cs-tabs button{display:flex;flex-direction:column;align-items:center;gap:3px;padding:8px 2px 6px;border:none;border-bottom:2px solid transparent;background:transparent;color:var(--muted,#a7afbf);font-size:10.5px;cursor:pointer;line-height:1.15;text-align:center}
+.cs-tabs button[aria-selected=true]{color:var(--blue,#9783ff);border-bottom-color:var(--blue,#9783ff)}
+.cs-tabs button:disabled{opacity:.4;cursor:not-allowed}
+.cs-tab-body{flex:1;min-height:0;overflow:auto;padding:12px 14px}
+.cs-tab-body .creative-card{border:none;padding:0;background:transparent}
+.cs-tab-body .ko-preview{display:none}
+/* Reused layer controls: only the selected layer's settings belong in this dialog. */
+.cs-layer-settings .overlay-panel>h3,.cs-layer-settings .overlay-panel>.hint,.cs-layer-settings .lut-row,.cs-layer-settings .overlay-list,
+.cs-layer-settings .overlay-access,.cs-layer-settings .media-layout-section,.cs-layer-settings .sticker-library{display:none!important}
+.cs-footer{display:flex;align-items:center;gap:10px;justify-content:space-between;padding:10px 16px;border-top:1px solid var(--line,#444a56)}
+@media(max-width:900px){.cs-body{grid-template-columns:1fr;overflow:auto}.cs-preview-col{border-right:none;border-bottom:1px solid var(--line,#444a56)}.creative-studio{height:94vh}}
+:root[data-theme="desk"] .creative-launch{background:var(--d-panel);border-color:var(--d-line)}
+:root[data-theme="desk"] .creative-launch svg{color:var(--d-cyan)}
+
+/* Free timeline: no accidental text selection while dragging clips; brighter, iconised toolbar. */
+.free-timeline .free-canvas,.free-timeline .free-labels,.free-timeline .free-ruler,.free-timeline .free-lane,.free-timeline .free-scroll{-webkit-user-select:none;user-select:none}
+.free-timeline header button,.free-timeline header label.free-zoom{display:inline-flex;align-items:center;gap:6px}
+:root[data-theme="desk"] .free-timeline header{gap:6px;padding:8px 10px;background:var(--d-panel);border-bottom:1px solid var(--d-line)}
+:root[data-theme="desk"] .free-timeline header strong{color:var(--d-text);margin-right:6px}
+:root[data-theme="desk"] .free-timeline header button{color:var(--d-text);font-weight:500;padding:6px 10px}
+:root[data-theme="desk"] .free-timeline header button svg{color:var(--d-cyan)}
+:root[data-theme="desk"] .free-timeline header button:disabled{opacity:.55}
+:root[data-theme="desk"] .free-timeline header button:disabled svg{color:inherit}
+:root[data-theme="desk"] .free-timeline header button.free-primary{background:var(--d-cyan);border-color:var(--d-cyan);color:#0B1620;font-weight:600}
+:root[data-theme="desk"] .free-timeline header button.free-primary svg{color:#0B1620}
+:root[data-theme="desk"] .free-timeline .hint{color:var(--d-dim)}
+:root[data-theme="desk"] .free-timeline .free-labels>*{color:var(--d-text);background:var(--d-panel)}
+:root[data-theme="desk"] .free-timeline .free-ruler{color:var(--d-dim)}
+.creative-studio .cs-companion:empty{display:none}
+.creative-studio .cs-companion .companion-preview{height:auto;margin-top:10px;border:1px solid var(--line);border-radius:10px}
+.creative-studio .cs-companion video{width:100%;max-height:260px}

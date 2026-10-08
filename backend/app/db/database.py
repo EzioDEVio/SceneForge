@@ -10,7 +10,7 @@ from app.db.models import Base
 
 engine = create_engine(
     DATABASE_URL,
-    connect_args={"check_same_thread": False},
+    connect_args={"check_same_thread": False, "timeout": 30},
     future=True,
 )
 
@@ -21,6 +21,10 @@ def _set_sqlite_pragma(dbapi_connection, connection_record):  # noqa: ANN001
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.execute("PRAGMA secure_delete=ON")
     cursor.execute("PRAGMA journal_mode=WAL")
+    # WAL + NORMAL stays consistent after a crash; only the last commit can be lost on
+    # power failure. FULL synced every progress update and stalled saves during renders.
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.execute("PRAGMA busy_timeout=30000")
     cursor.close()
 
 

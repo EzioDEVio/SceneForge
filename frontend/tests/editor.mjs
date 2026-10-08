@@ -25,7 +25,7 @@ const {default:userEvent}=await import('@testing-library/user-event');
 const user=userEvent.setup();
 const fixture=JSON.parse(readFileSync('../tests/ui-project-fixture.json','utf8'));
 let project=structuredClone(fixture);
-let failNextPatch=false;
+let failNextPatch=false,failAllPatches=false;
 let requests=[];
 let next=10;
 let profiles=[];
@@ -93,12 +93,12 @@ globalThis.fetch=async(path,init={})=>{
  else if(path==='/api/system/encoders')result={gpu:{available:true,vendor:'nvidia',name:'NVIDIA Test GPU',h264:'h264_nvenc',hevc:'hevc_nvenc'},encoders:{},notes:[],choices:['auto','cpu','gpu'],default:'auto'};
  else if(path===`/api/projects/${project.id}/reframe`&&method==='POST')result={job_id:'rf-1',project_id:project.id,total:2};
  else if(path==='/api/reframe/jobs/rf-1')result={job_id:'rf-1',project_id:project.id,source_project_id:project.id,status:'succeeded',stage:'done',progress:100,done:2,total:2,warnings:['clip.mp4: no clear subject found; the frame stays centred.'],error:null};
- else if(/^\/api\/scenes\/[^/]+\/editor-state$/.test(path)&&method==='POST'){if(oldBackend)return {ok:false,status:404,json:async()=>({detail:'This SceneForge backend is out of date. Start the newest source folder.'})};if(failNextPatch){failNextPatch=false;return {ok:false,status:503,json:async()=>({detail:'Save failed for test'})};}const sc=project.scenes.find(s=>s.id===path.split('/')[3]);const patch=body.scene||{};Object.assign(sc,Object.fromEntries(Object.entries(patch).filter(([k])=>!['font','look','overlays','transition_in'].includes(k))));for(const [key,column] of [['font','font_json'],['look','look_json'],['overlays','overlays_json'],['transition_in','transition_in_json']])if(key in patch)sc[column]=body.replace?clone(patch[key]):{...sc[column],...patch[key]};for(const row of body.shots||[]){const sh=sc.shots.find(s=>s.id===row.id);for(const [key,value] of Object.entries(row.patch))sh[({motion:'motion_json',crop:'crop_json',speed:'speed_json'})[key]||key]=value;}if(sc.look_json)for(const k of Object.keys(sc.look_json))if(sc.look_json[k]===null)delete sc.look_json[k];sc.revision=(sc.revision||0)+1;result=sc;}
+ else if(/^\/api\/scenes\/[^/]+\/editor-state$/.test(path)&&method==='POST'){if(oldBackend)return {ok:false,status:404,json:async()=>({detail:'This SceneForge backend is out of date. Start the newest source folder.'})};if(failNextPatch||failAllPatches){failNextPatch=false;return {ok:false,status:503,json:async()=>({detail:'Save failed for test'})};}const sc=project.scenes.find(s=>s.id===path.split('/')[3]);const patch=body.scene||{};Object.assign(sc,Object.fromEntries(Object.entries(patch).filter(([k])=>!['font','look','overlays','transition_in'].includes(k))));for(const [key,column] of [['font','font_json'],['look','look_json'],['overlays','overlays_json'],['transition_in','transition_in_json']])if(key in patch)sc[column]=body.replace?clone(patch[key]):{...sc[column],...patch[key]};for(const row of body.shots||[]){const sh=sc.shots.find(s=>s.id===row.id);for(const [key,value] of Object.entries(row.patch))sh[({motion:'motion_json',crop:'crop_json',speed:'speed_json'})[key]||key]=value;}if(sc.look_json)for(const k of Object.keys(sc.look_json))if(sc.look_json[k]===null)delete sc.look_json[k];sc.revision=(sc.revision||0)+1;result=sc;}
  else if(path.startsWith('/api/scenes/shots/')&&method==='PATCH') {const id=path.split('/').at(-1);const shot=project.scenes.flatMap(s=>s.shots).find(s=>s.id===id);Object.assign(shot,body);if(body.motion)shot.motion_json=body.motion;if(body.audio)shot.audio_json=body.audio;result=shot;}
  else if(/^\/api\/scenes\/[^/]+$/.test(path)&&method==='GET') {result=project.scenes.find(s=>s.id===path.split('/').at(-1));}
  else if(path.startsWith('/api/scenes/')&&method==='PATCH') {
   await new Promise(r=>setTimeout(r,25));
-  if(failNextPatch){failNextPatch=false;return {ok:false,status:503,statusText:'Unavailable',json:async()=>({detail:'Save failed for test'})};}
+  if(failNextPatch||failAllPatches){failNextPatch=false;return {ok:false,status:503,statusText:'Unavailable',json:async()=>({detail:'Save failed for test'})};}
   const s=project.scenes.find(s=>s.id===path.split('/').at(-1));
   const {font,look,...fields}=body;Object.assign(s,fields);if(look&&!oldBackend){s.look_json={...(s.look_json||{})};for(const [k,v] of Object.entries(look)){if(v===null)delete s.look_json[k];else s.look_json[k]=v;}}if(body.transition_in)s.transition_in_json=body.transition_in;if(font)Object.assign(s.font_json,font);s.is_stale=true;result=s;
  }
@@ -249,8 +249,16 @@ try{
  await user.click(within(fxPanel).getByRole('button',{name:/Reset to default/}));await saved();
  check('Reset to default clears the preset settings',!project.scenes.find(s=>s.id===firstId).look_json.fx_params);
  await user.clear(screen.getByRole('searchbox',{name:'Search effects'}));
- const filterHeading=screen.getByRole('heading',{name:'Color filters · 8 additions'});
- const creativeHeading=screen.getByRole('heading',{name:'Creative effects · 2 additions'});
+ const filterHeading=screen.getByRole('heading',{name:'Color filters'});
+ const creativeHeading=screen.getByRole('heading',{name:'Creative effects'});
+ const fxTabs=screen.getByRole('tablist',{name:'Effect categories'});
+ check('Effects opens on the Looks category with classic looks first',within(fxTabs).getByRole('tab',{name:/Looks/}).getAttribute('aria-selected')==='true'&&document.querySelector('.filter-catalog h4')?.textContent==='Classic looks and film treatments');
+ await user.click(within(fxTabs).getByRole('tab',{name:/Old film/}));
+ check('category tabs show one category at a time',document.querySelector('.fx-tab')?.dataset.fxcat==='film'&&within(fxTabs).getByRole('tab',{name:/Old film/}).getAttribute('aria-selected')==='true');
+ await user.click(within(fxTabs).getByRole('tab',{name:/Looks/}));
+ await user.click(screen.getByRole('button',{name:'Color filters',exact:true}));
+ check('look chips narrow the gallery to one group',creativeHeading.closest('section').hidden&&!filterHeading.closest('section').hidden);
+ await user.click(screen.getByRole('button',{name:'All',exact:true}));
  check('the eight color filters are grouped separately',filterHeading.parentElement.querySelectorAll('.effect-tile').length===8);
  check('two creative effects are grouped separately from color looks',creativeHeading.parentElement.querySelectorAll('.effect-tile').length===2);
  await user.type(screen.getByRole('searchbox',{name:'Search effects'}),'Chromatic split');
@@ -554,6 +562,9 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await waitFor(()=>assert.ok(ovSave()?.some(o=>o.width===18&&o.asset_id.startsWith('up-'))));
  check('custom PNG sticker uploads to the project and is reusable from its sticker list',ovSave().some(o=>o.width===18&&o.asset_id.startsWith('up-')));
  await user.click(screen.getByRole('button',{name:/Delete overlay/}));await saved();
+ await user.click(screen.getByRole('button',{name:/^Textured title/}));
+ const ttDialog=screen.getByRole('dialog',{name:'Textured title'});
+ check('Textured title opens in its own dialog with settings tabs',['Create','Position & size','Frame','Move & green screen','Timing & animation'].every(t=>within(ttDialog).getByRole('tab',{name:t})));
  const ttButton=screen.getByRole('button',{name:'Add textured title'});
  check('subject cutout and textured title tools appear in Overlays',!!screen.getByRole('region',{name:'Subject cutout'})&&!!screen.getByRole('combobox',{name:'Cutout model'})&&ttButton.disabled);
  await user.type(screen.getByRole('textbox',{name:'Textured title text'}),'LAVA');
@@ -561,6 +572,8 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getByRole('button',{name:'Add textured title'}));
  await waitFor(()=>assert.ok(requests.some(r=>r.path.endsWith('/textured-title')&&payload(r)?.text==='LAVA'&&payload(r)?.texture?.preset==='neon')));
  check('textured title sends the text and chosen pattern',true);
+ await user.click(within(ttDialog).getByRole('button',{name:'Done'}));
+ check('Done closes the creative title dialog',!screen.queryByRole('dialog',{name:'Textured title'}));
  await user.click(screen.getByRole('tab',{name:'Effects',exact:true}));await openFxGroups();
  await user.click(screen.getByRole('button',{name:'Original',exact:true}));await saved();
  const a3=screen.getByLabelText('Project audio timeline track');
@@ -814,6 +827,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(screen.getByRole('checkbox',{name:'Captions enabled'}));await saved();
  await user.click(screen.getByRole('checkbox',{name:/Typewriter reveal/}));await saved();
  check('typewriter enables captions without overwriting their text',project.scenes.find(s=>s.id===firstId).font_json.captions_enabled&&project.scenes.find(s=>s.id===firstId).font_json.typewriter&&project.scenes.find(s=>s.id===firstId).subtitle_text==='An edited narration.');
+ check('Typewriter shortcut at the top of Text shows its state',screen.getByRole('switch',{name:'Typewriter on or off'}).checked&&!!screen.getByRole('group',{name:'Typewriter shortcut'}).querySelector('svg'));
  await user.click(screen.getByRole('button',{name:'Edit captions & titles'}));
  const reopened=visibleEditor().getByRole('textbox',{name:'Layer 1 text'});
  await user.clear(reopened);await user.type(reopened,'Revised title');await saved();
@@ -848,9 +862,10 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.clear(visibleEditor().getByRole('textbox',{name:'Narration script'}));
  await user.type(visibleEditor().getByRole('textbox',{name:'Narration script'}),'Recoverable draft');
  await waitFor(()=>assert.equal(screen.getByRole('status').textContent,'Save failed'),{timeout:2500});
- failNextPatch=true;
+ failAllPatches=true;
  await user.click(screen.getByRole('button',{name:'Export video'}));
- await waitFor(()=>assert.ok(screen.getAllByRole('alert').some(el=>el.textContent.includes('Could not finish saving'))));
+ await waitFor(()=>assert.ok(screen.getAllByRole('alert').some(el=>el.textContent.includes('Could not finish saving'))),{timeout:8000});
+ failAllPatches=false;
  check('save failure keeps the draft and blocks export with recovery guidance',visibleEditor().getByRole('textbox',{name:'Narration script'}).value==='Recoverable draft'&&!screen.queryByRole('dialog',{name:'Export video'}));
  await user.click(screen.getByRole('button',{name:'Retry text save / dismiss'}));await saved();
  check('failed save can be retried',project.scenes.find(s=>s.id===firstId).spoken_text==='Recoverable draft');

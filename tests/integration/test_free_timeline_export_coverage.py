@@ -76,4 +76,10 @@ with TestClient(app) as client:
   r=client.post(f'/api/assets/{aid}/reveal',headers={'X-SceneForge-Action':'reveal','Origin':'http://127.0.0.1:8000'})
   assert r.status_code==200 and r.json()['opened'],r.text
   cmd=popen.call_args[0][0];assert str(out.resolve().parent) in ' '.join(cmd) or str(out.resolve()) in ' '.join(cmd),cmd
+ with patch('subprocess.Popen'):
+  for ok_origin in ('http://localhost:8000','http://127.0.0.1:5173','http://127.0.0.1:8300'):
+   assert client.post(f'/api/assets/{aid}/reveal',headers={'X-SceneForge-Action':'reveal','Origin':ok_origin}).status_code==200,ok_origin
+  for bad_origin in ('http://127.0.0.1.evil.example','https://sceneforge.example','http://192.168.1.5:8000'):
+   assert client.post(f'/api/assets/{aid}/reveal',headers={'X-SceneForge-Action':'reveal','Origin':bad_origin}).status_code==403,bad_origin
+ loc=client.get(f'/api/assets/{aid}/location').json();assert pathlib.Path(loc['path']).is_file()
  print('PASS open file location works in browser mode, only for render outputs, same app and this computer',flush=True)

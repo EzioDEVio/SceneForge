@@ -23,7 +23,7 @@ router = APIRouter(prefix="/api/assets", tags=["assets"])
 
 
 @router.post("/upload", response_model=schemas.AssetOut)
-async def upload_asset(project_id: str, file: UploadFile, db: Session = Depends(get_db)):
+def upload_asset(project_id: str, file: UploadFile, db: Session = Depends(get_db)):
     project = db.get(Project, project_id)
     if not project:
         raise HTTPException(404, "Project not found")
@@ -41,7 +41,7 @@ async def upload_asset(project_id: str, file: UploadFile, db: Session = Depends(
     size = 0
     with open(dest_path, "wb") as out:
         while True:
-            chunk = await file.read(1 << 20)
+            chunk = file.file.read(1 << 20)
             if not chunk:
                 break
             size += len(chunk)
@@ -115,8 +115,10 @@ def reveal_asset(asset_id: str, request: Request, db: Session = Depends(get_db))
     if (request.client.host if request.client else "") not in ("127.0.0.1", "::1", "localhost", "testclient"):
         raise HTTPException(403, "Folders can only be opened on the computer running SceneForge")
     origin = request.headers.get("origin")
-    if origin and origin not in ("http://127.0.0.1:8000", "http://localhost:8000", "http://127.0.0.1:5173", "http://localhost:5173"):
-        raise HTTPException(403, "Folders can only be opened from SceneForge")
+    # Any page served from this computer (any port: browser mode, dev server, desktop app).
+    # Other websites have non-loopback origins and are refused.
+    if origin and not re.fullmatch(r"https?://(127\.0\.0\.1|localhost|\[::1\])(:\d{1,5})?", origin):
+        raise HTTPException(403, "Folders can only be opened from SceneForge on this computer")
     location = asset_location(asset_id, db)
     path = location["path"]
     try:
@@ -183,7 +185,7 @@ def stream_asset(asset_id: str, request: Request, db: Session = Depends(get_db),
 
 
 @router.post("/lut", response_model=schemas.AssetOut)
-async def import_lut(project_id: str, file: UploadFile, db: Session = Depends(get_db)):
+def import_lut(project_id: str, file: UploadFile, db: Session = Depends(get_db)):
     """Import a 3D .cube LUT. It is validated fully before it is stored and
     is never passed to FFmpeg directly: renders bake it into a generated
     grade LUT (render/grade.py)."""
@@ -192,7 +194,7 @@ async def import_lut(project_id: str, file: UploadFile, db: Session = Depends(ge
         raise HTTPException(404, "Project not found")
     if Path(file.filename or "").suffix.lower() != ".cube":
         raise HTTPException(400, "Choose a .cube LUT file.")
-    data = await file.read(MAX_CUBE_BYTES + 1)
+    data = file.file.read(MAX_CUBE_BYTES + 1)
     if len(data) > MAX_CUBE_BYTES:
         raise HTTPException(413, "This LUT is larger than 32 MB. Use a LUT of 65 points or fewer.")
     if b"\x00" in data[:4096]:

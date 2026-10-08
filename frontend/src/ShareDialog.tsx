@@ -1,4 +1,4 @@
-import React, {useMemo, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import {Check, Clipboard, Download, ExternalLink, FolderOpen, Share2, X} from 'lucide-react';
 import {api} from './api';
 
@@ -11,7 +11,10 @@ const DESTINATIONS:Destination[] = [
 ];
 
 export function ShareDialog({assetId,fileName,onClose,onReveal}:{assetId:string;fileName:string;onClose:()=>void;onReveal?:(assetId:string)=>Promise<unknown>}) {
-  const [copied,setCopied]=useState(false),[error,setError]=useState('');
+  const [copied,setCopied]=useState(false),[error,setError]=useState(''),[status,setStatus]=useState(''),[location,setLocation]=useState('');
+  // Where the export is saved on this computer, so it can always be found even if a folder window cannot open.
+  useEffect(()=>{let live=true;fetch(`/api/assets/${assetId}/location`).then(r=>r.ok?r.json():null).then(j=>{if(live&&j?.path)setLocation(j.path);}).catch(()=>{});return()=>{live=false;};},[assetId]);
+  async function copyPath(){try{await navigator.clipboard.writeText(location);setStatus('File location copied. Paste it into File Explorer’s address bar.');}catch{setStatus('Select the location above and copy it with Ctrl+C.');}}
   const downloadUrl=api.assetDownloadUrl(assetId);
   const fileUrl=useMemo(()=>new URL(downloadUrl,window.location.href).href,[downloadUrl]);
   async function shareFile(){
@@ -28,32 +31,34 @@ export function ShareDialog({assetId,fileName,onClose,onReveal}:{assetId:string;
   }
   function open(url:string){const d=(window as any).sceneforgeDesktop;if(d?.openExternal)void d.openExternal(url);else window.open(url,'_blank','noopener,noreferrer');}
   async function reveal(){
-    if(onReveal){try{await onReveal(assetId);return;}catch(e:any){setError(e?.message||'Could not open the export folder.');}}
+    setError('');setStatus('Opening the folder…');
+    const opened='Opened the folder in File Explorer with the video selected. If you do not see it, it may be behind this window: check the taskbar.';
+    if(onReveal){try{await onReveal(assetId);setStatus(opened);return;}catch(e:any){setStatus('');setError(e?.message||'Could not open the export folder.');return;}}
     // Browser mode: the SceneForge server runs on this computer and can open the folder.
     try{
       const r=await fetch(`/api/assets/${assetId}/reveal`,{method:'POST',headers:{'X-SceneForge-Action':'reveal'}});
-      if(r.ok)return;
+      if(r.ok){setStatus(opened);return;}
       const body=await r.json().catch(()=>({}));
-      setError(body?.detail||'Could not open the export folder. Use Download instead.');
-    }catch{setError('Could not reach SceneForge to open the folder. Use Download instead.');}
+      setStatus('');setError((body?.detail||'Could not open the export folder.')+(location?' The file location is shown above: use Copy location.':''));
+    }catch{setStatus('');setError('Could not reach SceneForge to open the folder. Use Copy location or Download video.');}
   }
   return <div className="info-backdrop share-backdrop" onMouseDown={e=>e.target===e.currentTarget&&onClose()}>
     <section className="info-panel wide share-dialog" role="dialog" aria-modal="true" aria-label="Share exported video">
       <header><span className="info-title"><Share2 size={18}/> Your video is ready to share</span><button className="icon-reset info-close" aria-label="Close share dialog" onClick={onClose}><X size={16}/></button></header>
       <div className="info-body">
-        <div className="share-export-file"><div className="share-file-icon"><Share2 size={20}/></div><div><strong>{fileName}</strong><small>Export is saved in this SceneForge project.</small></div></div>
+        <div className="share-export-file"><div className="share-file-icon"><Share2 size={20}/></div><div className="share-file-meta"><strong>{fileName}</strong>{location?<><small className="share-path" title={location}>{location}</small><button className="text-btn" onClick={()=>void copyPath()}><Clipboard size={12}/> Copy location</button></>:<small>Export is saved in this SceneForge project.</small>}</div></div>
         <div className="share-primary-actions">
-          <a className="btn btn-primary" href={downloadUrl} download><Download size={15}/> Download video</a>
+          <a className="btn btn-primary" href={downloadUrl} download={fileName} onClick={()=>{setError('');setStatus((window as any).sceneforgeDesktop?'Choose where to save the video.':'Downloading… your browser saves it to its Downloads folder (see the download icon at the top right of the browser).');}}><Download size={15}/> Download video</a>
           <button className="btn" onClick={()=>void reveal()}><FolderOpen size={15}/> Open file location</button>
           <button className="btn" onClick={()=>void shareFile()}><Share2 size={15}/> {copied?<><Check size={14}/> Link copied</>:'Share file…'}</button>
         </div>
+        {(status||error)&&<p className={error?'form-error share-status':'share-status'} role="status">{error||status}</p>}
         <p className="hint">The exported file stays on your computer until you choose a destination. SceneForge does not upload it automatically.</p>
         <h3 className="share-destinations-title">Choose a platform</h3>
         <div className="share-destinations">{DESTINATIONS.map(p=><article key={p.name} className="share-destination">
           <div><strong>{p.name}</strong><button className="text-btn" onClick={()=>open(p.url)}>Open {p.name} <ExternalLink size={12}/></button></div>
           <p>{p.steps}</p>{p.note&&<small>{p.note}</small>}
         </article>)}</div>
-        {error&&<p className="form-error" role="status">{error}</p>}
         <div className="button-row"><button className="text-btn" onClick={async()=>{try{await navigator.clipboard.writeText(fileUrl);setCopied(true);setTimeout(()=>setCopied(false),2500);}catch{setError('Clipboard access is unavailable. Use Download video instead.');}}}><Clipboard size={13}/> Copy local video link</button><button className="btn" onClick={onClose}>Done</button></div>
       </div>
     </section>

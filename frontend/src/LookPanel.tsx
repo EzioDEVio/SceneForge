@@ -134,7 +134,7 @@ export function LookPanel({scene, disabled, onDraft, onSaveNow}: Props) {
   const lut = look.lut;
 
   return <div className="look-panel">
-    {scene.effect_preset === 'glitch' && <section className="look-section" aria-label="Glitch controls">
+    {scene.effect_preset === 'glitch' && <section className="look-section" data-fx-cat="looks" aria-label="Glitch controls">
       <h3><Zap size={15}/> Glitch</h3>
       <p className="hint">Tears run across the whole frame in bursts. Effect strength above sets how hard it tears.</p>
       <label className="control-label">Speed · {glitch.speed.toFixed(2)}×
@@ -145,7 +145,7 @@ export function LookPanel({scene, disabled, onDraft, onSaveNow}: Props) {
       </div>
     </section>}
 
-    {(scene.effect_preset === 'focus_blur' || scene.effect_preset === 'tilt_shift') && <section className="look-section" aria-label="Focus blur controls">
+    {(scene.effect_preset === 'focus_blur' || scene.effect_preset === 'tilt_shift') && <section className="look-section" data-fx-cat="looks" aria-label="Focus blur controls">
       <h3><Zap size={15}/> {scene.effect_preset === 'tilt_shift' ? 'Tilt-shift' : 'Focus blur'}</h3>
       <p className="hint">{scene.effect_preset === 'tilt_shift' ? 'A sharp horizontal band; everything above and below is blurred.' : 'A round sharp area; everything outside it is blurred.'} Render to see the exact result.</p>
       {packRow('Sharp area', focus.size, 5, 95, '%', size => setFocusOpt({size}))}
@@ -153,18 +153,18 @@ export function LookPanel({scene, disabled, onDraft, onSaveNow}: Props) {
       {scene.effect_preset === 'focus_blur' && packRow('Centre left–right', focus.x, 0, 100, '%', x => setFocusOpt({x}))}
       {packRow('Centre up–down', focus.y, 0, 100, '%', y => setFocusOpt({y}))}
     </section>}
-    {scene.effect_preset === 'mosaic' && <section className="look-section" aria-label="Mosaic controls">
+    {scene.effect_preset === 'mosaic' && <section className="look-section" data-fx-cat="looks" aria-label="Mosaic controls">
       <h3><Zap size={15}/> Mosaic</h3>
       <p className="hint">Block size is in pixels at 1080p and scales with the video size.</p>
       {packRow('Block size', mosaic.block, 2, 120, 'px', block => {const next = {block}; setMosaic(next); onDraft({mosaic: next});})}
     </section>}
-    {scene.effect_preset === 'chromatic_split' && <section className="look-section" aria-label="RGB split controls">
+    {scene.effect_preset === 'chromatic_split' && <section className="look-section" data-fx-cat="looks" aria-label="RGB split controls">
       <h3><Zap size={15}/> RGB split</h3>
       <p className="hint">How far the red and blue channels are pushed apart (up to 40 px at 1080p).</p>
       {packRow('Split amount', rgb.amount, 1, 100, '%', amount => {const next = {amount}; setRgb(next); onDraft({rgbsplit: next});})}
     </section>}
 
-    <section className="look-section" aria-label="Old film">
+    <section className="look-section" data-fx-cat="film" aria-label="Old film">
       <div className="look-heading"><h3><Film size={15}/> Old film</h3>
         <label className="switch-label"><input type="checkbox" role="switch" aria-label="Old film damage" checked={!!film} disabled={disabled} onChange={e => setFilmLook(e.target.checked ? {...FILM_DEFAULTS} : null)}/> {film ? 'On' : 'Off'}</label></div>
       <p className="hint">Scratches, dust, hairs, flicker and projector wobble, like WWII newsreels and 8 mm home movies. Plays live in the preview.</p>
@@ -189,7 +189,7 @@ export function LookPanel({scene, disabled, onDraft, onSaveNow}: Props) {
       </>}
     </section>
 
-    <section className="look-section" aria-label="Adjustments">
+    <section className="look-section" data-fx-cat="adjust" aria-label="Adjustments">
       <div className="look-heading"><h3><SlidersHorizontal size={15}/> Adjust</h3>
         <button className="text-btn" disabled={disabled || !active} onClick={() => {setAdjust({}); onDraft({adjust: {}});}}><RotateCcw size={12}/> Reset all</button></div>
       {(['Light', 'Color', 'Detail'] as const).map(group => <fieldset key={group} className="adjust-group"><legend>{group}</legend>
@@ -208,7 +208,7 @@ export function LookPanel({scene, disabled, onDraft, onSaveNow}: Props) {
       <p className="hint">Double-click a slider to reset it. The preview is approximate; render to see the exact grade.</p>
     </section>
 
-    <section className="look-section" aria-label="Color LUT">
+    <section className="look-section" data-fx-cat="adjust" aria-label="Color LUT">
       <h3><Palette size={15}/> Color LUT</h3>
       <p className="hint">Apply a .cube colour grade: 3D, 1D, or DaVinci Resolve’s shaper LUTs. Film looks and camera LUTs (Log to Rec709) expect log footage and look very strong on normal video.</p>
       <div className="lut-row">

@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.9.3 RC4 — owner remarks on RC3 (October 7, 2026, not published)
+
+- **Creative titles open in their own window.** Overlays → Creative titles → *Video inside text* or *Textured title* opens a dialog with a live preview beside the settings and tabs for Create, Position & size, Frame, Move & green screen and Timing & animation, so nothing needs scrolling. The preview updates as you type; once added, drag the layer on the picture to place it. Existing creative layers have an Adjust button. The rendered *Preview video inside text* now plays inside the dialog instead of behind it.
+- **Censor words is easy to find again.** The Audio tab opens with a "Censor words (bleep or mute)" card that jumps to the narration, the video's own sound or a timeline audio clip.
+- **Effects tab in four icon categories:** Looks, Old film, Adjust & LUT, More effects; one shows at a time (search still looks through all of them). Looks puts the classic looks (with Original) first, with chips to narrow to Classic, Color filters, Film & lens or Creative. A dot marks a category that is in use.
+- **Typewriter is at the top of the Text tab** with a typewriter icon, an On/Off switch and a Settings link to its speed and sound.
+- **Download and Open file location** (share window): shows where the video is saved with Copy location, reports what happened under the buttons, and works for any local SceneForge address (127.0.0.1, localhost, any port).
+- **Free timeline look:** icon buttons, Render full video highlighted, and no more blue text selection while dragging clips.
+- **Projects and other left-side actions no longer stall on a pending Motion/Effects draft:** SceneForge asks *Apply and continue* / *Discard and continue*; Cancel keeps the draft and shows it. Saves still in progress are retried for a few seconds, and a blocked action names the scene that is not saved yet.
+- **Freezes under load (reproduced and fixed):** many scene renders at once held the database long enough for other saves to fail ("database is locked") and for the editor to wait. Renders and exports now queue for a limited number of slots, progress updates are written less often, the database waits for its turn instead of failing, and uploads no longer block other requests.
+- **Long exports no longer run out of memory:** projects with more than 8 scenes are assembled in batches and then joined; transitions across batch joins are kept, and picture and sound stay the same length.
+- Tests: `tests/integration/stress_live_server.py` (30 scenes with looks, old film, adjustments, three text layers each, typewriter, karaoke, stickers, picture-in-picture video, textured and video-inside-text titles, voice takes, music clips, transitions; renders, uploads, export and a Free-timeline export while measuring request times and FFmpeg memory), `tests/integration/test_export_batching.py`; updated editor, share-dialog and four browser harnesses for the new dialogs and categories.
+
 ## 0.9.3 RC3 — Director's Desk look (October 7, 2026, not published)
 
 Stage 1 of the new design: the look, with no change in how anything works.

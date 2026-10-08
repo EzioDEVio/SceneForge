@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from "react";
+import {Minimize2, Maximize2, ListOrdered, BoxSelect, Highlighter, SplitSquareHorizontal, Magnet, Undo2, Redo2, Scissors, Trash2, MonitorPlay, Play, Pause, RefreshCw, Clapperboard, ZoomIn} from "lucide-react";
 import { createPortal } from "react-dom";
 import {
   api,
@@ -594,7 +595,7 @@ export function FreeTimeline({
         onKeyDown={e => {if(!['ArrowUp','ArrowDown','Home','End'].includes(e.key))return;e.preventDefault();setMinimized(false);setExpanded(false);setHeight(e.key==='Home'?240:e.key==='End'?maxHeight:Math.max(240,Math.min(maxHeight,viewHeight+(e.key==='ArrowUp'?40:-40))));}}><span/> <small>Drag to resize</small> <span/></div>
       <header>
         <strong>Free timeline</strong>
-        <button className="free-size-button" aria-label={minimized ? "Restore minimized free timeline" : "Minimize free timeline"} title={minimized ? "Show the timeline tracks again" : "Hide tracks to give the preview more room"} onClick={() => setMinimized(!minimized)}>{minimized ? "Restore tracks" : "Minimize"}</button>
+        <button className="free-size-button" aria-label={minimized ? "Restore minimized free timeline" : "Minimize free timeline"} title={minimized ? "Show the timeline tracks again" : "Hide tracks to give the preview more room"} onClick={() => setMinimized(!minimized)}><Minimize2 size={14} aria-hidden/>{minimized ? "Restore tracks" : "Minimize"}</button>
         <button
           aria-label={
             expanded ? "Restore free timeline" : "Maximize free timeline"
@@ -603,7 +604,7 @@ export function FreeTimeline({
           title={expanded ? "Return to your chosen timeline height" : "Show the largest timeline that fits this window"}
           onClick={() => {setMinimized(false);setExpanded(!expanded);}}
         >
-          {expanded ? "Restore" : "Maximize"}
+          <Maximize2 size={14} aria-hidden/>{expanded ? "Restore" : "Maximize"}
         </button>
         <button
           className="free-size-button"
@@ -611,7 +612,7 @@ export function FreeTimeline({
           title="View original source scenes. Your free cuts and export remain active."
           disabled={disabled || pending}
         >
-          Scene assembly
+          <ListOrdered size={14} aria-hidden/>Scene assembly
         </button>
         <button
           aria-label="Box select free clips"
@@ -621,7 +622,7 @@ export function FreeTimeline({
             setRangeMode(false);
           }}
         >
-          Box select
+          <BoxSelect size={14} aria-hidden/>Box select
         </button>
         <button
           aria-label="Highlight free timeline range"
@@ -631,7 +632,7 @@ export function FreeTimeline({
             setBoxMode(false);
           }}
         >
-          Highlight range
+          <Highlighter size={14} aria-hidden/>Highlight range
         </button>
         <button
           disabled={!range || !selected.length || disabled || pending}
@@ -655,31 +656,31 @@ export function FreeTimeline({
             }
           }}
         >
-          Split highlighted range
+          <SplitSquareHorizontal size={14} aria-hidden/>Split highlighted range
         </button>
         <button aria-pressed={snap} onClick={() => setSnap(!snap)}>
-          Snap
+          <Magnet size={14} aria-hidden/>Snap
         </button>
         <button disabled={disabled || pending || !canUndo} onClick={onUndo}>
-          Undo
+          <Undo2 size={14} aria-hidden/>Undo
         </button>
         <button disabled={disabled || pending || !canRedo} onClick={onRedo}>
-          Redo
+          <Redo2 size={14} aria-hidden/>Redo
         </button>
         <button
           disabled={disabled || pending}
           onClick={() => void split()}
         >
-          Split at playhead
+          <Scissors size={14} aria-hidden/>Split at playhead
         </button>
         <button
           disabled={!selected.length || disabled || pending}
           onClick={remove}
         >
-          Remove clips
+          <Trash2 size={14} aria-hidden/>Remove clips
         </button>
         <button onClick={() => setPreview(!preview)}>
-          {preview ? "Close free preview" : "Open free preview"}
+          <MonitorPlay size={14} aria-hidden/>{preview ? "Close free preview" : "Open free preview"}
         </button>
         <button
           onClick={() => {
@@ -687,19 +688,19 @@ export function FreeTimeline({
             setPlaying(!playing);
           }}
         >
-          {playing ? "Pause" : "Play"}
+          {playing ? <Pause size={14} aria-hidden/> : <Play size={14} aria-hidden/>}{playing ? "Pause" : "Play"}
         </button>
         <button
           disabled={disabled || pending}
           onClick={() => void renderMissing()}
         >
-          Render changed sources
+          <RefreshCw size={14} aria-hidden/>Render changed sources
         </button>
-        <button disabled={disabled || pending} onClick={onExport}>
-          Render full video
+        <button className="free-primary" disabled={disabled || pending} onClick={onExport}>
+          <Clapperboard size={14} aria-hidden/>Render full video
         </button>
-        <label>
-          Zoom
+        <label className="free-zoom">
+          <ZoomIn size={14} aria-hidden/>Zoom
           <input
             aria-label="Free timeline zoom"
             type="range"

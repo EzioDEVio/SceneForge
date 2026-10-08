@@ -2,7 +2,7 @@
 // in one place. Before 0.9.0 the on/off switch lived in Caption style → Animation and the
 // timing/sound controls were further down the Text tab, which users found hard to follow.
 import React, {useEffect, useRef, useState} from 'react';
-import {Keyboard, Pause, Play, Upload, Volume2} from 'lucide-react';
+import {ChevronDown, Keyboard, Pause, Play, Upload, Volume2} from 'lucide-react';
 import type {Scene} from './api';
 import {FeatureHelp} from './FeatureHelp';
 
@@ -86,4 +86,18 @@ export function TypewriterPanel({scene, captions, narration, update, onCopyNarra
       <p className="hint">The sound follows each letter as it appears, not the rhythm of the original recording. If you also used this recording as narration, remove it under Audio so you don't hear it twice.</p>
     </fieldset>
   </section>;
+}
+
+/** Top-of-Text-tab shortcut so the typewriter is easy to find: switch it on here, or jump to its settings. */
+export function TypewriterShortcut({scene, captions, narration, update, onCopyNarration}: Omit<Props, 'onUploadSound'>) {
+  const f = scene.font_json; const on = !!f.typewriter;
+  const toggle = (next: boolean) => {if (next && !captions.trim() && narration.trim()) onCopyNarration(); void update({font: {typewriter: next, ...(next ? {captions_enabled: true, karaoke: false, split: 'full'} : {})}});};
+  const jump = () => {const box = document.querySelector<HTMLElement>('.scene-editor:not([hidden]) .typewriter-box'); const body = box?.closest<HTMLElement>('.inspector-body');
+    if (box && body) {body.scrollTo({top: body.scrollTop + box.getBoundingClientRect().top - body.getBoundingClientRect().top - 8, behavior: 'smooth'}); box.querySelector<HTMLElement>('input')?.focus({preventScroll: true});}};
+  return <div className={`typewriter-shortcut ${on ? 'on' : ''}`} role="group" aria-label="Typewriter shortcut">
+    <span className="tw-icon" aria-hidden><Keyboard size={22}/></span>
+    <span className="tw-text"><strong>Typewriter</strong><small>{on ? `On · captions type in${f.typewriter_sound ? ' with keystroke sound' : ''}` : 'Captions type themselves in, letter by letter'}</small></span>
+    <label className="switch-label"><input type="checkbox" role="switch" aria-label="Typewriter on or off" checked={on} onChange={e => toggle(e.target.checked)}/> {on ? 'On' : 'Off'}</label>
+    <button type="button" className="text-btn" onClick={jump} title="Speed and keystroke sound"><ChevronDown size={13}/> Settings</button>
+  </div>;
 }

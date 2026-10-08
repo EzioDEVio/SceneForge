@@ -33,12 +33,14 @@ await page.getByRole('tab',{name:'Media',exact:true}).click();
 assert.equal(await free.isDisabled(),false,'A draft must not silently disable timeline entry');
 assert.match(await page.locator('.save-status').innerText(),/Draft changes/);
 await free.click();
+{const ask=page.locator('dialog.editor-choice');await ask.waitFor();assert.match(await ask.innerText(),/Discard and continue[\s\S]*|Apply and continue/);await ask.getByRole('button',{name:'Cancel',exact:true}).click();await ask.waitFor({state:'detached'});}
 await page.getByRole('alert').filter({hasText:'Apply or Cancel the Motion/Effects'}).waitFor();
 assert.deepEqual((await scene()).shots,original.shots,'Blocked timeline switch committed a draft');
 assert(await page.getByRole('tab',{name:'Motion',exact:true}).getAttribute('aria-selected')==='true');
 await page.screenshot({path:path.join(qa,'draft-action-guidance.png'),fullPage:true});
 await page.getByRole('tab',{name:'Media',exact:true}).click();
 await render.click();
+{const ask=page.locator('dialog.editor-choice');await ask.waitFor();assert.match(await ask.innerText(),/Discard and continue[\s\S]*|Apply and continue/);await ask.getByRole('button',{name:'Cancel',exact:true}).click();await ask.waitFor({state:'detached'});}
 await page.getByRole('alert').filter({hasText:'Apply or Cancel the Motion/Effects'}).waitFor();
 await page.locator('.scene-editor:not([hidden]) .editor-draft-actions').getByRole('button',{name:'Cancel changes',exact:true}).click();
 console.log('PASS reproduced draft lock is actionable; timeline and export direct to Apply/Cancel; Cancel preserves source');

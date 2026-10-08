@@ -109,7 +109,7 @@ def create_local_tts_take(scene_id: str, body: schemas.VoiceTakeCreate, db: Sess
 
 
 @router.post("/api/scenes/{scene_id}/voice-takes/upload", response_model=schemas.VoiceTakeOut)
-async def upload_voice_take(scene_id: str, file: UploadFile, db: Session = Depends(get_db)):
+def upload_voice_take(scene_id: str, file: UploadFile, db: Session = Depends(get_db)):
     scene = db.get(Scene, scene_id)
     if not scene:
         raise HTTPException(404, "Scene not found")
@@ -126,7 +126,7 @@ async def upload_voice_take(scene_id: str, file: UploadFile, db: Session = Depen
     hasher = hashlib.sha256()
     with open(dest_path, "wb") as out:
         while True:
-            chunk = await file.read(1 << 20)
+            chunk = file.file.read(1 << 20)
             if not chunk:
                 break
             hasher.update(chunk)
