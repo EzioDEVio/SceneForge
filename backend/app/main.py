@@ -14,7 +14,7 @@ from app.db.database import init_db, SessionLocal
 from app.db.models import ProviderProfile
 from app.security.secrets import migrate_credentials
 
-app = FastAPI(title="SceneForge Studio API", version="0.9.3")
+app = FastAPI(title="SceneForge Studio API", version="0.9.4-beta.1")
 
 from app.render.font_runtime import FontRuntimeError
 from fastapi.responses import JSONResponse
@@ -106,7 +106,7 @@ logbuffer.install()
 # new interface connected to an old backend (e.g. a still-running old
 # start.bat window) shows "Backend update required" instead of silently
 # losing settings the old backend does not know.
-BUILD_ID = "v0.9.3"
+BUILD_ID = "v0.9.4-beta.1"
 
 
 @app.get("/api/health")
