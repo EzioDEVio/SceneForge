@@ -96,23 +96,55 @@ with TestClient(app) as c:
     r = c.post('/api/local-speech/voicebox/connect')
     check('Voicebox not running is explained', r.status_code == 503 and 'voicebox.sh' in r.text)
     class VB(BaseHTTPRequestHandler):
+        """Behaves like Voicebox 0.5.0: /generate queues and returns status "generating",
+        defaults to the Qwen engine when none is passed, and /audio 404s until done."""
+        profiles = []
+        gens = {}
+        last = None
         def _send(self, code, body, ctype='application/json'):
             self.send_response(code); self.send_header('Content-Type', ctype); self.end_headers(); self.wfile.write(body)
         def do_GET(self):
-            if self.path == '/profiles': self._send(200, json.dumps([{'id': 'p1', 'name': 'Narrator', 'language': 'en'}]).encode())
-            elif self.path == '/audio/g1': self._send(200, wav.getvalue(), 'audio/wav')
-            else: self._send(404, b'{}')
+            if self.path == '/profiles': return self._send(200, json.dumps(VB.profiles).encode())
+            if self.path.startswith('/profiles/'):
+                p = next((p for p in VB.profiles if p['id'] == self.path.split('/')[-1]), None)
+                return self._send(200, json.dumps(p).encode()) if p else self._send(404, b'{"detail":"Profile not found"}')
+            if self.path.startswith('/history/'):
+                g = VB.gens[self.path.split('/')[-1]]; g['polls'] += 1
+                if g['polls'] >= 2: g['status'] = 'completed'
+                return self._send(200, json.dumps({'id': g['id'], 'status': g['status'], 'error': None}).encode())
+            if self.path.startswith('/audio/'):
+                g = VB.gens.get(self.path.split('/')[-1])
+                return self._send(200, wav.getvalue(), 'audio/wav') if g and g['status'] == 'completed' else self._send(404, b'{"detail":"Audio file not found"}')
+            self._send(404, b'{}')
         def do_POST(self):
             payload = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
             VB.last = payload
-            self._send(200, json.dumps({'id': 'g1', 'profile_id': payload['profile_id'], 'audio_path': 'x.wav'}).encode())
+            prof = next(p for p in VB.profiles if p['id'] == payload['profile_id'])
+            engine = payload.get('engine') or 'qwen'
+            if prof.get('preset_engine') and engine != prof['preset_engine']:
+                return self._send(400, json.dumps({'detail': f"Preset profile requires engine {prof['preset_engine']}"}).encode())
+            gid = f"g{len(VB.gens) + 1}"; VB.gens[gid] = {'id': gid, 'status': 'generating', 'polls': 0}
+            self._send(200, json.dumps({'id': gid, 'profile_id': payload['profile_id'], 'status': 'generating'}).encode())
         def log_message(self, *a): pass
     srv = HTTPServer(('127.0.0.1', 0), VB)
     threading.Thread(target=srv.serve_forever, daemon=True).start()
-    with patch.object(voicebox, 'DEFAULT_URL', f'http://127.0.0.1:{srv.server_address[1]}'):
+    with patch.object(voicebox, 'DEFAULT_URL', f'http://127.0.0.1:{srv.server_address[1]}'), patch.object(voicebox, 'POLL_SECONDS', 0.05):
+        st = c.get('/api/local-speech/voicebox/status').json()
+        check('an open Voicebox without voices is detected as such', st['running'] and st['profiles'] == 0)
+        vb = c.post('/api/local-speech/voicebox/connect')
+        check('connecting to an empty Voicebox keeps the connection and says how to add a voice',
+              vb.status_code == 200 and vb.json()['status'] == 'needs_voices' and 'Voices' in vb.json()['message'])
+        VB.profiles = [{'id': 'p1', 'name': 'Narrator', 'language': 'en', 'voice_type': 'cloned'},
+                       {'id': 'k1', 'name': 'Heart', 'language': 'en', 'voice_type': 'preset', 'preset_engine': 'kokoro'}]
         vb = c.post('/api/local-speech/voicebox/connect').json()
-        check('a running Voicebox connects and lists its profiles', vb['voices'] == ['p1'])
+        check('a running Voicebox connects and lists its profiles', vb['voices'] == ['p1', 'k1'])
+        names = c.get(f"/api/providers/profile/{vb['profile']['id']}/voices").json()
+        check('Voicebox voices show their names', 'Narrator' in json.dumps(names))
         t = c.post(f'/api/scenes/{sid}/voice-takes/service', json={'provider_id': vb['profile']['id'], 'voice': 'p1', 'language': 'en', 'speed': 1.0})
-    check('Voicebox narration is fetched and saved as a take', t.status_code == 200 and t.json()['provider'] == 'voicebox' and VB.last['profile_id'] == 'p1')
+        check('Voicebox narration waits for the queued generation and is saved as a take',
+              t.status_code == 200 and t.json()['provider'] == 'voicebox' and VB.last['profile_id'] == 'p1' and VB.gens['g1']['polls'] >= 2)
+        t = c.post(f'/api/scenes/{sid}/voice-takes/service', json={'provider_id': vb['profile']['id'], 'voice': 'k1', 'language': 'en-US', 'speed': 1.0})
+        check("a preset voice is generated with its own engine, not Voicebox's Qwen default",
+              t.status_code == 200 and VB.last['engine'] == 'kokoro' and VB.last['language'] == 'en')
     srv.shutdown()
 print(f'{checks} built-in and optional voice checks passed')

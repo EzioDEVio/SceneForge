@@ -15,11 +15,11 @@ export function VoiceEngines({busy, providers, onUse, onSelectProvider}: {busy: 
   onUse: (engine: 'kokoro_builtin' | 'chatterbox' | 'voicebox') => void; onSelectProvider: (id: string) => void}) {
   const [kokoro, setKokoro] = React.useState<Kokoro | null>(null);
   const [chatter, setChatter] = React.useState<Chatter | null>(null);
-  const [voicebox, setVoicebox] = React.useState(false);
+  const [voicebox, setVoicebox] = React.useState<{running: boolean; profiles: number}>({running: false, profiles: 0});
   const [note, setNote] = React.useState('');
   const refresh = React.useCallback(async () => {
     const [k, c, v] = await Promise.allSettled([getJson('/api/local-speech/kokoro_builtin/status'), getJson('/api/local-speech/chatterbox/status'), getJson('/api/local-speech/voicebox/status')]);
-    if (k.status === 'fulfilled') setKokoro(k.value); if (c.status === 'fulfilled') setChatter(c.value); if (v.status === 'fulfilled') setVoicebox(!!v.value.running);
+    if (k.status === 'fulfilled') setKokoro(k.value); if (c.status === 'fulfilled') setChatter(c.value); if (v.status === 'fulfilled') setVoicebox({running: !!v.value.running, profiles: Number(v.value.profiles || 0)});
   }, []);
   React.useEffect(() => {void refresh();}, [refresh]);
   const downloading = kokoro?.state === 'downloading' && !kokoro.installed;
@@ -62,10 +62,12 @@ export function VoiceEngines({busy, providers, onUse, onSelectProvider}: {busy: 
           ? <button className="btn btn-primary" disabled={busy} onClick={() => onSelectProvider(gemini.id)}>Use Gemini voices</button>
           : <button className="btn" disabled={busy} onClick={() => openEngines('cloud')}>Add free key</button>}
       </li>
-      <li className={`voice-engine ${voicebox ? 'ready' : ''}`} aria-label="Voicebox">
+      <li className={`voice-engine ${voicebox.running && voicebox.profiles ? 'ready' : ''}`} aria-label="Voicebox">
         <span className="voice-engine-icon" aria-hidden><Waves size={17}/></span>
-        <span className="voice-engine-text"><b>Voicebox <em>optional app</em></b><small>{voicebox ? 'Running on this computer · uses your Voicebox voice profiles and clones' : 'If you use the free Voicebox app (voicebox.sh), open it and connect here'}</small></span>
-        <button className="btn" disabled={busy} onClick={() => voicebox ? onUse('voicebox') : void refresh()}>{voicebox ? 'Use Voicebox' : 'Check again'}</button>
+        <span className="voice-engine-text"><b>Voicebox <em>optional app</em></b><small>{!voicebox.running ? 'If you use the free Voicebox app (voicebox.sh), open it, then click Check again'
+            : voicebox.profiles ? `Open on this computer · ${voicebox.profiles} voice${voicebox.profiles === 1 ? '' : 's'} (your clones and presets)`
+            : 'Voicebox is open but has no voices yet. In Voicebox, open Voices and create, clone or add a preset voice, then click Check again.'}</small></span>
+        <button className={`btn ${voicebox.running && voicebox.profiles ? 'btn-primary' : ''}`} disabled={busy} onClick={() => voicebox.running && voicebox.profiles ? onUse('voicebox') : void refresh()}>{voicebox.running && voicebox.profiles ? 'Use Voicebox' : 'Check again'}</button>
       </li>
     </ul>
     {note && <p className="form-error" role="alert">{note}</p>}

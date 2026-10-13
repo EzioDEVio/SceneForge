@@ -1,3 +1,4 @@
+import {errorHint} from "./errorHints";
 import {PROVIDER_NOTES, PROVIDER_OPTIONS} from "./providerCatalog";
 import {SearchField} from './SearchField';
 import {FreeTimeline,seedFree} from './FreeTimeline';
@@ -408,6 +409,7 @@ function VoicePanel({ scene, onChanged, beforeGenerate }: { scene: Scene; onChan
       const result=await api.connectLocalSpeech(engine);
       setProviders(old=>[...old.filter(p=>p.id!==result.profile.id),result.profile]);
       setProviderId(result.profile.id);setVoices(result.voices.map(v=>typeof v === "string" ? {id:v,name:v} : v));setVoice(result.voices[0] || "");
+      if(engine==="voicebox"&&result.voices.length){const named=await api.providerVoices(result.profile.id);const next=named.voices.map(v=>typeof v === "string" ? {id:v,name:v} : v);setVoices(next);setVoice(next[0]?.id||"");}
       if(engine==="chatterbox"&&/[\u0600-\u06ff]/.test(scene.spoken_text))setLanguage("ar");
       if((engine==="kokoro"||engine==="kokoro_builtin")&&!['en','es','fr','hi','it','pt'].includes(language))setLanguage("en");
       setLocalStatus(result.message);
@@ -420,11 +422,11 @@ function VoicePanel({ scene, onChanged, beforeGenerate }: { scene: Scene; onChan
   useEffect(()=>{if(availableVoices.length&&!availableVoices.some(v=>v.id===voice))setVoice(availableVoices[0].id);},[language,voices,providerId]);
   useEffect(()=>{const refreshProviders=()=>api.listProviders().then(p=>setProviders(p.filter(v=>v.capability==="speech"))).catch(()=>{});void refreshProviders();window.addEventListener("sceneforge:providers-changed",refreshProviders);return()=>window.removeEventListener("sceneforge:providers-changed",refreshProviders);},[]);
   async function connect(id:string){
-    setProviderId(id);setVoices([]);setErr(null);if(["kokoro","kokoro_builtin"].includes(providers.find(p=>p.id===id)?.name||"")&&!voicePrefix[language])setLanguage("en");
+    setProviderId(id);setVoices([]);setErr(null);setLocalStatus("");if(["kokoro","kokoro_builtin"].includes(providers.find(p=>p.id===id)?.name||"")&&!voicePrefix[language])setLanguage("en");
     if(!id)return;
     setBusy(true);
     try{const result=await api.providerVoices(id);const next=result.voices.map(v=>typeof v === "string" ? {id:v,name:v} : v);setVoices(next);setVoice(next[0]?.id||"");}
-    catch(e:any){setErr(e.message);}finally{setBusy(false);}
+    catch(e:any){if(/has no voices yet/.test(e.message))setLocalStatus(e.message);else setErr(e.message);}finally{setBusy(false);}
   }
   const [open, setOpen] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -506,7 +508,7 @@ function VoicePanel({ scene, onChanged, beforeGenerate }: { scene: Scene; onChan
             Pick a voice above. The diagnostic espeak voice is robotic and must be chosen explicitly. Narration is sent as continuous text, separately from typewriter animation.
           </small>
           {previewUrl && <audio controls src={previewUrl} style={{ width: "100%" }} />}
-          {err && <div className="error-box">{err}</div>}
+          {err && <div className="error-box">{err}{errorHint(err)&&<p className="error-hint"><b>What to do:</b> {errorHint(err)}</p>}</div>}
           {scene.voice_takes.length > 0 && (
             <div>
               <strong style={{ fontSize: 12 }}>Takes</strong>
@@ -917,7 +919,7 @@ function PartRow({layerActions,scene:savedScene, project, index, total, active, 
           </div>
         </div>
         {isGenerating && <ProgressCard title={`Rendering “${scene.title}”`} stage={job?.stage} progress={job?.progress || 0} status={job?.status} onCancel={job?.id ? () => void api.cancelJob(job.id).catch(() => {}) : undefined}/>}
-        {(error || job?.status === "failed") && <div role="alert" className="error-box"><details><summary>Render/save failed — show details</summary><pre>{error || job?.error}</pre></details><button className="text-btn" onClick={()=>{setError(null);setJobId(null);}}>Dismiss</button>{error && <button className="text-btn" onClick={async () => { setError(null); await flush(); }}>Retry text save / dismiss</button>}</div>}
+        {(error || job?.status === "failed") && <div role="alert" className="error-box">{errorHint(error || job?.error)&&<p className="error-hint"><b>What to do:</b> {errorHint(error || job?.error)}</p>}<details><summary>Render/save failed — show details</summary><pre>{error || job?.error}</pre></details><button className="text-btn" onClick={()=>{setError(null);setJobId(null);}}>Dismiss</button>{error && <button className="text-btn" onClick={async () => { setError(null); await flush(); }}>Retry text save / dismiss</button>}</div>}
         <section className={`script-card ${scriptOpen ? "expanded" : ""}`} aria-label="Narration script">
           <div className="section-heading script-heading">
             <h3><FileText size={16}/> Narration script</h3>
@@ -936,6 +938,7 @@ function PartRow({layerActions,scene:savedScene, project, index, total, active, 
         <InspectorSections active={active} tab={tab} sceneTitle={scene.title} media={shot?scene.shots.indexOf(shot)+1:0}/>
         {(tab==="Motion"||tab==="Effects"||hasDraft)&&<EditorDraftPreview sceneId={scene.id} edits={editorEdits} dirty={hasDraft} active={active} busy={saving} onApply={()=>void applyEditor()} onCancel={cancelEditor}/>}
         <div className="inspector-body" role="tabpanel" id={`${scene.id}-panel`} aria-labelledby={`${scene.id}-${tab}-tab`}>
+          {(tab==="Motion"||tab==="Effects"||tab==="Text")&&scene.shots.length>0&&scene.timing_mode==="audio_driven"&&!scene.voice_takes.some(t=>t.accepted)&&<p className="order-tip" role="note"><b>Tip: narration first.</b> This part has no narration yet, so its length is a placeholder. Its motion, effects and captions follow the narration’s length, so add the narration first, then fine-tune here. <button className="text-btn" onClick={()=>setTab("Audio")}>Go to Voice & narration</button></p>}
           {active&&layerActions&&selectedLayer&&tab===(['image','video'].includes(selectedLayer.kind)?'Media':'Text')&&<LayerInspector key={layerActions.selectedId} clip={selectedLayer} project={project} actions={layerActions} length={project.finishing_json?.free_timeline?.enabled?86400000:sequenceClips(project.scenes).reduce((n,c)=>Math.max(n,c.end),0)} onClose={()=>layerActions.onSelect('')}/>}
 
           {tab === "Media" && <>
@@ -1516,7 +1519,7 @@ export default function App() {
     {reframeOpen&&project&&<ReframeProjectDialog project={project} onClose={()=>setReframeOpen(false)} onOpen={id=>{setReframeOpen(false);void openProject(id);}}/>}
     {videoGenOpen&&project&&<VideoGenerationPanel project={project} selectedSceneId={selected?.id||null} onClose={()=>setVideoGenOpen(false)} onOpenSettings={()=>openSettings('providers')} onAdd={addGeneratedVideoToTimeline} onCaptions={captionGeneratedScene}/>}
     {exporting&&exportJob&&<ProgressCard floating title="Exporting video" stage={exportJob.stage} progress={exportJob.progress||0} status={exportJob.status} onCancel={()=>void api.cancelJob(exportJob.id).catch(()=>{})}/>}
-    {(error||exportJob?.status==="failed")&&<div role="alert" className="error-box">{error?<p>{error}</p>:<details><summary>Export failed — show details</summary><pre>{exportJob?.error}</pre></details>}<button className="text-btn" onClick={()=>{setError(null);if(exportJob?.status==='failed')setExportJobId(null);}}>Dismiss</button></div>}
+    {(error||exportJob?.status==="failed")&&<div role="alert" className="error-box">{errorHint(error||exportJob?.error)&&<p className="error-hint"><b>What to do:</b> {errorHint(error||exportJob?.error)}</p>}{error?<p>{error}</p>:<details><summary>Export failed — show details</summary><pre>{exportJob?.error}</pre></details>}<button className="text-btn" onClick={()=>{setError(null);if(exportJob?.status==='failed')setExportJobId(null);}}>Dismiss</button></div>}
     <div className="editor-menubar">
       {['File','AI Engines','Edit','View','Help'].map(name=><div className="editor-menu" key={name}><button aria-expanded={menu===name} onClick={()=>setMenu(menu===name?'':name)}>{name}</button>{menu===name&&<div className="editor-menu-items">
        {name==='AI Engines'&&<><button onClick={()=>{setMenu('');setInfoPanel({panel:'ai',section:'cloud'});}}><Key size={14} aria-hidden className="menu-icon"/>AI providers · API keys</button><button onClick={()=>{setMenu('');setInfoPanel({panel:'ai',section:'sd'});}}><ImageIcon size={14} aria-hidden className="menu-icon"/>Local image engines</button><button onClick={()=>{setMenu('');setInfoPanel({panel:'ai',section:'voices'});}}><Mic size={14} aria-hidden className="menu-icon"/>Local voice engines</button><button onClick={()=>{setMenu('');setInfoPanel({panel:'ai'});}}><HelpCircle size={14} aria-hidden className="menu-icon"/>AI help &amp; setup</button></>}

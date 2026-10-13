@@ -108,3 +108,33 @@ ws=Path(temp.name)/'queued';r=_sp.run([sys.executable,str(root/'backend/desktop_
 assert r.returncode==0,r.stderr
 assert json.loads((ws/'ai-setup-pending.json').read_text())=={'components':['whisper','kokoro','chatterbox'],'gpu':True,'accepted_terms':True}
 print('PASS installer choices are queued quickly and installed by the app on first start; unknown tools and unaccepted terms are ignored')
+
+# 0.9.4-beta.4: the NVIDIA option is saved, and switching it changes the installed PyTorch build.
+with TestClient(app) as client:
+    before=client.get('/api/local-ai/setup').json()['settings']
+    saved=client.put('/api/local-ai/startup',json={'gpu':True}).json()
+    after=client.get('/api/local-ai/setup').json()
+    assert saved['gpu'] is True and after['settings']['gpu'] is True and after['settings'].get('autostart')==before.get('autostart')
+    assert client.put('/api/local-ai/startup',json={'autostart':False}).json()['gpu'] is True
+    assert client.put('/api/local-ai/startup',json={'gpu':False}).json()['gpu'] is False
+print('PASS the NVIDIA graphics card option stays ticked after saving (and other options are kept)')
+from app import native_engines as ne
+engines=Path(temp.name)/'engines-gpu'
+with patch.dict(os.environ,{'SCENEFORGE_NATIVE_ENGINES':str(engines)}),patch.object(ne,'ensure_uv',return_value=Path('uv')),patch.object(ne.shutil,'copy2'):
+    py=ne.venv_python('chatterbox');py.parent.mkdir(parents=True);py.write_text('')
+    (engines/'chatterbox'/'installed.json').write_text(json.dumps({'gpu':False}))
+    assert ne.build('chatterbox')=='cpu'
+    calls=[];ne.install('chatterbox',gpu=True,run=lambda a,e:calls.append(a),report=lambda *a,**k:None)
+    torch_call=next(c for c in calls if 'torch==2.6.0' in c)
+    assert '--reinstall-package' in torch_call and 'https://download.pytorch.org/whl/cu124' in torch_call,torch_call
+    assert ne.build('chatterbox')=='gpu'
+    calls=[];ne.install('chatterbox',gpu=True,run=lambda a,e:calls.append(a),report=lambda *a,**k:None)
+    assert '--reinstall-package' not in next(c for c in calls if 'torch==2.6.0' in c)
+    (engines/'chatterbox'/'installed.json').write_text(json.dumps({'gpu':False}))
+    with patch.object(ne.subprocess,'Popen') as popen,patch.object(ne,'_service_source',return_value=engines):
+        ne._processes.clear();assert ne.start('chatterbox',gpu=True)
+        assert popen.call_args.kwargs['env']['CHATTERBOX_DEVICE']=='cpu'
+    ne._processes.clear()
+    with patch.object(m,'health',return_value=None),patch.object(m,'image_ready',return_value=False):
+        st=m.state();assert st['builds']=={'chatterbox':'cpu'} and isinstance(st['nvidia'],bool)
+print('PASS switching to the graphics card reinstalls PyTorch with the NVIDIA build; a CPU build never starts on the GPU')

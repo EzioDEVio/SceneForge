@@ -26,12 +26,17 @@ def install(body:Install):
     return {'started':True}
 
 class Startup(BaseModel):
-    autostart:bool
+    autostart:bool|None=None
+    gpu:bool|None=None
 
 @router.put('/api/local-ai/startup')
 def startup(body:Startup):
+    """Save the AI Engines options (start with SceneForge, use the NVIDIA graphics card)."""
     with managed_ai._lock:
-        value={**managed_ai.preferences(),'autostart':body.autostart};managed_ai.save_preferences(value)
+        value=managed_ai.preferences()
+        if body.autostart is not None:value['autostart']=body.autostart
+        if body.gpu is not None:value['gpu']=body.gpu
+        managed_ai.save_preferences(value)
     return value
 
 

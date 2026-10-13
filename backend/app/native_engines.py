@@ -113,6 +113,23 @@ def installed(component: str) -> bool:
     return (root() / component / "installed.json").is_file() and venv_python(component).is_file()
 
 
+def build(component: str) -> str | None:
+    """Which PyTorch build an installed engine has: "gpu", "cpu" or None (not installed)."""
+    if not installed(component):
+        return None
+    try:
+        return "gpu" if json.loads((root() / component / "installed.json").read_text(encoding="utf-8")).get("gpu") else "cpu"
+    except (OSError, ValueError):
+        return "cpu"
+
+
+def nvidia_present() -> bool:
+    """An NVIDIA driver is installed (nvidia-smi ships with it)."""
+    if shutil.which("nvidia-smi"):
+        return True
+    return os.name == "nt" and Path(os.environ.get("SystemRoot", r"C:\Windows"), "System32", "nvidia-smi.exe").is_file()
+
+
 def _service_source(component: str) -> Path:
     name = SPECS[component]["service"]
     for base in (Path(RESOURCE_DIR) / "services", Path(__file__).resolve().parents[2] / "services"):
@@ -137,6 +154,11 @@ def install(component: str, gpu: bool = False, run=None, report=print, packages:
     source = _service_source(component)
     if packages is None:
         torch_args = [uv, "pip", "install", "--python", py, *spec["torch"]]
+        if build(component) not in (None, "gpu" if gpu else "cpu"):
+            # Switching between the CPU and NVIDIA builds: "torch==2.6.0" is already satisfied by the
+            # other build, so ask uv to replace it.
+            for package in spec["torch"]:
+                torch_args += ["--reinstall-package", package.split("==")[0]]
         if platform.system() != "Darwin":
             torch_args += ["--index-url", spec["gpu_index"] if gpu else CPU_INDEX]
         report(f"{spec['label']}: installing PyTorch ({'NVIDIA GPU' if gpu else 'CPU'} build, about 1–3 GB).")
@@ -156,9 +178,12 @@ def running(component: str) -> bool:
 
 
 def start(component: str, gpu: bool = False) -> bool:
-    """Start the engine in the background (no window). Returns False when not installed."""
+    """Start the engine in the background (no window). Returns False when not installed.
+    The device follows the PyTorch build that is actually installed, not the current setting,
+    so a CPU build is never asked to run on the graphics card."""
     if not installed(component):
         return False
+    gpu = build(component) == "gpu"
     with _lock:
         if running(component):
             return True
@@ -178,6 +203,19 @@ def start(component: str, gpu: bool = False) -> bool:
             [str(venv_python(component)), "-m", "uvicorn", "server:app", "--host", "127.0.0.1", "--port", str(spec["port"])],
             cwd=str(home), env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, creationflags=FLAGS)
         return True
+
+
+def stop(component: str) -> None:
+    p = _processes.pop(component, None)
+    if p and p.poll() is None:
+        if os.name == "nt":
+            subprocess.run(["taskkill.exe", "/PID", str(p.pid), "/T", "/F"], capture_output=True, creationflags=FLAGS, timeout=15)
+        else:
+            p.terminate()
+            try:
+                p.wait(10)
+            except subprocess.TimeoutExpired:
+                p.kill()
 
 
 def stop_all() -> None:

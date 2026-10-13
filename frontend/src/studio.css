@@ -739,3 +739,12 @@ html[data-theme="light"] .studio-shell .audio-card input[type=range]{accent-colo
 /* Several-outcome prompts (askChoice): one full-width button per line, primary first. */
 .editor-confirm.editor-choice .button-row{display:flex;flex-direction:column;align-items:stretch;gap:8px}
 .editor-confirm.editor-choice .button-row .btn{justify-content:center;width:100%}
+/* 0.9.4-beta.4: show where dropped media goes: a bar between parts (new part) or the whole part (add to it). */
+.sequence-dock .picture-clip.drop-before,.sequence-dock .picture-clip.drop-after{outline:none;filter:none;overflow:visible}
+.sequence-dock .picture-clip.drop-before{box-shadow:inset 4px 0 0 #5fd3ff,-3px 0 0 #5fd3ff}
+.sequence-dock .picture-clip.drop-after{box-shadow:inset -4px 0 0 #5fd3ff,3px 0 0 #5fd3ff}
+.sequence-dock .picture-clip[data-drop-label]::before{content:attr(data-drop-label);position:absolute;z-index:6;top:22px;padding:2px 8px;border-radius:6px;background:#5fd3ff;color:#0e1520;font:600 11px/18px system-ui,sans-serif;white-space:nowrap;pointer-events:none}
+.sequence-dock .picture-clip.drop-before[data-drop-label]::before{left:8px}
+.sequence-dock .picture-clip.drop-after[data-drop-label]::before{right:8px}
+.sequence-dock .picture-clip.drop-inside[data-drop-label]::before{left:50%;transform:translateX(-50%)}
+.sequence-dock.tool-blade .picture-clip,.sequence-dock.tool-blade .project-audio-body{cursor:crosshair}

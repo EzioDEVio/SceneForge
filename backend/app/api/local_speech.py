@@ -42,7 +42,7 @@ def kokoro_download():
 @router.get('/voicebox/status')
 def voicebox_status():
     from app.providers import voicebox
-    return {'running': voicebox.running(), 'url': voicebox.DEFAULT_URL}
+    return voicebox.status()
 
 
 @router.post('/{engine}/connect')
@@ -61,9 +61,11 @@ def connect(engine: str, db: Session = Depends(get_db)):
             raise HTTPException(503, 'Voicebox is not running. Install it from voicebox.sh, open it, then click Connect Voicebox again.')
         profile = _built_in_profile(db, 'voicebox', voicebox.DEFAULT_URL, 'voicebox')
         try: voices = voicebox.voice_details(profile.base_url)
-        except ValueError as e: raise HTTPException(503, str(e))
+        except ValueError as e:
+            # Connected, but nothing to speak with yet: keep the connection and say what to do in Voicebox.
+            return {'profile': _to_out(profile), 'voices': [], 'status': 'needs_voices', 'message': str(e)}
         return {'profile': _to_out(profile), 'voices': [v['id'] for v in voices], 'status': 'service_reachable',
-                'message': 'Voicebox connected. Your Voicebox voice profiles are listed under Voice.'}
+                'message': f'Voicebox connected with {len(voices)} voice{"s" if len(voices) != 1 else ""}. Pick one under Voice.'}
     if engine not in ENGINES: raise HTTPException(404, 'Unknown local engine')
     url, model = ENGINES[engine]
     profile = db.query(ProviderProfile).filter_by(capability='speech', name=engine).first()

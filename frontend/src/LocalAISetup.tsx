@@ -9,14 +9,15 @@ const ENGINES:{id:Component;name:string;does:string;size:string;Icon:typeof Cpu}
  {id:'chatterbox',name:'Chatterbox',does:'Natural narration voices in Arabic and 22 more languages',size:'about 3 GB',Icon:Mic},
 ];
 type State={status:string;completed:number;total:number;current:string;log:string[];error:string;supported:boolean;
- settings:{autostart:boolean;components:string[];gpu:boolean};running?:Partial<Record<Component,boolean>>};
+ settings:{autostart:boolean;components:string[];gpu:boolean};running?:Partial<Record<Component,boolean>>;
+ builds?:Partial<Record<Component,'gpu'|'cpu'>>;nvidia?:boolean};
 async function request(url:string,options:RequestInit={}){
  const r=await fetch(url,{...options,headers:{'Content-Type':'application/json',...options.headers}});
  const data=await r.json();if(!r.ok)throw Error(data.detail||'Local AI setup failed.');return data;
 }
 
-/** One click per engine: SceneForge installs Docker Desktop if needed, downloads the
- *  engine and its model, starts it and connects it. Nothing to configure. */
+/** One click per engine: SceneForge downloads the engine into its own folder (no Docker), fetches
+ *  its model, starts it and connects it. Nothing to configure. */
 export function LocalAISetup({onReady}:{onReady?:()=>void}){
  const [state,setState]=useState<State|null>(null),[message,setMessage]=useState(''),[starting,setStarting]=useState<string>('');
  useEffect(()=>{let active=true,last='';const check=async()=>{try{const s=await request('/api/local-ai/setup');if(active){setState(s);if(s.status==='done'&&last!=='done')onReady?.();last=s.status;}}catch(e:any){if(active)setMessage(e.message);}};void check();const timer=setInterval(check,2500);return()=>{active=false;clearInterval(timer);};},[]);
@@ -35,10 +36,12 @@ export function LocalAISetup({onReady}:{onReady?:()=>void}){
  }
  async function setting(patch:Partial<State['settings']>){
   if(!state)return;
-  try{if('autostart' in patch){const settings=await request('/api/local-ai/startup',{method:'PUT',body:JSON.stringify({autostart:patch.autostart})});setState({...state,settings});}
-   else setState({...state,settings:{...state.settings,...patch}});}catch(e:any){setMessage(e.message);}
+  setState({...state,settings:{...state.settings,...patch}});   // show the tick at once
+  try{const settings=await request('/api/local-ai/startup',{method:'PUT',body:JSON.stringify(patch)});setState(s=>s&&{...s,settings});}
+  catch(e:any){setMessage(e.message);setState(s=>s&&{...s,settings:state.settings});}
  }
  const missing=ENGINES.filter(e=>!installed(e.id)).map(e=>e.id);
+ const switchable=(['stable_diffusion','chatterbox'] as Component[]).filter(c=>state?.builds?.[c]&&state.builds[c]!==(state.settings.gpu?'gpu':'cpu'));
  const unsupported=state&&!state.supported;
  return <section className="engine-install" aria-label="Install local AI">
   <div className="engine-install-head"><h3>Free AI on this computer</h3>
@@ -61,7 +64,10 @@ export function LocalAISetup({onReady}:{onReady?:()=>void}){
   {!!state?.log.length&&<details open={state.status==='error'}><summary>Installation details</summary><pre>{state.log.join('\n')}</pre></details>}
   {state&&!unsupported&&<div className="engine-options">
    <label><input type="checkbox" aria-label="Start installed AI with SceneForge" checked={state.settings.autostart} disabled={installing} onChange={e=>void setting({autostart:e.target.checked})}/>Start installed engines when SceneForge opens</label>
-   <label><input type="checkbox" checked={!!state.settings.gpu} disabled={installing} onChange={e=>void setting({gpu:e.target.checked})}/>Use my NVIDIA graphics card for pictures (much faster; needs a recent NVIDIA driver)</label>
+   <label><input type="checkbox" aria-label="Use my NVIDIA graphics card" checked={!!state.settings.gpu} disabled={installing} onChange={e=>void setting({gpu:e.target.checked})}/>Use my NVIDIA graphics card for pictures and voices (much faster; needs a recent NVIDIA driver)</label>
+   {state.settings.gpu&&state.nvidia===false&&<p className="hint" role="status">No NVIDIA driver was found on this computer. Install the latest NVIDIA driver first, or leave this off to use the processor.</p>}
+   {switchable.length>0&&<p className="hint engine-switch" role="status">{switchable.map(c=>ENGINES.find(e=>e.id===c)!.name).join(' and ')} {switchable.length>1?'are':'is'} installed for the {state.settings.gpu?'processor':'graphics card'}.
+     <button className="btn" disabled={installing||!!starting} onClick={()=>void install(switchable)}>Switch to the {state.settings.gpu?'graphics card':'processor'}</button> {state.settings.gpu?'Downloads the NVIDIA build of PyTorch (about 2.5 GB); your models are kept.':'Downloads the processor build of PyTorch (about 200 MB).'}</p>}
   </div>}
   <p className="hint engine-terms">Installing downloads free software and models. By clicking Install you accept their terms: <a href="https://huggingface.co/spaces/CompVis/stable-diffusion-license" target="_blank" rel="noreferrer">Stable Diffusion model</a> · <a href="https://github.com/resemble-ai/chatterbox/blob/master/LICENSE" target="_blank" rel="noreferrer">Chatterbox</a> · <a href="https://huggingface.co/hexgrad/Kokoro-82M" target="_blank" rel="noreferrer">Kokoro</a> · <a href="https://github.com/pytorch/pytorch/blob/main/LICENSE" target="_blank" rel="noreferrer">PyTorch</a>. Allow about 12 GB of free space for everything.</p>
  </section>;

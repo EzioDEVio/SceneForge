@@ -169,3 +169,5 @@ html[data-theme=light] .title-designer-actions{background:#f6f9ff;border-color:#
 .setup-art{aspect-ratio:16/9;height:auto}
 .voice-engines{container-type:inline-size}
 @container (max-width:440px){.voice-engine{grid-template-columns:auto minmax(0,1fr)}.voice-engine>.btn{grid-column:2;justify-self:start}}
+.error-hint{margin:6px 0;font-size:13px;line-height:1.45}.error-hint b{font-weight:700}
+.order-tip{margin:0 0 12px;padding:9px 12px;border-radius:8px;border:1px solid color-mix(in srgb,var(--accent,#57c7dd) 45%,transparent);background:color-mix(in srgb,var(--accent,#57c7dd) 10%,transparent);font-size:12.5px;line-height:1.45}.order-tip .text-btn{padding:0 2px;font-size:12.5px}

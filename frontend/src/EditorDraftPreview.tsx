@@ -1,3 +1,4 @@
+import {errorHint} from "./errorHints";
 import React,{useEffect,useRef,useState} from 'react';
 import {createPortal} from 'react-dom';
 import {api} from './api';
@@ -36,7 +37,7 @@ export function EditorDraftPreview({sceneId,edits,dirty,active,busy,onApply,onCa
   <div className="button-row"><button className="btn" disabled={!dirty||running||busy} onClick={()=>void render()}>Render draft preview</button><button className="btn btn-primary" disabled={!dirty||busy||running} onClick={onApply}>Apply changes</button><button className="btn" disabled={!dirty||busy} onClick={cancel}>Cancel changes</button>{!open&&<button className="btn" onClick={()=>setOpen(true)}>Open draft companion</button>}</div>
   <p className="hint">Draft render checks this scene. Project music and timeline layers are available in the main timeline preview.</p>
   {running&&<button className="btn" disabled={!jobId} onClick={()=>void stop()}>Stop preview</button>}
-  {failure&&<p role="alert">{error||connectionError||job.error}</p>}{connectionError&&<button className="btn" onClick={()=>setRetry(n=>n+1)}>Retry connection</button>}
+  {failure&&<p role="alert">{error||connectionError||job.error}{errorHint(error||connectionError||job.error)&&<span className="error-hint"> <b>What to do:</b> {errorHint(error||connectionError||job.error)}</span>}</p>}{connectionError&&<button className="btn" onClick={()=>setRetry(n=>n+1)}>Retry connection</button>}
   {active&&dirty&&open&&host&&createPortal(<section className="companion-preview editor-draft-companion" aria-label="Motion and Effects companion">
    <header><strong>Draft preview</strong><button aria-label="Minimize draft preview" onClick={()=>setOpen(false)}>−</button><button aria-label="Close draft preview" onClick={()=>setOpen(false)}>×</button></header>
    <div className="draft-media-frame">{ready?<video controls preload="auto" poster={api.assetThumbUrl(job.artifact_asset_id,720)} src={api.assetStreamUrl(job.artifact_asset_id)} aria-label="Rendered draft preview" onError={()=>setError('The preview video could not load. Try rendering again.')}/>:<div className="draft-preview-placeholder"><span aria-hidden="true">▶</span><p role="status">{status}</p>{running&&<progress aria-label="Draft preview progress" max={100} value={job?.progress||0}/>}</div>}</div>

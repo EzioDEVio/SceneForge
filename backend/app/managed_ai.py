@@ -52,8 +52,9 @@ def set_runtime(component, runtime):
 def state():
     with _lock:
         import platform
-        from app.native_engines import UV_ASSETS
-        return {**_state, 'log':list(_state['log']), 'settings':preferences(), 'supported':(platform.system(),platform.machine()) in UV_ASSETS}
+        from app.native_engines import UV_ASSETS, build, nvidia_present
+        return {**_state, 'log':list(_state['log']), 'settings':preferences(), 'supported':(platform.system(),platform.machine()) in UV_ASSETS,
+                'builds':{c:build(c) for c in ('stable_diffusion','chatterbox') if build(c)}, 'nvidia':nvidia_present()}
 
 def report(message, **patch):
     with _lock:
@@ -259,7 +260,16 @@ def install(components, gpu=False):
                 model=_load_local_model(WhisperModel)
                 del model
             else:
-                ready=image_ready() if component=='stable_diffusion' else bool((health(component) or {}).get('model_ready'))
+                from app import native_engines
+                wanted='gpu' if gpu else 'cpu'
+                if native_engines.build(component) not in (None,wanted):
+                    # Switch the installed engine between its CPU and NVIDIA builds.
+                    report(f"Switching {component} to the {'NVIDIA graphics card' if gpu else 'CPU'} build.",step='Switching build',part=0.05)
+                    native_engines.stop(component)
+                    for _ in range(30):
+                        if not health(component):break
+                        time.sleep(1)
+                ready=(native_engines.build(component) in (None,wanted)) and (image_ready() if component=='stable_diffusion' else bool((health(component) or {}).get('model_ready')))
                 if not ready:
                     port=7860 if component=='stable_diffusion' else 8881
                     import socket
