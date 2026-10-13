@@ -121,7 +121,8 @@ MODELS = {"qwen-tts-1.7B": ("qwen", "1.7B"), "qwen-tts-0.6B": ("qwen", "0.6B"),
           "luxtts": ("luxtts", None), "tada-1b": ("tada", "1B"), "tada-3b-ml": ("tada", "3B"), "kokoro": ("kokoro", None)}
 CLONING = ("qwen", "chatterbox", "chatterbox_turbo", "luxtts", "tada")
 ACTIVE = ("generating", "loading_model")
-STUCK_SECONDS = 180            # an earlier Voicebox job still "Generating…" after this blocks its queue
+STUCK_SECONDS = 600            # an earlier Voicebox job still "Generating…" after this blocks its queue
+                               # (10 min: Voicebox on a processor needs minutes for a long narration)
 LOADING_SECONDS = 120          # stop waiting while Voicebox loads or downloads a model
 TIMEOUT_SECONDS = 600
 
@@ -241,6 +242,8 @@ def synthesize(url: str | None, text: str, profile_id: str, language: str | None
         gid = meta["id"]
         state, error = str(meta.get("status") or "completed"), meta.get("error")
         started = time.monotonic()
+        # Voicebox on a processor (no GPU) takes far longer for long text: allow ~2 s per character, 10–45 min.
+        limit = TIMEOUT_SECONDS if TIMEOUT_SECONDS < 60 else min(2700, max(TIMEOUT_SECONDS, len(text) * 2))
         loading_since = started if state == "loading_model" else None
         while state not in ("completed", "failed"):
             now = time.monotonic()
@@ -248,8 +251,8 @@ def synthesize(url: str | None, text: str, profile_id: str, language: str | None
                 gid = None   # leave the model download running in Voicebox
                 raise VoiceboxError(f"Voicebox is still loading the model for {what} after {LOADING_SECONDS // 60} minutes. "
                                     + (note + " " if note else "") + "The narration will finish in Voicebox; generate again here once Voicebox is idle.")
-            if now - started > TIMEOUT_SECONDS:
-                raise VoiceboxError(f"Voicebox did not finish {what} within {TIMEOUT_SECONDS // 60} minutes. SceneForge cancelled it; "
+            if now - started > limit:
+                raise VoiceboxError(f"Voicebox did not finish {what} within {int(limit // 60)} minutes. SceneForge cancelled it; "
                                     "check Voicebox and try a shorter text.")
             time.sleep(POLL_SECONDS)
             h = requests.get(f"{base}/history/{gid}", timeout=(5, 15), **_NO_PROXY)

@@ -27,7 +27,7 @@ Say ("  yes: " + ($health | ConvertTo-Json -Compress -Depth 3))
 
 Say ""
 Say "2. Voices (profiles)"
-$profiles = @(Get-Json '/profiles')
+$profiles = @(Get-Json '/profiles' | ForEach-Object { $_ })   # a JSON list arrives as one object; unroll it
 foreach ($p in $profiles) {
     Say ("  - {0} | id {1} | type {2} | preset engine {3} | default engine {4} | language {5}" -f $p.name, $p.id, $p.voice_type, $p.preset_engine, $p.default_engine, $p.language)
 }
@@ -36,7 +36,7 @@ Say ""
 Say "3. Models (downloaded / downloading / loaded)"
 $models = Get-Json '/models/status'
 if ($models) {
-    foreach ($m in $models.models) {
+    foreach ($m in @($models.models | ForEach-Object { $_ })) {
         Say ("  - {0} ({1}) downloaded={2} downloading={3} loaded={4} size={5} MB" -f $m.model_name, $m.display_name, $m.downloaded, $m.downloading, $m.loaded, [math]::Round([double]($m.size_mb), 0))
     }
 }
@@ -46,11 +46,13 @@ Say "4. Recent narrations (newest first)"
 $history = Get-Json '/history?limit=20'
 $stuck = @()
 if ($history) {
-    foreach ($h in $history.items) {
+    foreach ($h in @($history.items | ForEach-Object { $_ })) {
         $age = ''
         try { $age = [int]((Get-Date).ToUniversalTime() - [datetime]::Parse($h.created_at)).TotalMinutes } catch {}
-        Say ("  - {0} | {1} | engine {2} {3} | {4} | {5} min ago | error: {6} | text: {7}" -f $h.id, $h.profile_name, $h.engine, $h.model_size, $h.status, $age, $h.error, ($h.text -replace '\s+', ' ').Substring(0, [math]::Min(50, $h.text.Length)))
-        if (($h.status -eq 'generating' -or $h.status -eq 'loading_model') -and $age -ne '' -and $age -ge 3) { $stuck += $h }
+        $short = ([string]$h.text -replace '\s+', ' ')
+        if ($short.Length -gt 50) { $short = $short.Substring(0, 50) }
+        Say ("  - {0} | {1} | engine {2} {3} | {4} | {5} min ago | error: {6} | text: {7}" -f $h.id, $h.profile_name, $h.engine, $h.model_size, $h.status, $age, $h.error, $short)
+        if (($h.status -eq 'generating' -or $h.status -eq 'loading_model') -and $age -ne '' -and $age -ge 10) { $stuck += $h }
     }
 }
 Say ""
