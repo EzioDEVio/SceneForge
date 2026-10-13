@@ -163,7 +163,7 @@ def synthesize_with_alignment(profile, text, voice, language, speed):
             if profile.name == 'chatterbox':
                 try: detail = str(res.json().get('detail', ''))[:800]
                 except ValueError: pass
-            raise ValueError(detail or f'Voice generation returned HTTP {res.status_code}. Run DIAGNOSE_VOICE.bat and check model installation.')
+            raise ValueError(detail or f'Voice generation returned HTTP {res.status_code}. Open AI Engines and check that the engine is ready.')
         if len(res.content) > 100 * 1024 * 1024: raise ValueError('Voice response is too large. Split the script into shorter scenes.')
         return res.content, None
     except requests.RequestException as exc:

@@ -101,12 +101,15 @@ with TestClient(app) as c:
         """Behaves like Voicebox 0.5.0: /generate queues and returns status "generating",
         defaults to the Qwen engine when none is passed, and /audio 404s until done."""
         profiles = []
+        models = [{'model_name': 'qwen-tts-1.7B', 'downloaded': False}, {'model_name': 'qwen-tts-0.6B', 'downloaded': True},
+                  {'model_name': 'kokoro', 'downloaded': True}, {'model_name': 'chatterbox-tts', 'downloaded': False, 'downloading': True}]
         gens = {}
         last = None
         def _send(self, code, body, ctype='application/json'):
             self.send_response(code); self.send_header('Content-Type', ctype); self.end_headers(); self.wfile.write(body)
         def do_GET(self):
             if self.path == '/profiles': return self._send(200, json.dumps(VB.profiles).encode())
+            if self.path == '/models/status': return self._send(200, json.dumps({'models': VB.models}).encode())
             if self.path.startswith('/profiles/'):
                 p = next((p for p in VB.profiles if p['id'] == self.path.split('/')[-1]), None)
                 return self._send(200, json.dumps(p).encode()) if p else self._send(404, b'{"detail":"Profile not found"}')
@@ -145,6 +148,13 @@ with TestClient(app) as c:
         t = c.post(f'/api/scenes/{sid}/voice-takes/service', json={'provider_id': vb['profile']['id'], 'voice': 'p1', 'language': 'en', 'speed': 1.0})
         check('Voicebox narration waits for the queued generation and is saved as a take',
               t.status_code == 200 and t.json()['provider'] == 'voicebox' and VB.last['profile_id'] == 'p1' and VB.gens['g1']['polls'] >= 2)
+        check('a cloned voice uses a model Voicebox already has (Qwen 0.6B), never a hidden 1.7B download',
+              VB.last.get('engine') == 'qwen' and VB.last.get('model_size') == '0.6B')
+        saved = VB.models; VB.models = [{'model_name': 'qwen-tts-1.7B', 'downloaded': False}, {'model_name': 'kokoro', 'downloaded': True}]
+        t = c.post(f'/api/scenes/{sid}/voice-takes/service', json={'provider_id': vb['profile']['id'], 'voice': 'p1', 'language': 'en', 'speed': 1.0})
+        check('with no model for a cloned voice, SceneForge says which model to download in Voicebox instead of waiting',
+              t.status_code >= 400 and 'Models' in t.text and 'Qwen TTS' in t.text and len(VB.gens) == 1)
+        VB.models = saved
         t = c.post(f'/api/scenes/{sid}/voice-takes/service', json={'provider_id': vb['profile']['id'], 'voice': 'k1', 'language': 'en-US', 'speed': 1.0})
         bad = c.put('/api/local-speech/voicebox/address', json={'url': 'ftp://x'})
         check('a wrong Voicebox address is refused with an example', bad.status_code == 400 and '17493' in bad.text)

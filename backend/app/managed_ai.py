@@ -30,9 +30,15 @@ def engine_root():
 
 def preferences():
     try:
-        return json.loads((DATA_DIR/'managed-ai.json').read_text())
+        prefs=json.loads((DATA_DIR/'managed-ai.json').read_text())
     except (OSError, ValueError):
-        return {'components':[], 'autostart':True, 'gpu':False}
+        prefs={'components':[], 'autostart':True}
+    if 'gpu' not in prefs:
+        # Nobody chose yet: use the graphics card when an NVIDIA driver is installed (the
+        # Docker engines always used the CUDA build; the processor is many times slower).
+        from app.native_engines import nvidia_present
+        prefs['gpu']=nvidia_present()
+    return prefs
 
 def save_preferences(value):
     p = DATA_DIR/'managed-ai.json'
@@ -43,8 +49,9 @@ def save_preferences(value):
 def running():
     """Which installed engines answer right now (quick loopback checks)."""
     from app.providers import kokoro_builtin
-    return {'stable_diffusion': image_ready() or bool(health('stable_diffusion')),
-            'chatterbox': bool(health('chatterbox')), 'kokoro': kokoro_builtin.installed()}
+    ok=lambda c:bool(health(c)) and not (health(c) or {}).get('last_error')   # a failed model is not "Ready"
+    return {'stable_diffusion': image_ready() or ok('stable_diffusion'),
+            'chatterbox': ok('chatterbox'), 'kokoro': kokoro_builtin.installed()}
 
 def set_runtime(component, runtime):
     prefs=preferences();prefs.setdefault('runtime',{})[component]=runtime;save_preferences(prefs)
@@ -173,13 +180,20 @@ def warmup(component,args):
         except Exception as exc:errors.append(exc)
     worker=threading.Thread(target=load,daemon=True);worker.start()
     cache='/models' if component=='stable_diffusion' else '/root/.cache/huggingface'
+    last_mb,still=-1.0,0
     while worker.is_alive():
         worker.join(5)
         if worker.is_alive():
             try:
                 if not args:
                     from app import native_engines
-                    report(f'{component}: {native_engines.model_cache_mb():.1f} MB of models downloaded; downloading/loading model.')
+                    mb=native_engines.model_cache_mb(component);expected=native_engines.MODEL_REPOS.get(component,('',0))[1]
+                    still=still+1 if mb<=last_mb+1 else 0;last_mb=mb
+                    label='Stable Diffusion' if component=='stable_diffusion' else 'Chatterbox'
+                    if still>=3 and mb>0:
+                        report(f'{label}: model downloaded ({mb:.0f} MB); loading it into memory. On the processor this can take several minutes.',step='Loading the model',part=0.95)
+                    else:
+                        report(f'{label}: {mb:.0f} MB of about {expected} MB downloaded.',step='Downloading the model',part=0.75+0.2*min(1.0,mb/max(1,expected)))
                     continue
                 result=subprocess.run(args+['exec','-T',component,'du','-sb',cache],capture_output=True,text=True,timeout=5,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
                 if result.returncode==0:
@@ -262,14 +276,17 @@ def install(components, gpu=False):
             else:
                 from app import native_engines
                 wanted='gpu' if gpu else 'cpu'
-                if native_engines.build(component) not in (None,wanted):
-                    # Switch the installed engine between its CPU and NVIDIA builds.
-                    report(f"Switching {component} to the {'NVIDIA graphics card' if gpu else 'CPU'} build.",step='Switching build',part=0.05)
+                failed=native_engines.installed(component) and bool((health(component) or {}).get('last_error'))
+                if native_engines.build(component) not in (None,wanted) or native_engines.stale(component) or failed:
+                    # Switch between the CPU and NVIDIA builds, update packages from an older
+                    # SceneForge, or restart an engine whose model failed to load (Retry).
+                    report(f"Switching {component} to the {'NVIDIA graphics card' if gpu else 'CPU'} build." if native_engines.build(component) not in (None,wanted)
+                           else f'Updating and restarting {component}.',step='Updating the engine',part=0.05)
                     native_engines.stop(component)
                     for _ in range(30):
                         if not health(component):break
                         time.sleep(1)
-                ready=(native_engines.build(component) in (None,wanted)) and (image_ready() if component=='stable_diffusion' else bool((health(component) or {}).get('model_ready')))
+                ready=(native_engines.build(component) in (None,wanted)) and not native_engines.stale(component) and (image_ready() if component=='stable_diffusion' else bool((health(component) or {}).get('model_ready')))
                 if not ready:
                     port=7860 if component=='stable_diffusion' else 8881
                     import socket
@@ -323,7 +340,10 @@ def autostart(force=False, services=None):
         native=[c for c in services if runtime.get(c)=='native' or native_engines.installed(c)]
         docker_services=[c for c in services if c not in native]
         for c in native:
-            if not health(c):native_engines.start(c,prefs.get('gpu',False))
+            h=health(c)
+            if h and (h.get('last_error') or native_engines.stale(c)) and native_engines.running(c):
+                native_engines.stop(c);h=None   # Start = repair: restart an engine whose model failed or whose packages changed
+            if not h:native_engines.start(c,prefs.get('gpu',False))
         if docker_services and os.name=='nt':
             # Engines installed by 0.9.4-beta.2 and earlier ran in Docker Desktop.
             docker=docker_path()
@@ -362,5 +382,7 @@ def start_pending_setup() -> bool:
     with _lock:
         if _running:return False
         _state.update(status='running',error='')
-    threading.Thread(target=install,args=(components,bool(value.get('gpu'))),daemon=True).start()
+    # Ticked in the installer: graphics card. Not ticked: detect (an NVIDIA driver means graphics card).
+    gpu=bool(value.get('gpu')) or bool(preferences().get('gpu'))
+    threading.Thread(target=install,args=(components,gpu),daemon=True).start()
     return True

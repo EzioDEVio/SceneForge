@@ -138,3 +138,28 @@ with patch.dict(os.environ,{'SCENEFORGE_NATIVE_ENGINES':str(engines)}),patch.obj
     with patch.object(m,'health',return_value=None),patch.object(m,'image_ready',return_value=False):
         st=m.state();assert st['builds']=={'chatterbox':'cpu'} and isinstance(st['nvidia'],bool)
 print('PASS switching to the graphics card reinstalls PyTorch with the NVIDIA build; a CPU build never starts on the GPU')
+
+# 0.9.4-beta.5: Chatterbox's watermark (resemble-perth) needs pkg_resources from setuptools, which a
+# uv environment does not include; engines installed by beta.3/beta.4 get their packages updated.
+assert any(l.strip().startswith('setuptools') for l in (root/'services/chatterbox/requirements.txt').read_text().splitlines())
+engines2=Path(temp.name)/'engines-stale'
+with patch.dict(os.environ,{'SCENEFORGE_NATIVE_ENGINES':str(engines2)}),patch.object(ne,'ensure_uv',return_value=Path('uv')):
+    py=ne.venv_python('chatterbox');py.parent.mkdir(parents=True);py.write_text('')
+    (engines2/'chatterbox'/'installed.json').write_text(json.dumps({'gpu':False}))   # written by beta.3/beta.4
+    assert ne.stale('chatterbox')
+    calls=[]
+    with patch.object(ne.subprocess,'Popen') as popen,patch.object(ne.subprocess,'run',side_effect=lambda a,**k:calls.append(a)):
+        ne._processes.clear();assert ne.start('chatterbox')
+    assert any('-r' in c and str(c[-1]).endswith('requirements.txt') for c in calls),calls
+    assert not ne.stale('chatterbox') and json.loads((engines2/'chatterbox'/'installed.json').read_text())['gpu'] is False
+    ne._processes.clear()
+    hub=engines2/'models'/'hub'/'models--ResembleAI--chatterbox'/'blobs';hub.mkdir(parents=True);(hub/'a').write_bytes(b'x'*2_000_000)
+    other=engines2/'models'/'hub'/'models--stable-diffusion-v1-5--stable-diffusion-v1-5'/'blobs';other.mkdir(parents=True);(other/'b').write_bytes(b'x'*3_000_000)
+    assert round(ne.model_cache_mb('chatterbox'))==2 and round(ne.model_cache_mb('stable_diffusion'))==3
+print('PASS Chatterbox gets setuptools (pkg_resources) for its watermark; older engine installs are updated before they start; download progress is per engine')
+(Path(temp.name)/'managed-ai.json').unlink(missing_ok=True)
+with patch('app.native_engines.nvidia_present',return_value=True):assert m.preferences()['gpu'] is True
+with patch('app.native_engines.nvidia_present',return_value=False):assert m.preferences()['gpu'] is False
+m.save_preferences({'components':[],'autostart':True,'gpu':False})
+with patch('app.native_engines.nvidia_present',return_value=True):assert m.preferences()['gpu'] is False
+print('PASS with no choice saved, an NVIDIA driver means the graphics card; a saved choice is kept')

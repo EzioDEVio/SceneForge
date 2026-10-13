@@ -4,3 +4,6 @@ chatterbox-tts==0.1.7
 fastapi
 uvicorn
 soundfile
+# resemble-perth (Chatterbox's audio watermark) imports pkg_resources, which comes with setuptools
+# (removed in setuptools 81). Without it Chatterbox fails with "'NoneType' object is not callable".
+setuptools<81

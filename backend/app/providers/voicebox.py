@@ -111,6 +111,43 @@ def voice_details(url: str | None) -> list[dict]:
     return out
 
 
+# Voicebox model names (GET /models/status) -> (engine, model_size for /generate).
+MODELS = {"qwen-tts-1.7B": ("qwen", "1.7B"), "qwen-tts-0.6B": ("qwen", "0.6B"),
+          "qwen-custom-voice-1.7B": ("qwen_custom_voice", "1.7B"), "qwen-custom-voice-0.6B": ("qwen_custom_voice", "0.6B"),
+          "chatterbox-tts": ("chatterbox", None), "chatterbox-turbo": ("chatterbox_turbo", None),
+          "luxtts": ("luxtts", None), "tada-1b": ("tada", "1B"), "tada-3b-ml": ("tada", "3B"), "kokoro": ("kokoro", None)}
+CLONING = ("qwen", "chatterbox", "chatterbox_turbo", "luxtts", "tada")
+NO_MODEL = ("Voicebox has no voice model downloaded for this voice yet, so it would first download several GB "
+            "in the background. In Voicebox, open Models and download one (for example {names}), wait until it "
+            "finishes, then generate again here.")
+
+
+def _pick_model(base: str, profile: dict) -> tuple[str | None, str | None]:
+    """Choose an engine and model size Voicebox already has on disk, so a narration never
+    starts a hidden multi-GB download (Voicebox's /generate defaults to Qwen 1.7B)."""
+    try:
+        res = requests.get(base + "/models/status", timeout=(5, 30), **_NO_PROXY)
+        res.raise_for_status()
+        rows = res.json().get("models", [])
+    except (requests.RequestException, ValueError, AttributeError):
+        return (_engine(profile) or None), None      # older Voicebox: let it decide
+    have = [(r.get("loaded", False), r["model_name"]) for r in rows
+            if isinstance(r, dict) and r.get("model_name") in MODELS and r.get("downloaded") and not r.get("downloading")]
+    fixed = _engine(profile)
+    kind = str(profile.get("voice_type") or "cloned")
+    allowed = [fixed] if fixed else (list(CLONING) if kind == "cloned" else [e for e, _ in MODELS.values()])
+    order = list(MODELS)   # larger/better first within each engine
+    choices = sorted((m for m in have if MODELS[m[1]][0] in allowed),
+                     key=lambda m: (not m[0], allowed.index(MODELS[m[1]][0]), order.index(m[1])))
+    if not choices:
+        wanted = [name for name, (engine, _) in MODELS.items() if engine in allowed]
+        pretty = {"qwen-tts-0.6B": "Qwen TTS 0.6B", "qwen-tts-1.7B": "Qwen TTS 1.7B", "chatterbox-tts": "Chatterbox TTS",
+                  "luxtts": "LuxTTS", "kokoro": "Kokoro 82M", "chatterbox-turbo": "Chatterbox Turbo"}
+        names = " or ".join([pretty[n] for n in wanted if n in pretty][:2]) or "the voice's model"
+        raise VoiceboxError(NO_MODEL.format(names=names))
+    return MODELS[choices[0][1]]
+
+
 def synthesize(url: str | None, text: str, profile_id: str, language: str | None) -> bytes:
     base = _base(url)
     try:
@@ -123,8 +160,11 @@ def synthesize(url: str | None, text: str, profile_id: str, language: str | None
         if lang not in LANGUAGES:
             lang = str(profile.get("language") or "en")
         body = {"profile_id": profile_id, "text": text[:50000], "language": lang}
-        if _engine(profile):
-            body["engine"] = _engine(profile)
+        engine, size = _pick_model(base, profile)
+        if engine:
+            body["engine"] = engine
+        if size:
+            body["model_size"] = size
         res = requests.post(base + "/generate", json=body, timeout=(10, 120), **_NO_PROXY)
         if not res.ok:
             why = _detail(res)
@@ -138,7 +178,8 @@ def synthesize(url: str | None, text: str, profile_id: str, language: str | None
         deadline = time.monotonic() + TIMEOUT_SECONDS
         while state not in ("completed", "failed"):
             if time.monotonic() > deadline:
-                raise VoiceboxError("Voicebox is still generating after 15 minutes. Check Voicebox, then try again.")
+                raise VoiceboxError("Voicebox is still " + ("loading its voice model" if state == "loading_model" else "generating")
+                                    + " after 15 minutes. Check Voicebox (Models and History), then try again.")
             time.sleep(POLL_SECONDS)
             h = requests.get(f"{base}/history/{gid}", timeout=(5, 15), **_NO_PROXY)
             if h.ok:

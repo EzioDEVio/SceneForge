@@ -123,6 +123,44 @@ def build(component: str) -> str | None:
         return "cpu"
 
 
+def _requirements_sha(component: str) -> str:
+    try:
+        return hashlib.sha256((_service_source(component) / "requirements.txt").read_bytes()).hexdigest()[:16]
+    except (OSError, NativeEngineError):
+        return ""
+
+
+def stale(component: str) -> bool:
+    """The engine's packages were installed from an older requirements list (for example
+    before setuptools was added for Chatterbox's watermark in 0.9.4-beta.5)."""
+    current = _requirements_sha(component) if installed(component) else ""
+    if not current:
+        return False
+    try:
+        info = json.loads((root() / component / "installed.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return True
+    return info.get("requirements") != current
+
+
+def refresh_packages(component: str, run=None, report=print) -> None:
+    """Bring an installed engine's packages up to date (PyTorch is left as it is)."""
+    if not stale(component):
+        return
+    uv = str(ensure_uv(report))
+    run = run or (lambda args, env: subprocess.run(args, env=env, check=True, creationflags=FLAGS))
+    report(f"{SPECS[component]['label']}: updating the engine packages.")
+    run([uv, "pip", "install", "--python", str(venv_python(component)), "-r",
+         str(_service_source(component) / "requirements.txt")], _env())
+    path = root() / component / "installed.json"
+    try:
+        info = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        info = {}
+    info["requirements"] = _requirements_sha(component)
+    path.write_text(json.dumps(info), encoding="utf-8")
+
+
 def nvidia_present() -> bool:
     """An NVIDIA driver is installed (nvidia-smi ships with it)."""
     if shutil.which("nvidia-smi"):
@@ -169,6 +207,7 @@ def install(component: str, gpu: bool = False, run=None, report=print, packages:
         run([uv, "pip", "install", "--python", py, *packages], env)
     shutil.copy2(source / "server.py", home / "server.py")
     (home / "installed.json").write_text(json.dumps({"python": PYTHON, "gpu": bool(gpu), "uv": UV_VERSION,
+                                                     "requirements": _requirements_sha(component),
                                                      "installed": time.strftime("%Y-%m-%d %H:%M:%S")}), encoding="utf-8")
 
 
@@ -184,6 +223,12 @@ def start(component: str, gpu: bool = False) -> bool:
     if not installed(component):
         return False
     gpu = build(component) == "gpu"
+    if running(component):
+        return True
+    try:
+        refresh_packages(component)
+    except (subprocess.CalledProcessError, OSError, NativeEngineError):
+        pass   # start anyway; the engine reports its own error if a package is missing
     with _lock:
         if running(component):
             return True
@@ -232,11 +277,18 @@ def stop_all() -> None:
         _processes.pop(component, None)
 
 
-def model_cache_mb() -> float:
+MODEL_REPOS = {"chatterbox": ("ResembleAI/chatterbox", 3200), "stable_diffusion": ("stable-diffusion-v1-5/stable-diffusion-v1-5", 5500)}
+
+
+def model_cache_mb(component: str | None = None) -> float:
+    """MB of model files downloaded, for one engine's model (or every model when None)."""
+    base = root() / "models"
+    if component in MODEL_REPOS:
+        base = base / "hub" / ("models--" + MODEL_REPOS[component][0].replace("/", "--"))
     total = 0
-    for path in (root() / "models").rglob("*"):
+    for path in base.rglob("*") if base.exists() else ():
         try:
-            if path.is_file():
+            if path.is_file() and not path.is_symlink():
                 total += path.stat().st_size
         except OSError:
             pass
