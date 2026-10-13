@@ -70,7 +70,8 @@ if ($Test) {
     Say ""
     Say ("5. Test narration with the voice '" + $Test + "'")
     $p = $profiles | Where-Object { $_.name -eq $Test } | Select-Object -First 1
-    if (-not $p) { Say "  ! No voice with that exact name." }
+    if ($stuck.Count -and -not $ClearStuck) { Say "  Skipped: the test would only wait behind the stuck narrations. Run with -ClearStuck -Test together." }
+    elseif (-not $p) { Say "  ! No voice with that exact name." }
     else {
         $engine = if ($p.default_engine) { $p.default_engine } elseif ($p.preset_engine) { $p.preset_engine } else { $null }
         $body = @{ profile_id = $p.id; text = 'This is a short SceneForge test.'; language = $(if ($p.language) { $p.language } else { 'en' }) }
@@ -88,6 +89,7 @@ if ($Test) {
             Say ("  final status: " + $s.status + " | error: " + $s.error + " | duration: " + $s.duration)
             if ($s.status -eq 'generating' -or $s.status -eq 'loading_model') {
                 Say "  Still not finished after 5 minutes: Voicebox itself is not producing audio for this voice."
+                try { Invoke-RestMethod -Method Post -Uri ($Url + '/generate/' + $g.id + '/cancel') -TimeoutSec 30 | Out-Null; Say "  The test narration was cancelled so it does not block Voicebox." } catch {}
             }
         } catch { Say ("  ! generate failed: " + $_.Exception.Message + " " + $_.ErrorDetails.Message) }
     }
