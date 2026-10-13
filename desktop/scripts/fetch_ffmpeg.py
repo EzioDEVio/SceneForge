@@ -1,5 +1,5 @@
-"""Fetch FFmpeg/ffprobe for the build machine's OS at BUILD time (never on a user's PC),
-verify the download, and check that every FFmpeg feature SceneForge uses is present.
+"""Fetch FFmpeg/ffprobe for this machine's OS: at BUILD time for the installers, and by
+scripts/setup.bat for people running SceneForge from source (--target tools/ffmpeg). Verifies the download and check that every FFmpeg feature SceneForge uses is present.
 
   Windows: gyan.dev essentials 8.1.2 (pinned SHA-256)
   Linux:   BtbN FFmpeg-Builds n8.1 linux64 GPL (verified against the release's checksums.sha256)
@@ -107,6 +107,13 @@ def verify():
 
 
 def main():
+    global TARGET
+    import argparse
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--target", type=Path, help="install folder (default: desktop/vendor/ffmpeg)")
+    args = parser.parse_args()
+    if args.target:
+        TARGET = args.target.resolve()
     if TARGET.exists():
         shutil.rmtree(TARGET)
     TARGET.parent.mkdir(parents=True, exist_ok=True)

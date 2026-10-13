@@ -139,6 +139,45 @@ def _decode_pcm16k(path: str):
     return np.frombuffer(proc.stdout, np.int16).astype(np.float32) / 32768.0
 
 
+def _too_sparse(result: dict, seconds: float) -> bool:
+    """True when the VAD pass found no speech, or far fewer words than talk or singing
+    would give for this length (normal speech is 120-160 words a minute)."""
+    words = len(result.get("words") or [])
+    if not words and not result.get("text"):
+        return True
+    return seconds >= 20 and words / (seconds / 60) < 45
+
+
+def _drop_repeats(result: dict) -> dict:
+    """Without VAD, Whisper can loop on one line over instrumental parts. Keep a phrase
+    at most three times in a row (choruses repeat; endless loops do not)."""
+    words = result.get("words") or []
+    if len(words) < 12:
+        return result
+    norm = [w[0].lower().strip(".,!?\"'") for w in words]
+    out, i = [], 0
+    while i < len(words):
+        dropped = False
+        for size in range(1, 9):
+            phrase = norm[i:i + size]
+            if len(phrase) < size:
+                break
+            # How many times does this phrase repeat back-to-back starting here?
+            count = 1
+            while norm[i + count * size:i + (count + 1) * size] == phrase:
+                count += 1
+            if count > 3:
+                out.extend(words[i:i + 3 * size])
+                i += count * size
+                dropped = True
+                break
+        if not dropped:
+            out.append(words[i]); i += 1
+    if len(out) != len(words):
+        result = {**result, "words": out, "text": " ".join(w[0] for w in out)}
+    return result
+
+
 _ACTIVE_RUNS = 0   # local transcriptions in progress (the model manager will not delete the model meanwhile)
 
 
@@ -219,11 +258,15 @@ def _local_run(path: str, language: str | None, task: str = "transcribe") -> dic
 
         try:
             result = recognize(True)
-            # VAD can reject quiet dialogue or clean, short lines. Retry once
-            # without it before reporting that speech was not found.
-            if not result["text"] and not result["words"]:
-                result = recognize(False)
-            return result
+            # VAD can reject quiet dialogue or clean, short lines, and it throws away most
+            # sung vocals over music (a 3-minute song came back as two captions). Retry
+            # without it when speech was not found or covers too little of the clip, and
+            # keep whichever pass recognized more.
+            if _too_sparse(result, len(audio) / 16000):
+                plain = recognize(False)
+                if len(plain["words"]) > len(result["words"]):
+                    result = plain
+            return _drop_repeats(result)
         except Exception as e:
             try:
                 return recognize(False)

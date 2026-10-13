@@ -1,4 +1,5 @@
 import React, {useMemo, useState} from 'react';
+import {SearchField} from './SearchField';
 import {ChevronLeft,ChevronRight,Scissors,Search,Trash2,Type} from 'lucide-react';
 import type {CaptionSegment} from './api';
 import {FeatureHelp} from './FeatureHelp';
@@ -43,7 +44,7 @@ export function CaptionSegmentsEditor({segments,onChange,direction='auto',onDire
       <FeatureHelp compact title="Editable caption clips" description="Auto captions are split into timed text clips. Each clip keeps its own wording and timing while sharing the caption style for this scene." steps="Edit a clip's text directly. Adjust its start or end time, split a multiword clip into two, or remove a clip. Choose caption styles above to restyle every clip."/>
     </header>
     <div className="caption-navigation">
-      <label className="caption-search"><Search size={13}/><input aria-label="Search captions" type="search" placeholder="Find caption text…" value={query} onChange={e=>setQuery(e.target.value)}/></label>
+      <SearchField compact label="Search captions" placeholder="Find caption text…" value={query} onChange={setQuery}/>
       <div className="caption-stepper"><button type="button" aria-label="Previous caption" title="Focus previous caption" disabled={!filtered.length} onClick={()=>navigate(-1)}><ChevronLeft size={14}/></button><span aria-live="polite">{activeIndex>=0?activeIndex+1:'—'} / {filtered.length}</span><button type="button" aria-label="Next caption" title="Focus next caption" disabled={!filtered.length} onClick={()=>navigate(1)}><ChevronRight size={14}/></button></div>
       <label className="caption-direction-control">Direction<select aria-label="Caption text direction" value={direction} onChange={e=>onDirectionChange?.(e.target.value as CaptionDirection)}><option value="auto">Auto</option><option value="rtl">Right to left</option><option value="ltr">Left to right</option></select></label>
       <button type="button" className="text-btn caption-collapse-all" aria-label={collapsed?'Expand all captions':'Collapse all captions'} onClick={()=>setCollapsed(v=>!v)}>{collapsed?'Expand all':'Collapse all'}</button>

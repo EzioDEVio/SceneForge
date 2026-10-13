@@ -14,7 +14,7 @@ from app.db.database import init_db, SessionLocal
 from app.db.models import ProviderProfile
 from app.security.secrets import migrate_credentials
 
-app = FastAPI(title="SceneForge Studio API", version="0.9.4-beta.1")
+app = FastAPI(title="SceneForge Studio API", version="0.9.4-beta.2")
 
 from app.render.font_runtime import FontRuntimeError
 from fastapi.responses import JSONResponse
@@ -106,12 +106,23 @@ logbuffer.install()
 # new interface connected to an old backend (e.g. a still-running old
 # start.bat window) shows "Backend update required" instead of silently
 # losing settings the old backend does not know.
-BUILD_ID = "v0.9.4-beta.1"
+BUILD_ID = "v0.9.4-beta.2"
+
+
+def _ffmpeg_warning() -> str:
+    import shutil
+    from app.config import FFMPEG_BIN, FFPROBE_BIN
+    missing = [n for n, b in (("FFmpeg", FFMPEG_BIN), ("FFprobe", FFPROBE_BIN)) if not (shutil.which(b) or os.path.isfile(b))]
+    if not missing:
+        return ""
+    return ("SceneForge cannot find " + " and ".join(missing) + ", which it needs to make videos. "
+            "If you installed SceneForge, reinstall it. If you run it from the source folder, run scripts\\setup.bat "
+            "again: it downloads FFmpeg for you.")
 
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "build": BUILD_ID, "credential_warning": 'Some saved credentials could not be secured. Unlock your OS credential store, restart, or re-enter the keys in Settings.' if getattr(app.state,'credential_migration_failures',0) else '', "features": ["local_speech", "combined_effects", "text_to_video"]}
+    return {"status": "ok", "build": BUILD_ID, "ffmpeg_warning": _ffmpeg_warning(), "credential_warning": 'Some saved credentials could not be secured. Unlock your OS credential store, restart, or re-enter the keys in Settings.' if getattr(app.state,'credential_migration_failures',0) else '', "features": ["local_speech", "combined_effects", "text_to_video"]}
 
 
 @app.get('/api/close-status')

@@ -47,8 +47,20 @@ PREVIEW_HEIGHT_16_9 = 720
 DEFAULT_LEAD_MS = 250
 DEFAULT_TRAIL_MS = 400
 
-FFMPEG_BIN = os.environ.get("SCENEFORGE_FFMPEG", "ffmpeg")
-FFPROBE_BIN = os.environ.get("SCENEFORGE_FFPROBE", "ffprobe")
+def _tool(name: str) -> str:
+    """The installers set SCENEFORGE_FFMPEG/FFPROBE to their bundled copy. Source runs use
+    FFmpeg on PATH, or the copy scripts\\setup.bat downloads into tools\\ffmpeg, so people
+    never have to install or configure FFmpeg themselves."""
+    import shutil
+    if shutil.which(name):
+        return name
+    exe = name + (".exe" if os.name == "nt" else "")
+    local = Path(__file__).resolve().parents[2] / "tools" / "ffmpeg" / "bin" / exe
+    return str(local) if local.is_file() else name
+
+
+FFMPEG_BIN = os.environ.get("SCENEFORGE_FFMPEG") or _tool("ffmpeg")
+FFPROBE_BIN = os.environ.get("SCENEFORGE_FFPROBE") or _tool("ffprobe")
 
 # x264 preset/CRF for shot and export encodes. "ultrafast" is the M1
 # default because the render bottleneck in practice is the zoompan filter

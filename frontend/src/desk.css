@@ -296,3 +296,35 @@ html.theme-switching *,html.theme-switching *::before,html.theme-switching *::af
 .creative-studio .cs-companion:empty{display:none}
 .creative-studio .cs-companion .companion-preview{height:auto;margin-top:10px;border:1px solid var(--line);border-radius:10px}
 .creative-studio .cs-companion video{width:100%;max-height:260px}
+
+/* Laptop screens and windowed mode (0.9.4-beta.2): give Scene settings its height back.
+   Owner screenshots at about 1366×768: the settings panel had ~190 px for content. */
+.free-switch-btn{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+@media (max-height:900px){
+  .studio-shell .inspector-heading{height:32px;flex-basis:32px}
+  .studio-shell .inspector-tabbar .inspector-tabs{height:36px}
+  .studio-shell .inspector-tabbar .inspector-tabs button{flex-direction:row;gap:5px;font-size:11px}
+  :root[data-theme="desk"] .inspector-tabbar .inspector-tabs button{font-size:11px}
+  .inspector-sections>p{display:none}
+  .studio-shell .inspector-sections{padding-top:6px;padding-bottom:6px}
+  .text-preview-footer{padding:5px 12px}
+  .text-preview-footer .btn{min-height:30px;padding-top:4px;padding-bottom:4px}
+}
+@media (max-height:900px) and (max-width:1500px){
+  .studio-shell .inspector-tabbar .inspector-tabs button{flex-direction:column;gap:2px;font-size:10px}
+  .studio-shell .inspector-tabbar .inspector-tabs button svg{width:15px;height:15px}
+  .studio-shell .inspector-tabbar .inspector-tabs{height:42px}
+}
+@media (max-width:1500px){.free-switch-btn span{display:none}}
+.playhead-add{display:inline-flex;align-items:center;gap:5px}
+@media (max-width:1600px){.playhead-add span{display:none}.playhead-add{padding-left:8px;padding-right:8px}}
+@media (max-width:1450px){:root[data-theme="desk"] .sequence-editbar .overlap-info{display:none}}
+@media (max-width:2000px){
+  :root[data-theme="desk"] .timeline-marker-actions button:has(svg){font-size:0;gap:0;padding:3px 6px}
+  :root[data-theme="desk"] .timeline-marker-actions button:has(svg) svg{margin:0}
+}
+@media (max-width:1700px){
+  :root[data-theme="desk"] .sequence-toolbar,:root[data-theme="desk"] .sequence-toolbar>div{gap:3px}
+  :root[data-theme="desk"] .timeline-marker-actions select{max-width:96px}
+}
+

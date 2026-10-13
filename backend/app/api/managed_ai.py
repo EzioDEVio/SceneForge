@@ -12,7 +12,7 @@ class Install(BaseModel):
     gpu:bool=False
 
 @router.get('/api/local-ai/setup')
-def state():return managed_ai.state()
+def state():return {**managed_ai.state(),'running':managed_ai.running()}
 
 @router.post('/api/local-ai/setup')
 def install(body:Install):
@@ -33,3 +33,17 @@ def startup(body:Startup):
     with managed_ai._lock:
         value={**managed_ai.preferences(),'autostart':body.autostart};managed_ai.save_preferences(value)
     return value
+
+
+class Start(BaseModel):
+    components:list[Literal['stable_diffusion','chatterbox']]=Field(min_length=1,max_length=2)
+
+@router.post('/api/local-ai/start')
+def start(body:Start):
+    """Start engines that were installed earlier (no downloads, no installs)."""
+    if os.name!='nt':raise HTTPException(400,'Automatic start is available on Windows.')
+    installed=managed_ai.preferences().get('components',[])
+    missing=[c for c in body.components if c not in installed]
+    if missing:raise HTTPException(400,'Install '+', '.join(missing)+' first.')
+    threading.Thread(target=managed_ai.autostart,kwargs={'force':True,'services':list(body.components)},daemon=True).start()
+    return {'started':True}

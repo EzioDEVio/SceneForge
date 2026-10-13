@@ -9,7 +9,7 @@ await build({entryPoints:['src/TitleDesigner.tsx','src/LocalAISetup.tsx'],outdir
 const require=createRequire(import.meta.url),React=require('react');
 const {TitleDesigner}=require('../node_modules/.cache/friendly-test/TitleDesigner.js');
 const {LocalAISetup}=require('../node_modules/.cache/friendly-test/LocalAISetup.js');
-const {render,screen,fireEvent,cleanup,waitFor,act}=await import('@testing-library/react');
+const {render,screen,fireEvent,cleanup,waitFor,act,within}=await import('@testing-library/react');
 let oldClose=0,newClose=0;
 const props={width:1920,height:1080,busy:false,onCreate:()=>{},onClose:()=>oldClose++};
 const rendered=render(React.createElement(TitleDesigner,props));
@@ -26,21 +26,32 @@ fireEvent.keyDown(document,{key:'Escape'});assert.equal(newClose,0);
 rendered.rerender(React.createElement(TitleDesigner,{...props,onClose:()=>newClose++}));
 fireEvent.keyDown(document,{key:'Escape'});assert.equal(newClose,1);assert.equal(oldClose,0);
 cleanup();console.log('PASS parent updates retain title focus/text, busy Escape guard, latest close callback, 19 real font choices');
-let installBody,ready=0;
-const state={status:'idle',completed:0,total:0,current:'',log:[],error:'',supported:true,settings:{autostart:true,components:[],gpu:false}};
+let installBody,startBody,ready=0;
+const state={status:'idle',completed:0,total:0,current:'',log:[],error:'',supported:true,settings:{autostart:true,components:[],gpu:false},running:{}};
 globalThis.fetch=async(url,options={})=>{
- if(options.method==='POST'){installBody=JSON.parse(options.body);Object.assign(state,{status:'done',completed:3,total:3});return {ok:true,json:async()=>({started:true})};}
+ if(options.method==='POST'&&url.endsWith('/start')){startBody=JSON.parse(options.body);return {ok:true,json:async()=>({started:true})};}
+ if(options.method==='POST'){installBody=JSON.parse(options.body);Object.assign(state,{status:'running',completed:1,total:installBody.components.length,current:installBody.components[0]});return {ok:true,json:async()=>({started:true})};}
  return {ok:true,json:async()=>structuredClone(state)};
 };
 render(React.createElement(LocalAISetup,{onReady:()=>ready++}));
-await waitFor(()=>assert(screen.getByRole('button',{name:'Install selected AI'}).disabled));
-fireEvent.click(screen.getByLabelText('Accept local AI component terms'));
-await waitFor(()=>assert(!screen.getByRole('button',{name:'Install selected AI'}).disabled));
-fireEvent.click(screen.getByRole('button',{name:'Install selected AI'}));
-await waitFor(()=>assert.deepEqual(installBody,{components:['whisper','stable_diffusion','chatterbox'],accept_terms:true,gpu:false}));
-await waitFor(()=>assert.equal(screen.getByRole('progressbar').value,3));
-cleanup();state.supported=false;state.status='idle';state.total=0;
+const row=name=>screen.getAllByRole('listitem').find(li=>li.getAttribute('aria-label').startsWith(name+':'));
+await waitFor(()=>assert.equal(row('Stable Diffusion').getAttribute('aria-label'),'Stable Diffusion: Not installed'));
+fireEvent.click(within(row('Stable Diffusion')).getByRole('button',{name:/Install/}));
+await waitFor(()=>assert.deepEqual(installBody,{components:['stable_diffusion'],accept_terms:true,gpu:false}));
+await waitFor(()=>assert.equal(screen.getByRole('progressbar').value,1));
+assert(screen.getByText(/By clicking Install you accept their terms/),'terms are stated beside the one-click install');
+Object.assign(state,{status:'done',completed:1,current:'',settings:{...state.settings,components:['whisper','stable_diffusion']},running:{stable_diffusion:false}});
+await waitFor(()=>assert.equal(ready,1),{timeout:4000});
+await waitFor(()=>assert.equal(row('Stable Diffusion').getAttribute('aria-label'),'Stable Diffusion: Installed · not running'),{timeout:4000});
+fireEvent.click(within(row('Stable Diffusion')).getByRole('button',{name:/Start/}));
+await waitFor(()=>assert.deepEqual(startBody,{components:['stable_diffusion']}));
+state.running={stable_diffusion:true};
+await waitFor(()=>assert.equal(row('Stable Diffusion').getAttribute('aria-label'),'Stable Diffusion: Ready'),{timeout:4000});
+assert.equal(within(row('Stable Diffusion')).queryAllByRole('button').length,0,'a running engine needs no button');
+fireEvent.click(within(row('Chatterbox')).getByRole('button',{name:/Install/}));
+await waitFor(()=>assert.deepEqual(installBody.components,['chatterbox']));
+cleanup();Object.assign(state,{supported:false,status:'idle',total:0,settings:{...state.settings,components:[]}});
 render(React.createElement(LocalAISetup,{}));
-fireEvent.click(screen.getByLabelText('Accept local AI component terms'));
-await waitFor(()=>assert(screen.getByRole('button',{name:'Install selected AI'}).disabled));
-cleanup();console.log('PASS installer terms gate, selected components, truthful completed progress and unsupported-platform guard; mocked installation only');
+await waitFor(()=>assert(screen.getByText(/One-click install is available on Windows/)));
+assert.equal(screen.queryAllByRole('button',{name:/Install/}).length,0);
+cleanup();console.log('PASS one-click install per engine, stated terms, truthful progress, Start for installed engines, Ready state and unsupported-platform guard; mocked installation only');

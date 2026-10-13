@@ -1,4 +1,5 @@
 import React, {useEffect, useRef, useState} from 'react';
+import {SearchField} from './SearchField';
 import {Plus, Trash2, Copy, ArrowUp, ArrowDown, Upload, PictureInPicture2, Search, Sticker} from 'lucide-react';
 import {api, Asset, Overlay, Scene} from './api';
 import {FeatureHelp} from './FeatureHelp';
@@ -278,7 +279,7 @@ export function OverlayPanel({scene, overlays, selected, onSelect, onChange, dis
     <section className="sticker-library" aria-label="Stickers and emoji">
       <div className="section-heading"><h3><Sticker size={15}/> Stickers & emoji</h3><span>{STICKER_LIBRARY.length+customStickerIds.length}</span><FeatureHelp compact title="Stickers and emoji" description="Add a reusable graphic or emoji as a normal image overlay on the scene." steps="Search or browse the sticker grid, click an item, then select it in the overlay list or preview to resize, position, animate, or delete it. Upload PNG or WebP files to keep transparent backgrounds; JPEG images are supported without transparency. Your uploads are saved in this project's Media Pool and listed here on this device."/></div>
       <p className="hint">Choose a sticker, or upload a PNG/WebP (transparent) or JPEG (solid background). Added stickers start at a compact size.</p>
-      <label className="search-control"><Search size={14}/><input aria-label="Search stickers and emoji" placeholder="Search stickers…" value={stickerQuery} onChange={e=>setStickerQuery(e.target.value)}/></label>
+      <SearchField compact label="Search stickers and emoji" placeholder="Search stickers…" value={stickerQuery} onChange={setStickerQuery}/>
       <div className="sticker-upload-row"><button className="btn" disabled={disabled||overlays.length>=8} onClick={()=>stickerFile.current?.click()}><Upload size={13}/> Upload sticker</button><input ref={stickerFile} type="file" accept=".png,.webp,.jpg,.jpeg,image/png,image/webp,image/jpeg" hidden aria-label="Upload custom sticker" onChange={e=>void uploadCustomSticker(e.target.files?.[0])}/></div>
       <StickerLibraryGrid query={stickerQuery} disabled={disabled||overlays.length>=8} busyId={stickerBusy} onPick={s=>void addLibrarySticker(s)}
         extraMatches={media.some(asset=>asset.type==='image'&&customStickerIds.includes(asset.id)&&`${asset.original_filename} upload custom`.toLowerCase().includes(stickerQuery.toLowerCase()))}

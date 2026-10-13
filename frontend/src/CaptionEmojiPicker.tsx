@@ -1,4 +1,5 @@
 import React, {useState} from 'react';
+import {SearchField} from './SearchField';
 import {api} from './api';
 import {STICKER_LIBRARY, stickerMatches} from './StickerLibrary';
 
@@ -13,7 +14,7 @@ export function CaptionEmojiPicker({index,value,side,onChange,onSide}:{index:num
   {value&&<label>Side<select aria-label={`Caption ${index} emoji side`} value={side} onChange={e=>onSide(e.target.value as 'left'|'right')}><option value="right">Right</option><option value="left">Left</option></select></label>}
   <button type="button" className="btn" aria-expanded={open} aria-controls={`caption-emoji-${index}`} onClick={()=>setOpen(!open)}>{open?'Close emoji browser':`Browse ${CAPTION_EMOJI.length} emoji`}</button>
   {open&&<section id={`caption-emoji-${index}`} className="caption-emoji-browser" aria-label={`Caption ${index} emoji browser`}>
-   <div className="emoji-browser-filters"><label>Find emoji<input autoFocus type="search" aria-label={`Search caption ${index} emoji`} placeholder="Smile, plane, heart…" value={query} onChange={e=>setQuery(e.target.value)}/></label><label>Category<select aria-label={`Caption ${index} emoji category`} value={category} onChange={e=>setCategory(e.target.value)}><option>All</option>{categories.map(c=><option key={c}>{c}</option>)}</select></label></div>
+   <div className="emoji-browser-filters"><SearchField escapeClears={false} compact autoFocus label={`Search caption ${index} emoji`} placeholder="Find emoji: smile, plane, heart…" value={query} onChange={setQuery}/><label>Category<select aria-label={`Caption ${index} emoji category`} value={category} onChange={e=>setCategory(e.target.value)}><option>All</option>{categories.map(c=><option key={c}>{c}</option>)}</select></label></div>
    <p className="hint" role="status">{shown.length} emoji · choose one for this caption</p>
    <div className="caption-emoji-grid" role="group" aria-label={`Caption ${index} emoji choices`}>{shown.map(item=><button type="button" key={item.id} aria-label={`Use ${item.name} emoji`} title={item.name} aria-pressed={value===item.id} onClick={()=>onChange(item.id)}><img src={api.stickerImageUrl(item.id)} alt="" loading="lazy"/><span>{item.name}</span></button>)}</div>
    {!shown.length&&<p className="hint">No matches. Clear the search or choose All categories.</p>}

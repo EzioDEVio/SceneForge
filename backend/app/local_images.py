@@ -10,6 +10,11 @@ def settings():
         saved = json.loads((DATA_DIR/"local-images.json").read_text())
         default.update({k:saved[k] for k in default if k in saved})
     except (OSError, ValueError): pass
+    # Only a folder that really holds AUTOMATIC1111 counts; the guessed default must not
+    # read as "Folder set" or be auto-started (owner report 2026-10-12).
+    default["found"] = (Path(default["folder"]).expanduser()/"webui-user.bat").is_file()
+    if not default["found"]:
+        default["autostart"] = False
     return default
 
 def save_settings(folder, autostart):
@@ -21,7 +26,7 @@ def save_settings(folder, autostart):
     with _lock:
         temp.write_text(json.dumps(value), encoding="utf-8")
         temp.replace(DATA_DIR/"local-images.json")
-    return value
+    return {**value, "found": True}
 
 def stop():
     if _process and _process.poll() is None and os.name == "nt":
@@ -45,7 +50,9 @@ def status():
     from app.managed_ai import preferences
     if _started and time.time()-_started<600 and 'stable_diffusion' in preferences().get('components',[]):
         return {'state':'starting','ready':False,'message':'Loading installed Stable Diffusion. Check AI Engines for setup progress.'}
-    return {'state':'failed' if _process else 'stopped','ready':False,'message':'Stable Diffusion API is unavailable. Start the engine or inspect the startup log.'}
+    if not _process and 'stable_diffusion' not in preferences().get('components',[]) and not settings()['found']:
+        return {'state':'not_installed','ready':False,'message':'Stable Diffusion is not installed yet. Click Install Stable Diffusion: it is free and sets itself up.'}
+    return {'state':'failed' if _process else 'stopped','ready':False,'message':'Stable Diffusion is installed but not running. Click Start / retry engine.'}
 
 def start():
     global _process,_started
@@ -60,7 +67,7 @@ def start():
             return {'state':'starting','ready':False,'message':'Starting installed Stable Diffusion. CPU model loading can take several minutes.'}
         root=Path(settings()['folder'])
         if not (root/'webui-user.bat').is_file():
-            return {'state':'failed','ready':False,'message':f'webui-user.bat not found in {root}. Select your installation folder in Local engine setup, then save and start.'}
+            return {'state':'not_installed','ready':False,'message':'Stable Diffusion is not installed yet. Open AI Engines and click Install next to Stable Diffusion: it is free and sets everything up for you.'}
         try:
             with socket.create_connection(('127.0.0.1',7860),timeout=1):
                 return {'state':'starting','ready':False,'message':'Port 7860 is occupied but the API is not ready. Check that the existing WebUI uses --api.'}

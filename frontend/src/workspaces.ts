@@ -28,6 +28,16 @@ export const workspacePreset = (id: string | undefined): WorkspacePreset => WORK
 export const isWorkspaceId = (v: unknown): v is WorkspaceId => WORKSPACES.some(w => w.id === v);
 
 /** Default timeline height (the Edit layout). */
-export const defaultTimelineHeight = () => Math.min(310, (typeof window === 'undefined' ? 900 : window.innerHeight) * .33);
+export const defaultTimelineHeight = () => Math.min(310, Math.max(180, (typeof window === 'undefined' ? 900 : window.innerHeight) * .3));
 export const timelineHeightFor = (preset: WorkspacePreset) =>
-  preset.timelineShare === null ? defaultTimelineHeight() : Math.max(250, Math.round((typeof window === 'undefined' ? 900 : window.innerHeight) * preset.timelineShare));
+  preset.timelineShare === null ? defaultTimelineHeight() : Math.max(timelineBounds().min, Math.round((typeof window === 'undefined' ? 900 : window.innerHeight) * preset.timelineShare));
+
+/** Timeline height limits for the current window. The editor above it (preview, narration,
+ *  Scene settings) always keeps at least ~360 px, so "Maximize timeline" and small windows
+ *  never squeeze the preview into a sliver (owner report 2026-10-12, laptop at 1366×768). */
+export const timelineBounds = () => {
+  const h = typeof window === 'undefined' ? 900 : window.innerHeight;
+  const min = h < 800 ? 180 : 250;
+  return {min, max: Math.max(min, Math.round(Math.min(h * .7, h - 83 - 360)))};
+};
+export const clampTimeline = (value: number) => {const {min, max} = timelineBounds(); return Math.max(min, Math.min(max, value));};

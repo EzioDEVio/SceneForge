@@ -22,13 +22,16 @@ if (-not (Test-Command "node")) {
     Write-Host "[ERROR] Node.js was not found on PATH. Install Node 22.12+ LTS from https://nodejs.org/" -ForegroundColor Red
     exit 1
 }
-if (-not (Test-Command "ffmpeg") -or -not (Test-Command "ffprobe")) {
-    Write-Host "[ERROR] ffmpeg/ffprobe were not found on PATH." -ForegroundColor Red
-    Write-Host "        Download a build from https://www.gyan.dev/ffmpeg/builds/, extract it," -ForegroundColor Red
-    Write-Host "        and add its bin\ folder to PATH." -ForegroundColor Red
-    exit 1
+$localFfmpeg = Join-Path $PSScriptRoot "..\tools\ffmpeg"
+if ((-not (Test-Command "ffmpeg") -or -not (Test-Command "ffprobe")) -and -not (Test-Path (Join-Path $localFfmpeg "bin\ffmpeg.exe"))) {
+    Write-Host "FFmpeg was not found. Downloading a verified copy into tools\ffmpeg (about 100 MB)..."
+    & python "$PSScriptRoot\..\desktop\scripts\fetch_ffmpeg.py" --target $localFfmpeg
+    if ($LASTEXITCODE -ne 0) {
+        Write-Host "[ERROR] FFmpeg could not be downloaded. Check the internet connection and run setup again." -ForegroundColor Red
+        exit 1
+    }
 }
-Write-Host "[OK] python, node, ffmpeg, ffprobe all found on PATH."
+Write-Host "[OK] python, node and FFmpeg are ready."
 
 Write-Host "`nSetting up backend (Python virtual environment)..."
 & python "$PSScriptRoot\windows_runtime.py" setup

@@ -1,6 +1,32 @@
 """Kokoro and the bundled Chatterbox bridge share an OpenAI-shaped audio API."""
 import requests
+from urllib.parse import urlparse
 from app.security.secrets import reveal
+
+_LOOPBACK = {'127.0.0.1', 'localhost', '::1'}
+
+
+def _local(url):
+    """Requests for this computer's own engines must not go through a system proxy.
+    On Windows, requests picks up the Internet Options proxy (VPNs, antivirus web
+    shields, company proxies) and then cannot reach 127.0.0.1, so a running
+    Chatterbox container looked "unavailable". A None entry removes the
+    environment proxy for that scheme."""
+    if (urlparse(url).hostname or '').lower() in _LOOPBACK:
+        return {'proxies': {'http': None, 'https': None}}
+    return {}
+
+
+def _unreachable(profile, base, exc):
+    name = (profile.name or 'Voice service').title()
+    root = base[:-3] if base.endswith('/v1') else base
+    if isinstance(exc, requests.Timeout):
+        return ValueError(f'{name} at {root} did not answer in time. It may still be starting or downloading its voice model; '
+                          'wait a minute and try again.')
+    if isinstance(exc, requests.ConnectionError):
+        return ValueError(f'Nothing is answering at {root}. Start {name} (Audio → Voice & narration → Start {name}), '
+                          'or check its address in Settings.')
+    return ValueError(f'{name} at {root} sent an unexpected reply. Check its address in Settings.')
 
 
 def connection(profile):
@@ -42,12 +68,14 @@ def list_voice_details(profile):
             raise ValueError('ElevenLabs voice list unavailable. Check the API key.')
     base, headers = connection(profile)
     try:
-        res = requests.get(base + '/audio/voices', headers=headers, timeout=(5, 15), allow_redirects=False)
+        res = requests.get(base + '/audio/voices', headers=headers, timeout=(5, 15), allow_redirects=False, **_local(base))
         if not res.ok: raise ValueError(f'Voice service returned HTTP {res.status_code}. Check the service URL.')
         values = res.json().get('voices', [])
         return [{'id': v if isinstance(v, str) else str(v['id']), 'name': v if isinstance(v, str) else str(v['id'])} for v in values]
-    except (requests.RequestException, KeyError, TypeError):
-        raise ValueError('Voice service unavailable. Start it and check its address in Settings.')
+    except (requests.RequestException, KeyError, TypeError, ValueError) as exc:
+        if isinstance(exc, ValueError) and str(exc).startswith('Voice service returned'):
+            raise
+        raise _unreachable(profile, base, exc) from exc
 
 
 def list_voices(profile):
@@ -111,7 +139,7 @@ def synthesize_with_alignment(profile, text, voice, language, speed):
             raise ValueError('Select a Kokoro voice matching a supported language.')
         payload['lang_code'] = voice[0]
     try:
-        res = requests.post(base + '/audio/speech', json=payload, headers=headers, timeout=(10, 600), allow_redirects=False)
+        res = requests.post(base + '/audio/speech', json=payload, headers=headers, timeout=(10, 600), allow_redirects=False, **_local(base))
         if not res.ok:
             detail = ''
             if profile.name == 'chatterbox':
@@ -120,5 +148,5 @@ def synthesize_with_alignment(profile, text, voice, language, speed):
             raise ValueError(detail or f'Voice generation returned HTTP {res.status_code}. Run DIAGNOSE_VOICE.bat and check model installation.')
         if len(res.content) > 100 * 1024 * 1024: raise ValueError('Voice response is too large. Split the script into shorter scenes.')
         return res.content, None
-    except requests.RequestException:
-        raise ValueError('Voice service unavailable or timed out. Check the service log before retrying.')
+    except requests.RequestException as exc:
+        raise _unreachable(profile, base, exc) from exc

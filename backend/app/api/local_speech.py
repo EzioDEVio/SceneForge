@@ -18,8 +18,8 @@ def connect(engine: str, db: Session = Depends(get_db)):
     if profile is None:
         profile = ProviderProfile(capability='speech',name=engine,base_url=url,model=model,secret_ref='')
     try: voices = list_voices(profile)
-    except ValueError:
-        raise HTTPException(503, f'{engine.title()} is unavailable at {url}. Start your installed voice service, then retry. If you use Docker, check that its engine and voice container are running.')
+    except ValueError as e:
+        raise HTTPException(503, f'{e} If you use Docker, check that Docker Desktop and the {engine} container are running.')
     if not voices: raise HTTPException(503, 'The speech service has no available voices.')
     db.add(profile);db.commit();db.refresh(profile)
     return {'profile': _to_out(profile), 'voices': voices, 'status': 'service_reachable',
@@ -61,13 +61,19 @@ def _services_dir() -> _Path | None:
     return None
 
 
+def _docker_exe() -> str | None:
+    # Docker Desktop installed after SceneForge started is not on this process's PATH yet.
+    from app import managed_ai
+    return managed_ai.docker_path()
+
+
 def _docker(args: list[str], timeout: int = 20):
     flags = _subprocess.CREATE_NO_WINDOW if _os.name == 'nt' else 0  # type: ignore[attr-defined]
-    return _subprocess.run(['docker', *args], capture_output=True, text=True, timeout=timeout, creationflags=flags)
+    return _subprocess.run([_docker_exe() or 'docker', *args], capture_output=True, text=True, timeout=timeout, creationflags=flags)
 
 
 def _docker_state() -> dict:
-    if not _shutil.which('docker'):
+    if not _docker_exe():
         return {'docker': 'missing', 'message': 'Docker Desktop is not installed. Install Docker Desktop (Linux containers), start it, then click Start again.'}
     try:
         info = _docker(['info', '--format', '{{.OSType}}'])
@@ -86,7 +92,9 @@ def engine_status(engine: str):
     url, _ = ENGINES[engine]
     import requests
     try:
-        reachable = requests.get(url + '/v1/audio/voices', timeout=2).ok
+        with requests.Session() as http:
+            http.trust_env = False  # never through a system proxy for this computer's own engine
+            reachable = http.get(url + '/v1/audio/voices', timeout=2).ok
     except Exception:  # noqa: BLE001
         reachable = False
     state = dict(_START_STATE.get(engine, {'state': 'idle', 'log': ''}))
@@ -110,13 +118,16 @@ def engine_start(engine: str):
         if _START_STATE.get(engine, {}).get('state') == 'starting':
             return {'engine': engine, 'state': 'starting'}
         _START_STATE[engine] = {'state': 'starting', 'log': 'Starting…\n'}
-    args = ['compose', '-f', str(services / 'compose.yaml')]
-    args += ['--profile', 'arabic', 'up', '-d', '--build', 'chatterbox'] if engine == 'chatterbox' else ['up', '-d', 'kokoro']
+    # Same Compose project as the one-click installer, so both share one container
+    # and one model cache instead of fighting over port 8881.
+    from app import managed_ai
+    base = managed_ai.compose(_docker_exe() or 'docker')
+    args = base[1:] + (['--profile', 'arabic', 'up', '-d', '--build', 'chatterbox'] if engine == 'chatterbox' else ['up', '-d', 'kokoro'])
 
     def run():
         flags = _subprocess.CREATE_NO_WINDOW if _os.name == 'nt' else 0  # type: ignore[attr-defined]
         try:
-            proc = _subprocess.Popen(['docker', *args], cwd=str(services), stdout=_subprocess.PIPE, stderr=_subprocess.STDOUT,
+            proc = _subprocess.Popen([base[0], *args], cwd=str(services), stdout=_subprocess.PIPE, stderr=_subprocess.STDOUT,
                                      text=True, errors='replace', creationflags=flags)
             for line in proc.stdout:  # type: ignore[union-attr]
                 with _START_LOCK:

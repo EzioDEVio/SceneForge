@@ -39,7 +39,7 @@ with TestClient(app) as c:
  folder=pathlib.Path(tmp.name)/'SD folder';folder.mkdir();(folder/'webui-user.bat').write_text('@echo off')
  assert c.put('/api/local-image-settings',json={'folder':tmp.name,'autostart':True}).status_code==400
  assert c.put('/api/local-image-settings',json={'folder':str(folder),'autostart':False}).status_code==200
- assert c.get('/api/local-image-settings').json()=={'folder':str(folder.resolve()),'autostart':False}
+ assert c.get('/api/local-image-settings').json()=={'folder':str(folder.resolve()),'autostart':False,'found':True}
  assert (pathlib.Path(tmp.name)/'local-images.json').exists()
  with patch.object(local_images,'status',return_value={'ready':True,'state':'ready'}),patch.object(local_images.subprocess,'Popen') as spawn:
   assert local_images.start()['ready'];spawn.assert_not_called()

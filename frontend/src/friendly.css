@@ -65,3 +65,25 @@ html[data-theme=light] .title-designer-actions{background:#f6f9ff;border-color:#
 @font-face{font-family:"DejaVu Sans Mono";src:url("/fonts/DejaVuSansMono-Bold.ttf");font-weight:700;font-display:swap;}
 @font-face{font-family:"Latin Modern Roman";src:url("/fonts/lmroman10-bold.otf");font-weight:700;font-display:swap;}
 @font-face{font-family:"Latin Modern Sans";src:url("/fonts/lmsans10-bold.otf");font-weight:700;font-display:swap;}
+/* One-click local AI (0.9.4-beta.2) */
+.engine-install-head{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.engine-install-head h3{margin:0}
+.engine-rows{list-style:none;margin:12px 0 4px;padding:0;display:grid;gap:8px}
+.engine-row{display:grid;grid-template-columns:auto minmax(0,1fr) auto auto;align-items:center;gap:12px;padding:10px 12px;border:1px solid var(--line);border-radius:10px}
+.engine-row.ready{border-color:color-mix(in srgb,var(--blue) 55%,var(--line))}
+.engine-icon{display:grid;place-items:center;width:34px;height:34px;border-radius:9px;background:var(--accent-soft);color:var(--blue)}
+.engine-text{display:flex;flex-direction:column;min-width:0}
+.engine-text small{color:var(--muted);font-size:12px;line-height:1.35}
+.engine-status{display:inline-flex;align-items:center;gap:5px;font-size:12px;color:var(--muted);white-space:nowrap}
+.engine-status.ok{color:var(--blue);font-weight:600}
+.engine-install .engine-options label{margin:6px 0}
+.engine-terms{margin-top:10px}
+.engine-install .spin{animation:sf-spin 1s linear infinite}
+@keyframes sf-spin{to{transform:rotate(360deg)}}
+@media (prefers-reduced-motion:reduce){.engine-install .spin{animation:none}}
+.advanced-engine>summary{cursor:pointer;list-style:none}
+.advanced-engine>summary::-webkit-details-marker{display:none}
+@media(max-width:640px){.engine-row{grid-template-columns:auto minmax(0,1fr)}.engine-row .engine-status,.engine-row .btn{grid-column:2}}
+.engine-install-cta{margin:8px 0;padding:10px 12px;border:1px solid var(--blue);border-radius:10px;background:var(--accent-soft)}
+.engine-install-cta p{margin:0 0 8px}
+.engine-terms a{color:var(--blue)}

@@ -1,4 +1,5 @@
 import React, {useMemo, useState} from 'react';
+import {SearchField} from './SearchField';
 import {Search} from 'lucide-react';
 import data from './captionStyles.json';
 
@@ -47,7 +48,7 @@ export function CaptionStylePicker({presets, css, onApply}: {presets: CaptionPre
   const [query, setQuery] = useState('');
   const shown = useMemo(() => presets.filter(p => (group === 'All' || captionStyleGroup(p) === group) && matches(p, query)), [presets, group, query]);
   return <div className="caption-style-picker">
-    <label className="search-control"><Search size={14}/><input aria-label="Search caption styles" placeholder={`Search ${presets.length} styles…`} value={query} onChange={e => setQuery(e.target.value)}/></label>
+    <SearchField compact label="Search caption styles" placeholder={`Search ${presets.length} styles…`} value={query} onChange={setQuery} count={shown.length}/>
     <div className="caption-style-tabs" role="group" aria-label="Caption style groups">
       {['All', ...CAPTION_STYLE_GROUPS].map(g => <button key={g} type="button" className={`sticker-tab ${group === g ? 'selected' : ''}`} aria-pressed={group === g} onClick={() => setGroup(g)}>
         {g}<small>{g === 'All' ? presets.length : presets.filter(p => captionStyleGroup(p) === g).length}</small></button>)}

@@ -261,8 +261,9 @@ export function FreeTimeline({
     job = useRef<string | null>(null);
   const saving = useRef(false);
   const resizeDrag = useRef<{y:number; height:number} | null>(null);
-  const maxHeight = Math.max(240, viewport - 160);
-  const viewHeight = minimized ? 76 : expanded ? maxHeight : Math.max(240, Math.min(maxHeight, height));
+  // Keep at least ~300 px for the preview and Scene settings above (laptop screens).
+  const maxHeight = Math.max(200, Math.min(viewport * .72, viewport - 83 - 300));
+  const viewHeight = minimized ? 76 : expanded ? maxHeight : Math.max(Math.min(240, maxHeight), Math.min(maxHeight, height));
   useEffect(() => {const resize = () => setViewport(window.innerHeight);window.addEventListener("resize", resize);return () => window.removeEventListener("resize", resize);}, []);
   useEffect(() => {try {localStorage.setItem(`sceneforge.freeHeight.${project.id}`, String(height));}catch {}}, [height, project.id]);
   last.current = moving;

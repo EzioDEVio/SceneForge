@@ -40,6 +40,11 @@ def save_preferences(value):
     tmp.write_text(json.dumps(value), encoding='utf-8')
     tmp.replace(p)
 
+def running():
+    """Which installed engines answer right now (quick loopback checks)."""
+    return {'stable_diffusion': image_ready() or bool(health('stable_diffusion')),
+            'chatterbox': bool(health('chatterbox'))}
+
 def state():
     with _lock:
         return {**_state, 'log':list(_state['log']), 'settings':preferences(), 'supported':os.name=='nt'}
@@ -246,7 +251,14 @@ def install(components, gpu=False):
                         if not health(component):raise RuntimeError(f'Port {port} is used by another service. Stop it or use your existing engine connection; Retry will not replace it.')
                     docker=ensure_docker();args=compose(docker,gpu)
                     profile='images' if component=='stable_diffusion' else 'arabic'
-                    run(args+['--profile',profile,'up','-d','--build',component])
+                    try:
+                        run(args+['--profile',profile,'up','-d','--build',component])
+                    except RuntimeError:
+                        # An engine started another way (e.g. an older SceneForge's Start
+                        # button, Compose project "services") may hold the port. If it
+                        # answers as this engine, use it instead of failing.
+                        if not health(component):raise
+                        report('Using the '+component+' engine that is already running on this computer.')
                     report('Downloading/loading '+component+' models. First setup can take many minutes; progress is shown below.')
                     port=7860 if component=='stable_diffusion' else 8881
                     for _ in range(90):

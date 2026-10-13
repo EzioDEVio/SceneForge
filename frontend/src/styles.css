@@ -123,3 +123,25 @@
 .typewriter-shortcut .tw-text small{color:var(--muted);font-size:12px;line-height:1.3}
 .fx-tab[data-fxcat="more"] .look-panel:not(.scene-fx-panel),
 .fx-tab[data-fxcat="looks"] .look-panel:not(.scene-fx-panel):not(:has(> [data-fx-cat="looks"])){display:none}
+
+/* One search field style for the whole app (0.9.4-beta.2). */
+.search-field{position:relative;display:flex;align-items:center;gap:8px;min-height:40px;padding:0 6px 0 12px;margin:0 0 10px;
+  border:1px solid var(--line);border-radius:10px;background:var(--surface,var(--panel));color:var(--muted);transition:border-color .15s,box-shadow .15s}
+.search-field.compact{min-height:32px;padding:0 4px 0 9px;gap:6px;border-radius:8px}
+.search-field:hover{border-color:color-mix(in srgb,var(--blue) 35%,var(--line))}
+.search-field:focus-within{border-color:var(--blue);box-shadow:0 0 0 3px color-mix(in srgb,var(--blue) 22%,transparent)}
+.search-field-icon{flex:0 0 auto;transition:color .15s,transform .2s}
+.search-field:focus-within .search-field-icon,.search-field.has-value .search-field-icon{color:var(--blue);transform:scale(1.1)}
+.search-field input{flex:1;min-width:0;height:100%;border:0!important;outline:0!important;box-shadow:none!important;background:transparent!important;
+  color:var(--text);font:inherit;font-size:14px;padding:8px 0}
+.search-field.compact input{font-size:13px;padding:5px 0}
+.search-field input::-webkit-search-cancel-button,.search-field input::-webkit-search-decoration{-webkit-appearance:none;appearance:none}
+.search-field input::placeholder{color:var(--muted);opacity:.85}
+.search-field-count{flex:0 0 auto;font-size:12px;color:var(--blue);white-space:nowrap}
+.search-field-count.none{color:var(--muted)}
+.search-field-clear{flex:0 0 auto;display:grid;place-items:center;width:26px;height:26px;border:0;border-radius:6px;background:transparent;color:var(--muted);cursor:pointer}
+.search-field-clear:hover{background:var(--accent-soft);color:var(--text)}
+.search-field-clear:focus-visible{outline:2px solid var(--blue);outline-offset:1px}
+.project-search{max-width:none}
+@media (prefers-reduced-motion:reduce){.search-field,.search-field-icon{transition:none}}
+:root .search-field input:focus,:root .search-field input:focus-visible,:root[data-theme] .search-field input:focus-visible{outline:none!important;box-shadow:none!important}

@@ -67,8 +67,45 @@ with patch.dict(sys.modules, {'faster_whisper': fake_module}):
     check('blank word-alignment entries fall back to estimated phrase timing',
           estimated['word_timing'] == 'estimated' and len(estimated['words']) == 3)
 
-import subprocess, tempfile, os
 import numpy as np
+
+
+class SongWhisper:
+    """VAD keeps only a few sung words of a 3:19 song; without VAD every line is heard."""
+    def __init__(self):
+        self.calls = []
+
+    def transcribe(self, audio, **kwargs):
+        self.calls.append(kwargs['vad_filter'])
+        n = 6 if kwargs['vad_filter'] else 320
+        lyric = 'hear the call of the north'.split()
+        rows = []
+        for i in range(0, n, 3):
+            ws = [SimpleNamespace(word=' ' + lyric[(i + k) % 6] + str((i + k) // 6), start=(i + k) * .6, end=(i + k) * .6 + .5) for k in range(min(3, n - i))]
+            rows.append(SimpleNamespace(text=' '.join(w.word.strip() for w in ws), start=ws[0].start, end=ws[-1].end, words=ws))
+        return iter(rows), SimpleNamespace(language='en')
+
+
+class LoopWhisper:
+    def transcribe(self, audio, **kwargs):
+        ws = [SimpleNamespace(word=' ' + x, start=i * .5, end=i * .5 + .4) for i, x in enumerate(('thank you ' * 30 + 'the end').split())]
+        return iter([SimpleNamespace(text='x', start=0, end=30, words=ws)]), SimpleNamespace(language='en')
+
+
+with patch.dict(sys.modules, {'faster_whisper': fake_module}):
+    song = SongWhisper()
+    with patch.object(transcribe, '_LOCAL_MODEL', song), patch.object(transcribe, '_normalize_local_audio', return_value='n.wav'), \
+         patch.object(transcribe, '_decode_pcm16k', return_value=np.zeros(199 * 16000, np.float32)):
+        sung = transcribe._local('song.wav', 'en')
+    check('a song where VAD keeps few words is transcribed again without VAD and the fuller pass is kept',
+          song.calls == [True, False] and len(sung['words']) >= 300)
+    with patch.object(transcribe, '_LOCAL_MODEL', LoopWhisper()), patch.object(transcribe, '_normalize_local_audio', return_value='n.wav'), \
+         patch.object(transcribe, '_decode_pcm16k', return_value=np.zeros(30 * 16000, np.float32)):
+        looped = transcribe._local('music.wav', 'en')
+    check('a line Whisper repeats endlessly over music is kept at most three times',
+          [w[0] for w in looped['words']] == ['thank', 'you'] * 3 + ['the', 'end'])
+
+import subprocess, tempfile, os
 with tempfile.TemporaryDirectory() as d:
     wav = os.path.join(d, 'tone.wav')
     subprocess.run(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', 'sine=f=440:d=1.5:r=44100', '-ac', '2', wav], check=True)

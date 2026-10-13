@@ -14,13 +14,19 @@ if errorlevel 1 goto :no_python
 where node >nul 2>nul
 if errorlevel 1 goto :no_node
 
+set "SF_FFMPEG_OK=1"
 where ffmpeg >nul 2>nul
-if errorlevel 1 goto :no_ffmpeg
-
+if errorlevel 1 set "SF_FFMPEG_OK="
 where ffprobe >nul 2>nul
-if errorlevel 1 goto :no_ffprobe
+if errorlevel 1 set "SF_FFMPEG_OK="
+if exist "%~dp0..\tools\ffmpeg\bin\ffmpeg.exe" set "SF_FFMPEG_OK=1"
+if not defined SF_FFMPEG_OK (
+  echo FFmpeg was not found. Downloading a verified copy into tools\ffmpeg ^(about 100 MB^)...
+  python "%~dp0..\desktop\scripts\fetch_ffmpeg.py" --target "%~dp0..\tools\ffmpeg"
+  if errorlevel 1 goto :no_ffmpeg
+)
 
-echo [OK] python, node, ffmpeg, ffprobe all found on PATH.
+echo [OK] python, node and FFmpeg are ready.
 echo.
 
 echo Setting up backend (Python virtual environment)...
@@ -58,9 +64,9 @@ pause
 exit /b 1
 
 :no_ffmpeg
-echo [ERROR] ffmpeg was not found on PATH.
-echo         Download a Windows build from https://www.gyan.dev/ffmpeg/builds/
-echo         and add its bin folder to your PATH. Then re-run this script.
+echo [ERROR] FFmpeg could not be downloaded automatically. Check the internet
+echo         connection and run this script again. ^(Or install FFmpeg yourself from
+echo         https://www.gyan.dev/ffmpeg/builds/ and add its bin folder to PATH.^)
 pause
 exit /b 1
 

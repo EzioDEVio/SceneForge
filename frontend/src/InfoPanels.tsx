@@ -58,7 +58,7 @@ const Badge = ({ok, children}: {ok: boolean; children: React.ReactNode}) => <spa
 
 export function AIEnginesPanel({section, onClose, onOpenSettings}: {section?: string; onClose: () => void; onOpenSettings: () => void}) {
   const [providers, setProviders] = useState<ProviderProfile[] | null>(null);
-  const [sd, setSd] = useState<{folder?: string; autostart?: boolean} | null>(null);
+  const [sd, setSd] = useState<{folder?: string; autostart?: boolean; found?: boolean} | null>(null);
   const [sdState, setSdState] = useState('');
   const [busy, setBusy] = useState(false);
   const refs = {start: useRef<HTMLElement>(null), cloud: useRef<HTMLElement>(null), sd: useRef<HTMLElement>(null), voices: useRef<HTMLElement>(null)};
@@ -88,7 +88,7 @@ export function AIEnginesPanel({section, onClose, onOpenSettings}: {section?: st
       <p><strong>AI is optional.</strong> You can make a whole video from your own photos, clips and recordings. AI helps you <em>generate images</em> (Media tab → <b>Generate image</b>) and <em>narration voices</em> (Audio tab → <b>Voice & narration</b>).</p>
       <div className="info-two">
         <div className="info-choice"><Cloud size={20}/><div><b>Cloud services</b><p>Fast and high quality. Paid, or with free allowances. You need an account and an API key.</p></div></div>
-        <div className="info-choice"><Cpu size={20}/><div><b>Local engines</b><p>Free and private, running on your computer. Installed separately; need a capable PC.</p></div></div>
+        <div className="info-choice"><Cpu size={20}/><div><b>Local engines</b><p>Free and private, running on your computer. One click installs each one below; pictures need a capable PC.</p></div></div>
       </div>
     </section>
     <section ref={refs.cloud as any} className="info-card">
@@ -103,25 +103,26 @@ export function AIEnginesPanel({section, onClose, onOpenSettings}: {section?: st
       <Steps items={[<>Create an account on the provider's website and copy your <b>API key</b>.</>, <>Expand the provider above and paste your key. It is stored in your system's credential store, never in project files.</>, <>Pick the provider when generating an image or voice.</>]}/>
       <button className="btn primary" onClick={onOpenSettings}>Open Settings to add or change keys</button>
     </section>
-    <LocalAISetup onReady={()=>api.listProviders().then(setProviders)}/><section ref={refs.sd as any} className="info-card">
-      <div className="info-card-head"><h3><Cpu size={16}/> Stable Diffusion: free local images</h3><Badge ok={!!sd?.folder}>{sd?.folder ? 'Folder set' : 'Not set up'}</Badge></div>
+    <div ref={refs.sd as any}><LocalAISetup onReady={()=>api.listProviders().then(setProviders)}/></div><details className="info-card advanced-engine">
+      <summary className="info-card-head"><h3><Cpu size={16}/> Advanced: use your own AUTOMATIC1111</h3><Badge ok={!!sd?.found}>{sd?.found ? 'Found' : 'Optional'}</Badge></summary>
+      <p className="hint">Only if you already run AUTOMATIC1111 Stable Diffusion WebUI. Otherwise use <b>Install</b> next to Stable Diffusion above: no folders or settings needed.</p>
       <p>Uses <b>AUTOMATIC1111 Stable Diffusion WebUI</b> installed on this PC. Needs a graphics card with at least 4 GB of memory; starting takes a few minutes and uses a lot of memory while running.</p>
       <Steps items={[<>Install AUTOMATIC1111 and make sure it runs on its own. <button className="text-btn inline" onClick={() => openLink('https://github.com/AUTOMATIC1111/stable-diffusion-webui')}><ExternalLink size={12}/> Installation guide</button></>,
         <>In its <code>webui-user.bat</code>, add <code>--api</code> to <code>COMMANDLINE_ARGS</code>.</>,
         <>Choose its folder here, then <b>Start</b>. In a scene: Media → Generate image → pick <b>Local Stable Diffusion</b>.</>]}/>
       <div className="sd-row">
-        <span className="sd-folder" title={sd?.folder || ''}>{sd?.folder || 'No folder chosen'}</span>
+        <span className="sd-folder" title={sd?.folder || ''}>{sd?.found ? sd.folder : 'No AUTOMATIC1111 folder chosen'}</span>
         <button className="btn" disabled={busy || !desktop()} title={desktop() ? '' : 'Available in the desktop app'} onClick={async () => {const f = await desktop()?.chooseSdFolder(); if (f) await saveSd({folder: f, autostart: false});}}><FolderOpen size={14}/> Choose folder</button>
-        <button className="btn primary" disabled={busy || !sd?.folder} onClick={() => void startSd()}><Play size={14}/> Start now</button>
+        <button className="btn primary" disabled={busy || !sd?.found} onClick={() => void startSd()}><Play size={14}/> Start now</button>
       </div>
-      <label className="switch-label finishing-toggle"><input type="checkbox" checked={!!sd?.autostart} disabled={busy || !sd?.folder} onChange={e => void saveSd({autostart: e.target.checked})}/> Start automatically with SceneForge <span className="muted">(makes SceneForge slower to open)</span></label>
+      <label className="switch-label finishing-toggle"><input type="checkbox" checked={!!sd?.autostart} disabled={busy || !sd?.found} onChange={e => void saveSd({autostart: e.target.checked})}/> Start automatically with SceneForge <span className="muted">(makes SceneForge slower to open)</span></label>
       {sdState && <p className="info-status" role="status">{sdState}</p>}
-    </section>
+    </details>
     <section ref={refs.voices as any} className="info-card">
       <div className="info-card-head"><h3><Mic size={16}/> Local voices: Chatterbox and Kokoro</h3></div>
       <p><b>Chatterbox</b> speaks many languages including Arabic; <b>Kokoro</b> is a fast English voice. Both are free and need no account.</p>
-      <Steps items={[<>Install <b>Docker Desktop</b> and start it. <button className="text-btn inline" onClick={() => openLink('https://www.docker.com/products/docker-desktop/')}><ExternalLink size={12}/> Download</button></>,
-        <>In a scene, open <b>Audio → Voice & narration</b> and click <b>Connect Chatterbox</b> or <b>Connect Kokoro</b>.</>,
+      <Steps items={[<>Click <b>Install</b> next to Chatterbox above. SceneForge sets up Docker Desktop and the voice engine for you.</>,
+        <>In a scene, open <b>Audio → Voice & narration</b>. If the engine is stopped, click <b>Start Chatterbox</b> there.</>,
         <>Pick the engine, a voice and a language, then <b>Generate</b>. The first start downloads the voice model.</>]}/>
       <p className="muted">Local captions already use Whisper without Docker. Open Text → Auto captions to check or download the model. Local narration engines require their separate setup.</p>
     </section>

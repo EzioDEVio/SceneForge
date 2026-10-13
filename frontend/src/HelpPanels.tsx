@@ -1,4 +1,5 @@
 import React, {useCallback, useEffect, useLayoutEffect, useRef, useState} from 'react';
+import {SearchField} from './SearchField';
 import {Clipboard, Cpu, Download, FolderOpen, Keyboard, RefreshCw, Trash2} from 'lucide-react';
 import {Modal} from './InfoPanels';
 import {askConfirm} from './dialogs';
@@ -60,7 +61,7 @@ export function ShortcutSheet({onClose}: {onClose: () => void}) {
   const groups=SHORTCUT_GROUPS.map(g=>({...g,items:g.items.filter(item=>`${g.title} ${item.action} ${item.keys.join(' ')}`.toLowerCase().includes(query))})).filter(g=>g.items.length);
   return <Modal title="Keyboard shortcuts" icon={<Keyboard size={18}/>} onClose={onClose} wide>
     <p className="info-lead">Shortcuts work while you are not typing in a text field. On macOS, use ⌘ instead of Ctrl.</p>
-    <label className="control-label">Find a shortcut<input autoFocus type="search" aria-label="Search keyboard shortcuts" placeholder="Search actions or keys, e.g. split or Ctrl+S" value={search} onChange={e=>setSearch(e.target.value)}/></label>
+    <SearchField escapeClears={false} autoFocus label="Search keyboard shortcuts" placeholder="Search actions or keys, e.g. split or Ctrl+S" value={search} onChange={setSearch}/>
     {!groups.length&&<p role="status">No shortcuts match your search.</p>}
     <div className="shortcut-groups">{groups.map(g => <section key={g.title} className="shortcut-group" aria-label={g.title}>
       <h3>{g.title}</h3>{g.note && <p className="hint">{g.note}</p>}
