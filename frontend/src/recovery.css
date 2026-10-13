@@ -101,3 +101,8 @@ html[data-theme="light"] .studio-shell .auto-captions-card :is(strong,label,.hin
 .provider-accordion-list{display:grid;gap:12px}.provider-setup-card{border:1px solid var(--border);border-radius:10px;background:var(--panel);overflow:hidden}.provider-connection summary{cursor:pointer;padding:14px;display:flex;align-items:center;justify-content:space-between;gap:14px;list-style:none}.provider-connection summary::-webkit-details-marker{display:none}.provider-connection summary small{display:block;margin-top:4px;font-size:12px;color:var(--muted)}.provider-connection[open] .provider-expand{transform:rotate(180deg)}.provider-connection summary:hover{background:var(--bg-elevated,var(--bg))}.provider-connection summary:focus-visible{outline:2px solid #74d3ff;outline-offset:-3px}.provider-connection form{padding:0 14px 14px}.provider-connection fieldset{padding:0;margin:0;border:0;display:grid;gap:12px}.provider-connection input{width:100%;box-sizing:border-box}.provider-account{margin:0 14px 12px;font-size:12px}
 
 .free-preview-item{position:absolute;inset:0;pointer-events:none}.free-preview-item>video{width:100%;height:100%;object-fit:contain}.free-ruler{position:sticky;top:0;z-index:5;background:var(--panel,#242832)}.free-labels>div:first-child{position:sticky;top:0;z-index:5;background:var(--panel,#242832)}
+/* 0.9.4-beta.3: one scroller for the Free timeline. The body used to scroll vertically on its own,
+   which slid clips under the sticky ruler and out of line with the track labels. */
+.free-scroll{overflow:auto}
+.free-scroll-body{overflow:visible;flex:1 0 auto;min-width:0}
+.free-scroll>.free-labels{z-index:6}

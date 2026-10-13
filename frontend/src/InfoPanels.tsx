@@ -18,6 +18,7 @@ const REPO = 'https://github.com/EzioDEVio/SceneForge';
 const openLink = (url: string) => desktop() ? desktop()!.openExternal(url) : window.open(url, '_blank', 'noopener');
 const CLOUD: {id:string; name: string; match: RegExp; what: string; url: string}[] = [
   {id:'elevenlabs', name: 'ElevenLabs', match: /elevenlabs/i, what: 'Natural voices in many languages, with exact word timing for captions.', url: 'https://elevenlabs.io'},
+  {id:'gemini_tts', name: 'Gemini voices', match: /^gemini_tts$/i, what: 'Narration in 100+ languages including Arabic, with a free Google AI Studio key.', url: 'https://aistudio.google.com/app/apikey'},
   {id:'openai', name: 'OpenAI', match: /openai/i, what: 'Image generation.', url: 'https://platform.openai.com/api-keys'},
   {id:'gemini', name: 'Google Gemini', match: /^gemini$/i, what: 'Image generation.', url: 'https://aistudio.google.com/app/apikey'},
   {id:'together', name: 'Together AI', match: /together/i, what: 'FLUX image generation.', url: 'https://api.together.ai'},
@@ -96,8 +97,7 @@ export function AIEnginesPanel({section, onClose, onOpenSettings}: {section?: st
       <p className="hint">Expand a provider below to add or replace its API key here. Collapse it when done. Local engines remain in their own sections below.</p>
       <div className="provider-accordion-list">
         {CLOUD.map(p => {const c = (providers||[]).find(v=>v.name===p.id);return <div className="provider-setup-card" key={p.id}>
-          <ProviderConnection name={p.id} profile={c} onSaved={()=>api.listProviders().then(setProviders)}/>
-          {p.url&&<button className="text-btn provider-account" onClick={()=>openLink(p.url)}><ExternalLink size={12}/> {c?.configured?'Account':'Get a key'} · {p.name}</button>}
+          <ProviderConnection name={p.id} profile={c} onSaved={()=>api.listProviders().then(setProviders)} accountUrl={p.url||undefined} onOpenAccount={openLink}/>
         </div>;})}
       </div>
       <Steps items={[<>Create an account on the provider's website and copy your <b>API key</b>.</>, <>Expand the provider above and paste your key. It is stored in your system's credential store, never in project files.</>, <>Pick the provider when generating an image or voice.</>]}/>

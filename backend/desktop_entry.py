@@ -53,6 +53,16 @@ class HangWatch:
 
 
 def main():
+    if len(sys.argv)>1 and sys.argv[1]=='--queue-local-ai':
+        # Windows installer (0.9.4-beta.3): record the chosen AI tools; SceneForge installs
+        # them on first start with its own progress screen, so the installer stays quick.
+        if len(sys.argv)!=5:raise SystemExit('Expected components, workspace and GPU flag.')
+        import json
+        from pathlib import Path
+        workspace=Path(sys.argv[3]);workspace.mkdir(parents=True,exist_ok=True)
+        components=[v for v in sys.argv[2].split(',') if v in ('whisper','kokoro','stable_diffusion','chatterbox')]
+        (workspace/'ai-setup-pending.json').write_text(json.dumps({'components':components,'gpu':sys.argv[4]=='1','accepted_terms':True}),encoding='utf-8')
+        raise SystemExit(0)
     if len(sys.argv)>1 and sys.argv[1]=='--install-local-ai':
         if len(sys.argv)!=5:raise SystemExit('Expected components, workspace and GPU flag.')
         os.environ['SCENEFORGE_DATA_DIR']=sys.argv[3]

@@ -328,3 +328,19 @@ html.theme-switching *,html.theme-switching *::before,html.theme-switching *::af
   :root[data-theme="desk"] .timeline-marker-actions select{max-width:96px}
 }
 
+/* Layout audit fixes (0.9.4-beta.3) */
+.editor-draft-actions.idle .button-row,.editor-draft-actions.idle>.hint{display:none}
+.editor-draft-actions.idle{padding-top:6px!important;padding-bottom:6px!important}
+.editor-draft-actions.idle>p{margin:0;font-size:12px}
+.draft-idle-hint{color:var(--muted);font-weight:400}
+.studio-shell .sequence-dock{min-height:150px}
+@media (max-height:800px){
+  .studio-shell .scene-heading{min-height:0;height:32px;padding-top:2px;padding-bottom:2px}
+  .studio-shell .preview-toolbar{min-height:0;padding-top:2px;padding-bottom:2px}
+  .studio-shell .preview-footer{min-height:0;padding-top:2px;padding-bottom:2px}
+  .studio-shell .render-bar{min-height:0;padding-top:3px;padding-bottom:3px}
+  .studio-shell .render-bar .btn{min-height:28px;padding-top:3px;padding-bottom:3px}
+  .studio-shell .inspector-sections{padding-top:4px;padding-bottom:4px}
+  .studio-shell .section-chip{padding-top:3px;padding-bottom:3px}
+}
+.free-timeline.minimized{height:auto!important;overflow:hidden}

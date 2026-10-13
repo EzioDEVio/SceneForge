@@ -19,23 +19,29 @@ fakeos=SimpleNamespace(name='nt',environ=os.environ)
 with TestClient(app) as client:
     r=client.post('/api/local-ai/setup',json={'components':['not-an-engine'],'accept_terms':True})
     assert r.status_code==422
-    assert client.get('/api/local-ai/setup').json()['supported'] is False
-    assert client.post('/api/local-ai/setup',json={'components':['whisper'],'accept_terms':True}).status_code==400
+    with patch('platform.system',return_value='Plan9'):
+        assert client.get('/api/local-ai/setup').json()['supported'] is False
+        assert client.post('/api/local-ai/setup',json={'components':['whisper'],'accept_terms':True}).status_code==400
 print('PASS unknown components and unsupported platform rejected before installation')
-with patch.object(m,'os',fakeos),patch.object(m,'engine_root',return_value=Path(temp.name)),patch.object(m.shutil,'disk_usage',return_value=SimpleNamespace(free=20_000_000_000)),patch('app.providers.transcribe._load_local_model',return_value=object()),patch.object(m,'ensure_docker',return_value='docker.exe'),patch.object(m,'compose',return_value=['docker.exe','compose','-p','sceneforge-managed-ai']),patch.object(m,'run') as commands,patch.object(m,'image_ready',return_value=False),patch.object(m,'warmup') as warm,patch('socket.create_connection',side_effect=OSError),patch.object(m,'health',side_effect=[{'service':'stable_diffusion','model_ready':True},{'service':'stable_diffusion','model_ready':True},{'service':'chatterbox','model_ready':False},{'service':'chatterbox','model_ready':True},{'service':'chatterbox','model_ready':True}]):
-    assert m.install(['whisper','stable_diffusion','chatterbox'])
+with patch.object(m,'os',fakeos),patch.object(m,'engine_root',return_value=Path(temp.name)),patch.object(m.shutil,'disk_usage',return_value=SimpleNamespace(free=20_000_000_000)),patch('app.providers.transcribe._load_local_model',return_value=object()),patch.object(m,'ensure_docker') as docker,patch.object(m,'image_ready',return_value=False),patch.object(m,'warmup') as warm,patch('socket.create_connection',side_effect=OSError),\
+     patch('app.native_engines.install') as native_install,patch('app.native_engines.start',return_value=True) as native_start,patch('app.native_engines.running',return_value=True),\
+     patch.object(m,'health',side_effect=[None,{'service':'stable_diffusion','model_ready':False},{'service':'stable_diffusion','model_ready':True},
+                                         {'service':'chatterbox','model_ready':False},{'service':'chatterbox','model_ready':True},{'service':'chatterbox','model_ready':True}]):
+    assert m.install(['whisper','stable_diffusion','chatterbox']),m.state()['error']
     assert m.state()['completed']==3 and m.state()['status']=='done'
-    assert commands.call_count==2 and warm.call_count==2
-    for call in commands.call_args_list:assert '--build' in call.args[0]
+    # Stable Diffusion was not running: installed natively and started. Chatterbox already answered: reused.
+    assert [c.args[0] for c in native_install.call_args_list]==['stable_diffusion'] and native_start.call_count==1 and warm.call_count==2
+    docker.assert_not_called()
+    assert m.preferences()['runtime']=={'stable_diffusion':'native'}
 with SessionLocal() as db:
     assert {p.name for p in db.query(ProviderProfile)}=={'local_sd','chatterbox'}
     p=db.query(ProviderProfile).filter_by(name='local_sd').one();p.base_url='http://127.0.0.1:9999';db.commit()
 m.register('stable_diffusion')
 with SessionLocal() as db:assert db.query(ProviderProfile).filter_by(name='local_sd').one().base_url.endswith(':9999')
-print('PASS ordered installation, actual stage completion, model checks, profile registration and existing connection preservation')
+print('PASS ordered installation without Docker, actual stage completion, model checks, profile registration and existing connection preservation')
 with patch.object(m,'os',fakeos),patch.object(m,'engine_root',return_value=Path(temp.name)),patch.object(m.shutil,'disk_usage',return_value=SimpleNamespace(free=0)),patch.object(m,'run') as commands:
     assert not m.install(['whisper']);assert 'free space' in m.state()['error'];commands.assert_not_called()
-with patch.object(m,'os',fakeos),patch.object(m,'engine_root',return_value=Path(temp.name)),patch.object(m.shutil,'disk_usage',return_value=SimpleNamespace(free=20_000_000_000)),patch.object(m,'image_ready',return_value=False),patch('socket.create_connection',return_value=MagicMock()),patch.object(m,'health',return_value=None),patch.object(m,'ensure_docker') as docker:
+with patch.object(m,'os',fakeos),patch.object(m,'engine_root',return_value=Path(temp.name)),patch.object(m.shutil,'disk_usage',return_value=SimpleNamespace(free=20_000_000_000)),patch.object(m,'image_ready',return_value=False),patch('socket.create_connection',return_value=MagicMock()),patch.object(m,'health',return_value=None),patch('app.native_engines.install') as docker:
     assert not m.install(['stable_diffusion']);assert 'another service' in m.state()['error'];docker.assert_not_called()
 print('PASS insufficient space and occupied ports fail clearly without installing or replacing services')
 with patch.object(m,'os',fakeos),patch.object(m,'engine_root',return_value=Path(temp.name)),patch.object(m.shutil,'disk_usage',return_value=SimpleNamespace(free=20_000_000_000)),patch('app.providers.transcribe._load_local_model',return_value=object()):
@@ -44,10 +50,14 @@ with patch.object(m,'os',fakeos),patch.object(m,'engine_root',return_value=Path(
 m.save_preferences({**m.preferences(),'autostart':False})
 with patch.object(m,'os',fakeos),patch.object(m,'docker_path') as docker:
     m.autostart();docker.assert_not_called()
-with patch.object(m,'os',fakeos),patch.object(m,'docker_path',return_value='docker.exe'),patch.object(m,'docker_ready',return_value=True),patch.object(m,'compose',return_value=['docker.exe','compose']),patch.object(m,'run') as commands,patch.object(m,'health',return_value={'model_ready':True}),patch.object(m,'session') as session:
+with patch.object(m,'os',fakeos),patch('app.native_engines.installed',side_effect=lambda c:c=='stable_diffusion'),patch('app.native_engines.start') as native_start,patch.object(m,'docker_path') as docker,patch.object(m,'health',side_effect=[None,{'model_ready':True}]),patch.object(m,'session'):
     m.autostart(force=True,services=['stable_diffusion'])
+    native_start.assert_called_once();docker.assert_not_called()
+m.save_preferences({**m.preferences(),'runtime':{}})
+with patch.object(m,'os',fakeos),patch('app.native_engines.installed',return_value=False),patch.object(m,'docker_path',return_value='docker.exe'),patch.object(m,'docker_ready',return_value=True),patch.object(m,'compose',return_value=['docker.exe','compose']),patch.object(m,'run') as commands,patch.object(m,'health',return_value={'model_ready':True}),patch.object(m,'session') as session:
+    m.autostart(force=True,services=['chatterbox'])
     args=commands.call_args.args[0];assert 'start' in args and '--build' not in args and 'install' not in args
-print('PASS Retry preserves installed components, startup choice is honored, manual start never builds or installs')
+print('PASS Retry preserves installed components, startup choice is honored, native engines start without Docker, older Docker installs still start, manual start never builds or installs')
 m._state['status']='running'
 with TestClient(app) as client:assert client.get('/api/close-status').json()['ready'] is False
 m._state['status']='done'
@@ -80,3 +90,21 @@ with patch.object(m,'session') as session,patch.object(m,'health',return_value={
         assert 'Stop the older engine' in str(error) and 'port 8881' in str(error)
     else:raise AssertionError('An incompatible engine must not be reported ready')
 print('PASS incompatible older engine gives a recovery action and cannot be reported ready')
+
+# 0.9.4-beta.3: the Windows installer only queues the chosen tools; the app installs them on start.
+import json
+pending=Path(temp.name)/'ai-setup-pending.json'
+pending.write_text(json.dumps({'components':['whisper','kokoro','not-real'],'gpu':True,'accepted_terms':True}))
+m._state['status']='idle'
+with patch.object(m,'install') as inst,patch.object(m.threading,'Thread',side_effect=lambda target,args,daemon:SimpleNamespace(start=lambda:target(*args))):
+    assert m.start_pending_setup() is True
+    inst.assert_called_once_with(['whisper','kokoro'],True)
+assert not pending.exists() and m.start_pending_setup() is False
+pending.write_text(json.dumps({'components':['whisper'],'accepted_terms':False}))
+with patch.object(m,'install') as inst:
+    assert m.start_pending_setup() is False;inst.assert_not_called()
+import subprocess as _sp
+ws=Path(temp.name)/'queued';r=_sp.run([sys.executable,str(root/'backend/desktop_entry.py'),'--queue-local-ai','whisper,kokoro,chatterbox',str(ws),'1'],capture_output=True,text=True)
+assert r.returncode==0,r.stderr
+assert json.loads((ws/'ai-setup-pending.json').read_text())=={'components':['whisper','kokoro','chatterbox'],'gpu':True,'accepted_terms':True}
+print('PASS installer choices are queued quickly and installed by the app on first start; unknown tools and unaccepted terms are ignored')

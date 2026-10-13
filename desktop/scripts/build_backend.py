@@ -8,4 +8,4 @@ subprocess.run([sys.executable,'-m','PyInstaller','--noconfirm','--clean','--one
  '--hidden-import','keyring.backends.Windows','--hidden-import','keyring.backends.SecretService','--hidden-import','keyring.backends.macOS',
  '--collect-submodules','cv2','--hidden-import','numpy',
  '--collect-all','faster_whisper','--collect-all','ctranslate2','--collect-all','av','--collect-all','onnxruntime',
- '--collect-all','arabic_reshaper','--collect-all','bidi',str(root/'backend/desktop_entry.py')],check=True,cwd=root)
+ '--collect-all','arabic_reshaper','--collect-all','bidi','--collect-all','kokoro_onnx','--collect-all','espeakng_loader','--collect-all','phonemizer',str(root/'backend/desktop_entry.py')],check=True,cwd=root)

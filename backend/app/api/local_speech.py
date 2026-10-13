@@ -10,8 +10,60 @@ router = APIRouter(prefix='/api/local-speech', tags=['local speech'])
 ENGINES = {'kokoro': ('http://127.0.0.1:8880', 'kokoro'),
            'chatterbox': ('http://127.0.0.1:8881', 'chatterbox')}
 
+def _built_in_profile(db, name, url, model):
+    profile = db.query(ProviderProfile).filter_by(capability='speech', name=name).first()
+    if profile is None:
+        profile = ProviderProfile(capability='speech', name=name, base_url=url, model=model, secret_ref='')
+        db.add(profile); db.commit(); db.refresh(profile)
+    return profile
+
+
+@router.get('/kokoro_builtin/status')
+def kokoro_status():
+    from app.providers import kokoro_builtin
+    return kokoro_builtin.status()
+
+
+@router.post('/kokoro_builtin/download')
+def kokoro_download():
+    """Download the built-in Kokoro voices (about 120 MB) in the background."""
+    from app.providers import kokoro_builtin
+    if kokoro_builtin.installed():
+        return kokoro_builtin.status()
+    if kokoro_builtin.status()['state'] != 'downloading':
+        def run():
+            try: kokoro_builtin.download()
+            except ValueError: pass   # reported through status()
+        _threading.Thread(target=run, daemon=True).start()
+        kokoro_builtin._progress['state'] = 'downloading'
+    return kokoro_builtin.status()
+
+
+@router.get('/voicebox/status')
+def voicebox_status():
+    from app.providers import voicebox
+    return {'running': voicebox.running(), 'url': voicebox.DEFAULT_URL}
+
+
 @router.post('/{engine}/connect')
 def connect(engine: str, db: Session = Depends(get_db)):
+    if engine == 'kokoro_builtin':
+        from app.providers import kokoro_builtin
+        if not kokoro_builtin.installed():
+            raise HTTPException(409, f'Download the built-in Kokoro voices first ({kokoro_builtin.DOWNLOAD_MB} MB, one time).')
+        profile = _built_in_profile(db, 'kokoro_builtin', 'builtin://kokoro', 'kokoro-82m')
+        voices = kokoro_builtin.voice_details()
+        return {'profile': _to_out(profile), 'voices': [v['id'] for v in voices], 'status': 'ready',
+                'message': 'Kokoro is built into SceneForge and ready. English, Spanish, French, Hindi, Italian and Portuguese.'}
+    if engine == 'voicebox':
+        from app.providers import voicebox
+        if not voicebox.running():
+            raise HTTPException(503, 'Voicebox is not running. Install it from voicebox.sh, open it, then click Connect Voicebox again.')
+        profile = _built_in_profile(db, 'voicebox', voicebox.DEFAULT_URL, 'voicebox')
+        try: voices = voicebox.voice_details(profile.base_url)
+        except ValueError as e: raise HTTPException(503, str(e))
+        return {'profile': _to_out(profile), 'voices': [v['id'] for v in voices], 'status': 'service_reachable',
+                'message': 'Voicebox connected. Your Voicebox voice profiles are listed under Voice.'}
     if engine not in ENGINES: raise HTTPException(404, 'Unknown local engine')
     url, model = ENGINES[engine]
     profile = db.query(ProviderProfile).filter_by(capability='speech', name=engine).first()
@@ -100,7 +152,14 @@ def engine_status(engine: str):
     state = dict(_START_STATE.get(engine, {'state': 'idle', 'log': ''}))
     if reachable:
         state['state'] = 'running'
-    return {'engine': engine, 'url': url, 'reachable': reachable, 'services_bundled': _services_dir() is not None, **_docker_state(), **state}
+    from app import native_engines
+    if engine == 'chatterbox' and (native_engines.installed('chatterbox') or reachable):
+        runtime = {'docker': 'ready', 'message': 'Runs on this computer without Docker.'}
+    elif engine == 'chatterbox':
+        runtime = {'docker': 'not_installed', 'message': 'Chatterbox is not installed yet. Open AI Engines and click Install next to Chatterbox: one click, no Docker.'}
+    else:
+        runtime = _docker_state()
+    return {'engine': engine, 'url': url, 'reachable': reachable, 'services_bundled': _services_dir() is not None, **runtime, **state}
 
 
 @router.post('/{engine}/start')
@@ -108,6 +167,17 @@ def engine_start(engine: str):
     """Build/start the engine's container with Docker Compose in the background.
     The first Chatterbox start downloads several GB and can take 10–30 minutes."""
     if engine not in ENGINES: raise HTTPException(404, 'Unknown local engine')
+    if engine == 'chatterbox':
+        # 0.9.4-beta.3: Chatterbox runs natively (no Docker). Start an installed copy, or
+        # point to the one-click install.
+        from app import native_engines, managed_ai
+        if native_engines.installed('chatterbox'):
+            native_engines.start('chatterbox', managed_ai.preferences().get('gpu', False))
+            with _START_LOCK:
+                _START_STATE[engine] = {'state': 'starting', 'log': 'Starting Chatterbox (no Docker)…\n'}
+            return {'engine': engine, 'state': 'starting'}
+        if managed_ai.preferences().get('runtime', {}).get('chatterbox') != 'docker' and 'chatterbox' not in managed_ai.preferences().get('components', []):
+            raise HTTPException(409, 'Chatterbox is not installed yet. Open AI Engines and click Install next to Chatterbox: one click, no Docker.')
     docker = _docker_state()
     if docker['docker'] != 'ready':
         raise HTTPException(503, docker['message'])

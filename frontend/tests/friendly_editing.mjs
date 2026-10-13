@@ -52,6 +52,6 @@ fireEvent.click(within(row('Chatterbox')).getByRole('button',{name:/Install/}));
 await waitFor(()=>assert.deepEqual(installBody.components,['chatterbox']));
 cleanup();Object.assign(state,{supported:false,status:'idle',total:0,settings:{...state.settings,components:[]}});
 render(React.createElement(LocalAISetup,{}));
-await waitFor(()=>assert(screen.getByText(/One-click install is available on Windows/)));
+await waitFor(()=>assert(screen.getByText(/One-click install is not available on this computer yet/)));
 assert.equal(screen.queryAllByRole('button',{name:/Install/}).length,0);
 cleanup();console.log('PASS one-click install per engine, stated terms, truthful progress, Start for installed engines, Ready state and unsupported-platform guard; mocked installation only');

@@ -154,10 +154,11 @@ The screenshots on this page come from the 0.7.0 build. They show a demo project
 
 ![Audio tab with local voice engines: Connect, Start and Check buttons for Chatterbox and Kokoro, and the narration engine, language and voice selectors](docs/images/local-voices.png)
 
-- **Chatterbox** (Arabic and multilingual) and **Kokoro** give natural narration with no provider key. They run as local services in **Docker Desktop** in Linux-containers mode.
-- The installer includes the service files. **Start Chatterbox** and **Start Kokoro** buttons detect a missing or stopped Docker, show a live log and connect when the engine answers.
-- The first start downloads container images and models, several GB for Chatterbox. Chatterbox uses CPU-only PyTorch. Chatterbox has not yet been confirmed working on a Windows test PC. Kokoro and the cloud voices are the fallback.
-- **Cloud voices:** ElevenLabs (with exact word timing) and Together AI. You can also upload your own recordings.
+- **Kokoro** is built into SceneForge (0.9.4-beta.3): English, Spanish, French, Hindi, Italian and Portuguese voices that run on the CPU. **Download voices** fetches about 120 MB once; no Docker, no account.
+- **Chatterbox** (Arabic and 22 more languages) installs with one click in **AI Engines**. SceneForge sets up a private Python inside its own folder and runs the voice engine there: no Docker, no administrator rights. The first setup downloads about 3 GB.
+- **Gemini voices** (cloud): 100+ languages including Arabic with a free Google AI Studio key. **Voicebox**: if you use the free Voicebox app, SceneForge can use its voices while it is open.
+- **Cloud voices:** ElevenLabs (with exact word timing), Gemini voices and Together AI. You can also upload your own recordings.
+- Engines set up with 0.9.4-beta.2 or earlier in Docker Desktop keep working.
 
 ### Export and share
 
@@ -202,8 +203,9 @@ Installers are on the **[Releases page](https://github.com/EzioDEVio/SceneForge/
 | Cutout model IS-Net general use | ~170 MB | Downloads on first use, checked by checksum *(0.7.0)* |
 | Cutout model People (U²-Net human) | ~176 MB | Downloads on first use, checked by checksum *(0.7.0)* |
 | Voice isolation model (MDX-Net Kim_Vocal_2) | ~67 MB | Downloads on first use, checked by checksum *(0.7.0)* |
-| Chatterbox and Kokoro voices | several GB (Chatterbox) | Docker Desktop (Linux containers) pulls them on first start |
-| Stable Diffusion (AUTOMATIC1111), ComfyUI and video models | varies | Installed separately by you |
+| Kokoro voices (built in) | ~120 MB | Downloads once, checked by checksum *(0.9.4)* |
+| Chatterbox voices, Stable Diffusion | ~3 GB / ~6 GB | One-click install in AI Engines, in SceneForge's own folder, no Docker *(0.9.4)* |
+| AUTOMATIC1111 (optional), ComfyUI and video models | varies | Installed separately by you |
 
 Downloaded models are kept in `%USERPROFILE%\.sceneforge\models\{whisper,cutout,voice}` (or `~/.sceneforge/models/…`). Provider keys are stored in the operating system's credential store (Windows Credential Manager, macOS Keychain, Linux Secret Service), never in project files.
 
@@ -213,8 +215,8 @@ AI is optional. You can build a complete video from your own photos, clips and r
 
 | Purpose | Cloud (your own account and key) | Local (free, on your computer) |
 |---|---|---|
-| Images | OpenAI, Google Gemini, Cloudflare Workers AI, Hugging Face | Stable Diffusion through AUTOMATIC1111 (point SceneForge at its folder in **AI Engines**) |
-| Voice | ElevenLabs (with exact word timing), Together AI | Chatterbox and Kokoro (Docker); espeak as an optional robotic diagnostic voice |
+| Images | OpenAI, Google Gemini, Cloudflare Workers AI, Hugging Face | Stable Diffusion 1.5 (one-click install in **AI Engines**, no Docker), or your own AUTOMATIC1111 |
+| Voice | ElevenLabs (with exact word timing), Gemini voices, Together AI | Kokoro (built in), Chatterbox (one-click, no Docker), Voicebox (optional app); espeak as an optional robotic diagnostic voice |
 | Captions | OpenAI Whisper, ElevenLabs Scribe | Faster-Whisper (model downloads once) |
 | Voice isolation, subject cutout | — | Local ONNX models (see above) |
 | Text-to-video | Google Veo 3.1, Runway Gen-4.5 and WAN 3.0 | ComfyUI workflows for LTX-2.5, Wan 2.1, Wan 2.2 and custom workflows |

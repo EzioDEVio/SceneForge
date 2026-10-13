@@ -42,6 +42,16 @@ font names and GUST Font License/LPPL notices in
 assets/fonts/licenses/Latin-Modern-LICENSE.txt. Unmodified font files and
 notices are also included in frontend/public/fonts.
 
-The local AI installer downloads separate Docker, SD 1.5 and Chatterbox
-components after terms review. See LOCAL_AI_INSTALLER.md for their sources,
+The local AI installer downloads SD 1.5 and Chatterbox components after terms
+review (0.9.4-beta.3: no Docker). It fetches uv 0.13.0 (Astral, MIT or
+Apache-2.0, pinned SHA-256 per platform), which installs a private CPython 3.11
+(python-build-standalone, PSF license) and the services' Python packages,
+including PyTorch (BSD-3-Clause), into SceneForge's engines folder.
+
+Built-in Kokoro voices (0.9.4-beta.3) bundle kokoro-onnx (MIT), phonemizer
+(GPL-3.0) and espeakng-loader with the espeak-ng library (GPL-3.0); the
+Kokoro-82M model (Apache-2.0) and voice pack download once from the
+kokoro-onnx release, checked by SHA-256. Optional Voicebox (MIT) is a separate
+app installed by the user; SceneForge only talks to its local API. Gemini voices
+are a Google service used with the user's own API key. See LOCAL_AI_INSTALLER.md for their sources,
 terms, storage, GPU/CPU behavior and Windows validation requirements.

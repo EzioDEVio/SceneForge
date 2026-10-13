@@ -15,10 +15,10 @@ import time
 import requests
 from app.config import DATA_DIR, RESOURCE_DIR
 
-COMPONENTS = ('whisper', 'stable_diffusion', 'chatterbox')
+COMPONENTS = ('whisper', 'kokoro', 'stable_diffusion', 'chatterbox')
 _lock = threading.RLock()
 _running = False
-_state = {'status':'idle', 'completed':0, 'total':0, 'current':'', 'log':[], 'error':''}
+_state = {'status':'idle', 'completed':0, 'total':0, 'current':'', 'part':0.0, 'step':'', 'log':[], 'error':''}
 try:
     _state.update(json.loads((DATA_DIR/'ai-install-status.json').read_text()))
     if _state['status']=='running':
@@ -42,12 +42,18 @@ def save_preferences(value):
 
 def running():
     """Which installed engines answer right now (quick loopback checks)."""
+    from app.providers import kokoro_builtin
     return {'stable_diffusion': image_ready() or bool(health('stable_diffusion')),
-            'chatterbox': bool(health('chatterbox'))}
+            'chatterbox': bool(health('chatterbox')), 'kokoro': kokoro_builtin.installed()}
+
+def set_runtime(component, runtime):
+    prefs=preferences();prefs.setdefault('runtime',{})[component]=runtime;save_preferences(prefs)
 
 def state():
     with _lock:
-        return {**_state, 'log':list(_state['log']), 'settings':preferences(), 'supported':os.name=='nt'}
+        import platform
+        from app.native_engines import UV_ASSETS
+        return {**_state, 'log':list(_state['log']), 'settings':preferences(), 'supported':(platform.system(),platform.machine()) in UV_ASSETS}
 
 def report(message, **patch):
     with _lock:
@@ -65,10 +71,10 @@ def report(message, **patch):
         encoding = getattr(sys.stdout, 'encoding', None) or 'utf-8'
         print(line.encode(encoding, errors='backslashreplace').decode(encoding), flush=True)
 
-def run(args, timeout=3600):
+def run(args, timeout=3600, env=None):
     # A timed command cannot leave its installers/children running unseen.
     flags = getattr(subprocess, 'CREATE_NO_WINDOW', 0)
-    with subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+    with subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, env=env,
                           text=True, encoding='utf-8', errors='replace', creationflags=flags) as p:
         def expire():
             if p.poll() is None:
@@ -170,6 +176,10 @@ def warmup(component,args):
         worker.join(5)
         if worker.is_alive():
             try:
+                if not args:
+                    from app import native_engines
+                    report(f'{component}: {native_engines.model_cache_mb():.1f} MB of models downloaded; downloading/loading model.')
+                    continue
                 result=subprocess.run(args+['exec','-T',component,'du','-sb',cache],capture_output=True,text=True,timeout=5,creationflags=getattr(subprocess,'CREATE_NO_WINDOW',0))
                 if result.returncode==0:
                     size=int(result.stdout.split()[0]);report(f'{component}: {size/1_000_000:.1f} MB cached; downloading/loading model.')
@@ -222,21 +232,30 @@ def install(components, gpu=False):
         if _running:raise RuntimeError('Local AI installation is already running.')
         if not components or any(c not in COMPONENTS for c in components):raise ValueError('Choose known local AI components.')
         _running=True
-        _state.update(status='running',completed=0,total=len(components),current='',log=[],error='')
+        _state.update(status='running',completed=0,total=len(components),current='',log=[],error='',queue=list(components),part=0.0,step='')
     try:
-        if os.name!='nt':raise RuntimeError('This automatic installer is for Windows. Existing local APIs remain available on other systems.')
         root=engine_root();root.mkdir(parents=True,exist_ok=True)
-        minimum=500_000_000 if components==['whisper'] else 15_000_000_000
+        minimum=500_000_000 if set(components)<={'whisper','kokoro'} else 15_000_000_000
         if shutil.disk_usage(root).free<minimum:raise RuntimeError('Not enough free space for selected local AI. Free space, then Retry.')
         prior=preferences()
         value={**prior,'components':list(prior['components']),'autostart':prior.get('autostart',True),'gpu':bool(gpu)}
         save_preferences(value)
         for component in components:
-            report('Preparing '+component, current=component)
-            if component=='whisper':
+            report('Preparing '+component, current=component, part=0.0, step='Preparing')
+            if component=='kokoro':
+                from app.providers import kokoro_builtin
+                report('Downloading the Kokoro voices.',step='Downloading voices',part=0.1)
+                kokoro_builtin.download(report)
+                from app.db.database import SessionLocal
+                from app.db.models import ProviderProfile
+                with SessionLocal() as db:
+                    if not db.query(ProviderProfile).filter_by(capability='speech',name='kokoro_builtin').first():
+                        db.add(ProviderProfile(capability='speech',name='kokoro_builtin',base_url='builtin://kokoro',model='kokoro-82m',secret_ref=''));db.commit()
+            elif component=='whisper':
                 report('Downloading/checking Whisper multilingual base model (about 145 MB).')
                 from faster_whisper import WhisperModel
                 from app.providers.transcribe import _load_local_model
+                report('Downloading the Whisper model.',step='Downloading the captions model',part=0.1)
                 model=_load_local_model(WhisperModel)
                 del model
             else:
@@ -249,28 +268,31 @@ def install(components, gpu=False):
                     except OSError:pass
                     else:
                         if not health(component):raise RuntimeError(f'Port {port} is used by another service. Stop it or use your existing engine connection; Retry will not replace it.')
-                    docker=ensure_docker();args=compose(docker,gpu)
-                    profile='images' if component=='stable_diffusion' else 'arabic'
-                    try:
-                        run(args+['--profile',profile,'up','-d','--build',component])
-                    except RuntimeError:
-                        # An engine started another way (e.g. an older SceneForge's Start
-                        # button, Compose project "services") may hold the port. If it
-                        # answers as this engine, use it instead of failing.
-                        if not health(component):raise
+                    if not health(component):
+                        # Native engine: private Python + packages, no Docker (0.9.4-beta.3).
+                        from app import native_engines
+                        report('Setting up a private Python for this engine.',step='Installing the engine (largest download)',part=0.1)
+                        native_engines.install(component,gpu,run=lambda a,e:run(a,env=e),report=report)
+                        report('Engine installed.',step='Starting the engine',part=0.6)
+                        native_engines.start(component,gpu)
+                        set_runtime(component,'native')
+                        report('Starting '+component+'. The first start loads PyTorch and can take a few minutes.')
+                        for _ in range(300):
+                            if health(component):break
+                            if not native_engines.running(component):raise RuntimeError(component+' stopped while starting. Open the engine log in AI Engines and Retry.')
+                            time.sleep(2)
+                        else:raise RuntimeError(component+' did not start within 10 minutes. Retry; downloads already made are kept.')
+                    else:
                         report('Using the '+component+' engine that is already running on this computer.')
                     report('Downloading/loading '+component+' models. First setup can take many minutes; progress is shown below.')
-                    port=7860 if component=='stable_diffusion' else 8881
-                    for _ in range(90):
-                        if health(component):break
-                        time.sleep(2)
-                    else:raise RuntimeError(component+' service did not start. Check Docker Desktop and Retry.')
-                    warmup_with_retry(component,args)
+                    report('Engine running.',step='Downloading and loading the model',part=0.75)
+                    warmup_with_retry(component,None)
                     if not (health(component) or {}).get('model_ready'):raise RuntimeError(component+' model did not become ready.')
                 register(component)
-            value['components']=list(dict.fromkeys(value['components']+[component]))
+            value={**preferences(),'gpu':bool(gpu)}   # keep what steps saved (e.g. runtime)
+            value['components']=list(dict.fromkeys(value.get('components',[])+[component]))
             save_preferences(value)
-            report(component+' ready',completed=_state['completed']+1)
+            report(component+' ready',completed=_state['completed']+1,part=0.0,step='')
         report('Selected local AI components are ready.',status='done',current='')
         return True
     except Exception as exc:
@@ -281,26 +303,54 @@ def install(components, gpu=False):
 
 def autostart(force=False, services=None):
     prefs=preferences()
-    if (not force and not prefs.get('autostart',True)) or os.name!='nt':return
+    if not force and not prefs.get('autostart',True):return
     services=services if services is not None else [c for c in prefs.get('components',[]) if c!='whisper']
     if not services:return
     try:
         # Startup never installs software or builds images. Installation is explicit.
-        docker=docker_path()
-        if not docker:return
-        if not docker_ready(docker):
-            desktop=Path(os.environ.get('ProgramFiles',r'C:\Program Files'))/'Docker/Docker/Docker Desktop.exe'
-            if desktop.is_file():subprocess.Popen([str(desktop)])
-            for _ in range(30):
-                if docker_ready(docker):break
-                time.sleep(2)
-            else:return
-        run(compose(docker,prefs.get('gpu',False))+['--profile','images','--profile','arabic','start']+services,timeout=120)
+        from app import native_engines
+        runtime=prefs.get('runtime',{})
+        native=[c for c in services if runtime.get(c)=='native' or native_engines.installed(c)]
+        docker_services=[c for c in services if c not in native]
+        for c in native:
+            if not health(c):native_engines.start(c,prefs.get('gpu',False))
+        if docker_services and os.name=='nt':
+            # Engines installed by 0.9.4-beta.2 and earlier ran in Docker Desktop.
+            docker=docker_path()
+            if docker:
+                if not docker_ready(docker):
+                    desktop=Path(os.environ.get('ProgramFiles',r'C:\Program Files'))/'Docker/Docker/Docker Desktop.exe'
+                    if desktop.is_file():subprocess.Popen([str(desktop)])
+                    for _ in range(30):
+                        if docker_ready(docker):break
+                        time.sleep(2)
+                if docker_ready(docker):
+                    run(compose(docker,prefs.get('gpu',False))+['--profile','images','--profile','arabic','start']+docker_services,timeout=120)
         # Reuse installed model caches, without downloading on every app launch.
         for c in services:
             port=7860 if c=='stable_diffusion' else 8881
-            for _ in range(30):
+            for _ in range(150 if c in native else 30):
                 if health(c):break
                 time.sleep(2)
+            else:continue
             with session() as s:s.post(f'http://127.0.0.1:{port}/warmup',timeout=(5,600))
     except Exception as exc:report('Automatic startup needs attention: '+str(exc))
+
+
+def start_pending_setup() -> bool:
+    """Install the AI tools chosen in the Windows installer (terms were accepted there).
+    Returns True when an installation was started."""
+    pending=DATA_DIR/'ai-setup-pending.json'
+    try:
+        value=json.loads(pending.read_text(encoding='utf-8'))
+    except (OSError,ValueError):
+        return False
+    pending.unlink(missing_ok=True)
+    components=[c for c in value.get('components',[]) if c in COMPONENTS]
+    if not components or not value.get('accepted_terms'):
+        return False
+    with _lock:
+        if _running:return False
+        _state.update(status='running',error='')
+    threading.Thread(target=install,args=(components,bool(value.get('gpu'))),daemon=True).start()
+    return True

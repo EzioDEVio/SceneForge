@@ -39,6 +39,15 @@ def connection(profile):
 
 
 def list_voice_details(profile):
+    if profile.name == 'kokoro_builtin':
+        from app.providers import kokoro_builtin
+        return kokoro_builtin.voice_details()
+    if profile.name == 'gemini_tts':
+        from app.providers import gemini_tts
+        return gemini_tts.voice_details()
+    if profile.name == 'voicebox':
+        from app.providers import voicebox
+        return voicebox.voice_details(profile.base_url)
     if profile.name == 'elevenlabs':
         base, headers = connection(profile)
         try:
@@ -100,6 +109,15 @@ def _alignment_from(payload) -> dict | None:
 def synthesize_with_alignment(profile, text, voice, language, speed):
     """Return (audio bytes, alignment or None). ElevenLabs is asked for
     character timestamps so word-by-word captions can follow the voice exactly."""
+    if profile.name == 'kokoro_builtin':
+        from app.providers import kokoro_builtin
+        return kokoro_builtin.synthesize(text, voice, language, speed), None
+    if profile.name == 'gemini_tts':
+        from app.providers import gemini_tts
+        return gemini_tts.synthesize(reveal(profile.secret_ref or ''), profile.model, text, voice, language, speed), None
+    if profile.name == 'voicebox':
+        from app.providers import voicebox
+        return voicebox.synthesize(profile.base_url, text, voice, language), None
     if profile.name == 'elevenlabs':
         base, headers = connection(profile)
         import re

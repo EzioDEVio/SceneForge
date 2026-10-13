@@ -1,5 +1,12 @@
 # Local AI installation — Windows test build
 
+> **0.9.4-beta.3:** no Docker. Stable Diffusion and Chatterbox install into SceneForge's
+> engines folder through uv (a private Python 3.11 and the service packages) and run as
+> background processes on the same ports (7860, 8881). Kokoro voices are built in. The
+> Windows installer only records the chosen tools; SceneForge installs them on first start
+> with a progress screen. Installs made by 0.9.4-beta.2 and earlier in Docker Desktop are
+> still started at launch. The Docker notes below describe those older installs.
+
 The Windows NSIS installer now offers Whisper, Stable Diffusion and Chatterbox
 on a component page. All three are selected initially. Review the linked
 component terms before continuing. The installer log shows installation stages

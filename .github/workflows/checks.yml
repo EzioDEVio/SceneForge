@@ -88,4 +88,8 @@ jobs:
             python tests/integration/test_managed_ai.py
             python tests/integration/test_managed_ai_warmup.py
             python tests/integration/test_stability_stress.py
+            python tests/integration/test_export_batching.py
+            python tests/integration/test_local_engine_proxy.py
+            python tests/integration/test_builtin_voices.py
+            python tests/integration/test_native_engines.py
           '

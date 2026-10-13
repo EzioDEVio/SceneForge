@@ -62,7 +62,10 @@ globalThis.fetch=async(path,init={})=>{
  else if(path===`/api/projects/${project.id}`&&method==='DELETE')result={ok:true};
  else if(path==='/api/providers'&&method==='GET') result=profiles;
  else if(path==='/api/providers'&&method==='POST'){const p={...body,id:'provider-'+body.name,configured:true,masked_key:'masked'};profiles=profiles.filter(v=>v.name!==p.name).concat(p);result=p;}
- else if(path==='/api/local-speech/kokoro/connect') {if(failLocal){failLocal=false;return {ok:false,status:503,json:async()=>({detail:'Engine is not running.'})};}const profile={id:'provider-kokoro',name:'kokoro',capability:'speech',base_url:'http://127.0.0.1:8880'};profiles.push(profile);result={profile,voices:['af_heart'],message:'Service connected.'};}
+ else if(path==='/api/local-speech/kokoro_builtin/connect') {if(failLocal){failLocal=false;return {ok:false,status:409,json:async()=>({detail:'Download the built-in Kokoro voices first (121 MB, one time).'})};}const profile={id:'provider-kokoro',name:'kokoro_builtin',capability:'speech',base_url:'builtin://kokoro'};profiles.push(profile);result={profile,voices:['af_heart'],message:'Kokoro is built into SceneForge and ready.'};}
+ else if(path==='/api/local-speech/kokoro_builtin/status') result={installed:true,state:'ready',done:0,total:1,error:'',download_mb:121,languages:['en']};
+ else if(path==='/api/local-speech/chatterbox/status') result={reachable:false,state:'idle',docker:'not_installed',message:''};
+ else if(path==='/api/local-speech/voicebox/status') result={running:false,url:'http://127.0.0.1:17493'};
  else if(path.endsWith('/voices'))result={voices:['af_heart','default']};
  else if(path.endsWith('/image-history'))result=[];
  else if(path.startsWith('/api/assets/luts'))result=[];
@@ -921,12 +924,13 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await user.click(within(engineDialog).getByRole('button',{name:'Close'}));
  await user.click(screen.getByRole('tab',{name:'Audio',exact:true}));
  check('robotic narration is not selected by default',screen.getByRole('combobox',{name:'Narration engine'}).value==='unselected');
- await user.click(screen.getByRole('button',{name:'Connect Kokoro',exact:true}));
- await screen.findByText('Engine is not running.');
+ await user.click(await screen.findByRole('button',{name:'Use Kokoro',exact:true}));
+ await screen.findByText(/Download the built-in Kokoro voices first/);
  check('unavailable engine does not silently select robotic fallback',screen.getByRole('combobox',{name:'Narration engine'}).value==='unselected');
- await user.click(screen.getByRole('button',{name:'Connect Kokoro',exact:true}));
+ await user.click(screen.getByRole('button',{name:'Use Kokoro',exact:true}));
  await waitFor(()=>assert.equal(screen.getByRole('combobox',{name:'Narration voice'}).value,'af_heart'));
- check('Kokoro connects and selects a compatible voice',screen.getByRole('combobox',{name:'Narration language'}).value==='en');
+ check('voice cards offer built-in Kokoro, Chatterbox without Docker, Gemini and Voicebox',['Kokoro','Chatterbox','Gemini voices','Voicebox'].every(n=>screen.getByRole('listitem',{name:n})));
+ check('built-in Kokoro connects and selects a compatible voice',screen.getByRole('combobox',{name:'Narration language'}).value==='en');
  await user.click(screen.getByRole('tab',{name:'Media',exact:true}));
  await user.click(screen.getByRole('button',{name:'Generate image',exact:true}));
  await waitFor(()=>assert.equal(screen.getByRole('combobox',{name:'Image provider'}).value,'provider-gemini'));

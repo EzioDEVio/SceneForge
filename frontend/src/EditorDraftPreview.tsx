@@ -29,8 +29,10 @@ export function EditorDraftPreview({sceneId,edits,dirty,active,busy,onApply,onCa
  const current=dirty&&renderSignature===signature,ready=current&&job?.status==='succeeded'&&job.artifact_asset_id;
  const status=starting?'Starting render…':connectionError||error||(current&&job?.status==='failed'&&(job.error||'Preview failed. Try rendering again.'))||(current&&job?.status==='cancelled'&&'Preview stopped. You can render again.')||(running?`${job?.stage||'Rendering scene'} · ${Math.round(job?.progress||0)}%`:'Render your draft to see movement, captions and sound.');
  const failure=error||connectionError||current&&job?.status==='failed';
- return <section className="editor-draft-actions" aria-label="Motion and Effects draft">
-  <p aria-live="polite">{dirty?'Draft · not saved':'Saved settings'}{dirty&&!current?' · preview outdated':''}</p>
+ // Nothing to apply: a single slim line instead of a 150 px panel (laptop screens).
+ const idle=!dirty&&!running&&!failure&&!connectionError;
+ return <section className={`editor-draft-actions ${idle?'idle':''}`} aria-label="Motion and Effects draft">
+  <p aria-live="polite">{dirty?'Draft · not saved':'Saved settings'}{dirty&&!current?' · preview outdated':''}{idle&&<span className="draft-idle-hint"> · changes here become a draft you can preview, apply or cancel</span>}</p>
   <div className="button-row"><button className="btn" disabled={!dirty||running||busy} onClick={()=>void render()}>Render draft preview</button><button className="btn btn-primary" disabled={!dirty||busy||running} onClick={onApply}>Apply changes</button><button className="btn" disabled={!dirty||busy} onClick={cancel}>Cancel changes</button>{!open&&<button className="btn" onClick={()=>setOpen(true)}>Open draft companion</button>}</div>
   <p className="hint">Draft render checks this scene. Project music and timeline layers are available in the main timeline preview.</p>
   {running&&<button className="btn" disabled={!jobId} onClick={()=>void stop()}>Stop preview</button>}

@@ -41,7 +41,7 @@ import {RestorePoints, useAutoSnapshots} from "./RestorePoints";
 import {ShareDialog} from "./ShareDialog";
 import VideoGenerationPanel from "./VideoGenerationPanel";
 import {FeatureHelp} from "./FeatureHelp";
-import {LocalEngineStarter} from "./LocalServices";
+import {VoiceEngines} from "./VoiceEngines";
 import {SubjectCutoutPanel} from "./CreativeTools";
 import {CreativeStudio, creativeKindOf, type CreativeKind} from "./CreativeStudio";
 import {PreferencesPanel} from "./PreferencesPanel";
@@ -409,18 +409,18 @@ function VoicePanel({ scene, onChanged, beforeGenerate }: { scene: Scene; onChan
       setProviders(old=>[...old.filter(p=>p.id!==result.profile.id),result.profile]);
       setProviderId(result.profile.id);setVoices(result.voices.map(v=>typeof v === "string" ? {id:v,name:v} : v));setVoice(result.voices[0] || "");
       if(engine==="chatterbox"&&/[\u0600-\u06ff]/.test(scene.spoken_text))setLanguage("ar");
-      if(engine==="kokoro"&&!['en','es','fr','hi','it','ja','pt','zh'].includes(language))setLanguage("en");
+      if((engine==="kokoro"||engine==="kokoro_builtin")&&!['en','es','fr','hi','it','pt'].includes(language))setLanguage("en");
       setLocalStatus(result.message);
     } catch(e:any){setErr(e.message);setLocalStatus("Engine unavailable. No fallback voice was selected.");}
     finally{setBusy(false);}
   }
   const selectedEngine=providers.find(p=>p.id===providerId)?.name;
   const voicePrefix:Record<string,string>={en:"ab",es:"e",fr:"f",hi:"h",it:"i",ja:"j",pt:"p",zh:"z"};
-  const availableVoices=selectedEngine==="kokoro"?voices.filter(v=>(voicePrefix[language]||"").includes(v.id[0])):voices;
+  const availableVoices=selectedEngine==="kokoro"||selectedEngine==="kokoro_builtin"?voices.filter(v=>(voicePrefix[language]||"").includes(v.id[0])):voices;
   useEffect(()=>{if(availableVoices.length&&!availableVoices.some(v=>v.id===voice))setVoice(availableVoices[0].id);},[language,voices,providerId]);
   useEffect(()=>{const refreshProviders=()=>api.listProviders().then(p=>setProviders(p.filter(v=>v.capability==="speech"))).catch(()=>{});void refreshProviders();window.addEventListener("sceneforge:providers-changed",refreshProviders);return()=>window.removeEventListener("sceneforge:providers-changed",refreshProviders);},[]);
   async function connect(id:string){
-    setProviderId(id);setVoices([]);setErr(null);if(providers.find(p=>p.id===id)?.name==="kokoro"&&!voicePrefix[language])setLanguage("en");
+    setProviderId(id);setVoices([]);setErr(null);if(["kokoro","kokoro_builtin"].includes(providers.find(p=>p.id===id)?.name||"")&&!voicePrefix[language])setLanguage("en");
     if(!id)return;
     setBusy(true);
     try{const result=await api.providerVoices(id);const next=result.voices.map(v=>typeof v === "string" ? {id:v,name:v} : v);setVoices(next);setVoice(next[0]?.id||"");}
@@ -482,9 +482,9 @@ function VoicePanel({ scene, onChanged, beforeGenerate }: { scene: Scene; onChan
       </div>
       {open && (
         <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
-          <section className="local-voice-component"><h3>Local voice engines</h3><p className="hint">Natural speech runs on this computer after the engine and model are installed. No AI provider key is required.</p><div className="button-row"><button className="btn" disabled={busy} onClick={()=>connectEngine("chatterbox")}>Connect Chatterbox · Arabic + multilingual</button><button className="btn" disabled={busy} onClick={()=>connectEngine("kokoro")}>Connect Kokoro</button></div><p className="hint">These engines run in Docker Desktop (Linux containers) on this PC. Start one here, wait until it says it is running, then click Connect. Enter narration text before generating audio.</p><LocalEngineStarter engine="chatterbox" label="Chatterbox" onReady={()=>connectEngine("chatterbox")}/><LocalEngineStarter engine="kokoro" label="Kokoro" onReady={()=>connectEngine("kokoro")}/>{localStatus&&<p role="status">{localStatus}</p>}</section>
-          <fieldset disabled={busy} className="provider-form"><label className="control-label">Narration engine<select aria-label="Narration engine" value={providerId} onChange={e=>connect(e.target.value)}><option value="unselected">Select a narration engine…</option><option value="">Diagnostic voice — robotic (espeak)</option>{providers.map(p=><option value={p.id} key={p.id}>{p.name}</option>)}</select></label>
-          <label className="control-label">Language<select aria-label="Narration language" value={language} onChange={e=>setLanguage(e.target.value)}>{(selectedEngine==="kokoro"?["en","fr","es","it","pt","ja","zh","hi"]:["en","ar","fr","es","de","it","pt","ja","zh","hi","ko","ru","tr"]).map(v=><option value={v} key={v}>{{en:"English",ar:"Arabic",fr:"French",es:"Spanish",de:"German",it:"Italian",pt:"Portuguese",ja:"Japanese",zh:"Chinese",hi:"Hindi",ko:"Korean",ru:"Russian",tr:"Turkish"}[v]}</option>)}</select></label>
+          <VoiceEngines busy={busy} providers={providers} onUse={engine=>void connectEngine(engine)} onSelectProvider={id=>void connect(id)}/>{localStatus&&<p role="status" className="hint">{localStatus}</p>}
+          <fieldset disabled={busy} className="provider-form"><label className="control-label">Narration engine<select aria-label="Narration engine" value={providerId} onChange={e=>connect(e.target.value)}><option value="unselected">Select a narration engine…</option><option value="">Diagnostic voice — robotic (espeak)</option>{providers.map(p=><option value={p.id} key={p.id}>{({kokoro_builtin:"Kokoro · built in",kokoro:"Kokoro · Docker (older setup)",chatterbox:"Chatterbox · Arabic + 22 languages",gemini_tts:"Gemini voices · cloud",voicebox:"Voicebox",elevenlabs:"ElevenLabs · cloud"} as Record<string,string>)[p.name]||p.name}</option>)}</select></label>
+          <label className="control-label">Language<select aria-label="Narration language" value={language} onChange={e=>setLanguage(e.target.value)}>{(selectedEngine==="kokoro"?["en","fr","es","it","pt","ja","zh","hi"]:selectedEngine==="kokoro_builtin"?["en","fr","es","it","pt","hi"]:["en","ar","fr","es","de","it","pt","ja","zh","hi","ko","ru","tr"]).map(v=><option value={v} key={v}>{{en:"English",ar:"Arabic",fr:"French",es:"Spanish",de:"German",it:"Italian",pt:"Portuguese",ja:"Japanese",zh:"Chinese",hi:"Hindi",ko:"Korean",ru:"Russian",tr:"Turkish"}[v]}</option>)}</select></label>
           {providerId&&<><label className="control-label">Voice<select aria-label="Narration voice" value={voice} onChange={e=>setVoice(e.target.value)}>{availableVoices.map(v=><option key={v.id} value={v.id}>{v.name}{[v.language,v.accent,v.gender].filter(Boolean).length?` · ${[v.language,v.accent,v.gender].filter(Boolean).join(" · ")}`:""}</option>)}</select></label><button className="text-btn" onClick={()=>connect(providerId)}>Refresh voices / test connection</button><label className="control-label">Speaking speed · {speed.toFixed(2)}×<input aria-label="Speaking speed" type="range" min={.5} max={2} step={.05} value={speed} onChange={e=>setSpeed(Number(e.target.value))}/></label></>}
           </fieldset>
           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -503,7 +503,7 @@ function VoicePanel({ scene, onChanged, beforeGenerate }: { scene: Scene; onChan
           </div>
           <small className="hint">
             {!scene.spoken_text.trim() && <strong style={{display:"block"}}>Enter narration text to enable voice generation.</strong>}
-            Select a local engine above. The diagnostic espeak voice is robotic and must be chosen explicitly. Narration is sent as continuous text, separately from typewriter animation.
+            Pick a voice above. The diagnostic espeak voice is robotic and must be chosen explicitly. Narration is sent as continuous text, separately from typewriter animation.
           </small>
           {previewUrl && <audio controls src={previewUrl} style={{ width: "100%" }} />}
           {err && <div className="error-box">{err}</div>}

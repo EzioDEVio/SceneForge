@@ -14,7 +14,7 @@ from app.db.database import init_db, SessionLocal
 from app.db.models import ProviderProfile
 from app.security.secrets import migrate_credentials
 
-app = FastAPI(title="SceneForge Studio API", version="0.9.4-beta.2")
+app = FastAPI(title="SceneForge Studio API", version="0.9.4-beta.3")
 
 from app.render.font_runtime import FontRuntimeError
 from fastapi.responses import JSONResponse
@@ -41,9 +41,10 @@ app.add_middleware(DesktopSessionMiddleware,token=os.environ.get("SCENEFORGE_DES
 def on_startup():
     logbuffer.install()   # again: uvicorn may have reconfigured logging after import
     init_db()
-    from app.managed_ai import autostart
-    threading_start = __import__("threading").Thread(target=autostart, daemon=True)
-    threading_start.start()
+    from app.managed_ai import autostart, start_pending_setup
+    if not start_pending_setup():   # tools chosen in the Windows installer install now, with progress in the app
+        threading_start = __import__("threading").Thread(target=autostart, daemon=True)
+        threading_start.start()
     # In-process render/generation threads cannot survive an app restart. Mark
     # their durable rows interrupted so stale jobs do not block project deletion.
     from app.workers.jobs import recover_interrupted_jobs
@@ -106,7 +107,7 @@ logbuffer.install()
 # new interface connected to an old backend (e.g. a still-running old
 # start.bat window) shows "Backend update required" instead of silently
 # losing settings the old backend does not know.
-BUILD_ID = "v0.9.4-beta.2"
+BUILD_ID = "v0.9.4-beta.3"
 
 
 def _ffmpeg_warning() -> str:
@@ -154,3 +155,5 @@ if _frontend_dist.exists():
 def stop_owned_image_engine():
     from app.local_images import stop
     stop()
+    from app.native_engines import stop_all
+    stop_all()   # native Chatterbox / Stable Diffusion started by this SceneForge

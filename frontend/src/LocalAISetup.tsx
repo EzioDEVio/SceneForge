@@ -1,11 +1,12 @@
 import React,{useEffect,useState} from 'react';
-import {Captions, CheckCircle2, Cpu, Download, Loader2, Mic, Play} from 'lucide-react';
+import {Captions, CheckCircle2, Cpu, Download, Loader2, Mic, Play, Sparkles} from 'lucide-react';
 
-type Component='whisper'|'stable_diffusion'|'chatterbox';
+type Component='whisper'|'kokoro'|'stable_diffusion'|'chatterbox';
 const ENGINES:{id:Component;name:string;does:string;size:string;Icon:typeof Cpu}[]=[
  {id:'whisper',name:'Whisper',does:'Automatic captions from speech and songs',size:'about 145 MB',Icon:Captions},
+ {id:'kokoro',name:'Kokoro',does:'Narration voices built into SceneForge: English, Spanish, French, Hindi, Italian, Portuguese',size:'about 120 MB',Icon:Sparkles},
  {id:'stable_diffusion',name:'Stable Diffusion',does:'Pictures from a text description',size:'about 6 GB',Icon:Cpu},
- {id:'chatterbox',name:'Chatterbox',does:'Natural narration voices in many languages, including Arabic',size:'about 5 GB',Icon:Mic},
+ {id:'chatterbox',name:'Chatterbox',does:'Natural narration voices in Arabic and 22 more languages',size:'about 3 GB',Icon:Mic},
 ];
 type State={status:string;completed:number;total:number;current:string;log:string[];error:string;supported:boolean;
  settings:{autostart:boolean;components:string[];gpu:boolean};running?:Partial<Record<Component,boolean>>};
@@ -20,7 +21,7 @@ export function LocalAISetup({onReady}:{onReady?:()=>void}){
  const [state,setState]=useState<State|null>(null),[message,setMessage]=useState(''),[starting,setStarting]=useState<string>('');
  useEffect(()=>{let active=true,last='';const check=async()=>{try{const s=await request('/api/local-ai/setup');if(active){setState(s);if(s.status==='done'&&last!=='done')onReady?.();last=s.status;}}catch(e:any){if(active)setMessage(e.message);}};void check();const timer=setInterval(check,2500);return()=>{active=false;clearInterval(timer);};},[]);
  const installing=state?.status==='running';
- const installed=(id:Component)=>!!state?.settings.components.includes(id);
+ const installed=(id:Component)=>!!state?.settings.components.includes(id)||!!state?.running?.[id];
  const running=(id:Component)=>id==='whisper'?installed(id):!!state?.running?.[id];
  async function install(components:Component[]){
   setStarting(components.join());setMessage('');
@@ -42,7 +43,7 @@ export function LocalAISetup({onReady}:{onReady?:()=>void}){
  return <section className="engine-install" aria-label="Install local AI">
   <div className="engine-install-head"><h3>Free AI on this computer</h3>
    {!unsupported&&missing.length>1&&<button className="btn btn-primary" disabled={installing||!!starting} onClick={()=>void install(missing)}><Download size={14} aria-hidden/> Install all</button>}</div>
-  <p className="hint">One click each. SceneForge downloads, installs, starts and connects everything for you, including Docker Desktop if this computer needs it. Models stay on this computer; nothing is uploaded.</p>
+  <p className="hint">One click each. SceneForge downloads, installs, starts and connects everything for you, inside its own folder: no Docker, no separate programs, no administrator rights. Models stay on this computer; nothing is uploaded.</p>
   <ul className="engine-rows">{ENGINES.map(({id,name,does,size,Icon})=>{
    const busyHere=(installing&&state?.current===id)||starting.split(',').includes(id);
    const status=busyHere?'Installing…':running(id)?'Ready':installed(id)?'Installed · not running':'Not installed';
@@ -54,7 +55,7 @@ export function LocalAISetup({onReady}:{onReady?:()=>void}){
       ?<button className="btn" disabled={installing||!!starting} onClick={()=>void start(id)}><Play size={14} aria-hidden/> Start</button>
       :<button className="btn btn-primary" disabled={installing||!!starting} onClick={()=>void install([id])}><Download size={14} aria-hidden/> Install</button>)}
    </li>;})}</ul>
-  {unsupported&&<p className="hint">One-click install is available on Windows. On this system, start your own engines and connect them below.</p>}
+  {unsupported&&<p className="hint">One-click install is not available on this computer yet. Start your own engines and connect them below.</p>}
   {state&&state.total>0&&installing?<><progress aria-label="Completed AI installation stages" max={state.total} value={state.completed}/><p role="status">{state.completed} of {state.total} done{state.current?` · working on ${ENGINES.find(e=>e.id===state.current)?.name||state.current}`:''}. First setup can take 10–40 minutes; keep SceneForge open.</p></>:null}
   {(state?.error||message)&&<p role={state?.error?'alert':'status'} className={state?.error?'form-error':'hint'}>{state?.error||message}</p>}
   {!!state?.log.length&&<details open={state.status==='error'}><summary>Installation details</summary><pre>{state.log.join('\n')}</pre></details>}
@@ -62,6 +63,6 @@ export function LocalAISetup({onReady}:{onReady?:()=>void}){
    <label><input type="checkbox" aria-label="Start installed AI with SceneForge" checked={state.settings.autostart} disabled={installing} onChange={e=>void setting({autostart:e.target.checked})}/>Start installed engines when SceneForge opens</label>
    <label><input type="checkbox" checked={!!state.settings.gpu} disabled={installing} onChange={e=>void setting({gpu:e.target.checked})}/>Use my NVIDIA graphics card for pictures (much faster; needs a recent NVIDIA driver)</label>
   </div>}
-  <p className="hint engine-terms">Installing downloads free software and models. By clicking Install you accept their terms: <a href="https://www.docker.com/legal/docker-subscription-service-agreement/" target="_blank" rel="noreferrer">Docker</a> · <a href="https://huggingface.co/spaces/CompVis/stable-diffusion-license" target="_blank" rel="noreferrer">Stable Diffusion model</a> · <a href="https://github.com/resemble-ai/chatterbox/blob/master/LICENSE" target="_blank" rel="noreferrer">Chatterbox</a>. Allow about 15 GB of free space for everything.</p>
+  <p className="hint engine-terms">Installing downloads free software and models. By clicking Install you accept their terms: <a href="https://huggingface.co/spaces/CompVis/stable-diffusion-license" target="_blank" rel="noreferrer">Stable Diffusion model</a> · <a href="https://github.com/resemble-ai/chatterbox/blob/master/LICENSE" target="_blank" rel="noreferrer">Chatterbox</a> · <a href="https://huggingface.co/hexgrad/Kokoro-82M" target="_blank" rel="noreferrer">Kokoro</a> · <a href="https://github.com/pytorch/pytorch/blob/main/LICENSE" target="_blank" rel="noreferrer">PyTorch</a>. Allow about 12 GB of free space for everything.</p>
  </section>;
 }

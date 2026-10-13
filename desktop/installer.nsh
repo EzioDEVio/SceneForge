@@ -6,6 +6,7 @@
 !include "LogicLib.nsh"
 !include "MUI2.nsh"
 Var SFWhisper
+Var SFKokoro
 Var SFImages
 Var SFVoice
 Var SFGpu
@@ -18,31 +19,29 @@ Var SFGpuFlag
 !macroend
 
 Function SFLocalAIPage
-  !insertmacro MUI_HEADER_TEXT "Set up local AI" "Choose optional tools to install with SceneForge."
+  !insertmacro MUI_HEADER_TEXT "Set up local AI" "Choose optional tools. SceneForge sets them up after it opens."
   nsDialogs::Create 1018
   Pop $0
-  ${NSD_CreateLabel} 0 0 100% 20u "Install local AI with SceneForge. Downloads are shown in the installation log. Allow at least 15 GB of free space and internet access."
+  ${NSD_CreateLabel} 0 0 100% 18u "Free AI that runs on this computer. Installing SceneForge stays quick: the selected tools download when SceneForge first opens, with progress shown there. No Docker needed."
   Pop $0
-  ${NSD_CreateCheckbox} 0 24u 100% 12u "Whisper - automatic captions (about 145 MB)"
+  ${NSD_CreateCheckbox} 0 21u 100% 12u "Whisper - automatic captions (about 145 MB)"
   Pop $SFWhisper
   ${NSD_Check} $SFWhisper
-  ${NSD_CreateCheckbox} 0 39u 100% 12u "Stable Diffusion - local pictures (several GB)"
+  ${NSD_CreateCheckbox} 0 34u 100% 12u "Kokoro - built-in narration voices (about 120 MB)"
+  Pop $SFKokoro
+  ${NSD_Check} $SFKokoro
+  ${NSD_CreateCheckbox} 0 47u 100% 12u "Stable Diffusion - local pictures (about 6 GB)"
   Pop $SFImages
-  ${NSD_Check} $SFImages
-  ${NSD_CreateCheckbox} 0 54u 100% 12u "Chatterbox - multilingual voices (several GB)"
+  ${NSD_CreateCheckbox} 0 60u 100% 12u "Chatterbox - Arabic and multilingual voices (about 3 GB)"
   Pop $SFVoice
-  ${NSD_Check} $SFVoice
-  ${NSD_CreateCheckbox} 0 69u 100% 12u "Use NVIDIA GPU for images (requires driver and Docker GPU support)"
+  ${NSD_CreateCheckbox} 0 73u 100% 12u "Use my NVIDIA graphics card for pictures and voices"
   Pop $SFGpu
-  ${NSD_CreateLabel} 0 85u 100% 20u "Image and voice tools need Docker Desktop and may need a Windows restart. Review the component terms below."
+  ${NSD_CreateLabel} 0 88u 100% 18u "Allow about 12 GB of free space for everything. You can add or remove tools later in AI Engines. Review the component terms below."
   Pop $0
-  ${NSD_CreateLink} 0 108u 30% 10u "Docker terms"
-  Pop $0
-  ${NSD_OnClick} $0 SFDockerTerms
-  ${NSD_CreateLink} 33% 108u 30% 10u "Image model terms"
+  ${NSD_CreateLink} 0 109u 45% 10u "Image model terms"
   Pop $0
   ${NSD_OnClick} $0 SFImageTerms
-  ${NSD_CreateLink} 66% 108u 30% 10u "Voice model terms"
+  ${NSD_CreateLink} 50% 109u 45% 10u "Voice model terms"
   Pop $0
   ${NSD_OnClick} $0 SFVoiceTerms
   ${NSD_CreateCheckbox} 0 124u 100% 12u "I accept the terms for the selected AI components."
@@ -50,10 +49,6 @@ Function SFLocalAIPage
   nsDialogs::Show
 FunctionEnd
 
-Function SFDockerTerms
-  Pop $0
-  ExecShell "open" "https://www.docker.com/legal/docker-subscription-service-agreement/"
-FunctionEnd
 Function SFImageTerms
   Pop $0
   ExecShell "open" "https://huggingface.co/spaces/CompVis/stable-diffusion-license"
@@ -69,6 +64,10 @@ Function SFLocalAILeave
   ${NSD_GetState} $SFWhisper $0
   ${If} $0 == ${BST_CHECKED}
     StrCpy $SFComponents "whisper"
+  ${EndIf}
+  ${NSD_GetState} $SFKokoro $0
+  ${If} $0 == ${BST_CHECKED}
+    StrCpy $SFComponents "$SFComponents,kokoro"
   ${EndIf}
   ${NSD_GetState} $SFImages $0
   ${If} $0 == ${BST_CHECKED}
@@ -93,12 +92,9 @@ FunctionEnd
 
 !macro customInstall
   ${If} $SFComponents != ""
-    DetailPrint "Installing selected local AI components. Large downloads can take many minutes."
-    nsExec::ExecToLog '"$INSTDIR\resources\backend\sceneforge-backend.exe" --install-local-ai "$SFComponents" "$APPDATA\SceneForge Studio\workspace" "$SFGpuFlag"'
+    DetailPrint "The selected local AI tools will download when SceneForge first opens."
+    nsExec::ExecToLog '"$INSTDIR\resources\backend\sceneforge-backend.exe" --queue-local-ai "$SFComponents" "$APPDATA\SceneForge Studio\workspace" "$SFGpuFlag"'
     Pop $0
-    ${If} $0 != 0
-      MessageBox MB_OK "SceneForge is installed. Local AI setup needs attention or a Windows restart. Open AI Engines - Set up free local AI to see progress and Retry."
-    ${EndIf}
   ${EndIf}
 !macroend
 !endif # BUILD_UNINSTALLER

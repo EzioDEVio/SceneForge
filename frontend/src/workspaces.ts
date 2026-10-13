@@ -28,7 +28,7 @@ export const workspacePreset = (id: string | undefined): WorkspacePreset => WORK
 export const isWorkspaceId = (v: unknown): v is WorkspaceId => WORKSPACES.some(w => w.id === v);
 
 /** Default timeline height (the Edit layout). */
-export const defaultTimelineHeight = () => Math.min(310, Math.max(180, (typeof window === 'undefined' ? 900 : window.innerHeight) * .3));
+export const defaultTimelineHeight = () => {const h = typeof window === 'undefined' ? 900 : window.innerHeight; return Math.round(Math.min(310, Math.max(h < 700 ? 160 : 180, h * (h < 700 ? .26 : .3))));};
 export const timelineHeightFor = (preset: WorkspacePreset) =>
   preset.timelineShare === null ? defaultTimelineHeight() : Math.max(timelineBounds().min, Math.round((typeof window === 'undefined' ? 900 : window.innerHeight) * preset.timelineShare));
 
@@ -37,7 +37,9 @@ export const timelineHeightFor = (preset: WorkspacePreset) =>
  *  never squeeze the preview into a sliver (owner report 2026-10-12, laptop at 1366×768). */
 export const timelineBounds = () => {
   const h = typeof window === 'undefined' ? 900 : window.innerHeight;
-  const min = h < 800 ? 180 : 250;
-  return {min, max: Math.max(min, Math.round(Math.min(h * .7, h - 83 - 360)))};
+  const min = h < 700 ? 160 : h < 800 ? 180 : 250;
+  // Preview + narration + scene/preview bars need ~420 px to stay useful (layout audit).
+  const reserve = Math.min(440, Math.round(h * .56));
+  return {min, max: Math.max(min, Math.round(Math.min(h * .7, h - 83 - reserve)))};
 };
 export const clampTimeline = (value: number) => {const {min, max} = timelineBounds(); return Math.max(min, Math.min(max, value));};

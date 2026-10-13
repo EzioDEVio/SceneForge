@@ -13,7 +13,7 @@ router = APIRouter(prefix="/api/providers", tags=["providers"])
 
 SUPPORTED = {
     "image": {"openai", "gemini", "cloudflare", "huggingface", "together", "local_sd"},
-    "speech": {"kokoro", "chatterbox", "elevenlabs"},
+    "speech": {"kokoro", "chatterbox", "elevenlabs", "gemini_tts", "kokoro_builtin", "voicebox"},
     "video": {"local_comfy", "google_veo", "runway"},
 }
 
@@ -70,6 +70,14 @@ def upsert_provider(body: schemas.ProviderProfileCreate, db: Session = Depends(g
     if body.name == 'elevenlabs':
         if not body.api_key.strip(): raise HTTPException(400, 'ElevenLabs API key is required.')
         body.base_url = 'https://api.elevenlabs.io/v1'
+    if body.name == 'gemini_tts':
+        if not body.api_key.strip() and not db.query(ProviderProfile).filter_by(capability='speech', name='gemini_tts').first():
+            raise HTTPException(400, 'Paste your Google AI Studio API key.')
+        body.base_url = 'https://generativelanguage.googleapis.com/v1beta'
+        from app.providers.gemini_tts import DEFAULT_MODEL
+        body.model = body.model if (body.model or '').startswith('gemini-') else DEFAULT_MODEL
+    if body.name in ('kokoro_builtin', 'voicebox'):
+        raise HTTPException(400, 'Connect this engine from Audio → Voice & narration.')
     if body.capability == "speech":
         from urllib.parse import urlsplit
         url = urlsplit(body.base_url or "")

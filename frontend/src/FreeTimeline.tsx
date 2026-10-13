@@ -238,7 +238,7 @@ export function FreeTimeline({
   const [selected, setSelected] = useState<string[]>([]),
     [expanded, setExpanded] = useState(false),
     [minimized, setMinimized] = useState(false),
-    [height, setHeight] = useState(() => {try {const h = Number(localStorage.getItem(`sceneforge.freeHeight.${project.id}`));return h >= 240 ? h : 360;}catch {return 360;}}),
+    [height, setHeight] = useState(() => {try {const h = Number(localStorage.getItem(`sceneforge.freeHeight.${project.id}`));return h >= 240 ? h : Math.round(window.innerHeight < 700 ? Math.max(200, window.innerHeight * .32) : Math.min(360, Math.max(240, window.innerHeight * .34)));}catch {return 360;}}),
     [viewport, setViewport] = useState(window.innerHeight),
     [boxMode, setBoxMode] = useState(false),
     [rangeMode, setRangeMode] = useState(false),
@@ -262,8 +262,8 @@ export function FreeTimeline({
   const saving = useRef(false);
   const resizeDrag = useRef<{y:number; height:number} | null>(null);
   // Keep at least ~300 px for the preview and Scene settings above (laptop screens).
-  const maxHeight = Math.max(200, Math.min(viewport * .72, viewport - 83 - 300));
-  const viewHeight = minimized ? 76 : expanded ? maxHeight : Math.max(Math.min(240, maxHeight), Math.min(maxHeight, height));
+  const maxHeight = Math.max(200, Math.min(viewport * .72, viewport - 83 - Math.min(400, Math.round(viewport * .45))));
+  const viewHeight = minimized ? 76 : expanded ? maxHeight : Math.max(Math.min(viewport < 700 ? 200 : 240, maxHeight), Math.min(maxHeight, height));
   useEffect(() => {const resize = () => setViewport(window.innerHeight);window.addEventListener("resize", resize);return () => window.removeEventListener("resize", resize);}, []);
   useEffect(() => {try {localStorage.setItem(`sceneforge.freeHeight.${project.id}`, String(height));}catch {}}, [height, project.id]);
   last.current = moving;
@@ -583,7 +583,7 @@ export function FreeTimeline({
   return (
     <section
       className={`free-timeline ${minimized ? "minimized" : ""}`}
-      style={{height: viewHeight}}
+      style={{height: minimized ? "auto" : viewHeight}}
       aria-label="Free timeline editor"
     >
       <div className="free-resizer" role="separator" aria-label="Resize free timeline" aria-orientation="horizontal" aria-valuemin={240} aria-valuemax={maxHeight} aria-valuenow={minimized ? 240 : viewHeight} aria-valuetext={minimized ? "Minimized" : `${Math.round(viewHeight)} pixels`} tabIndex={0}
