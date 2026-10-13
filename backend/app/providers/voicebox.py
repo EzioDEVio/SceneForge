@@ -26,7 +26,6 @@ LANGUAGES = {"zh", "en", "ja", "ko", "de", "fr", "ru", "pt", "es", "it", "he", "
 NO_VOICES = ("Voicebox is open but has no voices yet. In Voicebox, open Voices and create, clone or add a "
              "preset voice, then click Refresh voices here.")
 POLL_SECONDS = 1.0
-TIMEOUT_SECONDS = 900
 
 
 class VoiceboxError(ValueError):
@@ -68,7 +67,7 @@ def status(url: str | None = None) -> dict:
     """For the Voices card: is Voicebox answering, how many voices does it have, and if it
     is not answering, why (in words the user can act on)."""
     base = _base(url)
-    out = {"running": False, "profiles": 0, "url": base, "reason": ""}
+    out = {"running": False, "profiles": 0, "url": base, "reason": "", "stuck": 0}
     try:
         rows = _profiles(url, timeout=(3, 10))
     except requests.ConnectionError:
@@ -84,6 +83,10 @@ def status(url: str | None = None) -> dict:
         out["reason"] = f"The program at {base} sent a reply SceneForge does not understand. Update Voicebox, or check the address below."
     else:
         out.update(running=True, profiles=len(rows))
+        try:
+            out["stuck"] = len(stuck_jobs(url, timeout=(3, 10)))
+        except (requests.RequestException, ValueError):
+            out["stuck"] = 0
     return out
 
 
@@ -117,40 +120,101 @@ MODELS = {"qwen-tts-1.7B": ("qwen", "1.7B"), "qwen-tts-0.6B": ("qwen", "0.6B"),
           "chatterbox-tts": ("chatterbox", None), "chatterbox-turbo": ("chatterbox_turbo", None),
           "luxtts": ("luxtts", None), "tada-1b": ("tada", "1B"), "tada-3b-ml": ("tada", "3B"), "kokoro": ("kokoro", None)}
 CLONING = ("qwen", "chatterbox", "chatterbox_turbo", "luxtts", "tada")
-NO_MODEL = ("Voicebox has no voice model downloaded for this voice yet, so it would first download several GB "
-            "in the background. In Voicebox, open Models and download one (for example {names}), wait until it "
-            "finishes, then generate again here.")
+ACTIVE = ("generating", "loading_model")
+STUCK_SECONDS = 180            # an earlier Voicebox job still "Generating…" after this blocks its queue
+LOADING_SECONDS = 120          # stop waiting while Voicebox loads or downloads a model
+TIMEOUT_SECONDS = 600
 
 
-def _pick_model(base: str, profile: dict) -> tuple[str | None, str | None]:
-    """Choose an engine and model size Voicebox already has on disk, so a narration never
-    starts a hidden multi-GB download (Voicebox's /generate defaults to Qwen 1.7B)."""
+def _utc(value) -> float | None:
+    from datetime import datetime, timezone
+    try:
+        d = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
+    except ValueError:
+        return None
+    return (d if d.tzinfo else d.replace(tzinfo=timezone.utc)).timestamp()
+
+
+def stuck_jobs(url: str | None = None, timeout=(3, 10)) -> list[dict]:
+    """Voicebox jobs still "Generating…"/"Loading model" after a few minutes. Voicebox runs one
+    job at a time, so one stuck job (for example a hidden model download, or Voicebox 0.5's
+    "orphaned" jobs) keeps every later narration waiting forever."""
+    res = requests.get(_base(url) + "/history", params={"limit": 50}, timeout=timeout, **_NO_PROXY)
+    res.raise_for_status()
+    rows = res.json().get("items", []) if isinstance(res.json(), dict) else []
+    now = time.time()
+    out = []
+    for r in rows:
+        started = _utc(r.get("created_at"))
+        if isinstance(r, dict) and r.get("status") in ACTIVE and started and now - started > STUCK_SECONDS:
+            out.append({"id": r.get("id"), "profile": r.get("profile_name") or "", "status": r.get("status"),
+                        "minutes": int((now - started) // 60), "text": str(r.get("text") or "")[:60]})
+    return out
+
+
+def clear_stuck(url: str | None = None) -> int:
+    """Cancel stuck Voicebox jobs through Voicebox's own cancel endpoint (it also clears
+    "orphaned" jobs). Returns how many were cleared."""
+    cleared = 0
+    for job in stuck_jobs(url):
+        try:
+            r = requests.post(f"{_base(url)}/generate/{job['id']}/cancel", timeout=(5, 30), **_NO_PROXY)
+            cleared += r.ok
+        except requests.RequestException:
+            pass
+    return cleared
+
+
+def _models(base: str) -> list[dict] | None:
     try:
         res = requests.get(base + "/models/status", timeout=(5, 30), **_NO_PROXY)
         res.raise_for_status()
         rows = res.json().get("models", [])
+        return [r for r in rows if isinstance(r, dict) and r.get("model_name") in MODELS]
     except (requests.RequestException, ValueError, AttributeError):
-        return (_engine(profile) or None), None      # older Voicebox: let it decide
-    have = [(r.get("loaded", False), r["model_name"]) for r in rows
-            if isinstance(r, dict) and r.get("model_name") in MODELS and r.get("downloaded") and not r.get("downloading")]
+        return None
+
+
+def _pick_model(base: str, profile: dict) -> tuple[str | None, str | None, str]:
+    """Engine and model size for this voice, preferring a model Voicebox already has loaded
+    or downloaded, so a narration does not start a hidden multi-GB download (Voicebox's
+    /generate otherwise uses Qwen 1.7B). Returns (engine, size, note); when Voicebox reports
+    nothing usable on disk, still asks for the voice's own engine (Voicebox may know better)
+    and says so in the note."""
     fixed = _engine(profile)
     kind = str(profile.get("voice_type") or "cloned")
-    allowed = [fixed] if fixed else (list(CLONING) if kind == "cloned" else [e for e, _ in MODELS.values()])
-    order = list(MODELS)   # larger/better first within each engine
-    choices = sorted((m for m in have if MODELS[m[1]][0] in allowed),
-                     key=lambda m: (not m[0], allowed.index(MODELS[m[1]][0]), order.index(m[1])))
-    if not choices:
-        wanted = [name for name, (engine, _) in MODELS.items() if engine in allowed]
-        pretty = {"qwen-tts-0.6B": "Qwen TTS 0.6B", "qwen-tts-1.7B": "Qwen TTS 1.7B", "chatterbox-tts": "Chatterbox TTS",
-                  "luxtts": "LuxTTS", "kokoro": "Kokoro 82M", "chatterbox-turbo": "Chatterbox Turbo"}
-        names = " or ".join([pretty[n] for n in wanted if n in pretty][:2]) or "the voice's model"
-        raise VoiceboxError(NO_MODEL.format(names=names))
-    return MODELS[choices[0][1]]
+    allowed = [fixed] if fixed else (list(CLONING) if kind == "cloned" else list(dict.fromkeys(e for e, _ in MODELS.values())))
+    rows = _models(base)
+    if rows is None:
+        return (fixed or None), None, ""
+    order = list(MODELS)
+    have = sorted((r for r in rows if MODELS[r["model_name"]][0] in allowed and (r.get("loaded") or (r.get("downloaded") and not r.get("downloading")))),
+                  key=lambda r: (not r.get("loaded"), allowed.index(MODELS[r["model_name"]][0]), order.index(r["model_name"])))
+    if have:
+        engine, size = MODELS[have[0]["model_name"]]
+        return engine, size, ""
+    busy = [r.get("display_name") or r["model_name"] for r in rows if r.get("downloading") and MODELS[r["model_name"]][0] in allowed]
+    if busy:
+        raise VoiceboxError(f"Voicebox is still downloading {busy[0]}. Wait until Voicebox → Models shows it as downloaded, then generate again.")
+    engine = fixed or allowed[0]
+    return engine, None, (f"Voicebox did not report a downloaded model for the {engine} engine, so it may need to download one first "
+                          "(watch Voicebox → Models).")
 
 
 def synthesize(url: str | None, text: str, profile_id: str, language: str | None) -> bytes:
     base = _base(url)
+    gid = None
     try:
+        try:
+            stuck = stuck_jobs(url)
+        except (requests.RequestException, ValueError):
+            stuck = []
+        if stuck:
+            oldest = max(j["minutes"] for j in stuck)
+            raise VoiceboxError(f"Voicebox has {len(stuck)} earlier narration{'s' if len(stuck) != 1 else ''} stuck at "
+                                f"\u201cGenerating\u2026\u201d (the oldest for {oldest} minutes). Voicebox makes one narration at a time, "
+                                "so new ones wait behind them. Click \u201cClear stuck Voicebox jobs\u201d on the Voicebox card "
+                                "(or restart Voicebox), then generate again.")
         prof = requests.get(f"{base}/profiles/{profile_id}", timeout=(5, 15), **_NO_PROXY)
         if prof.status_code == 404:
             raise VoiceboxError("This voice no longer exists in Voicebox. Click Refresh voices and pick another.")
@@ -160,34 +224,46 @@ def synthesize(url: str | None, text: str, profile_id: str, language: str | None
         if lang not in LANGUAGES:
             lang = str(profile.get("language") or "en")
         body = {"profile_id": profile_id, "text": text[:50000], "language": lang}
-        engine, size = _pick_model(base, profile)
+        engine, size, note = _pick_model(base, profile)
         if engine:
             body["engine"] = engine
         if size:
             body["model_size"] = size
+        what = f"voice \u201c{profile.get('name') or profile_id}\u201d with {engine or 'its default engine'}{' ' + size if size else ''}"
         res = requests.post(base + "/generate", json=body, timeout=(10, 120), **_NO_PROXY)
         if not res.ok:
             why = _detail(res)
-            raise VoiceboxError("Voicebox could not generate this narration" + (f": {why}" if why else f" (HTTP {res.status_code}).")
-                                + (" Download that voice's model in Voicebox → Models, then try again." if "not downloaded" in why.lower() or "not cached" in why.lower() else ""))
+            raise VoiceboxError(f"Voicebox could not generate this narration ({what})" + (f": {why}" if why else f" (HTTP {res.status_code}).")
+                                + (" Download that model in Voicebox \u2192 Models, then try again." if "not downloaded" in why.lower() or "not cached" in why.lower() else ""))
         if res.headers.get("content-type", "").startswith("audio/"):
             return res.content
         meta = res.json()
         gid = meta["id"]
         state, error = str(meta.get("status") or "completed"), meta.get("error")
-        deadline = time.monotonic() + TIMEOUT_SECONDS
+        started = time.monotonic()
+        loading_since = started if state == "loading_model" else None
         while state not in ("completed", "failed"):
-            if time.monotonic() > deadline:
-                raise VoiceboxError("Voicebox is still " + ("loading its voice model" if state == "loading_model" else "generating")
-                                    + " after 15 minutes. Check Voicebox (Models and History), then try again.")
+            now = time.monotonic()
+            if loading_since and now - loading_since > LOADING_SECONDS:
+                gid = None   # leave the model download running in Voicebox
+                raise VoiceboxError(f"Voicebox is still loading the model for {what} after {LOADING_SECONDS // 60} minutes. "
+                                    + (note + " " if note else "") + "The narration will finish in Voicebox; generate again here once Voicebox is idle.")
+            if now - started > TIMEOUT_SECONDS:
+                raise VoiceboxError(f"Voicebox did not finish {what} within {TIMEOUT_SECONDS // 60} minutes. SceneForge cancelled it; "
+                                    "check Voicebox and try a shorter text.")
             time.sleep(POLL_SECONDS)
             h = requests.get(f"{base}/history/{gid}", timeout=(5, 15), **_NO_PROXY)
             if h.ok:
                 info = h.json()
                 state, error = str(info.get("status") or "completed"), info.get("error")
+                if state == "loading_model" and loading_since is None:
+                    loading_since = time.monotonic()
+                elif state != "loading_model":
+                    loading_since = None
+        done, gid = gid, None
         if state == "failed":
-            raise VoiceboxError("Voicebox could not generate this narration" + (f": {str(error)[:300]}" if error else "."))
-        audio = requests.get(f"{base}/audio/{gid}", timeout=(10, 120), **_NO_PROXY)
+            raise VoiceboxError(f"Voicebox could not generate this narration ({what})" + (f": {str(error)[:300]}" if error else "."))
+        audio = requests.get(f"{base}/audio/{done}", timeout=(10, 120), **_NO_PROXY)
         if not audio.ok:
             raise VoiceboxError("Voicebox finished but its audio file is missing" + (f": {_detail(audio)}" if _detail(audio) else "."))
         return audio.content
@@ -197,3 +273,9 @@ def synthesize(url: str | None, text: str, profile_id: str, language: str | None
         if isinstance(e, VoiceboxError):
             raise
         raise VoiceboxError("Voicebox sent an unexpected reply. Update Voicebox and try again.") from e
+    finally:
+        if gid:   # never leave our own job blocking Voicebox's queue
+            try:
+                requests.post(f"{base}/generate/{gid}/cancel", timeout=(5, 15), **_NO_PROXY)
+            except requests.RequestException:
+                pass

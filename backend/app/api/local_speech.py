@@ -52,6 +52,17 @@ def voicebox_status(db: Session = Depends(get_db)):
     return voicebox.status(_voicebox_url(db))
 
 
+@router.post('/voicebox/clear-stuck')
+def voicebox_clear_stuck(db: Session = Depends(get_db)):
+    """Cancel Voicebox jobs stuck at "Generating…" (they block Voicebox's one-at-a-time queue)."""
+    import requests
+    from app.providers import voicebox
+    url = _voicebox_url(db)
+    try: cleared = voicebox.clear_stuck(url)
+    except (requests.RequestException, ValueError): raise HTTPException(503, 'Voicebox is not answering.')
+    return {**voicebox.status(url), 'cleared': cleared}
+
+
 class VoiceboxAddress(BaseModel):
     url: str
 

@@ -1,5 +1,14 @@
 # Changelog
 
+## 0.9.4-beta.6 — Voicebox narrations stuck at "Generating…" (October 13, 2026, beta pre-release)
+
+- **Stuck Voicebox queue:** Voicebox makes one narration at a time. One job that never finishes (in the owner's test, a narration sent by beta.4 with Voicebox's default Qwen 1.7B model, plus Voicebox 0.5's own "orphaned" jobs) keeps every later narration at "Generating…" forever, which looked like SceneForge failing. SceneForge now checks Voicebox's history first: if earlier jobs have been active for more than 3 minutes it says so instead of queueing behind them, the Voicebox card shows how many are stuck, and **Clear stuck Voicebox jobs** cancels them through Voicebox's own cancel endpoint (which also clears orphaned jobs).
+- SceneForge no longer leaves its own jobs behind: a narration that does not finish within 10 minutes is cancelled in Voicebox. If Voicebox is still loading or downloading a model after 2 minutes, SceneForge stops waiting, says so and leaves the download running in Voicebox.
+- **"No voice model downloaded" for CustomVoice voices** (beta.5): when Voicebox does not report a downloaded model for a voice, SceneForge now still asks for the voice's own engine (Voicebox may know better) instead of refusing; it still prefers a model Voicebox reports as loaded or downloaded, and says so when one is being downloaded.
+- Errors name the voice, engine and model size that were requested.
+- `scripts/voicebox-diagnose.ps1`: a read-only Windows check that lists Voicebox's voices, models, recent jobs and stuck jobs into `voicebox-report.txt`; `-ClearStuck` cancels stuck jobs and `-Test "voice name"` makes one short test narration directly in Voicebox. Checked with PowerShell 7 against a stand-in that answers like Voicebox 0.5.0.
+- Tests: stuck-job report, card count and clearing, loading-model and never-finishing jobs, CustomVoice voices without a reported model (`test_builtin_voices.py`).
+
 ## 0.9.4-beta.5 — Chatterbox, Stable Diffusion and Voicebox on the owner's PC (October 13, 2026, beta pre-release)
 
 - **Chatterbox: "TypeError: 'NoneType' object is not callable".** Chatterbox's audio watermark (resemble-perth) imports `pkg_resources`, which ships with setuptools. The Docker image had setuptools; the private Python environment that uv creates does not, so the watermark failed to import and Chatterbox crashed while loading. Chatterbox's requirements now include `setuptools<81` (reproduced here: `import pkg_resources` fails in a fresh uv environment and works after this). Engines installed by beta.3/beta.4 get their packages updated automatically before they start, and **Start** or **Install** in AI Engines now restarts an engine whose model failed, instead of reusing it. A failed engine is no longer shown as Ready. The error no longer points to the Docker-era DIAGNOSE_VOICE.bat.

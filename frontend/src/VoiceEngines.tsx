@@ -15,7 +15,7 @@ export function VoiceEngines({busy, providers, onUse, onSelectProvider}: {busy: 
   onUse: (engine: 'kokoro_builtin' | 'chatterbox' | 'voicebox') => void; onSelectProvider: (id: string) => void}) {
   const [kokoro, setKokoro] = React.useState<Kokoro | null>(null);
   const [chatter, setChatter] = React.useState<Chatter | null>(null);
-  const [voicebox, setVoicebox] = React.useState<{running: boolean; profiles: number; url?: string; reason?: string}>({running: false, profiles: 0});
+  const [voicebox, setVoicebox] = React.useState<{running: boolean; profiles: number; url?: string; reason?: string; stuck?: number}>({running: false, profiles: 0});
   const [vbChecking, setVbChecking] = React.useState(false);
   const [vbChecked, setVbChecked] = React.useState('');
   const [vbEdit, setVbEdit] = React.useState(false);
@@ -23,7 +23,7 @@ export function VoiceEngines({busy, providers, onUse, onSelectProvider}: {busy: 
   const [note, setNote] = React.useState('');
   const refresh = React.useCallback(async () => {
     const [k, c, v] = await Promise.allSettled([getJson('/api/local-speech/kokoro_builtin/status'), getJson('/api/local-speech/chatterbox/status'), getJson('/api/local-speech/voicebox/status')]);
-    if (k.status === 'fulfilled') setKokoro(k.value); if (c.status === 'fulfilled') setChatter(c.value); if (v.status === 'fulfilled') setVoicebox({running: !!v.value.running, profiles: Number(v.value.profiles || 0), url: v.value.url, reason: v.value.reason});
+    if (k.status === 'fulfilled') setKokoro(k.value); if (c.status === 'fulfilled') setChatter(c.value); if (v.status === 'fulfilled') setVoicebox({running: !!v.value.running, profiles: Number(v.value.profiles || 0), url: v.value.url, reason: v.value.reason, stuck: Number(v.value.stuck || 0)});
   }, []);
   React.useEffect(() => {void refresh();}, [refresh]);
   const downloading = kokoro?.state === 'downloading' && !kokoro.installed;
@@ -40,10 +40,17 @@ export function VoiceEngines({busy, providers, onUse, onSelectProvider}: {busy: 
       const v = address !== undefined
         ? await getJson('/api/local-speech/voicebox/address', {method: 'PUT', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({url: address})})
         : await getJson('/api/local-speech/voicebox/status');
-      setVoicebox({running: !!v.running, profiles: Number(v.profiles || 0), url: v.url, reason: v.reason});
+      setVoicebox({running: !!v.running, profiles: Number(v.profiles || 0), url: v.url, reason: v.reason, stuck: Number(v.stuck || 0)});
       if (address !== undefined) setVbEdit(false);
     } catch (e: any) {setNote(e.message);}
     finally {setVbChecking(false); setVbChecked(new Date().toLocaleTimeString([], {hour: '2-digit', minute: '2-digit', second: '2-digit'}));}
+  }
+  async function clearStuck() {
+    setVbChecking(true); setNote('');
+    try {const v = await getJson('/api/local-speech/voicebox/clear-stuck', {method: 'POST'});
+      setVoicebox({running: !!v.running, profiles: Number(v.profiles || 0), url: v.url, reason: v.reason, stuck: Number(v.stuck || 0)});
+      setNote(`Cleared ${v.cleared} stuck Voicebox job${v.cleared === 1 ? '' : 's'}. Generate the narration again.`);}
+    catch (e: any) {setNote(e.message);} finally {setVbChecking(false);}
   }
   async function startChatterbox() {setNote(''); try {await getJson('/api/local-speech/chatterbox/start', {method: 'POST'}); await refresh();} catch (e: any) {setNote(e.message);}}
   const gemini = providers.find(p => p.name === 'gemini_tts' && p.configured);
@@ -85,6 +92,7 @@ export function VoiceEngines({busy, providers, onUse, onSelectProvider}: {busy: 
             : 'Voicebox is open but has no voices yet. In Voicebox, open Voices and create, clone or add a preset voice, then click Check again.'}</small>
           {vbChecked && !voicebox.running && <small className="voice-engine-reason" role="status">{voicebox.reason || 'Voicebox is not answering.'} <span className="muted">Checked {vbChecked}.</span></small>}
           {vbChecked && voicebox.running && <small role="status" className="muted">Checked {vbChecked} · {voicebox.url}</small>}
+          {voicebox.running && !!voicebox.stuck && <small className="voice-engine-reason" role="status">{voicebox.stuck} earlier Voicebox job{voicebox.stuck === 1 ? ' is' : 's are'} stuck at “Generating…” and block{voicebox.stuck === 1 ? 's' : ''} new narrations. <button className="text-btn" disabled={vbChecking} onClick={() => void clearStuck()}>Clear stuck Voicebox jobs</button></small>}
           {(vbEdit || (vbChecked && !voicebox.running)) && <span className="voice-engine-address">
             {vbEdit ? <><input aria-label="Voicebox address" value={vbUrl} placeholder="http://127.0.0.1:17493" onChange={e => setVbUrl(e.target.value)} onKeyDown={e => {if (e.key === 'Enter') void checkVoicebox(vbUrl);}}/>
               <button className="text-btn" disabled={vbChecking} onClick={() => void checkVoicebox(vbUrl)}>Save and check</button></>
@@ -95,6 +103,6 @@ export function VoiceEngines({busy, providers, onUse, onSelectProvider}: {busy: 
           : <button className="btn" disabled={busy || vbChecking} onClick={() => void checkVoicebox()}>{vbChecking ? <><Loader2 size={14} className="spin" aria-hidden/> Checking…</> : 'Check again'}</button>}
       </li>
     </ul>
-    {note && <p className="form-error" role="alert">{note}</p>}
+    {note && <p className={/^Cleared/.test(note) ? 'hint' : 'form-error'} role={/^Cleared/.test(note) ? 'status' : 'alert'}>{note}</p>}
   </section>;
 }

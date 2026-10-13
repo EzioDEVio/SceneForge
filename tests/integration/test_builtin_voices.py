@@ -105,6 +105,8 @@ with TestClient(app) as c:
                   {'model_name': 'kokoro', 'downloaded': True}, {'model_name': 'chatterbox-tts', 'downloaded': False, 'downloading': True}]
         gens = {}
         last = None
+        mode = 'normal'          # normal | stall | loading
+        cancelled = []
         def _send(self, code, body, ctype='application/json'):
             self.send_response(code); self.send_header('Content-Type', ctype); self.end_headers(); self.wfile.write(body)
         def do_GET(self):
@@ -113,22 +115,30 @@ with TestClient(app) as c:
             if self.path.startswith('/profiles/'):
                 p = next((p for p in VB.profiles if p['id'] == self.path.split('/')[-1]), None)
                 return self._send(200, json.dumps(p).encode()) if p else self._send(404, b'{"detail":"Profile not found"}')
+            if self.path.split('?')[0] == '/history':
+                return self._send(200, json.dumps({'items': list(VB.gens.values()), 'total': len(VB.gens)}).encode())
             if self.path.startswith('/history/'):
                 g = VB.gens[self.path.split('/')[-1]]; g['polls'] += 1
-                if g['polls'] >= 2: g['status'] = 'completed'
+                if g['status'] == 'generating' and g['polls'] >= 2 and VB.mode == 'normal': g['status'] = 'completed'
+                if VB.mode == 'loading' and g['status'] != 'failed': g['status'] = 'loading_model'
                 return self._send(200, json.dumps({'id': g['id'], 'status': g['status'], 'error': None}).encode())
             if self.path.startswith('/audio/'):
                 g = VB.gens.get(self.path.split('/')[-1])
                 return self._send(200, wav.getvalue(), 'audio/wav') if g and g['status'] == 'completed' else self._send(404, b'{"detail":"Audio file not found"}')
             self._send(404, b'{}')
         def do_POST(self):
+            if self.path.endswith('/cancel'):
+                gid = self.path.split('/')[2]; VB.cancelled.append(gid); VB.gens[gid]['status'] = 'failed'
+                return self._send(200, b'{"message":"Generation cancelled"}')
             payload = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
             VB.last = payload
             prof = next(p for p in VB.profiles if p['id'] == payload['profile_id'])
             engine = payload.get('engine') or 'qwen'
             if prof.get('preset_engine') and engine != prof['preset_engine']:
                 return self._send(400, json.dumps({'detail': f"Preset profile requires engine {prof['preset_engine']}"}).encode())
-            gid = f"g{len(VB.gens) + 1}"; VB.gens[gid] = {'id': gid, 'status': 'generating', 'polls': 0}
+            import datetime as _dt
+            gid = f"g{len(VB.gens) + 1}"; VB.last_gid = gid; VB.gens[gid] = {'id': gid, 'status': 'generating', 'polls': 0, 'profile_name': prof['name'],
+                                                         'created_at': _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None).isoformat(), 'text': payload['text']}
             self._send(200, json.dumps({'id': gid, 'profile_id': payload['profile_id'], 'status': 'generating'}).encode())
         def log_message(self, *a): pass
     srv = HTTPServer(('127.0.0.1', 0), VB)
@@ -150,16 +160,43 @@ with TestClient(app) as c:
               t.status_code == 200 and t.json()['provider'] == 'voicebox' and VB.last['profile_id'] == 'p1' and VB.gens['g1']['polls'] >= 2)
         check('a cloned voice uses a model Voicebox already has (Qwen 0.6B), never a hidden 1.7B download',
               VB.last.get('engine') == 'qwen' and VB.last.get('model_size') == '0.6B')
-        saved = VB.models; VB.models = [{'model_name': 'qwen-tts-1.7B', 'downloaded': False}, {'model_name': 'kokoro', 'downloaded': True}]
-        t = c.post(f'/api/scenes/{sid}/voice-takes/service', json={'provider_id': vb['profile']['id'], 'voice': 'p1', 'language': 'en', 'speed': 1.0})
-        check('with no model for a cloned voice, SceneForge says which model to download in Voicebox instead of waiting',
-              t.status_code >= 400 and 'Models' in t.text and 'Qwen TTS' in t.text and len(VB.gens) == 1)
+        saved = VB.models; VB.models = [{'model_name': 'qwen-custom-voice-1.7B', 'downloaded': False}, {'model_name': 'kokoro', 'downloaded': True}]
+        VB.profiles.append({'id': 'c1', 'name': 'adien voice', 'language': 'en', 'voice_type': 'preset', 'preset_engine': 'qwen_custom_voice'})
+        t = c.post(f'/api/scenes/{sid}/voice-takes/service', json={'provider_id': vb['profile']['id'], 'voice': 'c1', 'language': 'en', 'speed': 1.0})
+        check("a CustomVoice voice still generates with its own engine when Voicebox does not report its model (owner's 'no model downloaded' message)",
+              t.status_code == 200 and VB.last['engine'] == 'qwen_custom_voice')
         VB.models = saved
+        import datetime as _dt
+        VB.gens['old'] = {'id': 'old', 'status': 'generating', 'polls': 0, 'profile_name': 'my-test-voice', 'text': 'stuck',
+                          'created_at': (_dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None) - _dt.timedelta(minutes=40)).isoformat()}
+        before = len(VB.gens)
+        t = c.post(f'/api/scenes/{sid}/voice-takes/service', json={'provider_id': vb['profile']['id'], 'voice': 'p1', 'language': 'en', 'speed': 1.0})
+        check('a stuck earlier Voicebox job is reported instead of queueing behind it for 15 minutes',
+              t.status_code >= 400 and 'stuck' in t.text and len(VB.gens) == before)
+        st = c.get('/api/local-speech/voicebox/status').json()
+        check('the Voicebox card counts stuck jobs', st['stuck'] == 1)
+        cl = c.post('/api/local-speech/voicebox/clear-stuck').json()
+        check("Clear stuck Voicebox jobs cancels them through Voicebox's own cancel", cl['cleared'] == 1 and 'old' in VB.cancelled and cl['stuck'] == 0)
+        t = c.post(f'/api/scenes/{sid}/voice-takes/service', json={'provider_id': vb['profile']['id'], 'voice': 'p1', 'language': 'en', 'speed': 1.0})
+        check('after clearing, narration generates again', t.status_code == 200)
+        VB.mode = 'loading'
+        with patch.object(voicebox, 'LOADING_SECONDS', 0.3):
+            t = c.post(f'/api/scenes/{sid}/voice-takes/service', json={'provider_id': vb['profile']['id'], 'voice': 'p1', 'language': 'en', 'speed': 1.0})
+        last = VB.last_gid
+        check('a model that keeps loading is reported after a short wait and left to finish in Voicebox',
+              t.status_code >= 400 and 'loading the model' in t.text and last not in VB.cancelled)
+        VB.gens[last]['status'] = 'completed'
+        VB.mode = 'stall'
+        with patch.object(voicebox, 'TIMEOUT_SECONDS', 0.3):
+            t = c.post(f'/api/scenes/{sid}/voice-takes/service', json={'provider_id': vb['profile']['id'], 'voice': 'p1', 'language': 'en', 'speed': 1.0})
+        last = VB.last_gid
+        check('a narration that never finishes is cancelled so it cannot block the Voicebox queue', t.status_code >= 400 and last in VB.cancelled)
+        VB.mode = 'normal'
         t = c.post(f'/api/scenes/{sid}/voice-takes/service', json={'provider_id': vb['profile']['id'], 'voice': 'k1', 'language': 'en-US', 'speed': 1.0})
         bad = c.put('/api/local-speech/voicebox/address', json={'url': 'ftp://x'})
         check('a wrong Voicebox address is refused with an example', bad.status_code == 400 and '17493' in bad.text)
         moved = c.put('/api/local-speech/voicebox/address', json={'url': f'127.0.0.1:{srv.server_address[1]}'}).json()
-        check('Voicebox on another address can be set and is found', moved['running'] and moved['profiles'] == 2)
+        check('Voicebox on another address can be set and is found', moved['running'] and moved['profiles'] == 3)
         check("a preset voice is generated with its own engine, not Voicebox's Qwen default",
               t.status_code == 200 and VB.last['engine'] == 'kokoro' and VB.last['language'] == 'en')
     srv.shutdown()
