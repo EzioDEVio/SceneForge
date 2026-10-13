@@ -55,3 +55,6 @@ kokoro-onnx release, checked by SHA-256. Optional Voicebox (MIT) is a separate
 app installed by the user; SceneForge only talks to its local API. Gemini voices
 are a Google service used with the user's own API key. See LOCAL_AI_INSTALLER.md for their sources,
 terms, storage, GPU/CPU behavior and Windows validation requirements.
+
+psutil (BSD-3-Clause, 0.9.4-beta.7) identifies which program holds an engine port, so
+SceneForge replaces only its own leftover engines and never closes other programs.

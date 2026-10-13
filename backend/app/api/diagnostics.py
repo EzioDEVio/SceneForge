@@ -30,7 +30,7 @@ SECRET_NAME = re.compile(r"KEY|TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|AUTH|COOK
 # Common provider key shapes, scrubbed even if they were not found in the credential store.
 SECRET_SHAPES = re.compile(r"\b(?:sk-[A-Za-z0-9_\-]{12,}|hf_[A-Za-z0-9]{12,}|r8_[A-Za-z0-9]{12,}|AIza[0-9A-Za-z_\-]{20,}|xi-[A-Za-z0-9]{16,})\b")
 ENV_PREFIXES = ("SCENEFORGE_", "HF_", "PYTHON", "PATH", "LANG", "LC_", "OS", "PROCESSOR_", "NUMBER_OF_PROCESSORS", "CUDA", "OMP_")
-LOG_FILES = ("desktop-backend.log", "updates.log")
+LOG_FILES = ("desktop-backend.log", "updates.log", "stable-diffusion.log")
 LOG_TAIL_BYTES = 256 * 1024
 
 README = """SceneForge Studio diagnostics
@@ -55,6 +55,10 @@ jobs.json             the last 20 render/export jobs: status, stage, progress, e
 logs/backend-recent.log   recent backend log lines kept in memory by this run
 logs/desktop-backend.log  tail of the desktop app's backend log (desktop app only)
 logs/updates.log          tail of the desktop updater log (desktop app only)
+local_ai.json         free AI setup: progress, its last log lines, chosen tools, graphics card option,
+                      installed engine builds, and which program holds each engine port (7860, 8881)
+logs/stable_diffusion-engine.log, logs/chatterbox-engine.log   tails of the engine logs
+logs/stable-diffusion.log  your own AUTOMATIC1111's startup log, if SceneForge started it
 
 Privacy
 -------
@@ -166,6 +170,30 @@ def _log_tail(path) -> str | None:
         return None
 
 
+def _local_ai() -> dict:
+    """Free AI setup state for support: progress and log, engine builds and port owners."""
+    from app import managed_ai, native_engines
+    state = managed_ai.state()
+    out = {k: state.get(k) for k in ("status", "completed", "total", "current", "step", "error", "queue", "supported", "builds", "nvidia")}
+    out["settings"] = state.get("settings")
+    out["setup_log"] = list(state.get("log") or [])[-80:]
+    out["engines_folder"] = str(native_engines.root())
+    out["engines"] = {}
+    for c, spec in native_engines.SPECS.items():
+        owner = native_engines.port_owner(spec["port"])
+        h = managed_ai.health(c)
+        info = {"installed": native_engines.installed(c), "build": native_engines.build(c), "packages_out_of_date": native_engines.stale(c),
+                "started_by_this_run": native_engines.running(c), "model_mb": round(native_engines.model_cache_mb(c)),
+                "health": h, "port": spec["port"],
+                "port_owner": {k: owner.get(k) for k in ("pid", "name", "kind", "ours", "leftover")} if owner else None}
+        try:
+            info["installed_json"] = json.loads((native_engines.root() / c / "installed.json").read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            pass
+        out["engines"][c] = info
+    return out
+
+
 def build_zip() -> bytes:
     from app.config import LOGS_DIR
     from app.db.database import SessionLocal
@@ -188,6 +216,18 @@ def build_zip() -> bytes:
                 files[name] = json.dumps(fn(), indent=2, default=str)
             except Exception as e:  # noqa: BLE001 - one failing section must not lose the rest
                 files[name] = json.dumps({"error": f"{type(e).__name__}: {e}"}, indent=2)
+    try:
+        files["local_ai.json"] = json.dumps(_local_ai(), indent=2, default=str)
+    except Exception as e:  # noqa: BLE001
+        files["local_ai.json"] = json.dumps({"error": f"{type(e).__name__}: {e}"}, indent=2)
+    try:
+        from app import native_engines
+        for c in ("stable_diffusion", "chatterbox"):
+            content = _log_tail(native_engines.root() / c / "engine.log")
+            if content is not None:
+                files[f"logs/{c}-engine.log"] = content
+    except Exception:  # noqa: BLE001
+        pass
     files["logs/backend-recent.log"] = "\n".join(tail(2000)) + "\n"
     for f in LOG_FILES:
         content = _log_tail(LOGS_DIR / f)

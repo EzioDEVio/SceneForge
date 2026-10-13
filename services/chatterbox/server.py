@@ -73,6 +73,6 @@ def speech(body: Speech):
         import logging
         logging.exception('Chatterbox synthesis failed')
         last_error = f'{type(exc).__name__}: {exc}'
-        raise HTTPException(503, 'Chatterbox could not generate speech: ' + last_error[:600] + '. The full log is in the SceneForge logs folder (chatterbox-engine.log); in AI Engines, Install Chatterbox again to repair it.') from exc
+        raise HTTPException(503, 'Chatterbox could not generate speech: ' + last_error[:600] + '. Its log is engine.log in the SceneForge engines folder (Help > Export diagnostics includes it); in AI Engines, click Start or Install Chatterbox again to repair it.') from exc
     finally:
         loading = False

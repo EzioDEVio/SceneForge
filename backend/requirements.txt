@@ -46,6 +46,7 @@ python-bidi==0.6.11
 
 # Built-in Kokoro voices (0.9.4-beta.3): Kokoro-82M through ONNX Runtime on the CPU, no
 # Docker. espeakng-loader ships the espeak-ng library used for pronunciation.
+psutil==7.1.0
 kokoro-onnx==0.6.1
 espeakng-loader==0.2.4
 phonemizer==3.4.0

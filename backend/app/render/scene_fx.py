@@ -18,6 +18,10 @@ scene has several images or clips. Settings live in scene.look_json:
   leak      {amount 0-100, speed 0-100, color warm|cool|rainbow}
   tone      {shadow #RRGGBB, highlight #RRGGBB, amount 0-100, balance -100..100}
             (split toning; baked into the grade LUT, see grade.py)
+  pulse     {amount 0-100, bpm 40-200}            beat zoom: quick punch-in on every beat
+  flash     {amount 0-100, mode intro|beats|both, bpm 40-200}   white flash in / strobe
+  trails    {amount 0-100}                        motion trails (frame echo)
+  mirror    {mode left|right|top|bottom|quad}     mirror / kaleidoscope
 """
 from __future__ import annotations
 
@@ -171,14 +175,91 @@ def clean_finish(d):
     return {"amount": int(_num(d, "amount", 0, 100, "Finishing effect"))}
 
 
+# ---- Trending (0.9.4-beta.7): beat zoom, flash, motion trails, mirror -------------
+MIRROR_MODES = ("left", "right", "top", "bottom", "quad")
+FLASH_MODES = ("intro", "beats", "both")
+
+
+def clean_pulse(d) -> dict:
+    d = _only({"amount": 45, "bpm": 120, **(d or {})}, {"amount", "bpm"}, "Beat zoom")
+    return {"amount": int(_num(d, "amount", 0, 100, "Beat zoom")), "bpm": int(_num(d, "bpm", 40, 200, "Beat zoom"))}
+
+
+def clean_flash(d) -> dict:
+    d = _only({"amount": 70, "mode": "intro", "bpm": 120, **(d or {})}, {"amount", "mode", "bpm"}, "Flash")
+    if d["mode"] not in FLASH_MODES:
+        raise SceneFxError("Flash mode must be one of: " + ", ".join(FLASH_MODES) + ".")
+    return {"amount": int(_num(d, "amount", 0, 100, "Flash")), "mode": d["mode"], "bpm": int(_num(d, "bpm", 40, 200, "Flash"))}
+
+
+def clean_trails(d) -> dict:
+    d = _only({"amount": 50, **(d or {})}, {"amount"}, "Motion trails")
+    return {"amount": int(_num(d, "amount", 0, 100, "Motion trails"))}
+
+
+def clean_mirror(d) -> dict:
+    d = _only({"mode": "left", **(d or {})}, {"mode"}, "Mirror")
+    if d["mode"] not in MIRROR_MODES:
+        raise SceneFxError("Mirror mode must be one of: " + ", ".join(MIRROR_MODES) + ".")
+    return {"mode": d["mode"]}
+
+
+def pulse_graph(base: str, pl: dict, w: int, h: int, fps: int) -> tuple[list[str], str]:
+    """Beat zoom: on every beat the picture punches in and eases back (zoompan, per frame)."""
+    a, bps = pl["amount"] / 100, pl["bpm"] / 60
+    z = f"1+{0.14 * a:.4f}*exp(-mod(it*{bps:.4f},1)*7)"
+    return [f"[{base}]zoompan=z='{z}':d=1:s={w}x{h}:fps={fps}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'[pulse]"], "pulse"
+
+
+def flash_graph(base: str, fl: dict) -> tuple[list[str], str]:
+    """White flash: brightness jumps up and fades out, at the start and/or on every beat."""
+    a, bps = fl["amount"] / 100, fl["bpm"] / 60
+    terms = []
+    if fl["mode"] in ("intro", "both"):
+        terms.append(f"{0.85 * a:.3f}*exp(-t*7)")
+    if fl["mode"] in ("beats", "both"):
+        terms.append(f"{0.45 * a:.3f}*exp(-mod(t*{bps:.4f},1)*12)")
+    bright = "min(1,(" + "+".join(terms) + "))"
+    return [f"[{base}]eq=brightness='{bright}':eval=frame,format=yuv420p[flash]"], "flash"
+
+
+def trails_graph(base: str, tr: dict) -> tuple[list[str], str]:
+    """Motion trails: each frame keeps fading copies of the previous frames (tmix)."""
+    n = 2 + round(tr["amount"] / 100 * 6)
+    weights = " ".join(f"{0.62 ** i:.3f}" for i in range(n))
+    return [f"[{base}]tmix=frames={n}:weights='{weights}'[trails]"], "trails"
+
+
+def mirror_graph(base: str, mr: dict, w: int, h: int) -> tuple[list[str], str]:
+    """Mirror one half of the picture onto the other (or a quarter into all four corners)."""
+    hw, hh = (w // 2) // 2 * 2, (h // 2) // 2 * 2   # even halves: yuv420 chroma rows must line up when flipped
+    m = mr["mode"]
+    if m in ("left", "right"):
+        src = f"crop={hw}:{h}:{0 if m == 'left' else w - hw}:0"
+        g = [f"[{base}]{src},split[mr1][mr2]", f"[mr2]hflip[mrf]",
+             f"[mr1][mrf]hstack" if m == "left" else f"[mrf][mr1]hstack"]
+        g[-1] += f",scale={w}:{h}[mirror]"
+        return g, "mirror"
+    if m in ("top", "bottom"):
+        src = f"crop={w}:{hh}:0:{0 if m == 'top' else h - hh}"
+        g = [f"[{base}]{src},split[mr1][mr2]", f"[mr2]vflip[mrf]",
+             (f"[mr1][mrf]vstack" if m == "top" else f"[mrf][mr1]vstack") + f",scale={w}:{h}[mirror]"]
+        return g, "mirror"
+    g = [f"[{base}]crop={hw}:{hh}:0:0,split[q1][q2]", "[q2]hflip[q3]", "[q1][q3]hstack,split[q4][q5]", "[q5]vflip[q6]",
+         f"[q4][q6]vstack,scale={w}:{h}[mirror]"]
+    return g, "mirror"
+
+
 CLEANERS = {"vignette": clean_finish, "letterbox": clean_finish, "sharpen": clean_finish,"stabilize": clean_stabilize, "wheels": clean_wheels, "shake": clean_shake, "spotlight": clean_spotlight, "redact": clean_redact, "leak": clean_leak, "tone": clean_tone,
-            "flare": clean_flare, "wiggle": clean_wiggle}
+            "flare": clean_flare, "wiggle": clean_wiggle, "pulse": clean_pulse, "flash": clean_flash, "trails": clean_trails,
+            "mirror": clean_mirror}
 
 
 def has_scene_fx(look: dict | None) -> bool:
     look = look or {}
     return bool(look.get("shake") or look.get("spotlight") or look.get("redact") or look.get("leak") or look.get("route") or look.get("annotations")
-                or look.get("flare") or look.get("wiggle") or look.get("vignette") or look.get("letterbox") or look.get("sharpen"))
+                or look.get("flare") or look.get("wiggle") or look.get("vignette") or look.get("letterbox") or look.get("sharpen")
+                or look.get("pulse") or look.get("flash") or look.get("trails") or look.get("mirror"))
 
 
 # --------------------------------------------------------------------------

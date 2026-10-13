@@ -25,8 +25,8 @@ with TestClient(app) as client:
 print('PASS unknown components and unsupported platform rejected before installation')
 with patch.object(m,'os',fakeos),patch.object(m,'engine_root',return_value=Path(temp.name)),patch.object(m.shutil,'disk_usage',return_value=SimpleNamespace(free=20_000_000_000)),patch('app.providers.transcribe._load_local_model',return_value=object()),patch.object(m,'ensure_docker') as docker,patch.object(m,'image_ready',return_value=False),patch.object(m,'warmup') as warm,patch('socket.create_connection',side_effect=OSError),\
      patch('app.native_engines.install') as native_install,patch('app.native_engines.start',return_value=True) as native_start,patch('app.native_engines.running',return_value=True),\
-     patch.object(m,'health',side_effect=[None,{'service':'stable_diffusion','model_ready':False},{'service':'stable_diffusion','model_ready':True},
-                                         {'service':'chatterbox','model_ready':False},{'service':'chatterbox','model_ready':True},{'service':'chatterbox','model_ready':True}]):
+     patch.object(m,'health',side_effect=[None,None,{'service':'stable_diffusion','model_ready':False},{'service':'stable_diffusion','model_ready':True},
+                                         {'service':'chatterbox','model_ready':False},{'service':'chatterbox','model_ready':False},{'service':'chatterbox','model_ready':True},{'service':'chatterbox','model_ready':True}]):
     assert m.install(['whisper','stable_diffusion','chatterbox']),m.state()['error']
     assert m.state()['completed']==3 and m.state()['status']=='done'
     # Stable Diffusion was not running: installed natively and started. Chatterbox already answered: reused.
@@ -42,11 +42,11 @@ print('PASS ordered installation without Docker, actual stage completion, model 
 with patch.object(m,'os',fakeos),patch.object(m,'engine_root',return_value=Path(temp.name)),patch.object(m.shutil,'disk_usage',return_value=SimpleNamespace(free=0)),patch.object(m,'run') as commands:
     assert not m.install(['whisper']);assert 'free space' in m.state()['error'];commands.assert_not_called()
 with patch.object(m,'os',fakeos),patch.object(m,'engine_root',return_value=Path(temp.name)),patch.object(m.shutil,'disk_usage',return_value=SimpleNamespace(free=20_000_000_000)),patch.object(m,'image_ready',return_value=False),patch('socket.create_connection',return_value=MagicMock()),patch.object(m,'health',return_value=None),patch('app.native_engines.install') as docker:
-    assert not m.install(['stable_diffusion']);assert 'another service' in m.state()['error'];docker.assert_not_called()
+    assert not m.install(['stable_diffusion']);assert 'not part of SceneForge' in m.state()['error'];docker.assert_not_called()
 print('PASS insufficient space and occupied ports fail clearly without installing or replacing services')
 with patch.object(m,'os',fakeos),patch.object(m,'engine_root',return_value=Path(temp.name)),patch.object(m.shutil,'disk_usage',return_value=SimpleNamespace(free=20_000_000_000)),patch('app.providers.transcribe._load_local_model',return_value=object()):
     assert m.install(['whisper']);assert m.state()['status']=='done'
-    assert {'whisper','stable_diffusion','chatterbox'}==set(m.preferences()['components'])
+    assert {'whisper','stable_diffusion','chatterbox'}==set(m.preferences()['components'])-{'kokoro'}   # Kokoro counts when its voices are on disk
 m.save_preferences({**m.preferences(),'autostart':False})
 with patch.object(m,'os',fakeos),patch.object(m,'docker_path') as docker:
     m.autostart();docker.assert_not_called()

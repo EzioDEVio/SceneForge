@@ -66,4 +66,37 @@ with patch.object(ne, '_service_source', return_value=service):
             break
         time.sleep(.5)
     check('the engine stops when SceneForge closes', not m.health('chatterbox'))
+
+    # 0.9.4-beta.7 (owner's PC): an engine left running by an earlier SceneForge kept the
+    # port, so a new version reused an old, broken Chatterbox. Simulate a restart: the engine
+    # keeps running but this SceneForge did not start it.
+    assert ne.start('chatterbox', gpu=False)
+    for _ in range(60):
+        if m.health('chatterbox'): break
+        time.sleep(1)
+    old_pid = ne.port_owner(8881)['pid']
+    ne._processes.clear()
+    owner = ne.port_owner(8881)
+    check('a leftover engine on the port is recognised as SceneForge\'s own', owner and owner['ours'] and owner['leftover'])
+    m.save_preferences({'components': ['chatterbox'], 'autostart': True, 'gpu': False, 'runtime': {'chatterbox': 'native'}})
+    m.autostart(force=True, services=['chatterbox'])
+    for _ in range(60):
+        if m.health('chatterbox') and ne.port_owner(8881) and ne.port_owner(8881)['pid'] != old_pid: break
+        time.sleep(1)
+    new_owner = ne.port_owner(8881)
+    import psutil
+    check('starting replaces the leftover engine with a fresh one from this version',
+          new_owner and new_owner['pid'] != old_pid and not new_owner['leftover'] and not psutil.pid_exists(old_pid))
+    ne.stop_all()
+    for _ in range(20):
+        if not ne.port_owner(8881): break
+        time.sleep(.5)
+    other = subprocess.Popen(['python3', '-m', 'http.server', '8881', '--bind', '127.0.0.1'], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+    for _ in range(20):
+        if ne.port_owner(8881): break
+        time.sleep(.5)
+    freed, why = ne.free_port('chatterbox', report=lambda *a: None)
+    check('a program that is not part of SceneForge is never closed; the message names it',
+          not freed and other.poll() is None and 'Close that program' in why and str(other.pid) in why)
+    other.kill()
 print(f'{checks} native engine checks passed')

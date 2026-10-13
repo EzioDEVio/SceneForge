@@ -1,6 +1,6 @@
 import {routeIconUrl} from "./RouteArtwork";
 import React, {useEffect, useState} from 'react';
-import {Vibrate, Focus, EyeOff, Sun, Blend, Plus, Trash2, Palette, LayoutGrid, Route as RouteIcon, Box as BoxIcon, MousePointerClick, Undo2, PenLine, Timer, ChevronDown, Film, SlidersHorizontal, Wand2} from 'lucide-react';
+import {Vibrate, Focus, EyeOff, Sun, Blend, Plus, Trash2, Palette, LayoutGrid, Route as RouteIcon, Box as BoxIcon, MousePointerClick, Undo2, PenLine, Timer, ChevronDown, Film, SlidersHorizontal, Wand2, Sparkles, ZoomIn, Zap, Wind, FlipHorizontal} from 'lucide-react';
 import type {Look, Scene} from './api';
 import {FeatureHelp} from './FeatureHelp';
 
@@ -71,6 +71,14 @@ const REDACT: Redact = {x: 50, y: 50, w: 20, h: 20, mode: 'blur', strength: 70, 
 const LEAK: Leak = {amount: 50, speed: 40, color: 'warm'};
 const FLARE: Flare = {x: 78, y: 22, color: '#FFB060', blend: 'screen', amount: 70, drift: 0};
 const WIGGLE: Wiggle = {amount: 40, speed: 40, size: 50};
+type Pulse = {amount: number; bpm: number};
+type Flash = {amount: number; mode: 'intro' | 'beats' | 'both'; bpm: number};
+type Trails = {amount: number};
+type Mirror = {mode: 'left' | 'right' | 'top' | 'bottom' | 'quad'};
+const PULSE: Pulse = {amount: 45, bpm: 120};
+const FLASH: Flash = {amount: 70, mode: 'intro', bpm: 120};
+const TRAILS: Trails = {amount: 50};
+const MIRROR: Mirror = {mode: 'left'};
 /** Suggested amount/speed when a shake preset is picked (the sliders still apply). */
 const SHAKE_PRESETS: Record<NonNullable<Shake['preset']>, Partial<Shake>> = {custom: {}, handheld: {amount: 35, speed: 40}, walk: {amount: 45, speed: 45}, run: {amount: 65, speed: 60}, impact: {amount: 70, speed: 60}};
 const TONE: Tone = {shadow: '#1E5A8C', highlight: '#F2A541', amount: 40, balance: 0};
@@ -92,7 +100,7 @@ export const FX_CATEGORIES: {id: FxCategory; label: string; Icon: typeof Sun; hi
   {id: 'looks', label: 'Looks', Icon: Palette, hint: 'Colour looks, film grades and lens effects'},
   {id: 'film', label: 'Old film', Icon: Film, hint: 'Scratches, dust, flicker and projector wobble'},
   {id: 'adjust', label: 'Adjust & LUT', Icon: SlidersHorizontal, hint: 'Light, colour and detail sliders, and .cube LUTs'},
-  {id: 'more', label: 'More effects', Icon: Wand2, hint: 'Vignette, camera, annotations, map route, split screen, intro, presets'},
+  {id: 'more', label: 'More effects', Icon: Wand2, hint: 'Trending (beat zoom, flash, trails, mirror), vignette, camera, annotations, map route, split screen, intro, presets'},
 ];
 /** One row of icon tabs at the top of Effects: shows one category at a time (all of them while searching). */
 export function EffectCategories({value, onChange, on, searching}: {value: FxCategory; onChange: (c: FxCategory) => void; on: Partial<Record<FxCategory, boolean>>; searching: boolean}) {
@@ -162,7 +170,7 @@ function StopLabelInput({index, value, onCommit}: {index: number; value: string;
 export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEditing, onRouteEditing, onAddMedia, liveAnnotations, vertical, query=''}: {query?:string;scene: Scene; disabled: boolean; onDraft: (look: Look) => void;
   liveRoute?: RouteFx | null; routeEditing?: boolean; onRouteEditing?: (on: boolean) => void; onAddMedia?: () => void; liveAnnotations?: Annotation[]; vertical?: boolean}) {
   const look = (scene.look_json || {}) as any;
-  const pick = (l: any) => ({vignette:l.vignette||null,letterbox:l.letterbox||null,sharpen:l.sharpen||null,countdown: l.countdown || null, annotations: l.annotations || [], shake: l.shake || null, spotlight: l.spotlight || null, redact: l.redact || [], leak: l.leak || null, flare: l.flare || null, wiggle: l.wiggle || null, tone: l.tone || null, wheels: l.wheels || null, layout: l.layout || null, parallax: l.parallax || null});
+  const pick = (l: any) => ({vignette:l.vignette||null,letterbox:l.letterbox||null,sharpen:l.sharpen||null,countdown: l.countdown || null, annotations: l.annotations || [], shake: l.shake || null, spotlight: l.spotlight || null, redact: l.redact || [], leak: l.leak || null, flare: l.flare || null, wiggle: l.wiggle || null, pulse: l.pulse || null, flash: l.flash || null, trails: l.trails || null, mirror: l.mirror || null, tone: l.tone || null, wheels: l.wheels || null, layout: l.layout || null, parallax: l.parallax || null});
   const [st, setSt] = useState(pick(look));
   const dirty=React.useRef<Record<string,string>>({}),sourceScene=React.useRef(scene.id);
   useEffect(() => {
@@ -185,6 +193,27 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
   const onCount = (xs: unknown[]) => xs.filter(Boolean).length;
   return <EffectSearch.Provider value={query}><div className="look-panel scene-fx-panel">
     <FxGroup id="finish" items="Edge vignette · Cinema bars · Detail sharpening" title="Finishing touches" Icon={Focus} description="Guide attention, add a cinema frame or bring out fine detail." active={onCount([st.vignette,st.letterbox,st.sharpen])}>{([['vignette','Edge vignette','Darken picture edges to guide attention.'],['letterbox','Cinema bars','Add black bars inside the frame; export dimensions stay the same. Captions remain above the bars.'],['sharpen','Detail sharpening','Bring out fine detail; low amounts suit faces. Render to see the exact sharpening.']] as const).map(([id,label,help])=><section key={id} className="audio-card"><label className="switch-label"><input type="checkbox" aria-label={label} checked={!!st[id]} disabled={disabled} onChange={e=>put(id,e.target.checked?{amount:50}:null)}/>{label}</label><p className="hint">{help}</p>{st[id]&&<Row label={`${label} amount`} value={st[id].amount} min={0} max={100} onChange={amount=>put(id,{amount})} disabled={disabled}/>}</section>)}</FxGroup>
+    <FxGroup id="trending" items="Beat zoom · Flash · Motion trails · Mirror" title="Trending" Icon={Sparkles} description="Popular short-video effects: punch-in on the beat, white flash, motion trails and mirror." active={onCount([(st as any).pulse, (st as any).flash, (st as any).trails, (st as any).mirror])}>
+    <Section title="Beat zoom" Icon={ZoomIn} on={!!(st as any).pulse} onToggle={on => put('pulse', on ? {...PULSE} : null)} disabled={disabled} hint="The picture punches in on every beat and eases back. Match the beats per minute to your music. Render to see it.">
+      {(st as any).pulse && <>
+        <Row label="Zoom strength" value={(st as any).pulse.amount} min={0} max={100} unit="%" onChange={amount => put('pulse', {...(st as any).pulse, amount})} disabled={disabled}/>
+        <Row label="Beats per minute" value={(st as any).pulse.bpm} min={40} max={200} onChange={bpm => put('pulse', {...(st as any).pulse, bpm})} disabled={disabled}/>
+      </>}
+    </Section>
+    <Section title="Flash" Icon={Zap} on={!!(st as any).flash} onToggle={on => put('flash', on ? {...FLASH} : null)} disabled={disabled} hint="A white flash that fades out: at the start of the scene, on every beat (strobe), or both. Render to see it.">
+      {(st as any).flash && <>
+        <Pills label="When" value={(st as any).flash.mode} options={[['intro', 'At the start'], ['beats', 'On every beat'], ['both', 'Both']]} onChange={mode => put('flash', {...(st as any).flash, mode})} disabled={disabled}/>
+        <Row label="Flash strength" value={(st as any).flash.amount} min={0} max={100} unit="%" onChange={amount => put('flash', {...(st as any).flash, amount})} disabled={disabled}/>
+        {(st as any).flash.mode !== 'intro' && <Row label="Flash beats per minute" value={(st as any).flash.bpm} min={40} max={200} onChange={bpm => put('flash', {...(st as any).flash, bpm})} disabled={disabled}/>}
+      </>}
+    </Section>
+    <Section title="Motion trails" Icon={Wind} on={!!(st as any).trails} onToggle={on => put('trails', on ? {...TRAILS} : null)} disabled={disabled} hint="Moving things leave fading copies behind them, a dreamy slow-motion look. Best on video clips. Render to see it.">
+      {(st as any).trails && <Row label="Trail length" value={(st as any).trails.amount} min={0} max={100} unit="%" onChange={amount => put('trails', {amount})} disabled={disabled}/>}
+    </Section>
+    <Section title="Mirror" Icon={FlipHorizontal} on={!!(st as any).mirror} onToggle={on => put('mirror', on ? {...MIRROR} : null)} disabled={disabled} hint="Reflect one half of the picture onto the other, or one corner into all four (kaleidoscope). Render to see it.">
+      {(st as any).mirror && <Pills label="Mirror" value={(st as any).mirror.mode} options={[['left', 'Left half'], ['right', 'Right half'], ['top', 'Top half'], ['bottom', 'Bottom half'], ['quad', 'Four corners']]} onChange={mode => put('mirror', {mode})} disabled={disabled}/>}
+    </Section>
+    </FxGroup>
     <FxGroup id="colour" items="Split toning · Colour wheels" title="Colour grading" Icon={Palette} description="Change the mood of the picture with colour tints." active={onCount([!!tone, !!wheels])}>
     <Section title="Split toning" Icon={Blend} on={!!tone} onToggle={on => put('tone', on ? {...TONE} : null)} disabled={disabled} hint="Tint shadows and highlights with two colours, like a film grade. Shows in the preview.">
       {tone && <>

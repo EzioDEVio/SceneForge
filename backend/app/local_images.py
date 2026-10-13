@@ -15,6 +15,11 @@ def settings():
     default["found"] = (Path(default["folder"]).expanduser()/"webui-user.bat").is_file()
     if not default["found"]:
         default["autostart"] = False
+    # Never start the user's own AUTOMATIC1111 just because it exists: it would compete with
+    # SceneForge's Stable Diffusion for port 7860 and graphics memory (owner's PC, 2026-10-13:
+    # a fresh SceneForge folder started it). Only an explicitly saved choice starts it.
+    if not (DATA_DIR/"local-images.json").is_file():
+        default["autostart"] = False
     return default
 
 def save_settings(folder, autostart):

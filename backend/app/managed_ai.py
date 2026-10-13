@@ -33,6 +33,17 @@ def preferences():
         prefs=json.loads((DATA_DIR/'managed-ai.json').read_text())
     except (OSError, ValueError):
         prefs={'components':[], 'autostart':True}
+    try:
+        # Engines live in the shared engines folder, preferences in this copy's data folder:
+        # a new SceneForge folder must still see engines installed by an earlier one.
+        from app.native_engines import installed as _native_installed
+        from app.providers.kokoro_builtin import installed as _kokoro_installed
+        extra=[c for c in ('stable_diffusion','chatterbox') if _native_installed(c)]+(['kokoro'] if _kokoro_installed() else [])
+        prefs['components']=list(dict.fromkeys(list(prefs.get('components',[]))+extra))
+        for c in ('stable_diffusion','chatterbox'):
+            if c in extra:prefs.setdefault('runtime',{}).setdefault(c,'native')
+    except Exception:
+        pass
     if 'gpu' not in prefs:
         # Nobody chose yet: use the graphics card when an NVIDIA driver is installed (the
         # Docker engines always used the CUDA build; the processor is many times slower).
@@ -46,12 +57,40 @@ def save_preferences(value):
     tmp.write_text(json.dumps(value), encoding='utf-8')
     tmp.replace(p)
 
+_quick={}
+_quick_lock=threading.Lock()
+
+def quick_health(component, ttl=3.0):
+    """health() for status polling: short timeout, cached for a few seconds, so a busy or hung
+    engine can never make the editor's status requests pile up (each poll used to wait up to 3 s
+    per engine, 9 s in all, while the UI polls every 2.5 s)."""
+    now=time.monotonic()
+    with _quick_lock:
+        hit=_quick.get(component)
+        if hit and now-hit[0]<ttl:return hit[1]
+    try:
+        with session() as s:
+            if component=='image_api':
+                r=s.get('http://127.0.0.1:7860/sdapi/v1/options',timeout=(0.5,1.5),allow_redirects=False)
+                value=bool(r.ok)
+            else:
+                port=7860 if component=='stable_diffusion' else 8881
+                r=s.get(f'http://127.0.0.1:{port}/health',timeout=(0.5,1.5),allow_redirects=False)
+                r.raise_for_status();data=r.json()
+                value=data if isinstance(data,dict) and data.get('service')==component else None
+    except (requests.RequestException,ValueError):
+        value=False if component=='image_api' else None
+    with _quick_lock:_quick[component]=(time.monotonic(),value)
+    return value
+
 def running():
-    """Which installed engines answer right now (quick loopback checks)."""
+    """Which installed engines answer right now (quick, parallel, cached loopback checks)."""
     from app.providers import kokoro_builtin
-    ok=lambda c:bool(health(c)) and not (health(c) or {}).get('last_error')   # a failed model is not "Ready"
-    return {'stable_diffusion': image_ready() or ok('stable_diffusion'),
-            'chatterbox': ok('chatterbox'), 'kokoro': kokoro_builtin.installed()}
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(max_workers=3) as pool:
+        api,sd,cb=pool.map(quick_health,('image_api','stable_diffusion','chatterbox'))
+    ok=lambda h:bool(h) and not h.get('last_error')   # a failed model is not "Ready"
+    return {'stable_diffusion': bool(api) or ok(sd), 'chatterbox': ok(cb), 'kokoro': kokoro_builtin.installed()}
 
 def set_runtime(component, runtime):
     prefs=preferences();prefs.setdefault('runtime',{})[component]=runtime;save_preferences(prefs)
@@ -70,6 +109,8 @@ def report(message, **patch):
         tmp = DATA_DIR/'ai-install-status.tmp'
         tmp.write_text(json.dumps(_state), encoding='utf-8')
         tmp.replace(DATA_DIR/'ai-install-status.json')
+    import logging
+    logging.getLogger('sceneforge.local_ai').info(message[:1000])   # also into Help > Export diagnostics
     line = '[Local AI] ' + message
     try:
         print(line, flush=True)
@@ -276,16 +317,19 @@ def install(components, gpu=False):
             else:
                 from app import native_engines
                 wanted='gpu' if gpu else 'cpu'
-                failed=native_engines.installed(component) and bool((health(component) or {}).get('last_error'))
-                if native_engines.build(component) not in (None,wanted) or native_engines.stale(component) or failed:
+                port=7860 if component=='stable_diffusion' else 8881
+                h=health(component)
+                owner=native_engines.port_owner(port) if h or native_engines.installed(component) else None
+                failed=bool((h or {}).get('last_error')) and (native_engines.installed(component) or (owner or {}).get('kind')=='docker')
+                leftover=bool(owner and owner.get('leftover'))   # an engine an earlier SceneForge left running
+                if native_engines.build(component) not in (None,wanted) or native_engines.stale(component) or failed or leftover:
                     # Switch between the CPU and NVIDIA builds, update packages from an older
-                    # SceneForge, or restart an engine whose model failed to load (Retry).
+                    # SceneForge, replace an engine left running by an earlier version, or
+                    # restart an engine whose model failed to load (Retry).
                     report(f"Switching {component} to the {'NVIDIA graphics card' if gpu else 'CPU'} build." if native_engines.build(component) not in (None,wanted)
-                           else f'Updating and restarting {component}.',step='Updating the engine',part=0.05)
-                    native_engines.stop(component)
-                    for _ in range(30):
-                        if not health(component):break
-                        time.sleep(1)
+                           else f'Restarting {component} with this version of SceneForge.',step='Updating the engine',part=0.05)
+                    freed,why=native_engines.free_port(component,report)
+                    if not freed:raise RuntimeError(why)
                 ready=(native_engines.build(component) in (None,wanted)) and not native_engines.stale(component) and (image_ready() if component=='stable_diffusion' else bool((health(component) or {}).get('model_ready')))
                 if not ready:
                     port=7860 if component=='stable_diffusion' else 8881
@@ -294,7 +338,14 @@ def install(components, gpu=False):
                         with socket.create_connection(('127.0.0.1',port),timeout=1):pass
                     except OSError:pass
                     else:
-                        if not health(component):raise RuntimeError(f'Port {port} is used by another service. Stop it or use your existing engine connection; Retry will not replace it.')
+                        if not health(component):
+                            owner=native_engines.port_owner(port)
+                            if owner and (owner.get('ours') or owner.get('kind')=='docker'):
+                                freed,why=native_engines.free_port(component,report)
+                                if not freed:raise RuntimeError(why)
+                            else:
+                                who=f"{owner['name']} (process {owner['pid']})" if owner else 'another program'
+                                raise RuntimeError(f'Port {port} is used by {who}, which is not part of SceneForge, so SceneForge will not close it. Close it, then click Retry.')
                     if not health(component):
                         # Native engine: private Python + packages, no Docker (0.9.4-beta.3).
                         from app import native_engines
@@ -341,8 +392,12 @@ def autostart(force=False, services=None):
         docker_services=[c for c in services if c not in native]
         for c in native:
             h=health(c)
-            if h and (h.get('last_error') or native_engines.stale(c)) and native_engines.running(c):
-                native_engines.stop(c);h=None   # Start = repair: restart an engine whose model failed or whose packages changed
+            owner=native_engines.port_owner(7860 if c=='stable_diffusion' else 8881) if h else None
+            if h and (h.get('last_error') or native_engines.stale(c) or (owner or {}).get('leftover')) and (native_engines.running(c) or (owner or {}).get('ours')):
+                # Start = repair: restart an engine whose model failed, whose packages changed, or
+                # that an earlier SceneForge left running (it may be an older version).
+                freed,_=native_engines.free_port(c,report)
+                h=None if freed else h
             if not h:native_engines.start(c,prefs.get('gpu',False))
         if docker_services and os.name=='nt':
             # Engines installed by 0.9.4-beta.2 and earlier ran in Docker Desktop.

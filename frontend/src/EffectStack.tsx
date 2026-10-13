@@ -4,15 +4,15 @@ import type {Look} from './api';
 import {FeatureHelp} from './FeatureHelp';
 
 /** Scene-level effects that can be reordered (backend render/fx_stack.py STACK_IDS, default order). */
-export const STACK_IDS = ['spotlight', 'leak', 'flare', 'wiggle', 'shake', 'vignette', 'letterbox', 'sharpen'] as const;
+export const STACK_IDS = ['mirror', 'trails', 'spotlight', 'leak', 'flare', 'wiggle', 'pulse', 'shake', 'flash', 'vignette', 'letterbox', 'sharpen'] as const;
 export type StackId = typeof STACK_IDS[number];
-export const STACK_LABELS: Record<StackId, string> = {spotlight: 'Spotlight', leak: 'Light leaks', flare: 'Lens flare', wiggle: 'Wiggle', shake: 'Camera shake',vignette:'Edge vignette',letterbox:'Cinema bars',sharpen:'Detail sharpening'};
+export const STACK_LABELS: Record<StackId, string> = {spotlight: 'Spotlight', leak: 'Light leaks', flare: 'Lens flare', wiggle: 'Wiggle', shake: 'Camera shake',vignette:'Edge vignette',letterbox:'Cinema bars',sharpen:'Detail sharpening',mirror:'Mirror',trails:'Motion trails',pulse:'Beat zoom',flash:'Flash'};
 
 /** Same rules as fx_stack.is_enabled: the effect has settings that change the picture. */
 export function stackEnabled(look: any, id: StackId): boolean {
   const v = look?.[id];
   if (!v) return false;
-  if (id === 'spotlight') return true;
+  if (id === 'spotlight' || id === 'mirror') return true;
   if (id === 'shake') return (v.amount ?? 0) > 0 || !!v.impact;
   return (v.amount ?? 0) > 0;
 }

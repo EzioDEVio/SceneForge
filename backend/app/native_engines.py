@@ -23,7 +23,7 @@ from pathlib import Path
 
 import requests
 
-from app.config import LOGS_DIR, RESOURCE_DIR
+from app.config import RESOURCE_DIR
 
 UV_VERSION = "0.13.0"
 UV_ASSETS = {  # (system, machine) -> (asset, sha256)
@@ -242,12 +242,155 @@ def start(component: str, gpu: bool = False) -> bool:
         env = _env(gpu)
         if component == "chatterbox":
             env["CHATTERBOX_DEVICE"] = "cuda" if gpu else "cpu"
-        LOGS_DIR.mkdir(parents=True, exist_ok=True)
-        log = (LOGS_DIR / f"{component}-engine.log").open("a", encoding="utf-8")
+        log = log_path(component).open("a", encoding="utf-8")
+        log.write(f"\n===== {time.strftime('%Y-%m-%d %H:%M:%S')} starting {component} on port {spec['port']} "
+                  f"({'NVIDIA graphics card' if gpu else 'processor'}) =====\n")
+        log.flush()
         _processes[component] = subprocess.Popen(
             [str(venv_python(component)), "-m", "uvicorn", "server:app", "--host", "127.0.0.1", "--port", str(spec["port"])],
             cwd=str(home), env=env, stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT, creationflags=FLAGS)
+        _close_with_sceneforge(_processes[component])
         return True
+
+
+def log_path(component: str) -> Path:
+    """Engine output, kept next to the engine so it survives SceneForge updates and folders."""
+    path = root() / component / "engine.log"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    try:   # keep the log small
+        if path.stat().st_size > 5_000_000:
+            path.write_bytes(path.read_bytes()[-1_000_000:])
+    except OSError:
+        pass
+    return path
+
+
+_JOB = None
+
+
+def _close_with_sceneforge(process: subprocess.Popen) -> None:
+    """Windows: put the engine in a job object that closes with SceneForge, so closing the
+    start.bat window (or a crash) cannot leave an engine running in the background holding
+    its port (owner's PC, 2026-10-13: an old Chatterbox from an earlier version kept answering)."""
+    global _JOB
+    if os.name != "nt":
+        return
+    try:
+        import ctypes
+        from ctypes import wintypes
+        k32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        if _JOB is None:
+            class Basic(ctypes.Structure):
+                _fields_ = [("PerProcessUserTimeLimit", ctypes.c_int64), ("PerJobUserTimeLimit", ctypes.c_int64),
+                            ("LimitFlags", wintypes.DWORD), ("MinimumWorkingSetSize", ctypes.c_size_t),
+                            ("MaximumWorkingSetSize", ctypes.c_size_t), ("ActiveProcessLimit", wintypes.DWORD),
+                            ("Affinity", ctypes.c_size_t), ("PriorityClass", wintypes.DWORD), ("SchedulingClass", wintypes.DWORD)]
+
+            class Io(ctypes.Structure):
+                _fields_ = [(n, ctypes.c_ulonglong) for n in ("ReadOperationCount", "WriteOperationCount", "OtherOperationCount",
+                                                             "ReadTransferCount", "WriteTransferCount", "OtherTransferCount")]
+
+            class Extended(ctypes.Structure):
+                _fields_ = [("BasicLimitInformation", Basic), ("IoInfo", Io), ("ProcessMemoryLimit", ctypes.c_size_t),
+                            ("JobMemoryLimit", ctypes.c_size_t), ("PeakProcessMemoryUsed", ctypes.c_size_t),
+                            ("PeakJobMemoryUsed", ctypes.c_size_t)]
+            k32.CreateJobObjectW.restype = wintypes.HANDLE
+            k32.CreateJobObjectW.argtypes = [ctypes.c_void_p, wintypes.LPCWSTR]
+            k32.SetInformationJobObject.argtypes = [wintypes.HANDLE, ctypes.c_int, ctypes.c_void_p, wintypes.DWORD]
+            job = k32.CreateJobObjectW(None, None)
+            info = Extended()
+            info.BasicLimitInformation.LimitFlags = 0x2000   # JOB_OBJECT_LIMIT_KILL_ON_JOB_CLOSE
+            if not job or not k32.SetInformationJobObject(job, 9, ctypes.byref(info), ctypes.sizeof(info)):
+                return
+            _JOB = job
+        k32.AssignProcessToJobObject.argtypes = [wintypes.HANDLE, wintypes.HANDLE]
+        k32.AssignProcessToJobObject(_JOB, wintypes.HANDLE(int(process._handle)))
+    except Exception:   # best effort; stop_all() still runs on a normal shutdown
+        pass
+
+
+DOCKER_NAMES = ("com.docker.backend", "wslrelay", "vpnkit", "docker-proxy", "com.docker.vpnkit", "dockerd")
+
+
+def port_owner(port: int) -> dict | None:
+    """Which program listens on a loopback port: ours (an engine in SceneForge's engines
+    folder, possibly left over from an earlier run), Docker, or something else."""
+    try:
+        import psutil
+    except ImportError:
+        return None
+    try:
+        conns = psutil.net_connections(kind="tcp")
+    except (psutil.Error, OSError):
+        return None
+    pid = next((c.pid for c in conns if c.laddr and c.laddr.port == port and c.status == psutil.CONN_LISTEN and c.pid), None)
+    if not pid:
+        return None
+    try:
+        p = psutil.Process(pid)
+        exe = p.exe() or ""
+        cmd = " ".join(p.cmdline())
+        name = p.name()
+    except (psutil.Error, OSError):
+        return {"pid": pid, "name": "?", "exe": "", "kind": "other", "ours": False}
+    base = str(root().resolve()).lower()
+    ours = exe.lower().startswith(base) or base in cmd.lower()
+    kind = "native" if ours else ("docker" if name.lower().split(".exe")[0] in DOCKER_NAMES else "other")
+    current = {proc.pid for proc in _processes.values() if proc.poll() is None}
+    try:
+        current |= {c.pid for proc in _processes.values() if proc.poll() is None for c in psutil.Process(proc.pid).children(recursive=True)}
+    except (psutil.Error, OSError):
+        pass
+    return {"pid": pid, "name": name, "exe": exe, "kind": kind, "ours": ours, "leftover": ours and pid not in current}
+
+
+def free_port(component: str, report=print) -> tuple[bool, str]:
+    """Make the engine's port free for a fresh start. Engines in SceneForge's own folder
+    (including ones left running by an earlier SceneForge) are stopped; an old SceneForge
+    Docker container is stopped through its own compose project; anything else is left
+    alone and named, so an unrelated program is never closed."""
+    port = SPECS[component]["port"]
+    stop(component)
+    owner = port_owner(port)
+    if owner is None:
+        return True, ""
+    if owner["ours"]:
+        report(f"Stopping an earlier {SPECS[component]['label']} engine (process {owner['pid']}) so the current version can start.")
+        try:
+            import psutil
+            proc = psutil.Process(owner["pid"])
+            family = proc.children(recursive=True) + [proc]
+            for item in family:
+                try:
+                    item.kill()
+                except psutil.Error:
+                    pass
+            psutil.wait_procs(family, timeout=15)
+        except Exception:
+            pass
+    elif owner["kind"] == "docker":
+        report(f"Stopping the older Docker {SPECS[component]['label']} engine from SceneForge 0.9.4-beta.2.")
+        try:
+            from app.managed_ai import docker_path
+            docker = docker_path()
+            if docker:
+                ids = subprocess.run([docker, "ps", "-q", "--filter", "label=com.docker.compose.project=sceneforge-managed-ai",
+                                      "--filter", f"publish={port}"], capture_output=True, text=True, timeout=30, creationflags=FLAGS).stdout.split()
+                if ids:
+                    subprocess.run([docker, "stop", *ids], capture_output=True, timeout=120, creationflags=FLAGS)
+        except (OSError, subprocess.SubprocessError):
+            pass
+    for _ in range(30):
+        if port_owner(port) is None:
+            return True, ""
+        time.sleep(0.5)
+    owner = port_owner(port)
+    if owner is None:
+        return True, ""
+    who = "Docker Desktop (an older engine container)" if owner["kind"] == "docker" else f"{owner['name']} (process {owner['pid']})"
+    return False, (f"Port {port} is used by {who}, so SceneForge cannot start {SPECS[component]['label']}. "
+                   + ("Stop the sceneforge-managed-ai containers in Docker Desktop" if owner["kind"] == "docker" else "Close that program")
+                   + ", then click Retry.")
 
 
 def stop(component: str) -> None:

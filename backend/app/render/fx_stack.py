@@ -27,9 +27,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-STACK_IDS: tuple[str, ...] = ("spotlight", "leak", "flare", "wiggle", "shake", "vignette", "letterbox", "sharpen")
+STACK_IDS: tuple[str, ...] = ("mirror", "trails", "spotlight", "leak", "flare", "wiggle", "pulse", "shake", "flash", "vignette", "letterbox", "sharpen")
 DEFAULT_ORDER: tuple[str, ...] = STACK_IDS
-LABELS = {"spotlight": "Spotlight", "leak": "Light leaks", "flare": "Lens flare", "wiggle": "Wiggle", "shake": "Camera shake", "vignette": "Edge vignette", "letterbox": "Cinema bars", "sharpen": "Detail sharpening"}
+LABELS = {"spotlight": "Spotlight", "leak": "Light leaks", "flare": "Lens flare", "wiggle": "Wiggle", "shake": "Camera shake", "vignette": "Edge vignette", "letterbox": "Cinema bars", "sharpen": "Detail sharpening",
+          "mirror": "Mirror", "trails": "Motion trails", "pulse": "Beat zoom", "flash": "Flash"}
 
 
 def _clean_ids(value, name: str) -> list[str]:
@@ -58,7 +59,7 @@ def is_enabled(look: dict, fx_id: str) -> bool:
     v = look.get(fx_id)
     if not v:
         return False
-    if fx_id == "spotlight":
+    if fx_id in ("spotlight", "mirror"):
         return True
     if fx_id == "shake":
         return v.get("amount", 0) > 0 or bool(v.get("impact"))
@@ -94,6 +95,14 @@ def stack_graph(base: str, look: dict, w: int, h: int, fps: int, dur: float, cac
             g, base = fx.flare_graph(base, p, png, drift, w, h, fps, dur)
         elif fx_id == "wiggle":
             g, base = fx.wiggle_graph(base, p, w, h, fps, dur)
+        elif fx_id == "pulse":
+            g, base = fx.pulse_graph(base, p, w, h, fps)
+        elif fx_id == "flash":
+            g, base = fx.flash_graph(base, p)
+        elif fx_id == "trails":
+            g, base = fx.trails_graph(base, p)
+        elif fx_id == "mirror":
+            g, base = fx.mirror_graph(base, p, w, h)
         elif fx_id in ("vignette", "letterbox", "sharpen"):
             amount = p["amount"] / 100
             filt = (f"vignette=angle={amount*1.2:.3f}" if fx_id == "vignette" else

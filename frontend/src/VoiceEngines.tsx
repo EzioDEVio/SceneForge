@@ -3,7 +3,7 @@ import {Cloud, Download, Loader2, Mic, Play, Sparkles, Waves} from 'lucide-react
 import type {ProviderProfile} from './api';
 
 type Kokoro = {installed: boolean; state: string; done: number; total: number; error: string; download_mb: number};
-type Chatter = {reachable: boolean; state: string; docker: string; message: string};
+type Chatter = {reachable: boolean; state: string; docker: string; message: string; error?: string};
 async function getJson(url: string, init?: RequestInit) {
   const r = await fetch(url, init); const data = await r.json().catch(() => ({}));
   if (!r.ok) throw Error(data.detail || 'Request failed'); return data;
@@ -27,8 +27,9 @@ export function VoiceEngines({busy, providers, onUse, onSelectProvider}: {busy: 
   }, []);
   React.useEffect(() => {void refresh();}, [refresh]);
   const downloading = kokoro?.state === 'downloading' && !kokoro.installed;
-  const starting = !chatter?.reachable && (chatter?.state === 'starting' || chatter?.state === 'started');
-  React.useEffect(() => {if (!downloading && !starting) return; const t = setInterval(() => void refresh(), 1500); return () => clearInterval(t);}, [downloading, starting, refresh]);
+  const [repairUntil, setRepairUntil] = React.useState(0);
+  const starting = (!chatter?.reachable && (chatter?.state === 'starting' || chatter?.state === 'started')) || (repairUntil > Date.now() && !chatter?.reachable);
+  React.useEffect(() => {if (!downloading && !starting && repairUntil < Date.now()) return; const t = setInterval(() => {if (repairUntil && repairUntil < Date.now()) setRepairUntil(0); void refresh();}, 2000); return () => clearInterval(t);}, [downloading, starting, repairUntil, refresh]);
   // Select Kokoro by itself once a download started here finishes.
   const fetched = React.useRef(false);
   React.useEffect(() => {if (downloading) fetched.current = true; else if (fetched.current && kokoro?.installed) {fetched.current = false; onUse('kokoro_builtin');}}, [downloading, kokoro?.installed]);
@@ -53,6 +54,9 @@ export function VoiceEngines({busy, providers, onUse, onSelectProvider}: {busy: 
     catch (e: any) {setNote(e.message);} finally {setVbChecking(false);}
   }
   async function startChatterbox() {setNote(''); try {await getJson('/api/local-speech/chatterbox/start', {method: 'POST'}); await refresh();} catch (e: any) {setNote(e.message);}}
+  /** Restart a Chatterbox whose model failed (also replaces one left running by an older SceneForge). */
+  async function repairChatterbox() {setNote(''); try {await getJson('/api/local-ai/start', {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({components: ['chatterbox']})});
+    setRepairUntil(Date.now() + 10 * 60_000); setChatter(c => c && {...c, reachable: false, error: '', state: 'starting'}); setNote('Restarting Chatterbox. Loading the voice model can take a few minutes.');} catch (e: any) {setNote(e.message);}}
   const gemini = providers.find(p => p.name === 'gemini_tts' && p.configured);
   const chatterInstalled = !!chatter && (chatter.reachable || chatter.docker === 'ready');
   const pct = kokoro && kokoro.total ? Math.round(kokoro.done / kokoro.total * 100) : 0;
@@ -71,8 +75,11 @@ export function VoiceEngines({busy, providers, onUse, onSelectProvider}: {busy: 
       <li className={`voice-engine ${chatter?.reachable ? 'ready' : ''}`} aria-label="Chatterbox">
         <span className="voice-engine-icon" aria-hidden><Mic size={17}/></span>
         <span className="voice-engine-text"><b>Chatterbox</b><small>Arabic and 22 more languages · natural, expressive · runs on this computer, no Docker</small>
-          {starting && <small role="status">Starting… the first start loads the voice model and can take a few minutes.</small>}</span>
-        {chatter?.reachable
+          {starting && <small role="status">Starting… the first start loads the voice model and can take a few minutes.</small>}
+          {chatter?.error && <small className="voice-engine-reason" role="status">Chatterbox could not load its voice model: {chatter.error}</small>}</span>
+        {chatter?.error
+          ? <button className="btn btn-primary" disabled={busy} onClick={() => void repairChatterbox()}>Repair Chatterbox</button>
+          : chatter?.reachable
           ? <button className="btn btn-primary" disabled={busy} onClick={() => onUse('chatterbox')}>Use Chatterbox</button>
           : chatterInstalled
             ? <button className="btn" disabled={busy || starting} onClick={() => void startChatterbox()}><Play size={14} aria-hidden/> {starting ? 'Starting…' : 'Start Chatterbox'}</button>

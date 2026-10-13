@@ -219,6 +219,10 @@ with TestClient(app) as c:
     check('no planted secret appears in the raw zip bytes', not any(s.encode() in raw for s in planted))
     leaked = [(nm, s) for nm in names for s in planted if s.encode() in z.read(nm)]
     check('no planted secret appears in any decompressed file (API key, env SECRET, desktop token, key-shaped log text, keyring ref)', not leaked)
+    la = json.loads(z.read('local_ai.json'))
+    check('local_ai.json has setup progress, its log, and each engine port owner (beta.7)',
+          'setup_log' in la and set(la['engines']) == {'stable_diffusion', 'chatterbox'}
+          and all('port_owner' in e and 'installed' in e for e in la['engines'].values()))
     check('the desktop log tail is included with the token redacted', b'[redacted]' in z.read('logs/desktop-backend.log') and b'ready' in z.read('logs/desktop-backend.log'))
 
 print(f'{n} 0.7.1 usability checks passed (model manager and diagnostics).')

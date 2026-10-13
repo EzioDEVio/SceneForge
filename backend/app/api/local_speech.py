@@ -186,7 +186,7 @@ def engine_status(engine: str):
     try:
         with requests.Session() as http:
             http.trust_env = False  # never through a system proxy for this computer's own engine
-            reachable = http.get(url + '/v1/audio/voices', timeout=2).ok
+            reachable = http.get(url + '/v1/audio/voices', timeout=(0.5, 2)).ok
     except Exception:  # noqa: BLE001
         reachable = False
     state = dict(_START_STATE.get(engine, {'state': 'idle', 'log': ''}))
@@ -199,7 +199,11 @@ def engine_status(engine: str):
         runtime = {'docker': 'not_installed', 'message': 'Chatterbox is not installed yet. Open AI Engines and click Install next to Chatterbox: one click, no Docker.'}
     else:
         runtime = _docker_state()
-    return {'engine': engine, 'url': url, 'reachable': reachable, 'services_bundled': _services_dir() is not None, **runtime, **state}
+    error = ''
+    if engine == 'chatterbox' and reachable:
+        from app.managed_ai import quick_health
+        error = str((quick_health('chatterbox') or {}).get('last_error') or '')[:300]   # a model that failed to load: offer Repair
+    return {'engine': engine, 'url': url, 'reachable': reachable, 'error': error, 'services_bundled': _services_dir() is not None, **runtime, **state}
 
 
 @router.post('/{engine}/start')

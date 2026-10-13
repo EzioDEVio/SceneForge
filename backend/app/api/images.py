@@ -121,7 +121,7 @@ def local_image_status(provider_id: str, db: Session = Depends(get_db)):
         result.raise_for_status()
         return {'ready': True, 'model': result.json().get('sd_model_checkpoint', 'current')}
     except Exception:
-        return {'ready': False, 'model': '', 'message': 'Local image API is not ready. Wait for startup, then retry. Check backend/data/logs/stable-diffusion.log if it stays unavailable.'}
+        return {'ready': False, 'model': '', 'message': 'Local image API is not ready. Wait for startup, then retry. Click View startup log if it stays unavailable.'}
 
 
 def _managed_profile(provider_id,db):
@@ -142,8 +142,9 @@ def start_local_image(provider_id:str,db:Session=Depends(get_db)):
 def local_image_log(provider_id:str,db:Session=Depends(get_db)):
     from app.config import LOGS_DIR
     _managed_profile(provider_id,db)
-    path=LOGS_DIR/'stable-diffusion.log'
-    if not path.exists():return {'text':'No startup log yet. Start the engine first.'}
+    from app import native_engines
+    path=native_engines.log_path('stable_diffusion') if native_engines.installed('stable_diffusion') else LOGS_DIR/'stable-diffusion.log'
+    if not path.exists() or not path.stat().st_size:return {'text':'No startup log yet. Start the engine first.'}
     with path.open('rb') as f:
         f.seek(0,2);f.seek(max(0,f.tell()-16000));data=f.read()
     return {'text':data.decode('utf-8',errors='replace')}
