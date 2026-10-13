@@ -61,18 +61,30 @@ def _profiles(url: str | None, timeout=(5, 15)) -> list[dict]:
 
 
 def running(url: str | None = None) -> bool:
-    try:
-        return requests.get(_base(url) + "/profiles", timeout=2, **_NO_PROXY).ok
-    except requests.RequestException:
-        return False
+    return status(url)["running"]
 
 
 def status(url: str | None = None) -> dict:
-    """For the Voices card: is Voicebox open, and how many voices does it have."""
+    """For the Voices card: is Voicebox answering, how many voices does it have, and if it
+    is not answering, why (in words the user can act on)."""
+    base = _base(url)
+    out = {"running": False, "profiles": 0, "url": base, "reason": ""}
     try:
-        return {"running": True, "profiles": len(_profiles(url, timeout=2)), "url": _base(url)}
+        rows = _profiles(url, timeout=(3, 10))
+    except requests.ConnectionError:
+        out["reason"] = (f"Nothing is answering at {base}. Make sure the Voicebox app has finished starting "
+                         "(its window shows Voices), or set the address Voicebox uses below.")
+    except requests.Timeout:
+        out["reason"] = (f"Voicebox at {base} did not reply within 10 seconds. It may still be starting or "
+                         "loading a model; wait a moment and click Check again.")
+    except requests.HTTPError as e:
+        code = e.response.status_code if e.response is not None else "?"
+        out["reason"] = f"Something answers at {base}, but not like Voicebox (HTTP {code}). Check the address below."
     except (requests.RequestException, ValueError):
-        return {"running": False, "profiles": 0, "url": _base(url)}
+        out["reason"] = f"The program at {base} sent a reply SceneForge does not understand. Update Voicebox, or check the address below."
+    else:
+        out.update(running=True, profiles=len(rows))
+    return out
 
 
 def _engine(p: dict) -> str:

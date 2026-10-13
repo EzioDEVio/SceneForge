@@ -1,6 +1,7 @@
 """Local speech components; fixed loopback endpoints, no cloud credentials."""
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
+from pydantic import BaseModel
 from app.db.database import get_db
 from app.db.models import ProviderProfile
 from app.api.providers import _to_out
@@ -39,10 +40,35 @@ def kokoro_download():
     return kokoro_builtin.status()
 
 
-@router.get('/voicebox/status')
-def voicebox_status():
+def _voicebox_url(db) -> str:
     from app.providers import voicebox
-    return voicebox.status()
+    profile = db.query(ProviderProfile).filter_by(capability='speech', name='voicebox').first()
+    return (profile.base_url if profile and profile.base_url else voicebox.DEFAULT_URL)
+
+
+@router.get('/voicebox/status')
+def voicebox_status(db: Session = Depends(get_db)):
+    from app.providers import voicebox
+    return voicebox.status(_voicebox_url(db))
+
+
+class VoiceboxAddress(BaseModel):
+    url: str
+
+
+@router.put('/voicebox/address')
+def voicebox_address(body: VoiceboxAddress, db: Session = Depends(get_db)):
+    """Change where SceneForge looks for Voicebox (default http://127.0.0.1:17493)."""
+    from urllib.parse import urlparse
+    from app.providers import voicebox
+    url = body.url.strip().rstrip('/')
+    if url and '://' not in url: url = 'http://' + url
+    parsed = urlparse(url or voicebox.DEFAULT_URL)
+    if parsed.scheme not in ('http', 'https') or not parsed.hostname or parsed.path not in ('', '/'):
+        raise HTTPException(400, 'Enter an address like http://127.0.0.1:17493.')
+    profile = _built_in_profile(db, 'voicebox', voicebox.DEFAULT_URL, 'voicebox')
+    profile.base_url = url or voicebox.DEFAULT_URL; db.commit()
+    return voicebox.status(profile.base_url)
 
 
 @router.post('/{engine}/connect')
@@ -57,9 +83,10 @@ def connect(engine: str, db: Session = Depends(get_db)):
                 'message': 'Kokoro is built into SceneForge and ready. English, Spanish, French, Hindi, Italian and Portuguese.'}
     if engine == 'voicebox':
         from app.providers import voicebox
-        if not voicebox.running():
-            raise HTTPException(503, 'Voicebox is not running. Install it from voicebox.sh, open it, then click Connect Voicebox again.')
-        profile = _built_in_profile(db, 'voicebox', voicebox.DEFAULT_URL, 'voicebox')
+        state = voicebox.status(_voicebox_url(db))
+        if not state['running']:
+            raise HTTPException(503, state['reason'] + ' Voicebox is a separate free app from voicebox.sh.')
+        profile = _built_in_profile(db, 'voicebox', state['url'], 'voicebox')
         try: voices = voicebox.voice_details(profile.base_url)
         except ValueError as e:
             # Connected, but nothing to speak with yet: keep the connection and say what to do in Voicebox.

@@ -33,6 +33,19 @@ const api = async (u, b, m = 'POST') => {const r = await fetch(base + '/api' + u
   assert.equal(await page.getByRole('tab', {name: 'Audio', exact: true}).getAttribute('aria-selected'), 'true');
   console.log('PASS a part without narration says to add narration first and links to Voice & narration');
 
+  // 1b. Voicebox "Check again" visibly checks and says why it is not found, with the address.
+  const vb = page.locator('.scene-editor:not([hidden]) li[aria-label="Voicebox"]');
+  await vb.getByRole('button', {name: 'Check again'}).click();
+  await vb.getByText(/Nothing is answering at http:\/\/127\.0\.0\.1:17493/).waitFor();
+  assert(await vb.getByText(/Checked \d/).isVisible());
+  await vb.getByRole('button', {name: /Change address/}).click();
+  await vb.getByLabel('Voicebox address').fill('127.0.0.1:17999'); await vb.getByRole('button', {name: 'Save and check'}).click();
+  await vb.getByText(/Nothing is answering at http:\/\/127\.0\.0\.1:17999/).waitFor();
+  await vb.getByRole('button', {name: /Change address/}).click();
+  await vb.getByLabel('Voicebox address').fill('http://127.0.0.1:17493'); await vb.getByRole('button', {name: 'Save and check'}).click();
+  await vb.getByText(/127\.0\.0\.1:17493/).first().waitFor();
+  console.log('PASS Voicebox Check again shows a spinner, the reason, the time and the address it tried; the address can be changed');
+
   // 2. Edit tools explain themselves; Blade cuts a part on the Picture track where clicked.
   await page.getByRole('button', {name: 'Slip tool'}).click();
   assert.match(await page.locator('.tool-feedback').textContent(), /Slip: .*A3–A8.*Add music or a sound effect/);

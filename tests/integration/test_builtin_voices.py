@@ -94,7 +94,9 @@ with TestClient(app) as c:
 
     # ---- Voicebox (local API mocked) ----
     r = c.post('/api/local-speech/voicebox/connect')
-    check('Voicebox not running is explained', r.status_code == 503 and 'voicebox.sh' in r.text)
+    check('Voicebox not running is explained', r.status_code == 503 and 'voicebox.sh' in r.text and 'Nothing is answering' in r.text)
+    st = c.get('/api/local-speech/voicebox/status').json()
+    check('Check again says why Voicebox is not found and where it looked', not st['running'] and 'Nothing is answering at http://127.0.0.1:17493' in st['reason'])
     class VB(BaseHTTPRequestHandler):
         """Behaves like Voicebox 0.5.0: /generate queues and returns status "generating",
         defaults to the Qwen engine when none is passed, and /audio 404s until done."""
@@ -144,6 +146,10 @@ with TestClient(app) as c:
         check('Voicebox narration waits for the queued generation and is saved as a take',
               t.status_code == 200 and t.json()['provider'] == 'voicebox' and VB.last['profile_id'] == 'p1' and VB.gens['g1']['polls'] >= 2)
         t = c.post(f'/api/scenes/{sid}/voice-takes/service', json={'provider_id': vb['profile']['id'], 'voice': 'k1', 'language': 'en-US', 'speed': 1.0})
+        bad = c.put('/api/local-speech/voicebox/address', json={'url': 'ftp://x'})
+        check('a wrong Voicebox address is refused with an example', bad.status_code == 400 and '17493' in bad.text)
+        moved = c.put('/api/local-speech/voicebox/address', json={'url': f'127.0.0.1:{srv.server_address[1]}'}).json()
+        check('Voicebox on another address can be set and is found', moved['running'] and moved['profiles'] == 2)
         check("a preset voice is generated with its own engine, not Voicebox's Qwen default",
               t.status_code == 200 and VB.last['engine'] == 'kokoro' and VB.last['language'] == 'en')
     srv.shutdown()
