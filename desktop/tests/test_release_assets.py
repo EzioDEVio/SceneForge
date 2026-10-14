@@ -32,9 +32,17 @@ class ReleaseAssetsTest(unittest.TestCase):
         self.assertEqual(self.names, [
             "SceneForge-Studio-0.9.3-Windows-x64-Setup.exe",
             "SceneForge-Studio-0.9.3-Windows-x64-Setup.exe.blockmap", "latest.yml",
-            "SceneForge-Studio-0.9.3-Linux-x64.AppImage",
-            "SceneForge-Studio-0.9.3-Linux-x64.deb", "latest-linux.yml",
+            "SceneForge-Studio-0.9.3-Linux-x86_64.AppImage",
+            "SceneForge-Studio-0.9.3-Linux-amd64.deb", "latest-linux.yml",
         ])
+
+    def test_matches_the_files_electron_builder_published(self):
+        # File names of the published 0.9.3 release on GitHub (Windows and Linux parts).
+        published = {"latest-linux.yml", "latest-mac.yml", "latest.yml",
+                     "SceneForge-Studio-0.9.3-Linux-amd64.deb", "SceneForge-Studio-0.9.3-Linux-x86_64.AppImage",
+                     "SceneForge-Studio-0.9.3-macOS-arm64.dmg", "SceneForge-Studio-0.9.3-macOS-arm64.zip",
+                     "SceneForge-Studio-0.9.3-Windows-x64-Setup.exe", "SceneForge-Studio-0.9.3-Windows-x64-Setup.exe.blockmap"}
+        self.assertLessEqual(set(self.names), published)
 
     def test_complete_draft(self):
         self.assertEqual(self.verify(), self.names)

@@ -22,12 +22,12 @@ def expected_assets(package: dict) -> list[str]:
         raise VerificationError("Invalid desktop version")
     build = package["build"]
 
-    def filename(platform: str, ext: str) -> str:
+    def filename(platform: str, ext: str, arch: str = "x64") -> str:
         settings = build[platform]
         # The target-specific NSIS setting takes precedence over the Windows one.
         template = (build.get("nsis", {}).get("artifactName") if platform == "win" else None)
         template = template or settings.get("artifactName") or build["artifactName"]
-        values = {"version": version, "arch": "x64", "ext": ext,
+        values = {"version": version, "arch": arch, "ext": ext,
                   "os": "win" if platform == "win" else "linux"}
         for key, value in values.items():
             template = template.replace("${" + key + "}", value)
@@ -43,8 +43,11 @@ def expected_assets(package: dict) -> list[str]:
     if not re.fullmatch(r"[A-Za-z0-9_-]+", channel):
         raise VerificationError("Invalid update channel")
     windows = filename("win", "exe")
+    # electron-builder writes ${arch} in each format's own spelling on Linux: x86_64 for
+    # AppImage and amd64 for deb (the published 0.9.x files show this). Expecting "x64"
+    # there made this check fail on every tagged release even when all files were uploaded.
     return [windows, windows + ".blockmap", channel + ".yml",
-            filename("linux", "AppImage"), filename("linux", "deb"),
+            filename("linux", "AppImage", "x86_64"), filename("linux", "deb", "amd64"),
             channel + "-linux.yml"]
 
 
