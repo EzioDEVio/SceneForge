@@ -1,6 +1,6 @@
 import {routeIconUrl} from "./RouteArtwork";
 import React, {useEffect, useState} from 'react';
-import {Vibrate, Focus, EyeOff, Sun, Blend, Plus, Trash2, Palette, LayoutGrid, Route as RouteIcon, Box as BoxIcon, MousePointerClick, Undo2, PenLine, Timer, ChevronDown, Film, SlidersHorizontal, Wand2, Sparkles, ZoomIn, Zap, Wind, FlipHorizontal} from 'lucide-react';
+import {Vibrate, Focus, EyeOff, Sun, Blend, Plus, Trash2, Palette, LayoutGrid, Route as RouteIcon, Box as BoxIcon, MousePointerClick, Undo2, PenLine, Timer, ChevronDown, Film, SlidersHorizontal, Wand2, Sparkles, ZoomIn, Zap, Wind, FlipHorizontal, Clapperboard, RotateCw, Gauge, Contrast, Columns2} from 'lucide-react';
 import type {Look, Scene} from './api';
 import {FeatureHelp} from './FeatureHelp';
 
@@ -79,6 +79,16 @@ const PULSE: Pulse = {amount: 45, bpm: 120};
 const FLASH: Flash = {amount: 70, mode: 'intro', bpm: 120};
 const TRAILS: Trails = {amount: 50};
 const MIRROR: Mirror = {mode: 'left'};
+type ColorSplit = {amount: number; mode: 'beats' | 'steady'; bpm: number};
+type CineOpen = {amount: number; zoom: 'in' | 'out' | 'none'; fade: 'in' | 'both' | 'none'; seconds: number};
+type Intro = {style: 'swipe_left' | 'swipe_right' | 'swipe_up' | 'spin' | 'zoom'; seconds: number};
+type BeforeAfter = {before: 'bw' | 'faded' | 'dark'; start: number; seconds: number};
+type SpeedBlur = {amount: number; direction: 'horizontal' | 'vertical'; when: 'whole' | 'start'};
+const COLORSPLIT: ColorSplit = {amount: 50, mode: 'beats', bpm: 120};
+const CINEOPEN: CineOpen = {amount: 50, zoom: 'in', fade: 'in', seconds: 1};
+const INTRO: Intro = {style: 'swipe_left', seconds: 0.5};
+const BEFOREAFTER: BeforeAfter = {before: 'bw', start: 25, seconds: 1.5};
+const SPEEDBLUR: SpeedBlur = {amount: 50, direction: 'horizontal', when: 'whole'};
 /** Suggested amount/speed when a shake preset is picked (the sliders still apply). */
 const SHAKE_PRESETS: Record<NonNullable<Shake['preset']>, Partial<Shake>> = {custom: {}, handheld: {amount: 35, speed: 40}, walk: {amount: 45, speed: 45}, run: {amount: 65, speed: 60}, impact: {amount: 70, speed: 60}};
 const TONE: Tone = {shadow: '#1E5A8C', highlight: '#F2A541', amount: 40, balance: 0};
@@ -100,7 +110,7 @@ export const FX_CATEGORIES: {id: FxCategory; label: string; Icon: typeof Sun; hi
   {id: 'looks', label: 'Looks', Icon: Palette, hint: 'Colour looks, film grades and lens effects'},
   {id: 'film', label: 'Old film', Icon: Film, hint: 'Scratches, dust, flicker and projector wobble'},
   {id: 'adjust', label: 'Adjust & LUT', Icon: SlidersHorizontal, hint: 'Light, colour and detail sliders, and .cube LUTs'},
-  {id: 'more', label: 'More effects', Icon: Wand2, hint: 'Trending (beat zoom, flash, trails, mirror), vignette, camera, annotations, map route, split screen, intro, presets'},
+  {id: 'more', label: 'More effects', Icon: Wand2, hint: 'Trending (beat zoom, flash, trails, mirror, RGB split, cinematic fade & zoom, intro move, before & after, speed blur), vignette, camera, annotations, map route, split screen, intro, presets'},
 ];
 /** One row of icon tabs at the top of Effects: shows one category at a time (all of them while searching). */
 export function EffectCategories({value, onChange, on, searching}: {value: FxCategory; onChange: (c: FxCategory) => void; on: Partial<Record<FxCategory, boolean>>; searching: boolean}) {
@@ -193,7 +203,7 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
   const onCount = (xs: unknown[]) => xs.filter(Boolean).length;
   return <EffectSearch.Provider value={query}><div className="look-panel scene-fx-panel">
     <FxGroup id="finish" items="Edge vignette · Cinema bars · Detail sharpening" title="Finishing touches" Icon={Focus} description="Guide attention, add a cinema frame or bring out fine detail." active={onCount([st.vignette,st.letterbox,st.sharpen])}>{([['vignette','Edge vignette','Darken picture edges to guide attention.'],['letterbox','Cinema bars','Add black bars inside the frame; export dimensions stay the same. Captions remain above the bars.'],['sharpen','Detail sharpening','Bring out fine detail; low amounts suit faces. Render to see the exact sharpening.']] as const).map(([id,label,help])=><section key={id} className="audio-card"><label className="switch-label"><input type="checkbox" aria-label={label} checked={!!st[id]} disabled={disabled} onChange={e=>put(id,e.target.checked?{amount:50}:null)}/>{label}</label><p className="hint">{help}</p>{st[id]&&<Row label={`${label} amount`} value={st[id].amount} min={0} max={100} onChange={amount=>put(id,{amount})} disabled={disabled}/>}</section>)}</FxGroup>
-    <FxGroup id="trending" items="Beat zoom · Flash · Motion trails · Mirror" title="Trending" Icon={Sparkles} description="Popular short-video effects: punch-in on the beat, white flash, motion trails and mirror." active={onCount([(st as any).pulse, (st as any).flash, (st as any).trails, (st as any).mirror])}>
+    <FxGroup id="trending" items="Beat zoom · Flash · Motion trails · Mirror · RGB split · Cinematic fade & zoom · Intro move · Before & after · Speed blur" title="Trending" Icon={Sparkles} description="Popular short-video effects. For speed ramps (velocity) and slow motion on a video clip, use Motion → Speed." active={onCount([(st as any).pulse, (st as any).flash, (st as any).trails, (st as any).mirror, (st as any).colorsplit, (st as any).cineopen, (st as any).intro, (st as any).beforeafter, (st as any).speedblur])}>
     <Section title="Beat zoom" Icon={ZoomIn} on={!!(st as any).pulse} onToggle={on => put('pulse', on ? {...PULSE} : null)} disabled={disabled} hint="The picture punches in on every beat and eases back. Match the beats per minute to your music. Render to see it.">
       {(st as any).pulse && <>
         <Row label="Zoom strength" value={(st as any).pulse.amount} min={0} max={100} unit="%" onChange={amount => put('pulse', {...(st as any).pulse, amount})} disabled={disabled}/>
@@ -212,6 +222,41 @@ export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEdi
     </Section>
     <Section title="Mirror" Icon={FlipHorizontal} on={!!(st as any).mirror} onToggle={on => put('mirror', on ? {...MIRROR} : null)} disabled={disabled} hint="Reflect one half of the picture onto the other, or one corner into all four (kaleidoscope). Render to see it.">
       {(st as any).mirror && <Pills label="Mirror" value={(st as any).mirror.mode} options={[['left', 'Left half'], ['right', 'Right half'], ['top', 'Top half'], ['bottom', 'Bottom half'], ['quad', 'Four corners']]} onChange={mode => put('mirror', {mode})} disabled={disabled}/>}
+    </Section>
+    <Section title="RGB split" Icon={Contrast} on={!!(st as any).colorsplit} onToggle={on => put('colorsplit', on ? {...COLORSPLIT} : null)} disabled={disabled} hint="The red and blue colours slide apart, the glitch look. On every beat it snaps out and settles back; Steady keeps it split. Render to see it.">
+      {(st as any).colorsplit && <>
+        <Pills label="RGB split timing" value={(st as any).colorsplit.mode} options={[['beats', 'On every beat'], ['steady', 'Steady']]} onChange={mode => put('colorsplit', {...(st as any).colorsplit, mode})} disabled={disabled}/>
+        <Row label="RGB split strength" value={(st as any).colorsplit.amount} min={0} max={100} unit="%" onChange={amount => put('colorsplit', {...(st as any).colorsplit, amount})} disabled={disabled}/>
+        {(st as any).colorsplit.mode === 'beats' && <Row label="RGB split beats per minute" value={(st as any).colorsplit.bpm} min={40} max={200} onChange={bpm => put('colorsplit', {...(st as any).colorsplit, bpm})} disabled={disabled}/>}
+      </>}
+    </Section>
+    <Section title="Cinematic fade & zoom" Icon={Clapperboard} on={!!(st as any).cineopen} onToggle={on => put('cineopen', on ? {...CINEOPEN} : null)} disabled={disabled} hint="Fades in from black while the picture slowly pushes in (or pulls out) across the whole part. Good for an opening or a closing shot. Render to see it.">
+      {(st as any).cineopen && <>
+        <Pills label="Slow zoom" value={(st as any).cineopen.zoom} options={[['in', 'Push in'], ['out', 'Pull out'], ['none', 'No zoom']]} onChange={zoom => put('cineopen', {...(st as any).cineopen, zoom})} disabled={disabled}/>
+        {(st as any).cineopen.zoom !== 'none' && <Row label="Slow zoom amount" value={(st as any).cineopen.amount} min={0} max={100} unit="%" onChange={amount => put('cineopen', {...(st as any).cineopen, amount})} disabled={disabled}/>}
+        <Pills label="Fade" value={(st as any).cineopen.fade} options={[['in', 'Fade in'], ['both', 'Fade in and out'], ['none', 'No fade']]} onChange={fade => put('cineopen', {...(st as any).cineopen, fade})} disabled={disabled}/>
+        {(st as any).cineopen.fade !== 'none' && <Row label="Fade length" value={(st as any).cineopen.seconds} min={0.2} max={3} step={0.1} unit="s" onChange={seconds => put('cineopen', {...(st as any).cineopen, seconds})} disabled={disabled}/>}
+      </>}
+    </Section>
+    <Section title="Intro move" Icon={RotateCw} on={!!(st as any).intro} onToggle={on => put('intro', on ? {...INTRO} : null)} disabled={disabled} hint="The picture swipes, spins or zooms into place at the start of the part, with motion blur. Pairs well with a beat. Render to see it.">
+      {(st as any).intro && <>
+        <Pills label="Intro style" value={(st as any).intro.style} options={[['swipe_left', 'Swipe left'], ['swipe_right', 'Swipe right'], ['swipe_up', 'Swipe up'], ['spin', 'Spin'], ['zoom', 'Zoom']]} onChange={style => put('intro', {...(st as any).intro, style})} disabled={disabled}/>
+        <Row label="Intro length" value={(st as any).intro.seconds} min={0.2} max={1.5} step={0.1} unit="s" onChange={seconds => put('intro', {...(st as any).intro, seconds})} disabled={disabled}/>
+      </>}
+    </Section>
+    <Section title="Before & after" Icon={Columns2} on={!!(st as any).beforeafter} onToggle={on => put('beforeafter', on ? {...BEFOREAFTER} : null)} disabled={disabled} hint="The part starts as a plain 'before' version; a white line sweeps across and reveals the real picture, like a before/after slider. Great with a colour look on the part. Render to see it.">
+      {(st as any).beforeafter && <>
+        <Pills label="Before looks" value={(st as any).beforeafter.before} options={[['bw', 'Black & white'], ['faded', 'Faded'], ['dark', 'Dark']]} onChange={before => put('beforeafter', {...(st as any).beforeafter, before})} disabled={disabled}/>
+        <Row label="Sweep starts at" value={(st as any).beforeafter.start} min={0} max={90} unit="% of the part" onChange={start => put('beforeafter', {...(st as any).beforeafter, start})} disabled={disabled}/>
+        <Row label="Sweep length" value={(st as any).beforeafter.seconds} min={0.3} max={5} step={0.1} unit="s" onChange={seconds => put('beforeafter', {...(st as any).beforeafter, seconds})} disabled={disabled}/>
+      </>}
+    </Section>
+    <Section title="Speed blur" Icon={Gauge} on={!!(st as any).speedblur} onToggle={on => put('speedblur', on ? {...SPEEDBLUR} : null)} disabled={disabled} hint="Directional motion blur for the fast 'velocity' feel. Use it on the whole part, or as a whoosh that clears up over the first half second. Render to see it.">
+      {(st as any).speedblur && <>
+        <Pills label="Blur direction" value={(st as any).speedblur.direction} options={[['horizontal', 'Sideways'], ['vertical', 'Up and down']]} onChange={direction => put('speedblur', {...(st as any).speedblur, direction})} disabled={disabled}/>
+        <Pills label="Blur when" value={(st as any).speedblur.when} options={[['whole', 'Whole part'], ['start', 'Whoosh at the start']]} onChange={when => put('speedblur', {...(st as any).speedblur, when})} disabled={disabled}/>
+        <Row label="Speed blur strength" value={(st as any).speedblur.amount} min={0} max={100} unit="%" onChange={amount => put('speedblur', {...(st as any).speedblur, amount})} disabled={disabled}/>
+      </>}
     </Section>
     </FxGroup>
     <FxGroup id="colour" items="Split toning · Colour wheels" title="Colour grading" Icon={Palette} description="Change the mood of the picture with colour tints." active={onCount([!!tone, !!wheels])}>

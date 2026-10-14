@@ -424,6 +424,16 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  check('light leaks save with colour',lk().some(l=>l.leak?.color==='rainbow'));
  await user.click(screen.getByRole('switch',{name:'Split toning'}));await saved();
  check('split toning saves',lk().some(l=>l.tone?.amount===40));
+ // Trending part 2 (beta.9): the CapCut trend effects are in More effects -> Trending
+ check('Trending lists the five new effects',['RGB split','Cinematic fade & zoom','Intro move','Before & after','Speed blur'].every(n=>!!screen.getByRole('switch',{name:n})));
+ await user.click(screen.getByRole('switch',{name:'Intro move'}));await user.click(within(screen.getByRole('radiogroup',{name:'Intro style'})).getByRole('radio',{name:'Spin'}));await saved();
+ check('intro move saves with its style',lk().some(l=>l.intro?.style==='spin'&&l.intro.seconds===0.5));
+ await user.click(screen.getByRole('switch',{name:'Before & after'}));await user.click(within(screen.getByRole('radiogroup',{name:'Before looks'})).getByRole('radio',{name:'Dark'}));await saved();
+ check('before & after saves with its before style',lk().some(l=>l.beforeafter?.before==='dark'&&l.beforeafter.start===25));
+ await user.click(screen.getByRole('switch',{name:'RGB split'}));await user.click(screen.getByRole('switch',{name:'Cinematic fade & zoom'}));await user.click(screen.getByRole('switch',{name:'Speed blur'}));await saved();
+ check('RGB split, cinematic fade & zoom and speed blur save their defaults',lk().some(l=>l.colorsplit?.mode==='beats')&&lk().some(l=>l.cineopen?.zoom==='in')&&lk().some(l=>l.speedblur?.direction==='horizontal'));
+ for(const n of ['Intro move','Before & after','RGB split','Cinematic fade & zoom','Speed blur'])await user.click(screen.getByRole('switch',{name:n}));await saved();
+ check('the five new effects switch off again',lk().some(l=>l.speedblur===null));
  await user.click(screen.getByRole('switch',{name:'Spotlight'}));await saved();
  check('turning an effect off removes it',lk().some(l=>'spotlight' in l&&l.spotlight===null)&&!document.querySelector('.scenefx-preview .fx-layer:not(.fx-leak)'));
  check('VHS look is offered',!!screen.getByRole('button',{name:'VHS',exact:true}));

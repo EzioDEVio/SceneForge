@@ -95,4 +95,5 @@ jobs:
             python tests/integration/test_trending_fx.py
             python tests/integration/test_reliability_perf.py
             python tests/integration/test_trend_transitions.py
+            python tests/integration/test_trending_fx2.py
           '

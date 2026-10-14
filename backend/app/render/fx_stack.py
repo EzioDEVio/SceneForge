@@ -27,10 +27,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-STACK_IDS: tuple[str, ...] = ("mirror", "trails", "spotlight", "leak", "flare", "wiggle", "pulse", "shake", "flash", "vignette", "letterbox", "sharpen")
+STACK_IDS: tuple[str, ...] = ("mirror", "trails", "speedblur", "colorsplit", "spotlight", "leak", "flare", "wiggle", "pulse", "shake",
+                               "beforeafter", "flash", "intro", "cineopen", "vignette", "letterbox", "sharpen")
 DEFAULT_ORDER: tuple[str, ...] = STACK_IDS
 LABELS = {"spotlight": "Spotlight", "leak": "Light leaks", "flare": "Lens flare", "wiggle": "Wiggle", "shake": "Camera shake", "vignette": "Edge vignette", "letterbox": "Cinema bars", "sharpen": "Detail sharpening",
-          "mirror": "Mirror", "trails": "Motion trails", "pulse": "Beat zoom", "flash": "Flash"}
+          "mirror": "Mirror", "trails": "Motion trails", "pulse": "Beat zoom", "flash": "Flash",
+          "speedblur": "Speed blur", "colorsplit": "RGB split", "beforeafter": "Before & after", "intro": "Intro move", "cineopen": "Cinematic fade & zoom"}
 
 
 def _clean_ids(value, name: str) -> list[str]:
@@ -59,7 +61,7 @@ def is_enabled(look: dict, fx_id: str) -> bool:
     v = look.get(fx_id)
     if not v:
         return False
-    if fx_id in ("spotlight", "mirror"):
+    if fx_id in ("spotlight", "mirror", "intro", "beforeafter", "cineopen"):
         return True
     if fx_id == "shake":
         return v.get("amount", 0) > 0 or bool(v.get("impact"))
@@ -103,6 +105,16 @@ def stack_graph(base: str, look: dict, w: int, h: int, fps: int, dur: float, cac
             g, base = fx.trails_graph(base, p)
         elif fx_id == "mirror":
             g, base = fx.mirror_graph(base, p, w, h)
+        elif fx_id == "colorsplit":
+            g, base = fx.colorsplit_graph(base, p, w, h)
+        elif fx_id == "cineopen":
+            g, base = fx.cineopen_graph(base, p, w, h, fps, dur)
+        elif fx_id == "intro":
+            g, base = fx.intro_graph(base, p, w, h, fps, dur)
+        elif fx_id == "beforeafter":
+            g, base = fx.beforeafter_graph(base, p, w, h, fps, dur)
+        elif fx_id == "speedblur":
+            g, base = fx.speedblur_graph(base, p, w, h, fps, dur)
         elif fx_id in ("vignette", "letterbox", "sharpen"):
             amount = p["amount"] / 100
             filt = (f"vignette=angle={amount*1.2:.3f}" if fx_id == "vignette" else

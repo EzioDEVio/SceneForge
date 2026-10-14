@@ -87,9 +87,9 @@ with TestClient(app) as c:
               {'glitch': {'strength': 60, 'speed': 1.0, 'block': 'medium'}}, {'adjust': {'exposure': 10, 'contrast': 15, 'saturation': 20}},
               {'film': {'tone': 'sepia'}}, {'tone': {'shadow': '#203050', 'highlight': '#F0C080', 'amount': 60, 'balance': 0}},
               {'mirror': {'mode': 'top'}, 'flash': {'amount': 60, 'mode': 'intro', 'bpm': 120}},
-              {'pulse': {'amount': 100, 'bpm': 200}, 'shake': {'amount': 30, 'speed': 70, 'impact': False}},
+              {'pulse': {'amount': 100, 'bpm': 200}, 'shake': {'amount': 30, 'speed': 70, 'impact': False}, 'intro': {'style': 'swipe_up', 'seconds': 0.4}, 'colorsplit': {'amount': 60, 'mode': 'beats', 'bpm': 120}},
               {'trails': {'amount': 100}, 'leak': {'amount': 40, 'speed': 60, 'color': 'rainbow'}},
-              {'mirror': {'mode': 'bottom'}, 'vignette': {'amount': 80}}, {'flash': {'amount': 100, 'mode': 'beats', 'bpm': 200}},
+              {'mirror': {'mode': 'bottom'}, 'vignette': {'amount': 80}}, {'flash': {'amount': 100, 'mode': 'beats', 'bpm': 200}, 'beforeafter': {'before': 'bw', 'start': 10, 'seconds': 0.5}, 'cineopen': {'amount': 60, 'zoom': 'out', 'fade': 'both', 'seconds': 0.3}, 'speedblur': {'amount': 40, 'direction': 'vertical', 'when': 'start'}},
               {'mirror': {'mode': 'right'}, 'wiggle': {'amount': 30, 'speed': 70, 'size': 30}},
               {'pulse': {'amount': 50, 'bpm': 60}, 'flash': {'amount': 50, 'mode': 'beats', 'bpm': 60}, 'trails': {'amount': 50}, 'mirror': {'mode': 'quad'}},
               {'fx_bypass': ['mirror'], 'mirror': {'mode': 'left'}, 'pulse': {'amount': 30, 'bpm': 120}}]

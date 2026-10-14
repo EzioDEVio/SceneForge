@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.9.4-beta.9 — the CapCut trend effects in More effects (October 13, 2026, beta pre-release)
+
+- beta.8 put the trend list into Transitions and Looks; the owner asked for them in **Effects → More effects**. Five new per-part effects in **More effects → Trending**, after CapCut's 2026 trend list:
+  - **RGB split**: red and blue slide apart (the glitch look), snapping out on every beat or held steady; strength and beats per minute.
+  - **Cinematic fade & zoom**: fade in from black (or in and out) while the picture slowly pushes in or pulls out across the part.
+  - **Intro move**: the picture swipes in (left, right, up), spins in or zooms in at the start of the part, with motion blur; 0.2–1.5 s.
+  - **Before & after**: the part starts as a black & white, faded or dark "before" picture and a white line sweeps across revealing the real one (the before/after transformation); start point and sweep length.
+  - **Speed blur**: directional motion blur for the "velocity" feel, on the whole part or as a whoosh that clears over the first half second.
+  They join the effect stack (reorder, bypass), look presets and effect search. The Trending group also points to Motion → Speed for speed ramps (velocity) and slow motion on video clips.
+- Measured here, 5 s at 1080p30, filters only (no effects 0.4 s): RGB split 4.4 s (steady 1 s), before & after 3.9 s, speed blur 1.1 s, cinematic 0.9 s, intro 0.8 s.
+- Tests: `test_trending_fx2.py` (in CI) checks each effect frame by frame (length kept, where and when it changes the picture, untouched after it ends, no black gaps), every pair in both orders keeps the exact length, invalid settings are refused, picture and video parts render and export, look presets keep them, and the 1080p timings. `test_reliability_perf.py` now includes them in its 24-part project; the editor test switches them on and off.
+
 ## 0.9.4-beta.8 — CapCut-style trending transitions and aesthetic looks (October 13, 2026, beta pre-release)
 
 - **Seven trending transitions** (part → Transitions), after CapCut's 2026 trend and transition guides: **Whip pan left / right** (fast swipe with motion blur), **Spin** (the picture spins and zooms into the next one), **Zoom punch** (punch into the centre, land on the next part with a zoom blur), **Glitch** (jitter, colour split and noise, cut in the middle), **Cinematic zoom fade** (crossfade while both pictures drift in scale) and **Before & after** (a white line sweeps across revealing the next part, like a before/after slider). Each has a hover preview in the list. They are built from fast native FFmpeg filters (FFmpeg's per-pixel custom transitions took about 3 minutes for one 0.6 s transition at 1080p); measured here at 1080p30: 0.4–0.8 s per transition, and the export keeps its exact length.

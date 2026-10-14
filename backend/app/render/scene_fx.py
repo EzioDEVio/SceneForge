@@ -250,16 +250,182 @@ def mirror_graph(base: str, mr: dict, w: int, h: int) -> tuple[list[str], str]:
     return g, "mirror"
 
 
+# ---- Trending, part 2 (0.9.4-beta.9): CapCut 2026 trend list as per-part effects -------
+# RGB split, cinematic fade & zoom, intro move (swipe / spin / zoom), before & after, speed blur.
+SPLIT_MODES = ("beats", "steady")
+CINE_ZOOMS = ("in", "out", "none")
+CINE_FADES = ("in", "both", "none")
+INTRO_STYLES = ("swipe_left", "swipe_right", "swipe_up", "spin", "zoom")
+BEFORE_STYLES = ("bw", "faded", "dark")
+BLUR_DIRS = ("horizontal", "vertical")
+BLUR_WHEN = ("whole", "start")
+
+
+def _choice(d: dict, key: str, options: tuple, name: str) -> str:
+    if d[key] not in options:
+        raise SceneFxError(f"{name} {key} must be one of: " + ", ".join(options) + ".")
+    return d[key]
+
+
+def clean_colorsplit(d) -> dict:
+    d = _only({"amount": 50, "mode": "beats", "bpm": 120, **(d or {})}, {"amount", "mode", "bpm"}, "RGB split")
+    return {"amount": int(_num(d, "amount", 0, 100, "RGB split")), "mode": _choice(d, "mode", SPLIT_MODES, "RGB split"),
+            "bpm": int(_num(d, "bpm", 40, 200, "RGB split"))}
+
+
+def clean_cineopen(d) -> dict:
+    d = _only({"amount": 50, "zoom": "in", "fade": "in", "seconds": 1.0, **(d or {})}, {"amount", "zoom", "fade", "seconds"}, "Cinematic fade & zoom")
+    return {"amount": int(_num(d, "amount", 0, 100, "Cinematic fade & zoom")), "zoom": _choice(d, "zoom", CINE_ZOOMS, "Cinematic fade & zoom"),
+            "fade": _choice(d, "fade", CINE_FADES, "Cinematic fade & zoom"), "seconds": round(float(_num(d, "seconds", 0.2, 3, "Cinematic fade & zoom")), 2)}
+
+
+def clean_intro(d) -> dict:
+    d = _only({"style": "swipe_left", "seconds": 0.5, **(d or {})}, {"style", "seconds"}, "Intro move")
+    return {"style": _choice(d, "style", INTRO_STYLES, "Intro move"), "seconds": round(float(_num(d, "seconds", 0.2, 1.5, "Intro move")), 2)}
+
+
+def clean_beforeafter(d) -> dict:
+    d = _only({"before": "bw", "start": 25, "seconds": 1.5, **(d or {})}, {"before", "start", "seconds"}, "Before & after")
+    return {"before": _choice(d, "before", BEFORE_STYLES, "Before & after"), "start": int(_num(d, "start", 0, 90, "Before & after")),
+            "seconds": round(float(_num(d, "seconds", 0.3, 5, "Before & after")), 2)}
+
+
+def clean_speedblur(d) -> dict:
+    d = _only({"amount": 50, "direction": "horizontal", "when": "whole", **(d or {})}, {"amount", "direction", "when"}, "Speed blur")
+    return {"amount": int(_num(d, "amount", 0, 100, "Speed blur")), "direction": _choice(d, "direction", BLUR_DIRS, "Speed blur"),
+            "when": _choice(d, "when", BLUR_WHEN, "Speed blur")}
+
+
+def _ease(x: str) -> str:
+    c = f"clip({x},0,1)"
+    return f"({c}*{c}*(3-2*{c}))"
+
+
+def _split_head(base: str, tag: str, seconds: float, fps: int) -> list[str]:
+    """[base] -> [{tag}h] (first `seconds`) and [{tag}r] (the rest), both at a fixed frame rate."""
+    k = max(1, round(seconds * fps))    # split by frame number: time-based trims drift by a frame after other filters
+    return [f"[{base}]format=yuv420p,setsar=1,setpts=N/({fps}*TB),split[{tag}a][{tag}b]",
+            f"[{tag}a]trim=end_frame={k},setpts=PTS-STARTPTS[{tag}h]",
+            f"[{tag}b]trim=start_frame={k},setpts=PTS-STARTPTS[{tag}r]"]
+
+
+def colorsplit_graph(base: str, cs: dict, w: int, h: int) -> tuple[list[str], str]:
+    """RGB split: the red and blue layers slide apart (on every beat, or steadily), built
+    from per-frame crops of padded colour layers added back together (no per-pixel expressions)."""
+    m = max(2, round(w * 0.04 * cs["amount"] / 100))           # largest shift, px (4 % of the width at 100)
+    bps = cs["bpm"] / 60
+    k = f"exp(-mod(t*{bps:.4f},1)*8)" if cs["mode"] == "beats" else "1"
+    if cs["mode"] == "steady":    # a fixed shift: FFmpeg's own (fast) channel shift
+        return [f"[{base}]rgbashift=rh=-{m}:bh={m}:edge=smear,format=yuv420p[colorsplit]"], "colorsplit"
+    pad = f"pad={w + 2 * m}:{h}:{m}:0,fillborders=left={m}:right={m}:mode=smear"
+    return [f"[{base}]format=gbrp,split=3[csr][csg][csb]",
+            f"[csr]lutrgb=g=0:b=0,{pad},crop={w}:{h}:x='{m}-{m}*{k}':y=0[csr2]",
+            f"[csb]lutrgb=r=0:g=0,{pad},crop={w}:{h}:x='{m}+{m}*{k}':y=0[csb2]",
+            "[csg]lutrgb=r=0:b=0[csg2]",
+            "[csr2][csg2]blend=all_mode=addition[csrg]",
+            "[csrg][csb2]blend=all_mode=addition,format=yuv420p[colorsplit]"], "colorsplit"
+
+
+def cineopen_graph(base: str, co: dict, w: int, h: int, fps: int, dur: float) -> tuple[list[str], str]:
+    """Cinematic fade & zoom: a slow push in (or pull out) across the part, fading in from
+    black at the start (and out at the end)."""
+    g, filt = [], []
+    span = max(dur, 0.1)
+    z = 0.15 * co["amount"] / 100
+    if co["zoom"] != "none" and z > 0:
+        p = _ease(f"it/{span:.4f}")
+        zexpr = f"1+{z:.4f}*{p}" if co["zoom"] == "in" else f"1+{z:.4f}*(1-{p})"
+        filt.append(f"zoompan=z='{zexpr}':d=1:s={w}x{h}:fps={fps}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)'")
+    fd = min(co["seconds"], span / 2)
+    if co["fade"] in ("in", "both"):
+        filt.append(f"fade=t=in:st=0:d={fd:.3f}")
+    if co["fade"] == "both":
+        filt.append(f"fade=t=out:st={max(0, span - fd):.3f}:d={fd:.3f}")
+    if not filt:
+        filt.append("null")
+    g.append(f"[{base}]{','.join(filt)},format=yuv420p[cineopen]")
+    return g, "cineopen"
+
+
+def intro_graph(base: str, it: dict, w: int, h: int, fps: int, dur: float) -> tuple[list[str], str]:
+    """Intro move: the picture swipes, spins or zooms into place over its first moments, with
+    motion blur. Only the opening is processed; the rest of the part passes through unchanged."""
+    d = min(it["seconds"], max(dur - 1 / fps, 1 / fps))
+    st = it["style"]
+    g = _split_head(base, "in", d, fps)
+    pos = _ease(f"t/{d:.4f}")
+    if st in ("swipe_left", "swipe_right"):
+        # the picture beside itself, scrolled into place (no black edges), 6 sub-frames averaged
+        x = f"(iw-ow)*(1-{pos})" if st == "swipe_left" else f"(iw-ow)*{pos}"
+        g.append(f"[inh]split[inh1][inh2];[inh1][inh2]hstack,fps={fps * 6},crop=w={w}:h={h}:x='{x}':y=0,tmix=frames=6,fps={fps}[inm]")
+    elif st == "swipe_up":
+        y = f"(ih-oh)*(1-{pos})"
+        g.append(f"[inh]split[inh1][inh2];[inh1][inh2]vstack,fps={fps * 6},crop=w={w}:h={h}:x=0:y='{y}',tmix=frames=6,fps={fps}[inm]")
+    elif st == "spin":
+        ang = f"-PI/2*(1-{_ease(f'it/{d:.4f}')})"
+        r = max(w, h) / min(w, h)
+        zoom = f"(abs(cos({ang}))+{r:.4f}*abs(sin({ang})))*1.02+0.3*(1-{_ease(f'it/{d:.4f}')})"
+        rot = ang.replace("it/", "t/")
+        g.append(f"[inh]rotate=a='{rot}':c=black,zoompan=z='{zoom}':d=1:s={w}x{h}:fps={fps}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)',tmix=frames=2[inm]")
+    else:   # zoom: lands from a punched-in close-up
+        g.append(f"[inh]zoompan=z='1+1.5*pow(1-{_ease(f'it/{d:.4f}')},2)':d=1:s={w}x{h}:fps={fps}:x='iw/2-(iw/zoom/2)':y='ih/2-(ih/zoom/2)',tmix=frames=3[inm]")
+    frames = max(1, round(d * fps))
+    g.append(f"[inm]format=yuv420p,setsar=1,tpad=stop_mode=clone:stop={frames},trim=end_frame={frames},setpts=PTS-STARTPTS[inm2]")
+    g.append("[inm2][inr]concat=n=2:v=1:a=0,format=yuv420p[intro]")
+    return g, "intro"
+
+
+def beforeafter_graph(base: str, ba: dict, w: int, h: int, fps: int, dur: float) -> tuple[list[str], str]:
+    """Before & after: the part starts as a "before" version (black & white, faded or dark);
+    a white line sweeps left to right revealing the real picture behind it."""
+    before = {"bw": "hue=s=0", "faded": "eq=saturation=0.35:contrast=0.75:brightness=0.05",
+              "dark": "eq=brightness=-0.18:saturation=0.6:contrast=0.9"}[ba["before"]]
+    start = dur * ba["start"] / 100
+    length = max(0.1, min(ba["seconds"], max(dur - start, 0.1)))
+    line = max(4, w // 240)
+    p = f"clip((t-{start:.4f})/{length:.4f},0,1)"
+    x = f"W*{p}"   # steady sweep, like dragging a slider
+    return [f"[{base}]format=yuv420p,split[baa][bab]",
+            f"[bab]{before},format=yuva420p[bab2]",
+            # mask: opaque everywhere, a transparent block slides in from the left over the sweep
+            f"color=c=white:s={w}x{h}:r={fps}:d={dur + 1:.3f},format=gray[bam0]",
+            f"color=c=black:s={w}x{h}:r={fps}:d={dur + 1:.3f},format=gray[bam1]",
+            f"[bam0][bam1]overlay=x='{x}-W':y=0:shortest=1,format=gray,lut=y='if(gt(val,127),255,0)'[bamask]",   # full 0/255: video-range white (235) let colour through
+            "[bab2][bamask]alphamerge[babm]",
+            f"[baa][babm]overlay=0:0:shortest=1,format=yuv420p[baov]",
+            f"color=c=white:s={line}x{h}:r={fps}:d={dur + 1:.3f},format=yuv420p[baline]",
+            f"[baov][baline]overlay=x='if(between(t,{start:.4f},{start + length:.4f}),{x}-{line // 2},-{line * 4})':y=0:shortest=1,format=yuv420p[beforeafter]"], "beforeafter"
+
+
+def speedblur_graph(base: str, sb: dict, w: int, h: int, fps: int, dur: float) -> tuple[list[str], str]:
+    """Speed blur: directional motion blur (the "velocity" look), on the whole part or as a
+    whoosh over its first half second that clears up."""
+    size = max(1, round(min(w, h) * 0.08 * sb["amount"] / 100))
+    blur = f"avgblur=sizeX={size}:sizeY=1" if sb["direction"] == "horizontal" else f"avgblur=sizeX=1:sizeY={size}"
+    if sb["when"] == "whole":
+        return [f"[{base}]{blur},format=yuv420p[speedblur]"], "speedblur"
+    d = min(0.5, max(dur - 1 / fps, 1 / fps))
+    g = _split_head(base, "sb", d, fps)
+    # strong at the start, fading to sharp: a blurred copy faded out over the sharp picture
+    g += [f"[sbh]split[sbh1][sbh2]",
+          f"[sbh2]{blur},format=yuva420p,fade=t=out:st=0:d={d:.3f}:alpha=1[sbhb]",
+          f"[sbh1][sbhb]overlay=0:0,format=yuv420p[sbm]",
+          "[sbm][sbr]concat=n=2:v=1:a=0,format=yuv420p[speedblur]"]
+    return g, "speedblur"
+
+
 CLEANERS = {"vignette": clean_finish, "letterbox": clean_finish, "sharpen": clean_finish,"stabilize": clean_stabilize, "wheels": clean_wheels, "shake": clean_shake, "spotlight": clean_spotlight, "redact": clean_redact, "leak": clean_leak, "tone": clean_tone,
             "flare": clean_flare, "wiggle": clean_wiggle, "pulse": clean_pulse, "flash": clean_flash, "trails": clean_trails,
-            "mirror": clean_mirror}
+            "mirror": clean_mirror, "colorsplit": clean_colorsplit, "cineopen": clean_cineopen, "intro": clean_intro,
+            "beforeafter": clean_beforeafter, "speedblur": clean_speedblur}
 
 
 def has_scene_fx(look: dict | None) -> bool:
     look = look or {}
     return bool(look.get("shake") or look.get("spotlight") or look.get("redact") or look.get("leak") or look.get("route") or look.get("annotations")
                 or look.get("flare") or look.get("wiggle") or look.get("vignette") or look.get("letterbox") or look.get("sharpen")
-                or look.get("pulse") or look.get("flash") or look.get("trails") or look.get("mirror"))
+                or look.get("pulse") or look.get("flash") or look.get("trails") or look.get("mirror")
+                or look.get("colorsplit") or look.get("cineopen") or look.get("intro") or look.get("beforeafter") or look.get("speedblur"))
 
 
 # --------------------------------------------------------------------------
