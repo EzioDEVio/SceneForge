@@ -1,0 +1,8 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Report a security problem privately
+    url: https://github.com/EzioDEVio/SceneForge/security/advisories/new
+    about: Please don't post vulnerabilities in public issues.
+  - name: Feature guide
+    url: https://github.com/EzioDEVio/SceneForge/blob/main/docs/FEATURES.md
+    about: Check how a feature works before reporting it.

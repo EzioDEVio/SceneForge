@@ -21,7 +21,7 @@ The mouse test uploads actual pictures, video and a WAV narration take. It selec
 with a visible rectangle, moves the group without Ctrl/Shift, verifies captions,
 shot and voice-take data, then checks Undo/Redo, Escape, picture-track lock,
 normal/compact track bounds and backwards selection after zoom/scroll.
-Screenshot: [Timeline mouse selection](Timeline-Mouse-Selection.jpg).
+Screenshot: [Timeline mouse selection](../evidence/Timeline-Mouse-Selection.jpg).
 
 The first marker-shortcut run exposed a harness save race: it sent Undo while
 the new marker was still saving. The harness now waits for Undo to be enabled

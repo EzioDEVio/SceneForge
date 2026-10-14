@@ -389,7 +389,8 @@ def capture(base: str, out: pathlib.Path):
     from playwright.sync_api import sync_playwright
     out.mkdir(parents=True, exist_ok=True)
     with sync_playwright() as p:
-        browser = p.chromium.launch()
+        import os
+        browser = p.chromium.launch(executable_path=os.environ.get("CHROMIUM_PATH") or None)
         ctx = browser.new_context(viewport=VIEW, device_scale_factor=1)
         webm_bridge(ctx, pathlib.Path(tempfile.mkdtemp(prefix="sf-webm-")))
         pg = ctx.new_page(); ed = Editor(pg, base)

@@ -164,7 +164,7 @@ Full detail is in `desktop/RELEASE_NOTES.md`.
 ## 6. How the owner gets a new build to GitHub
 Each source zip contains `SceneForge/history/SceneForge.gitbundle`, which holds the full history. On Windows, from the folder the zip was extracted to:
 ```powershell
-cd "C:\Users\moham\Downloads\Claude_sceneforge\HAND OVER FROM CHATGPT TO CLAUDE\SceneForge-<VERSION>-Source"
+cd "C:\path\to\SceneForge-<VERSION>-Source"
 git clone -b claude/0.7.0-rc5-timeline "SceneForge\history\SceneForge.gitbundle" SceneForge-repo
 cd SceneForge-repo
 git remote set-url origin https://github.com/EzioDEVio/SceneForge.git

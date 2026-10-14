@@ -73,6 +73,6 @@ The ZIP must be checked for corruption, exact manifest hashes, case-insensitive
 paths, new fonts/installer/services, current compiled asset references and Git
 bundle recovery, then tested after a clean extraction before delivery.
 
-![Dark title editor](qa/friendly-title-editing.png)
+![Dark title editor](../evidence/qa/friendly-title-editing.png)
 
-![Light title editor](qa/friendly-title-editing-light.png)
+![Light title editor](../evidence/qa/friendly-title-editing-light.png)

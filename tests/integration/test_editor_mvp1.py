@@ -94,5 +94,5 @@ with tempfile.TemporaryDirectory(prefix='sceneforge-mvp1-') as data:
         check('unconfigured image provider reports a real error',requests.post(BASE+f'/api/scenes/{sid}/generate-image',json={'prompt':'test'},timeout=10).status_code>=400)
     finally:
         proc.terminate();proc.wait(timeout=10);log.close()
-        (ROOT/'docs'/'mvp1-test-results.json').write_text(json.dumps(results,indent=2))
+        out=ROOT/'tests'/'output';out.mkdir(parents=True,exist_ok=True);(out/'mvp1-test-results.json').write_text(json.dumps(results,indent=2))
 print(f'{len(results)} checks passed')

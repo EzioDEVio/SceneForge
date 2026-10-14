@@ -1,0 +1,23 @@
+name: Feature idea
+description: Suggest something new or a better way to do something
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to make or do?
+      description: Describe the video or the task, not just the feature. "I make travel shorts and want…"
+    validations:
+      required: true
+  - type: textarea
+    id: idea
+    attributes:
+      label: What would help?
+      description: How you imagine it working. Links or screenshots from other editors are welcome.
+    validations:
+      required: true
+  - type: textarea
+    id: today
+    attributes:
+      label: How do you do it today?
+      description: Workarounds you use now, if any.

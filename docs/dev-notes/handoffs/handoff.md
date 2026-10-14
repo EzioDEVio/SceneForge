@@ -216,7 +216,7 @@ Rates shown by the app, checked 2026-09-28:
 | Runway WAN 3.0 | $0.05/sec at 480p; $0.10/sec at 720p; $0.20/sec at 1080p |
 | Local ComfyUI choices | No provider API fee; user's hardware, electricity, storage and licenses still apply |
 
-The app and [README.md](README.md) link to official prices and setup pages. Estimates can differ from final provider bills, taxes, regional billing or account credits. Local weights are not included: users run ComfyUI on loopback, install the chosen model and dependencies, export with **Save (API Format)**, and import that JSON. Common prompt/size/frame-count/seed inputs are mapped; specialized graphs may need adjustment. Cloud output sizes, ratios and durations are limited to the chosen model's supported options; local custom width/height must be multiples of 16.
+The app and [README.md](../../../README.md) link to official prices and setup pages. Estimates can differ from final provider bills, taxes, regional billing or account credits. Local weights are not included: users run ComfyUI on loopback, install the chosen model and dependencies, export with **Save (API Format)**, and import that JSON. Common prompt/size/frame-count/seed inputs are mapped; specialized graphs may need adjustment. Cloud output sizes, ratios and durations are limited to the chosen model's supported options; local custom width/height must be multiples of 16.
 
 ### Files changed for 0.7.0-wip.1
 

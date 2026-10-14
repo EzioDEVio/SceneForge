@@ -17,7 +17,6 @@ on:
       - '.github/workflows/release.yml'
       - 'tests/**'
       - 'docs/**'
-      - 'handoff.md'
   workflow_dispatch:
 permissions:
   contents: write

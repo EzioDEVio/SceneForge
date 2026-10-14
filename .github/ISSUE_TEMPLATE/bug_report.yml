@@ -1,0 +1,51 @@
+name: Bug report
+description: Something doesn't work as it should
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting! Please check [known limitations](https://github.com/EzioDEVio/SceneForge/blob/main/docs/known-limitations.md) first. Security problems go to [SECURITY.md](https://github.com/EzioDEVio/SceneForge/blob/main/SECURITY.md) instead.
+  - type: input
+    id: version
+    attributes:
+      label: SceneForge version
+      description: Help → About
+      placeholder: 0.9.4-beta.9
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating system
+      options: [Windows 11, Windows 10, macOS (Apple Silicon), Linux (AppImage), Linux (deb), Running from source]
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: What did you do?
+      description: The steps that lead to the problem.
+      placeholder: |
+        1. Open a project with …
+        2. In Effects → More effects, turn on …
+        3. Click Render scene
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What happened, and what did you expect?
+      description: Error messages and screenshots help a lot.
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: Attach the zip from **Help → Export diagnostics** if you can. Remove anything private first. Never paste API keys.
+  - type: textarea
+    id: extra
+    attributes:
+      label: Anything else?
+      description: Graphics card, AI engines in use, project aspect ratio, whether the part has narration…

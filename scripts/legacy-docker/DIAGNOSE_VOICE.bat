@@ -1,5 +1,5 @@
 @echo off
-cd /d "%~dp0"
+cd /d "%~dp0..\.."
 echo === Docker engine ===
 docker info --format "{{.ServerVersion}}"
 echo === Voice containers ===

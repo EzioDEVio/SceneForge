@@ -43,8 +43,8 @@ async function api(url,body,method='POST'){const r=await fetch(base+'/api'+url,{
  await page.getByRole('slider',{name:'Overlay width slider',exact:true}).fill('45');
  assert.equal(await page.getByRole('spinbutton',{name:'Overlay width',exact:true}).inputValue(),'45');
  await page.getByRole('slider',{name:'Overlay opacity slider',exact:true}).fill('100');
- fs.mkdirSync(path.join(root,'docs/qa'),{recursive:true});
- await draftBox.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(root,'docs/qa/overlay-draft-preview-093.png'),fullPage:true});
+ fs.mkdirSync(path.join(root,'tests/output/qa'),{recursive:true});
+ await draftBox.scrollIntoViewIfNeeded();await page.screenshot({path:path.join(root,'tests/output/qa/overlay-draft-preview-093.png'),fullPage:true});
  console.log('PASS sliders update precise values and draft preview before Apply without changing saved clip');
  // A broken Windows font DLL must explain recovery in the draft pane.
  const fontRoute='**/layer-preview?style=*';
@@ -55,7 +55,7 @@ async function api(url,body,method='POST'){const r=await fetch(base+'/api'+url,{
   return img&&JSON.parse(new URL(img.src).searchParams.get('style')).text==='FONT ERROR TEST'&&document.querySelector('.layer-draft-preview [role="status"]')?.textContent.includes('scripts/setup.bat');
  });
  assert.equal((await read()).finishing_json.layer_clips.find(c=>c.id===text.id).text,text.text);
- await page.screenshot({path:path.join(root,'docs/qa/text-runtime-recovery.png'),fullPage:true});
+ await page.screenshot({path:path.join(root,'tests/output/qa/text-runtime-recovery.png'),fullPage:true});
  await page.unroute(fontRoute);
  await page.getByRole('textbox',{name:'Overlay text',exact:true}).fill('PARIS 1969');
  try {await page.waitForFunction(()=>{const img=document.querySelector('.layer-draft-preview img');return img?.complete&&img.naturalWidth>0&&document.querySelector('.layer-draft-preview [role="status"]')?.textContent==='';});} catch(error) {console.error('DRAFT RECOVERY STATE',JSON.stringify(await page.locator('.layer-draft-preview').evaluateAll(elements=>elements.map(el=>({status:el.querySelector('[role="status"]')?.textContent,images:Array.from(el.querySelectorAll('img')).map(img=>({src:img.src,complete:img.complete,width:img.naturalWidth}))})))));throw error;}
@@ -146,11 +146,11 @@ async function api(url,body,method='POST'){const r=await fetch(base+'/api'+url,{
  await page.getByRole('separator',{name:'Resize timeline',exact:true}).focus();for(let i=0;i<9;i++)await page.keyboard.press('ArrowUp');
  await page.locator('.inspector-body:visible').evaluate(e=>e.scrollTop=0);
  await page.waitForFunction(()=>Array.from(document.querySelectorAll('.project-layer-preview img')).filter(img=>img.getBoundingClientRect().width>0).every(img=>img.complete&&img.naturalWidth>0));
- fs.mkdirSync(path.join(root,'docs/qa'),{recursive:true});
- await page.screenshot({path:path.join(root,'docs/qa/timeline-overlays-093.png'),fullPage:true});console.log('PASS beige caption boxes, clip persistence after reload, no browser errors');
+ fs.mkdirSync(path.join(root,'tests/output/qa'),{recursive:true});
+ await page.screenshot({path:path.join(root,'tests/output/qa/timeline-overlays-093.png'),fullPage:true});console.log('PASS beige caption boxes, clip persistence after reload, no browser errors');
  const closeInspector=page.getByTitle('Return to scene controls', {exact:true});if(await closeInspector.count())await closeInspector.click();
  await page.getByRole('tab',{name:'Text',exact:true}).click();await page.getByRole('heading',{name:'Whole-video tracks',exact:true}).scrollIntoViewIfNeeded();
- await page.screenshot({path:path.join(root,'docs/qa/styled-text-cards-093.png'),fullPage:true});
+ await page.screenshot({path:path.join(root,'tests/output/qa/styled-text-cards-093.png'),fullPage:true});
 
  }catch(e){if(browser){const pages=browser.contexts().flatMap(c=>c.pages());if(pages[0])await pages[0].screenshot({path:path.join(data,'failure.png'),fullPage:true}).catch(()=>{});}console.error('Data directory:',data);console.error(logs.slice(-1400));throw e;}finally{if(browser)await browser.close();if(server)server.kill();if(devServer)devServer.kill();}
 })().catch(e=>{console.error(e);process.exitCode=1;});

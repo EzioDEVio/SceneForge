@@ -59,6 +59,6 @@ for ($attempt=0; $attempt -lt 20; $attempt++) {
 if (-not $ready) {
     Write-Host 'Voice service is not responding. Recent container logs:' -ForegroundColor Yellow
     [void](Invoke-DockerProcess -ArgumentText ('compose -f "' + $compose + '" logs --tail 80 ' + $Engine))
-    throw 'The container did not become ready. Save the output above. Run DIAGNOSE_VOICE.bat for status and logs.'
+    throw 'The container did not become ready. Save the output above. Run scripts\legacy-docker\DIAGNOSE_VOICE.bat for status and logs.'
 }
 Write-Host 'Voice API is responding. Connect in Audio, then audition a short sentence.' -ForegroundColor Green

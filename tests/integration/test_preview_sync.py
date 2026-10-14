@@ -10,7 +10,7 @@ ROOT=pathlib.Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'backend'))
 from app.render.typewriter import reveal_schedule,graphemes,write_typing_audio,DEFAULT_KEY
 BASE='http://127.0.0.1:8138';checks=[]
-OUT=ROOT/'docs'/'mvp1.1-evidence';OUT.mkdir(exist_ok=True)
+OUT=ROOT/'tests'/'output'/'mvp1.1-evidence';OUT.mkdir(parents=True,exist_ok=True)
 def check(name,ok,detail=None):
     checks.append({'check':name,'passed':bool(ok),'detail':detail})
     print(('PASS ' if ok else 'FAIL ')+name,flush=True)

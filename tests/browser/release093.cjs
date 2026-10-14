@@ -42,9 +42,9 @@ assert(Math.abs(typedBox.x-fixedBox.x)<1&&Math.abs(typedBox.y-fixedBox.y)<1,'Tit
 assert.equal(await dialog.evaluate(el=>el.querySelector(".title-designer-controls").scrollTop),fixedScroll,'Title typing must not jump the scroll position');
 assert(await typing.evaluate(el=>document.activeElement===el),'Title typing retains focus');
 await typing.fill('PARIS 1969');
-await page.screenshot({path:path.join(root,'docs/qa/friendly-title-editing.png'),fullPage:true});
+await page.screenshot({path:path.join(root,'tests/output/qa/friendly-title-editing.png'),fullPage:true});
 await page.evaluate(()=>document.documentElement.dataset.theme='light');
-await page.screenshot({path:path.join(root,'docs/qa/friendly-title-editing-light.png'),fullPage:true});
+await page.screenshot({path:path.join(root,'tests/output/qa/friendly-title-editing-light.png'),fullPage:true});
 await page.evaluate(()=>document.documentElement.dataset.theme='dark');
 console.log('PASS 19 bundled title fonts, Arabic/English typing with fixed control geometry, focus and scroll');
 
@@ -131,7 +131,7 @@ await page.waitForFunction(()=>document.querySelector('video[aria-label="Rendere
 assert.deepEqual(await api('/scenes/'+p.scenes[1].id,undefined,'GET'),sourceForPreview);
 await koPreview.getByLabel('Rendered video inside text preview',{exact:true}).evaluate(video=>{video.currentTime=1;});
 await page.waitForFunction(()=>{const v=document.querySelector('video[aria-label="Rendered video inside text preview"]');return v&&v.currentTime>=1&&!v.seeking;});
-await page.screenshot({path:path.join(root,'docs/qa/owner-knockout-preview.png'),fullPage:true});
+await page.screenshot({path:path.join(root,'tests/output/qa/owner-knockout-preview.png'),fullPage:true});
 await koTitle.fill('CHANGED');await koPreview.getByRole('status').filter({hasText:'Settings changed'}).waitFor();
 await koPreview.getByRole('button',{name:'Close video inside text preview',exact:true}).click();await koPreview.waitFor({state:'detached'});
 assert.equal(await koTitle.inputValue(),'CHANGED');

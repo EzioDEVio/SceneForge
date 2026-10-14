@@ -11,7 +11,7 @@
 - **Friendly for regular users.** Use plain words, give every feature short help, and group related controls neatly.
 - **Bundle work.** Put many features and fixes into each release, because the owner has limited credits.
 - **Use full real Windows paths in instructions, never placeholders.** The owner's repo is at:
-  `C:\Users\moham\Downloads\Claude_sceneforge\HAND OVER FROM CHATGPT TO CLAUDE\SceneForge-0.9.1\SceneForge-0.9.1\SceneForge-repo`
+  `C:\path\to\SceneForge-repo`
 - **No paid provider calls or credits during development.** Never read, print or commit API keys or secrets.
 - **Never push, merge, tag or publish a release without the owner's explicit instruction.**
 - **Ask for the owner’s OK before creating another update build or checkpoint ZIP.** Prepare fixes and run checks first, describe the exact changes, then wait for approval (owner instruction, October 3, 2026).
@@ -110,8 +110,8 @@ Commits on top of 0.9.2 (`60faf81`):
 ## 6. How the owner pushes a bundle (PowerShell)
 
 ```
-cd "C:\Users\moham\Downloads\Claude_sceneforge\HAND OVER FROM CHATGPT TO CLAUDE\SceneForge-0.9.1\SceneForge-0.9.1\SceneForge-repo"
-git fetch "C:\Users\moham\Downloads\SceneForge-handoff\SceneForge-0.9.3.bundle" claude/0.9.3:claude/0.9.3
+cd "C:\path\to\SceneForge-repo"
+git fetch "C:\path\to\SceneForge-0.9.3.bundle" claude/0.9.3:claude/0.9.3
 git checkout claude/0.9.3
 git push origin claude/0.9.3
 ```

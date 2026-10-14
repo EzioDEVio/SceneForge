@@ -364,7 +364,7 @@ This is an installer-test candidate on `chatgpt/0.7.0-video-generation`, not a p
 - Added the same 1–3 compare-and-select workflow to AI Image Studio; hosted providers show a per-image billing acknowledgment, while local Stable Diffusion advances a fixed seed for each option.
 - Generated results are stored as project Media Pool assets, can be inserted into the selected scene or as a new timeline scene, and can be passed to existing local auto captions. Successful caption handoff closes the generator and opens Text for segment edits/styles.
 - Model weights, ComfyUI, workflow nodes and workflow files are not included in the base installer. Local custom nodes execute within ComfyUI using the user's permissions; only import trusted workflows.
-- Full API references and install details are in [README.md](../README.md); current scope and checks are in [the 0.7.0 review](../docs/REVIEW_0.7.0_VIDEO_GENERATION.md).
+- Full API references and install details are in [README.md](../README.md); current scope and checks are in [the 0.7.0 review](../docs/dev-notes/reviews/REVIEW_0.7.0_VIDEO_GENERATION.md).
 
 ## Verification
 - `npm run build` — passed (TypeScript and Vite). Vite reports a 555.65 kB minified editor bundle, above its 500 kB advisory threshold.
@@ -382,7 +382,7 @@ This is an installer-test candidate on `chatgpt/0.7.0-video-generation`, not a p
 
 # SceneForge Studio 0.6.0-wip.10 (unreleased)
 
-This is a reviewed source snapshot, not a published GitHub release. See [the source comparison and review](../docs/REVIEW_0.6.0_WIP.md).
+This is a reviewed source snapshot, not a published GitHub release. See [the source comparison and review](../docs/dev-notes/reviews/REVIEW_0.6.0_WIP.md).
 
 ## Compatibility and timeline fixes
 - Restored undo/redo coverage for scene add/delete, media insertion, title cards, narration attach/remove, scene reorder, clip sound, and scene splits (up to 100 recent timeline operations).

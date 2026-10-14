@@ -30,7 +30,7 @@ def main():
                     except subprocess.TimeoutExpired:
                         continue
         if not ready:
-            print('Voice: Docker is not ready. Start Docker Desktop, then run START_CHATTERBOX_VOICE.bat.'); return
+            print('Voice: Docker is not ready. Start Docker Desktop, then run scripts\\legacy-docker\\START_CHATTERBOX_VOICE.bat.'); return
         compose = str(Path(__file__).resolve().parents[1] / 'services/compose.yaml')
         for engine in ('chatterbox', 'kokoro'):
             result = command([docker, 'compose', '-f', compose, 'ps', '-a', '-q', engine])
@@ -39,7 +39,7 @@ def main():
                 print(f'Voice: {engine} is not installed for this Compose project; use its START launcher once.'); continue
             for container_id in ids:
                 result = command([docker, 'start', container_id], timeout=15)
-                print(f'Voice: {engine} container started.' if result.returncode == 0 else f'Voice: {engine} startup failed. Run DIAGNOSE_VOICE.bat.')
+                print(f'Voice: {engine} container started.' if result.returncode == 0 else f'Voice: {engine} startup failed. Run scripts\\legacy-docker\\DIAGNOSE_VOICE.bat.')
     except (OSError, subprocess.TimeoutExpired) as exc:
         print(f'Voice auto-start could not finish ({type(exc).__name__}). The editor remains available.')
 

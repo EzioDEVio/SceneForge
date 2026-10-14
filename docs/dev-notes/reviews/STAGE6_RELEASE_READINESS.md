@@ -39,7 +39,7 @@ The fresh runtime required installing Python dependencies locally; dependency ma
 ## Windows test sequence after an approved package is created
 
 The latest owner-provided checkpoint path is:
-`C:\Users\moham\Downloads\Claude_sceneforge\HAND OVER FROM  CLAUDE TO CHATGPT\SceneForge-0.9.3-C-checkpoint`
+`C:\path\to\SceneForge-0.9.3-C-checkpoint`
 
 This names the existing owner checkpoint, not a new package root. New extraction instructions must use the actual approved package path once it exists. Source setup requires Python 3.12, Node 22.12+ and FFmpeg on PATH.
 

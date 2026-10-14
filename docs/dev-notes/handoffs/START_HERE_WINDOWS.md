@@ -4,12 +4,12 @@ This contains the complete current source and a freshly compiled frontend. It is
 
 ## Launch on Windows
 
-Close the old SceneForge process and extract this ZIP into a new folder. Keep your old copy and project data. If Windows offers an “Extract all” destination, choose `C:\Users\moham\Downloads` so the archive's source folder lands at the path below.
+Close the old SceneForge process and extract this ZIP into a new folder. Keep your old copy and project data. If Windows offers an “Extract all” destination, choose `C:\path\to\Downloads` so the archive's source folder lands at the path below.
 
 With Python 3.12, Node 22.12 or newer, and FFmpeg/FFprobe on PATH, open PowerShell and run:
 
 ```powershell
-Set-Location 'C:\Users\moham\Downloads\SceneForge-0.9.3-Stability-Corrected'
+Set-Location 'C:\path\to\SceneForge-0.9.3-Stability-Corrected'
 .\scripts\setup.bat
 .\scripts\start.bat
 ```

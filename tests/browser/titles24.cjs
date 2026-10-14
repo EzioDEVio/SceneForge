@@ -37,6 +37,6 @@ await page.getByRole('button',{name:'Next scene',exact:true}).click();assert(Mat
 await page.getByRole('button',{name:'Previous scene',exact:true}).click();assert.equal(await page.locator('.program-monitor video').evaluate(v=>v.currentTime),0);
 await page.getByRole('button',{name:'Play movie',exact:true}).click();await page.getByRole('button',{name:'Pause full video',exact:true}).click();assert.equal(await page.locator('.program-monitor video').evaluate(v=>v.paused),true);
 for(const width of [1366,1920]){await page.setViewportSize({width,height:1080});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));}
-fs.mkdirSync(path.join(root,'docs/qa'),{recursive:true});await page.screenshot({path:path.join(root,'docs/qa/titles-duration-24.png')});assert.deepEqual(errors,[]);
+fs.mkdirSync(path.join(root,'tests/output/qa'),{recursive:true});await page.screenshot({path:path.join(root,'tests/output/qa/titles-duration-24.png')});assert.deepEqual(errors,[]);
 console.log('PASS duration keyboard, undo/redo, pointer drag, Arabic slide title creation, full movie 9.6s, and playback controls');
 }catch(e){console.error(e,logs.slice(-2500));process.exitCode=1;}finally{await browser?.close();server?.kill();}})();

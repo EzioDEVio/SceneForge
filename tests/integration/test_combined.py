@@ -153,6 +153,6 @@ uvicorn.run('app.main:app',host='127.0.0.1',port=8139)
         proc.terminate();proc.wait(timeout=10)
 finally:
  server.shutdown()
- out=ROOT/'docs'/'combined-evidence';out.mkdir(exist_ok=True)
+ out=ROOT/'tests'/'output'/'combined-evidence';out.mkdir(parents=True,exist_ok=True)
  (out/'results.json').write_text(json.dumps(checks,indent=2))
 print(f'{len(checks)} combined checks passed')

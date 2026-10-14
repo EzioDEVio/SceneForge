@@ -12,7 +12,7 @@ The editor now distinguishes drafts from active saves. Free timeline and export 
 
 The diagnostic logs also showed Windows console encoding failures during local-AI progress logging, and a Chatterbox service returning 404 for `/warmup`. Unicode logging now survives a legacy console while retaining the original progress text in the UTF-8 status file. An incompatible service shows an explicit instruction to stop the older engine using its port and retry. This guidance does not prove that the owner's engine or model download has been repaired; the real Windows setup needs retesting.
 
-![Draft recovery guidance](stability-20261006/draft-action-guidance.png)
+![Draft recovery guidance](../evidence/stability-20261006/draft-action-guidance.png)
 
 ## Validation results
 
@@ -43,7 +43,7 @@ The stress test used a disposable database, two generated videos with embedded a
 
 Stress outputs were 320×180 to keep the repeated-worker exercise bounded. Separate rendering regressions exercise higher resolutions. These checks do not cover hour-long projects, overnight memory stability, 4K stress, real Windows UI operation, NVIDIA rendering or multi-GB AI model downloads. Hosted-provider tests use fixtures and do not make paid provider calls.
 
-The new browser and stress regressions are included in the normal browser/CI test commands. Machine-readable results and source hashes are in [results.json](stability-20261006/results.json).
+The new browser and stress regressions are included in the normal browser/CI test commands. Machine-readable results and source hashes are in [results.json](../evidence/stability-20261006/results.json).
 
 ## Owner's Windows recheck after an approved package
 

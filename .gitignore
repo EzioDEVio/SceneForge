@@ -28,5 +28,6 @@ desktop/release/
 tests/browser/node_modules/
 
 # Browser checkpoint screenshot (the reviewed manual image is under docs/images).
-/docs/qa/timeline-overlays-093.png
+# screenshots and evidence written by the tests
+/tests/output/
 tools/ffmpeg/

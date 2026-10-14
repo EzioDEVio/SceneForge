@@ -33,7 +33,7 @@ await page.getByRole('combobox',{name:'Title card animation',exact:true}).select
 await page.getByRole('button',{name:'Play rendered preview',exact:true}).click();
 await page.locator('.title-designer video').waitFor({timeout:90000});
 await page.waitForFunction(()=>document.querySelector('.title-designer video').readyState>=2);
-await page.screenshot({path:path.join(root,'docs/qa/title-designer-25.png')});
+await page.screenshot({path:path.join(root,'tests/output/qa/title-designer-25.png')});
 await page.getByRole('button',{name:'Create title card',exact:true}).click();
 await page.waitForFunction(()=>document.querySelectorAll('.picture-clip').length===4);
 const current=await api('/projects/'+p.id,undefined,'GET');const card=current.scenes[3];
@@ -47,6 +47,6 @@ await page.getByRole('button',{name:'Next scene',exact:true}).click();assert(Mat
 await page.getByRole('button',{name:'Previous scene',exact:true}).click();assert.equal(await page.locator('.program-monitor video').evaluate(v=>v.currentTime),0);
 await page.getByRole('button',{name:'Play movie',exact:true}).click();await page.getByRole('button',{name:'Pause full video',exact:true}).click();assert.equal(await page.locator('.program-monitor video').evaluate(v=>v.paused),true);
 for(const width of [1366,1920]){await page.setViewportSize({width,height:1080});assert(await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));}
-fs.mkdirSync(path.join(root,'docs/qa'),{recursive:true});await page.screenshot({path:path.join(root,'docs/qa/titles-duration-25.png')});assert.deepEqual(errors,[]);
+fs.mkdirSync(path.join(root,'tests/output/qa'),{recursive:true});await page.screenshot({path:path.join(root,'tests/output/qa/titles-duration-25.png')});assert.deepEqual(errors,[]);
 console.log('PASS duration keyboard, undo/redo, pointer drag, Arabic slide title creation, full movie 9.6s, and playback controls');
 }catch(e){console.error(e,logs.slice(-2500));process.exitCode=1;}finally{await browser?.close();server?.kill();}})();

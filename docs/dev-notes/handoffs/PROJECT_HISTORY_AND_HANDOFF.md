@@ -41,7 +41,7 @@ This is the single-document handoff: it combines current status and next steps, 
 
 The companion ZIP contains the complete tracked SceneForge source tree (frontend, backend, Electron desktop app, assets, setup/build scripts, workflows, tests and documentation) plus a Git bundle containing repository history. Installed dependencies, generated build output/caches, local databases and `backend/data` user project files are excluded. This is a source package, not a platform installer. Optional AI model weights, ComfyUI, custom nodes and provider API keys are not bundled. The Windows installer is a separate temporary Actions artifact linked above.
 
-For source setup, install boundaries, provider configuration and current app features, see [README.md](README.md). Detailed historical release entries are reproduced in Appendix B and also maintained in [`desktop/RELEASE_NOTES.md`](desktop/RELEASE_NOTES.md). The working handoff remains in [`handoff.md`](handoff.md).
+For source setup, install boundaries, provider configuration and current app features, see [README.md](../../../README.md). Detailed historical release entries are reproduced in Appendix B and also maintained in [`desktop/RELEASE_NOTES.md`](../../../desktop/RELEASE_NOTES.md). The working handoff remains in [`handoff.md`](handoff.md).
 
 ---
 
@@ -203,7 +203,7 @@ Rates shown by the app, checked 2026-09-28:
 | Runway WAN 3.0 | $0.05/sec at 480p; $0.10/sec at 720p; $0.20/sec at 1080p |
 | Local ComfyUI choices | No provider API fee; user's hardware, electricity, storage and licenses still apply |
 
-The app and [README.md](README.md) link to official prices and setup pages. Estimates can differ from final provider bills, taxes, regional billing or account credits. Local weights are not included: users run ComfyUI on loopback, install the chosen model and dependencies, export with **Save (API Format)**, and import that JSON. Common prompt/size/frame-count/seed inputs are mapped; specialized graphs may need adjustment. Cloud output sizes, ratios and durations are limited to the chosen model's supported options; local custom width/height must be multiples of 16.
+The app and [README.md](../../../README.md) link to official prices and setup pages. Estimates can differ from final provider bills, taxes, regional billing or account credits. Local weights are not included: users run ComfyUI on loopback, install the chosen model and dependencies, export with **Save (API Format)**, and import that JSON. Common prompt/size/frame-count/seed inputs are mapped; specialized graphs may need adjustment. Cloud output sizes, ratios and durations are limited to the chosen model's supported options; local custom width/height must be multiples of 16.
 
 #### Files changed for 0.7.0-wip.1
 
@@ -608,7 +608,7 @@ This is an installer-test candidate on `chatgpt/0.7.0-video-generation`, not a p
 - Added the same 1–3 compare-and-select workflow to AI Image Studio; hosted providers show a per-image billing acknowledgment, while local Stable Diffusion advances a fixed seed for each option.
 - Generated results are stored as project Media Pool assets, can be inserted into the selected scene or as a new timeline scene, and can be passed to existing local auto captions. Successful caption handoff closes the generator and opens Text for segment edits/styles.
 - Model weights, ComfyUI, workflow nodes and workflow files are not included in the base installer. Local custom nodes execute within ComfyUI using the user's permissions; only import trusted workflows.
-- Full API references and install details are in [README.md](README.md); current scope and checks are in [the 0.7.0 review](docs/REVIEW_0.7.0_VIDEO_GENERATION.md).
+- Full API references and install details are in [README.md](../../../README.md); current scope and checks are in [the 0.7.0 review](../reviews/REVIEW_0.7.0_VIDEO_GENERATION.md).
 
 ### Verification
 - `npm run build` — passed (TypeScript and Vite). Vite reports a 555.65 kB minified editor bundle, above its 500 kB advisory threshold.
@@ -626,7 +626,7 @@ This is an installer-test candidate on `chatgpt/0.7.0-video-generation`, not a p
 
 ## SceneForge Studio 0.6.0-wip.10 (unreleased)
 
-This is a reviewed source snapshot, not a published GitHub release. See [the source comparison and review](docs/REVIEW_0.6.0_WIP.md).
+This is a reviewed source snapshot, not a published GitHub release. See [the source comparison and review](../reviews/REVIEW_0.6.0_WIP.md).
 
 ### Compatibility and timeline fixes
 - Restored undo/redo coverage for scene add/delete, media insertion, title cards, narration attach/remove, scene reorder, clip sound, and scene splits (up to 100 recent timeline operations).

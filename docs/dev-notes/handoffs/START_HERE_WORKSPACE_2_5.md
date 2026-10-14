@@ -10,7 +10,7 @@ Stop SceneForge and back up the current app folder. Copy the contents of this re
 Refresh with Ctrl+F5. The sidebar must show Workspace 2.5.
 
 ## Stable Diffusion
-The backend starts your existing Windows AUTOMATIC1111 installation in the background. The default folder is `C:\Users\moham\stable-diffusion-webui` for Mohammed's Windows account (generally `%USERPROFILE%\stable-diffusion-webui`). It runs your existing `webui-user.bat`; retain `--api` in its configuration. It does not install models or modify that environment.
+The backend starts your existing Windows AUTOMATIC1111 installation in the background. The default folder is `C:\path\to\stable-diffusion-webui` for Mohammed's Windows account (generally `%USERPROFILE%\stable-diffusion-webui`). It runs your existing `webui-user.bat`; retain `--api` in its configuration. It does not install models or modify that environment.
 
 For another folder, set `$env:SCENEFORGE_SD_DIR='C:\your\stable-diffusion-webui'` before running start.bat. Set `SCENEFORGE_SD_AUTOSTART=0` to disable automatic launch. The image drawer polls readiness every five seconds and provides **Start / retry engine**, **Check engine**, and **View startup log**. Controls manage localhost port 7860 only. A ready API may belong to an already-running WebUI. Startup does not necessarily open a browser tab. An occupied port is never killed or replaced. A timeout is reported after five minutes; retry will not duplicate a still-running process. Close/restart the failed WebUI yourself if its log calls for that.
 

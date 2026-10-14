@@ -16,7 +16,7 @@ REQUIRED = ('README.md','LICENSE','backend/app/main.py','backend/requirements.tx
  'backend/app/managed_ai.py','backend/app/api/managed_ai.py','services/stable-diffusion/server.py',
  'desktop/installer.nsh','docs/LOCAL_AI_INSTALLER.md',
  'docs/TEXT_RUNTIME_RECOVERY.md','scripts/check_release_versions.py',
- 'scripts/verify_checkpoint_zip.py','docs/manual.html','docs/STAGE6_RELEASE_READINESS.md',
+ 'scripts/verify_checkpoint_zip.py','docs/manual.html','docs/dev-notes/reviews/STAGE6_RELEASE_READINESS.md',
  'assets/route-icons/plane.png','assets/route-icons/ship.png','assets/route-icons/car.png','assets/route-icons/pin.png')
 
 def verify(path, max_bytes=40_000_000):
