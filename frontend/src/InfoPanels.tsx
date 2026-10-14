@@ -120,11 +120,11 @@ export function AIEnginesPanel({section, onClose, onOpenSettings}: {section?: st
     </details>
     <section ref={refs.voices as any} className="info-card">
       <div className="info-card-head"><h3><Mic size={16}/> Local voices: Chatterbox and Kokoro</h3></div>
-      <p><b>Chatterbox</b> speaks many languages including Arabic; <b>Kokoro</b> is a fast English voice. Both are free and need no account.</p>
-      <Steps items={[<>Click <b>Install</b> next to Chatterbox above. SceneForge sets up Docker Desktop and the voice engine for you.</>,
-        <>In a scene, open <b>Audio → Voice & narration</b>. If the engine is stopped, click <b>Start Chatterbox</b> there.</>,
+      <p><b>Chatterbox</b> speaks Arabic and 22 more languages; <b>Kokoro</b> speaks English, Spanish, French, Hindi, Italian and Portuguese. Both are free, run on this computer and need no account.</p>
+      <Steps items={[<>Kokoro is built in: download its voices once (about 120 MB). For Chatterbox, click <b>Install</b> above; SceneForge installs it in its own folder (no Docker, no administrator rights).</>,
+        <>In a scene, open <b>Audio → Voice & narration</b>. Each engine has a card there: <b>Download</b>, <b>Install</b> or <b>Start</b>.</>,
         <>Pick the engine, a voice and a language, then <b>Generate</b>. The first start downloads the voice model.</>]}/>
-      <p className="muted">Local captions already use Whisper without Docker. Open Text → Auto captions to check or download the model. Local narration engines require their separate setup.</p>
+      <p className="muted">Local captions use Whisper: install it above, or open Text → Auto captions to check or download the model.</p>
     </section>
   </Modal>;
 }

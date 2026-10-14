@@ -2,9 +2,9 @@
 import {build} from 'esbuild';
 import {createRequire} from 'node:module';
 import assert from 'node:assert/strict';
-await build({stdin:{contents:"export * from './src/poolPlan';export * from './src/fonts';export * from './src/timelineDrop';export * from './src/duration';export {adjustPreviewFilter} from './src/LookPanel';",resolveDir:'.',loader:'ts'},outfile:'node_modules/.cache/units.cjs',bundle:true,platform:'node',format:'cjs',logLevel:'silent'});
+await build({stdin:{contents:"export * from './src/poolPlan';export * from './src/fonts';export * from './src/timelineDrop';export * from './src/duration';export {adjustPreviewFilter} from './src/LookPanel';export {sceneFxState} from './src/EffectsPanels';export {STACK_IDS} from './src/EffectStack';",resolveDir:'.',loader:'ts'},outfile:'node_modules/.cache/units.cjs',bundle:true,platform:'node',format:'cjs',logLevel:'silent'});
 const require=createRequire(import.meta.url);
-const {planPoolInsert,isUntouchedPlaceholder,fontPair,previewFontFamily,planFileDrop,mediaKind,isMediaDrag,ASSET_DRAG_TYPE,adjustPreviewFilter,snapTimelineTime}=require('../node_modules/.cache/units.cjs');
+const {planPoolInsert,isUntouchedPlaceholder,fontPair,previewFontFamily,planFileDrop,mediaKind,isMediaDrag,ASSET_DRAG_TYPE,adjustPreviewFilter,snapTimelineTime,sceneFxState,STACK_IDS}=require('../node_modules/.cache/units.cjs');
 let passed=0;const check=(name,cond)=>{assert.ok(cond,name);console.log('PASS '+name);passed++;};
 const scene=(id,extra={})=>({id,title:`Part-${id}`,shots:[],original_text:'',spoken_text:'',subtitle_text:'',voice_takes:[],font_json:{},...extra});
 const asset=(id,type='image')=>({id,type,original_filename:id});
@@ -43,4 +43,7 @@ const okLayer=l=>FAMILIES.includes(l.family)&&l.shadow<=10&&l.shadow>=0&&l.size>
 check('every title template makes layers the backend accepts',TEXT_TEMPLATES.length>=5&&TEXT_TEMPLATES.every(t=>templateLayers(t,0).every(okLayer)));
 let n=0;const ids=templateLayers(TEXT_TEMPLATES[0],2000,()=>'id'+(n++));
 check('template layers get fresh ids and start at the given time',ids[0].id==='id0'&&ids[1].id==='id1'&&ids[0].start_ms===2300&&ids[0].end_ms===7000);
+{const saved=Object.fromEntries(STACK_IDS.map(id=>[id,{amount:50,marker:id}]));const st=sceneFxState(saved);
+ const lost=STACK_IDS.filter(id=>st[id]?.marker!==id);
+ check('the effects panel keeps every saved effect-stack effect when a part is reopened'+(lost.length?': lost '+lost.join(', '):''),lost.length===0);}
 console.log(`${passed} unit checks passed.`);

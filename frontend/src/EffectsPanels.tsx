@@ -177,10 +177,14 @@ function StopLabelInput({index, value, onCommit}: {index: number; value: string;
 }
 
 /** Scene effects: camera shake, spotlight, blur/pixelate regions, light leaks, split toning. */
+/** Panel state from a scene's look_json: every scene-level effect the panels show. Every effect-stack
+ *  id must be here, or a saved effect shows as Off after reopening (beta.9 missed its five new ones). */
+export const sceneFxState = (l: any) => ({vignette:l.vignette||null,letterbox:l.letterbox||null,sharpen:l.sharpen||null,countdown: l.countdown || null, annotations: l.annotations || [], shake: l.shake || null, spotlight: l.spotlight || null, redact: l.redact || [], leak: l.leak || null, flare: l.flare || null, wiggle: l.wiggle || null, pulse: l.pulse || null, flash: l.flash || null, trails: l.trails || null, mirror: l.mirror || null, colorsplit: l.colorsplit || null, cineopen: l.cineopen || null, intro: l.intro || null, beforeafter: l.beforeafter || null, speedblur: l.speedblur || null, tone: l.tone || null, wheels: l.wheels || null, layout: l.layout || null, parallax: l.parallax || null});
+
 export function SceneEffectsPanel({scene, disabled, onDraft, liveRoute, routeEditing, onRouteEditing, onAddMedia, liveAnnotations, vertical, query=''}: {query?:string;scene: Scene; disabled: boolean; onDraft: (look: Look) => void;
   liveRoute?: RouteFx | null; routeEditing?: boolean; onRouteEditing?: (on: boolean) => void; onAddMedia?: () => void; liveAnnotations?: Annotation[]; vertical?: boolean}) {
   const look = (scene.look_json || {}) as any;
-  const pick = (l: any) => ({vignette:l.vignette||null,letterbox:l.letterbox||null,sharpen:l.sharpen||null,countdown: l.countdown || null, annotations: l.annotations || [], shake: l.shake || null, spotlight: l.spotlight || null, redact: l.redact || [], leak: l.leak || null, flare: l.flare || null, wiggle: l.wiggle || null, pulse: l.pulse || null, flash: l.flash || null, trails: l.trails || null, mirror: l.mirror || null, tone: l.tone || null, wheels: l.wheels || null, layout: l.layout || null, parallax: l.parallax || null});
+  const pick = sceneFxState;
   const [st, setSt] = useState(pick(look));
   const dirty=React.useRef<Record<string,string>>({}),sourceScene=React.useRef(scene.id);
   useEffect(() => {
