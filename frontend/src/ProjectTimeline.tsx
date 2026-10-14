@@ -34,6 +34,9 @@ export const TRANSITIONS = [
   ['open','Horizontal open'], ['close','Horizontal close'], ['vert_open','Vertical open'],
   ['rect_crop','Rectangle crop'], ['distance','Distance morph'], ['cover_left','Cover left'],
   ['reveal_right','Reveal right'],
+  // Trending (0.9.4-beta.8)
+  ['whip_left','Whip pan left'], ['whip_right','Whip pan right'], ['spin','Spin'], ['zoom_punch','Zoom punch'],
+  ['glitch','Glitch'], ['zoom_fade','Cinematic zoom fade'], ['before_after','Before & after'],
 ];
 export function transitionLabel(key:string){return TRANSITIONS.find(([type])=>type===key)?.[1]||key.replace(/_/g,' ').replace(/\b\w/g,(char:string)=>char.toUpperCase());}
 export {sceneDuration} from './duration';

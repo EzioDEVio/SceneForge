@@ -207,6 +207,12 @@ _EFFECT_FILTERS: dict[str, str] = {
     EffectPreset.MONO_BLUE: "hue=s=0,colorbalance=rs=-0.06:gs=0.01:bs=0.15,eq=contrast=1.08",
     # Deliberate color-channel displacement for energetic RGB edges.
     EffectPreset.CHROMATIC_SPLIT: "chromashift=cbh=10:crh=-10:edge=smear",
+    # Aesthetic trend filters (0.9.4-beta.8), after CapCut's 2026 trend list (Y2K, cozy, "clean girl").
+    EffectPreset.Y2K: ("colorbalance=rs=0.03:bs=0.08:rh=0.06:gh=-0.02:bh=0.06,eq=saturation=1.18:contrast=1.05:brightness=0.03,"
+                       "format=gbrp,split[y2a][y2b];[y2b]gblur=sigma=10[y2c];[y2a][y2c]blend=all_mode=screen:all_opacity=0.30,format=yuv420p,chromashift=cbh=3:crh=-3:edge=smear"),
+    EffectPreset.COZY: ("colorbalance=rs=0.05:gs=0.02:bs=-0.04:rm=0.04:bm=-0.03,curves=all='0/0.07 0.5/0.55 1/0.97',"
+                        "eq=saturation=0.94:brightness=0.02,noise=alls=3:allf=t,vignette=PI/7"),
+    EffectPreset.CLEAN_GIRL: "eq=brightness=0.04:contrast=0.94:saturation=0.9:gamma=1.05,colorbalance=rh=0.02:bh=-0.01,unsharp=3:3:0.3",
     # Blend adjacent frames for a soft movement trail, separate from color looks.
     EffectPreset.MOTION_TRAIL: "tmix=frames=4:weights='1 0.55 0.25 0.1'",
     # Film-print style grades (named "-style": FFmpeg curve approximations,

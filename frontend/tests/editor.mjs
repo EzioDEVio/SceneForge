@@ -262,7 +262,7 @@ try{
  await user.click(screen.getByRole('button',{name:'Color filters',exact:true}));
  check('look chips narrow the gallery to one group',creativeHeading.closest('section').hidden&&!filterHeading.closest('section').hidden);
  await user.click(screen.getByRole('button',{name:'All',exact:true}));
- check('the eight color filters are grouped separately',filterHeading.parentElement.querySelectorAll('.effect-tile').length===8);
+ check('the eleven color filters (including Y2K, Cozy and Clean & bright) are grouped separately',filterHeading.parentElement.querySelectorAll('.effect-tile').length===11&&['Y2K','Cozy','Clean & bright'].every(n=>[...filterHeading.parentElement.querySelectorAll('.effect-tile')].some(t=>t.textContent.includes(n))));
  check('two creative effects are grouped separately from color looks',creativeHeading.parentElement.querySelectorAll('.effect-tile').length===2);
  await user.type(screen.getByRole('searchbox',{name:'Search effects'}),'Chromatic split');
  await user.click(screen.getByRole('button',{name:'Chromatic split',exact:true}));await saved();
@@ -952,7 +952,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  const coverTile=[...document.querySelectorAll('.transition-presets button')].find(b=>b.textContent.includes('Cover left'));
  await user.hover(coverTile);
  const transitionLabels=[...document.querySelectorAll('.transition-presets button')].map(b=>b.textContent||'');
- check('28 curated transition choices avoid repeated directional variants; the first playing scene cannot take an incoming transition',transitionLabels.length===28&&coverTile.disabled&&!transitionLabels.includes('Slide right')&&!transitionLabels.includes('Cover right')&&!document.querySelector('.tx-on-canvas'));
+ check('35 curated transition choices (28 plus the 7 trending ones) avoid repeated directional variants; the first playing scene cannot take an incoming transition',transitionLabels.length===35&&['Whip pan left','Whip pan right','Spin','Zoom punch','Glitch','Cinematic zoom fade','Before & after'].every(n=>transitionLabels.some(l=>l.includes(n)))&&coverTile.disabled&&!transitionLabels.includes('Slide right')&&!transitionLabels.includes('Cover right')&&!document.querySelector('.tx-on-canvas'));
  await user.unhover(coverTile);
  check('moving away ends the transition preview',!document.querySelector('.tx-on-canvas'));
  const pcs=[...document.querySelectorAll('.picture-clip')];

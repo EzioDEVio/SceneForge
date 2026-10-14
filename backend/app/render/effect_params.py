@@ -423,6 +423,38 @@ def _b_mono_blue(p, w, h):
     return _upd(c, p, "brightness", "eq", "brightness")
 
 
+def _b_y2k(p, w, h):
+    c = _base(EffectPreset.Y2K)
+    for k in ("saturation", "contrast", "brightness"):
+        c = _upd(c, p, k, "eq", k)
+    if p.changed("glow"):
+        c = _set(c, "blend", "all_opacity", _n(p["glow"] / 100))
+    if p.changed("fringe"):
+        px = int(round(p["fringe"]))
+        c = _set(_set(c, "chromashift", "cbh", str(px)), "chromashift", "crh", str(-px))
+    return _tail(c, p)
+
+
+def _b_cozy(p, w, h):
+    c = _scale_cb(_base(EffectPreset.COZY), p["warm"] / 100, "sm")
+    for k in ("saturation", "brightness"):
+        c = _upd(c, p, k, "eq", k)
+    if p.changed("grain"):
+        c = _set(c, "noise", "alls", str(int(round(p["grain"]))))
+    if p.changed("vignette"):
+        c = c.replace("vignette=PI/7", f"vignette=PI/{_n(_vig_div(p['vignette'], 7), 3)}")
+    return c
+
+
+def _b_clean(p, w, h):
+    c = _base(EffectPreset.CLEAN_GIRL)
+    for k in ("brightness", "contrast", "saturation"):
+        c = _upd(c, p, k, "eq", k)
+    if p.changed("sharpen"):
+        c = c.replace("unsharp=3:3:0.3", f"unsharp=3:3:{_n(p['sharpen'] / 100)}")
+    return _tail(c, p)
+
+
 _TRAIL = (1.0, 0.55, 0.25, 0.1)    # the original 4-frame weight curve
 
 
@@ -516,6 +548,12 @@ PRESETS: dict[str, tuple[list[dict], Callable]] = {
                   _num("radius", "Radius", 2, 40, 12, help="Glow size, in thousandths of the frame width."),
                   _color("color", "Glow colour", _HALATION),
                   _num("amount", "Glow amount", 0, 100, 90, unit="%")], _b_halation),
+    E.Y2K: ([SATURATION(118), CONTRAST(105),
+             _num("glow", "Glow", 0, 80, 30, unit="%", css={"fn": "brightness", "k": 0.002}),
+             _num("fringe", "Colour fringe", 0, 12, 3, unit="px")], _b_y2k),
+    E.COZY: ([_num("warm", "Warm tint", 0, 200, 100, unit="%", help="Strength of the warm cast."),
+              SATURATION(94), _num("grain", "Grain", 0, 40, 3), VIGNETTE(50)], _b_cozy),
+    E.CLEAN_GIRL: ([BRIGHTNESS(4), CONTRAST(94), SATURATION(90), _num("sharpen", "Sharpen", 0, 100, 30, unit="%")], _b_clean),
     E.PRINT_2383: ([CONTRAST(104), SATURATION(90), FADE, WARMTH], None),  # builder set below
     E.TUNGSTEN_NIGHT: ([CONTRAST(106), SATURATION(85), FADE, WARMTH], None),
     E.CROSS_PROCESS: ([CONTRAST(106), SATURATION(118), FADE, WARMTH], None),

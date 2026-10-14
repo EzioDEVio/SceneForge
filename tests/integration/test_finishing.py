@@ -22,9 +22,15 @@ def ff(*a):subprocess.run(['ffmpeg','-v','error','-y',*a],check=True,capture_out
 client=TestClient(app).__enter__()
 
 # --- every transition type renders -----------------------------------------
-types=[x.value for x in TransitionType if x.value!='cut']
-check('every transition type maps to an FFmpeg xfade',all(tt in XFADE_NAMES for tt in types) and len(types)>=19)
+from app.render.trend_transitions import NAMES as TREND, native_graph
+types=[x.value for x in TransitionType if x.value!='cut' and x.value not in TREND]
+check('every transition type maps to an FFmpeg xfade or a trending transition graph',all(tt in XFADE_NAMES for tt in types) and len(types)>=19
+      and {x.value for x in TransitionType} - {'cut'} == set(types) | set(TREND))
 failed=[]
+for tt in TREND:
+ g=native_graph(tt,'0:v','1:v','v',0.5,1.0,320,180,30,'f')
+ r=subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i','color=c=red:s=320x180:d=2:r=30','-f','lavfi','-i','color=c=blue:s=320x180:d=2:r=30','-filter_complex',';'.join(g),'-map','[v]','-f','null','-'],capture_output=True)
+ if r.returncode:failed.append(tt)
 for tt in types:
  r=subprocess.run(['ffmpeg','-v','error','-y','-f','lavfi','-i','color=c=red:s=320x180:d=2:r=30','-f','lavfi','-i','color=c=blue:s=320x180:d=2:r=30','-filter_complex',f"[0][1]xfade=transition={XFADE_NAMES[tt]}:duration=1:offset=0.5,format=yuv420p",'-f','null','-'],capture_output=True)
  if r.returncode:failed.append(tt)

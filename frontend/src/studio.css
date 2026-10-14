@@ -748,3 +748,18 @@ html[data-theme="light"] .studio-shell .audio-card input[type=range]{accent-colo
 .sequence-dock .picture-clip.drop-after[data-drop-label]::before{right:8px}
 .sequence-dock .picture-clip.drop-inside[data-drop-label]::before{left:50%;transform:translateX(-50%)}
 .sequence-dock.tool-blade .picture-clip,.sequence-dock.tool-blade .project-audio-body{cursor:crosshair}
+/* Trending transitions (0.9.4-beta.8): hover previews */
+@keyframes sf-tx-whip-l{0%,10%{transform:translateX(100%);filter:blur(0)}30%{filter:blur(6px)}50%,100%{transform:none;filter:blur(0)}}
+@keyframes sf-tx-whip-r{0%,10%{transform:translateX(-100%);filter:blur(0)}30%{filter:blur(6px)}50%,100%{transform:none;filter:blur(0)}}
+@keyframes sf-tx-spin{0%,10%{transform:rotate(-90deg) scale(2.2);opacity:0}25%{opacity:1}55%,100%{transform:none;opacity:1}}
+@keyframes sf-tx-punch{0%,10%{transform:scale(3);filter:blur(4px);opacity:0}25%{opacity:1}55%,100%{transform:none;filter:blur(0);opacity:1}}
+@keyframes sf-tx-glitch{0%,10%{opacity:0;transform:none}20%{opacity:1;transform:translateX(8%) skewX(8deg);filter:hue-rotate(90deg) saturate(3)}26%{transform:translateX(-6%);filter:none}32%{transform:translateX(4%) skewX(-6deg)}40%,100%{transform:none;opacity:1;filter:none}}
+@keyframes sf-tx-zoomfade{0%,10%{transform:scale(1.12);opacity:0}60%,100%{transform:none;opacity:1}}
+@keyframes sf-tx-before-after{0%,10%{clip-path:inset(0 100% 0 0);box-shadow:inset -3px 0 #fff}55%{clip-path:inset(0 0 0 0)}100%{clip-path:inset(0 0 0 0)}}
+.tx-live.sample-whip_left span+span,button:hover>.sample-whip_left span+span,button:focus-visible>.sample-whip_left span+span{animation:sf-tx-whip-l 1.5s cubic-bezier(.7,0,.3,1) infinite}
+.tx-live.sample-whip_right span+span,button:hover>.sample-whip_right span+span,button:focus-visible>.sample-whip_right span+span{animation:sf-tx-whip-r 1.5s cubic-bezier(.7,0,.3,1) infinite}
+.tx-live.sample-spin span+span,button:hover>.sample-spin span+span,button:focus-visible>.sample-spin span+span{animation:sf-tx-spin 1.5s ease-in-out infinite}
+.tx-live.sample-zoom_punch span+span,button:hover>.sample-zoom_punch span+span,button:focus-visible>.sample-zoom_punch span+span{animation:sf-tx-punch 1.5s ease-out infinite}
+.tx-live.sample-glitch span+span,button:hover>.sample-glitch span+span,button:focus-visible>.sample-glitch span+span{animation:sf-tx-glitch 1.5s steps(12,end) infinite}
+.tx-live.sample-zoom_fade span+span,button:hover>.sample-zoom_fade span+span,button:focus-visible>.sample-zoom_fade span+span{animation:sf-tx-zoomfade 1.8s ease-in-out infinite}
+.tx-live.sample-before_after span+span,button:hover>.sample-before_after span+span,button:focus-visible>.sample-before_after span+span{animation:sf-tx-before-after 1.8s ease-in-out infinite;border-right:3px solid #fff}

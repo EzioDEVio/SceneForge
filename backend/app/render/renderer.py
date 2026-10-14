@@ -653,6 +653,7 @@ FILM_BURN_EXPR = (
     f"if(eq(PLANE,1),(A*P+B*(1-P))+({_BURN_HEAT})*(62-(A*P+B*(1-P))),"
     f"(A*P+B*(1-P))+({_BURN_HEAT})*(192-(A*P+B*(1-P)))))"
 )
+from app.render.trend_transitions import NAMES as TREND_TRANSITIONS, native_graph as trend_graph  # noqa: E402
 XFADE_NAMES = {
     "fade_through_black": "fadeblack", "dissolve": "dissolve", "slide": "slideleft",
     "slide_right": "slideright", "wipe_left": "wipeleft", "wipe_right": "wiperight",
@@ -793,6 +794,13 @@ def _render_export_core(
             if dur_ms <= 0:
                 filter_parts.append(f"[{v_label}][{vnext}]concat=n=2:v=1:a=0[{vraw}]")
                 filter_parts.append(f"[{a_label}][{anext}]concat=n=2:v=0:a=1[{araw}]")
+            elif ttype in TREND_TRANSITIONS:
+                # Trending transitions are built from native filters (fast); same timing as xfade.
+                filter_parts += trend_graph(str(ttype.value if hasattr(ttype, "value") else ttype), v_label, vnext, vraw,
+                                            offset_s, dur_s, project.width, project.height, project.fps, str(i))
+                filter_parts.append(
+                    f"[{a_label}][{anext}]acrossfade=d={dur_s:.3f}[{araw}]"
+                )
             else:
                 filter_parts.append(
                     f"[{v_label}][{vnext}]xfade=transition={xfade_transition}:duration={dur_s:.3f}:offset={offset_s:.3f}[{vraw}]"
