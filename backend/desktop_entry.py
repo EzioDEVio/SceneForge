@@ -57,7 +57,8 @@ def main():
         # Windows installer (0.9.4-beta.3): record the chosen AI tools; SceneForge installs
         # them on first start with its own progress screen, so the installer stays quick.
         if len(sys.argv)!=5:raise SystemExit('Expected components, workspace and GPU flag.')
-        import json
+        # json comes from the module import: a local "import json" here made json local to all of
+        # main(), so the start-up announcement below failed with NameError (0.9.4-beta.3..beta.9).
         from pathlib import Path
         workspace=Path(sys.argv[3]);workspace.mkdir(parents=True,exist_ok=True)
         components=[v for v in sys.argv[2].split(',') if v in ('whisper','kokoro','stable_diffusion','chatterbox')]
