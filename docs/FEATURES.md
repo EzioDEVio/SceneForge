@@ -5,8 +5,8 @@ Version labels in *italics* say when a feature arrived; the full record is in th
 [changelog](CHANGELOG.md) and the [release notes](../desktop/RELEASE_NOTES.md).
 
 Most screenshots show a demo project made from generated pictures, video and sound
-([`scripts/capture_readme_screenshots.py`](../scripts/capture_readme_screenshots.py) rebuilds it); the demo reel and the
-trending-effects screenshot use photos from Pixabay.
+([`scripts/capture_readme_screenshots.py`](../scripts/capture_readme_screenshots.py) rebuilds it). The demo reel, the effect
+clips below and the trending-effects screenshot use photos and video clips from Pixabay.
 
 ## Trending effects, transitions and looks
 
@@ -20,6 +20,30 @@ Short-video effects after CapCut's 2026 trend list, all rendered by FFmpeg on yo
 - **Transitions** *(0.9.4)*: Whip pan left and right, Spin, Zoom punch, Glitch, Cinematic zoom fade, and Before & after, next to the classic dissolves, wipes and slides. Hover one to preview it. Each export keeps its exact length.
 - **Looks** *(0.9.4)*: Y2K, Cozy, and Clean & bright, with their own sliders.
 - Speed ramps (including a "bullet" velocity ramp) and slow motion for video clips are under **Motion → Speed**; beat markers and **Sync scene cuts to the beat** are on the timeline and in Finishing.
+
+### Each effect, rendered by SceneForge
+
+<table>
+  <tr>
+    <td width="33%"><img src="images/effects/before-after.webp" alt="Before & after: Black & white first, a white line sweeps across to colour." width="100%"><br><b>Before & after</b><br><sub>Black & white first, a white line sweeps across to colour.</sub></td>
+    <td width="33%"><img src="images/effects/rgb-split.webp" alt="RGB split: Red and blue snap apart on every beat." width="100%"><br><b>RGB split</b><br><sub>Red and blue snap apart on every beat.</sub></td>
+    <td width="33%"><img src="images/effects/cinematic-fade-zoom.webp" alt="Cinematic fade & zoom: Fades in from black while the picture pushes in, then fades out." width="100%"><br><b>Cinematic fade & zoom</b><br><sub>Fades in from black while the picture pushes in, then fades out.</sub></td>
+  </tr>
+  <tr>
+    <td width="33%"><img src="images/effects/intro-spin.webp" alt="Intro move: spin: The part spins and zooms into place." width="100%"><br><b>Intro move: spin</b><br><sub>The part spins and zooms into place.</sub></td>
+    <td width="33%"><img src="images/effects/intro-swipe.webp" alt="Intro move: swipe: A fast swipe with motion blur." width="100%"><br><b>Intro move: swipe</b><br><sub>A fast swipe with motion blur.</sub></td>
+    <td width="33%"><img src="images/effects/speed-blur.webp" alt="Speed blur: A whoosh of motion blur that clears up." width="100%"><br><b>Speed blur</b><br><sub>A whoosh of motion blur that clears up.</sub></td>
+  </tr>
+  <tr>
+    <td width="33%"><img src="images/effects/beat-zoom-flash.webp" alt="Beat zoom + flash: Punch-in and a soft flash on every beat." width="100%"><br><b>Beat zoom + flash</b><br><sub>Punch-in and a soft flash on every beat.</sub></td>
+    <td width="33%"><img src="images/effects/mirror.webp" alt="Mirror: One half reflected onto the other." width="100%"><br><b>Mirror</b><br><sub>One half reflected onto the other.</sub></td>
+    <td width="33%"><img src="images/effects/motion-trails.webp" alt="Motion trails: Moving things leave fading copies behind." width="100%"><br><b>Motion trails</b><br><sub>Moving things leave fading copies behind.</sub></td>
+  </tr>
+</table>
+
+![The same Greek salad photo four times: Original, Y2K (cooler with a soft glow), Cozy (warm and faded) and Clean & bright (brighter, softer contrast)](images/effects/looks-compare.jpg)
+
+<sub>Footage and photos: Pixabay. Each clip is a single part rendered by SceneForge with one effect switched on.</sub>
 
 ## Editor and timeline
 

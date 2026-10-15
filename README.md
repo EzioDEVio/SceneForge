@@ -62,7 +62,7 @@ The full list is in the [changelog](docs/CHANGELOG.md).
   </tr>
 </table>
 
-**Also inside:** a multitrack timeline with pro edit tools (ripple, roll, slip, slide, blade), script-to-scenes and project templates, beat markers and beat sync, keyframes, 35+ film looks and LUT import, AI voice isolation, silence and filler-word removal, auto-reframe to 9:16, GPU export, and exports for YouTube, Shorts/Reels/TikTok, Instagram, ProRes, GIF and SRT/VTT. See the **[feature guide](docs/FEATURES.md)**.
+**Also inside:** a multitrack timeline with pro edit tools (ripple, roll, slip, slide, blade), script-to-scenes and project templates, beat markers and beat sync, keyframes, 35+ film looks and LUT import, AI voice isolation, silence and filler-word removal, auto-reframe to 9:16, GPU export, and exports for YouTube, Shorts/Reels/TikTok, Instagram, ProRes, GIF and SRT/VTT. See the **[feature guide](docs/FEATURES.md)**, with a short clip of every trending effect.
 
 ## AI is optional
 
@@ -117,5 +117,5 @@ SceneForge Studio is free software under the **[GNU General Public License v3.0 
 - Emoji: [Twemoji](https://github.com/jdecked/twemoji) v17.0.3 graphics, Copyright Twitter, Inc. and other contributors, **CC-BY 4.0** (`assets/stickers/LICENSE-TWEMOJI-GRAPHICS.txt`). The 78 graphic stickers were drawn for SceneForge.
 - Cutout models are ONNX files published with rembg (MIT); IS-Net general use and U²-Net small are Apache-2.0. The source does not state the People model's licence.
 - The voice isolation model (MDX-Net Kim_Vocal_2, from the Ultimate Vocal Remover repository) has **no explicit licence from its author**; check it before relying on the feature commercially.
-- The demo photos at the top of this page are from [Pixabay](https://pixabay.com) under the Pixabay Content License; they are not covered by SceneForge's licence.
+- The demo photos and video clips on this page and in the feature guide are from [Pixabay](https://pixabay.com) under the Pixabay Content License; they are not covered by SceneForge's licence.
 - AI models and services you add (Whisper, Kokoro, Chatterbox, Stable Diffusion, ComfyUI models, cloud providers) are not part of SceneForge and have their own terms, which may restrict commercial use.
