@@ -14,7 +14,9 @@ Voicebox itself is installed and updated by the user.
 """
 from __future__ import annotations
 
+import re
 import time
+from urllib.parse import quote
 
 import requests
 
@@ -50,6 +52,17 @@ def _base(url: str | None) -> str:
     scheme = "https" if parts.scheme == "https" else "http"
     netloc = f"[{host}]" if host == "::1" else host
     return f"{scheme}://{netloc}" + (f":{int(port)}" if port else "")
+
+
+_PROFILE_ID = re.compile(r"[A-Za-z0-9_-]{1,128}")
+
+
+def _profile_ref(profile_id: str) -> str:
+    """A Voicebox voice id goes into a URL path: only plain ids (letters, digits, - and _) are
+    accepted, so a request value cannot change which Voicebox endpoint is called."""
+    if not isinstance(profile_id, str) or not _PROFILE_ID.fullmatch(profile_id):
+        raise VoiceboxError("This voice id is not valid. Click Refresh voices and pick a voice again.")
+    return quote(profile_id, safe="")
 
 
 def _detail(res: requests.Response) -> str:
@@ -236,7 +249,7 @@ def synthesize(url: str | None, text: str, profile_id: str, language: str | None
                                 f"\u201cGenerating\u2026\u201d (the oldest for {oldest} minutes). Voicebox makes one narration at a time, "
                                 "so new ones wait behind them. Click \u201cClear stuck Voicebox jobs\u201d on the Voicebox card "
                                 "(or restart Voicebox), then generate again.")
-        prof = requests.get(f"{base}/profiles/{profile_id}", timeout=(5, 15), **_NO_PROXY)
+        prof = requests.get(f"{base}/profiles/{_profile_ref(profile_id)}", timeout=(5, 15), **_NO_PROXY)
         if prof.status_code == 404:
             raise VoiceboxError("This voice no longer exists in Voicebox. Click Refresh voices and pick another.")
         prof.raise_for_status()

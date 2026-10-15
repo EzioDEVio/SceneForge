@@ -7,7 +7,8 @@
   - Backend: Pillow pinned to 12.3.0 (it allowed 10.x). Chatterbox engine: FastAPI, Uvicorn and soundfile pinned.
   - Desktop build tools: http-cache-semantics and global-agent (which pulled in roarr and sprintf-js) updated through npm overrides; the frontend's source-map-js updated. `npm audit` now reports 0 for frontend, desktop and browser tests.
   - Paths built from request values (project media, stickers, music fit, countdowns, restore points, ComfyUI workflows) go through one `safe_join` check that refuses anything outside its folder.
-  - Voicebox requests only go to this computer (an address on another machine is refused).
+  - Voicebox requests only go to this computer (an address on another machine is refused). Voicebox and ElevenLabs voice ids must be plain ids before they go into a request address.
+  - Desktop build: urllib3 2.8.0 stated in `desktop/requirements-build.txt` too (GitHub resolved 2.7.0 there). Help → Collect diagnostics only saves the backend's report if it is a zip of a sane size.
   - Script import: the pattern that removes "(pause …)" notes took about 5 seconds on a hostile 280 KB script; it now takes 0.04 s.
   - The diagnostic espeak voice only accepts known voice names; asset stream links encode the id.
   - New `test_security_hardening.py` (in CI).

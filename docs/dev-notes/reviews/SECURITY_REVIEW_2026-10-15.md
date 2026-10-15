@@ -14,6 +14,7 @@ Actions), fixed what was real, and records why the rest are safe to dismiss.
 | `services/chatterbox/requirements.txt` | FastAPI, Uvicorn, soundfile unpinned | pinned to current releases |
 | `frontend/package-lock.json` | source-map-js (high) | updated |
 | `desktop/package-lock.json` | http-cache-semantics (high), global-agent → roarr → sprintf-js (moderate) | npm `overrides`: http-cache-semantics 4.3.0, global-agent 4.1.3 (same `bootstrap` API, no roarr) |
+| `desktop/requirements-build.txt` | urllib3 2.7.0 as resolved by GitHub (3 advisories: GHSA-vxq7-64xx-v4gw, GHSA-8988-9cw3-xx77, GHSA-gh4c-6fx4-qh6g) | `urllib3==2.8.0` stated in the file itself. The backend already pinned 2.8.0, but GitHub's dependency graph did not follow `-r ../backend/requirements.txt` for this file and resolved 2.7.0 |
 
 Why transformers 5.17 and not the newest: from 5.18, transformers calls
 `torch.accelerator.current_accelerator()` at import, which with torch 2.6.0 raises when no CUDA
@@ -34,7 +35,10 @@ Not covered by Dependabot, noted for later:
 ## Code scanning (CodeQL)
 
 Local scan of the same commit: 49 alerts (GitHub's 53 includes alerts from earlier commits that
-close when the code changes). After the fixes: 10, all reviewed below.
+close when the code changes). After the fixes: 10, all reviewed below. A second pass with the
+`security-extended` suites (which include the partial-SSRF and network-to-file queries GitHub
+also reports) left 12 on GitHub's list of 14: the 2 partial-SSRF alerts are fixed, the rest are
+listed below.
 
 Fixed:
 
@@ -43,6 +47,9 @@ Fixed:
   anything outside its folder (also `..`, absolute paths and NUL bytes); refused requests get 400.
 - **Server-side request forgery (2):** the Voicebox address is limited to this computer, both
   when it is set and when it is used.
+- **Partial server-side request forgery (2, second pass):** the Voicebox voice id and the
+  ElevenLabs voice id go into a URL path; both must now be plain ids (letters, digits, `-`, `_`)
+  and are encoded as one path segment, so a request value cannot change which endpoint is called.
 - **Polynomial ReDoS (2):** stage-direction patterns in the script parser are bounded;
   280 KB of "(pause " took 5 s before and 0.04 s after.
 - **Command-line injection (2):** the espeak voice comes from a fixed list; the FFprobe path
@@ -57,3 +64,5 @@ Safe to dismiss on GitHub (Security → Code scanning → the alert → Dismiss 
 | Information exposure through an exception (8) | `backend/app/api/images.py` (2), `local_speech.py` (2), `video_cutout.py`, `services/*/server.py` (3) | Won't fix | The message is shown on purpose so people can fix the problem themselves (for example the Chatterbox and Stable Diffusion engine errors). The backend and the engines listen only on 127.0.0.1; the desktop app also requires a per-launch token. No traceback is returned, only the error message. |
 | Uncontrolled data used in path expression (1) | `backend/app/local_images.py` | Won't fix | The user chooses the folder of their own AUTOMATIC1111 installation on their own computer; the folder must contain `webui-user.bat`. |
 | Clear-text logging of sensitive information (1) | `tests/integration/test_071_usability.py` | Used in tests | The test logs a planted fake key on purpose to check that diagnostics redact it. |
+| Network data written to file (1) | `desktop/main.cjs` (Help → Collect diagnostics) | Won't fix | Saving the backend's diagnostics report into the diagnostics folder is the feature. The data comes from SceneForge's own backend on 127.0.0.1 with the per-launch token, and since this review only a zip file (PK signature) of at most 50 MB is saved. |
+| Network data written to file (1) | `tests/browser/free_export_choice.cjs` | Used in tests | The test downloads its own export from the local test server to check it with ffprobe. |

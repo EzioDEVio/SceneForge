@@ -121,12 +121,15 @@ def synthesize_with_alignment(profile, text, voice, language, speed):
     if profile.name == 'elevenlabs':
         base, headers = connection(profile)
         import re
-        if not re.fullmatch(r'[A-Za-z0-9_-]+', voice or ''):
+        from urllib.parse import quote
+        if not isinstance(voice, str) or not re.fullmatch(r'[A-Za-z0-9_-]{1,64}', voice):
             raise ValueError('Select an ElevenLabs voice first.')
         if not .7 <= speed <= 1.2:
             raise ValueError('ElevenLabs speaking speed must be between 0.70 and 1.20.')
+        # The host is fixed (api.elevenlabs.io); the voice id is a plain id, encoded as one path segment.
+        voice_ref = quote(voice, safe='')
         try:
-            res = requests.post(base + '/text-to-speech/' + voice + '/with-timestamps',
+            res = requests.post(f'{base}/text-to-speech/{voice_ref}/with-timestamps',
                 params={'output_format': 'mp3_44100_128'},
                 json={'text': text, 'model_id': profile.model or 'eleven_multilingual_v2',
                       'voice_settings': {'stability': 0.45, 'similarity_boost': 0.8, 'speed': speed}},

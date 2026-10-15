@@ -64,8 +64,36 @@ check('Voicebox default and loopback addresses are kept', voicebox._base(None) =
 st = voicebox.status('http://192.168.1.4:17493')
 check('a remote Voicebox address saved earlier shows a reason instead of failing', st['running'] is False and 'this computer' in st['reason'])
 
+for vid in ('../health', 'a/b', 'x?y=1', 'a#b', '', 'é', 'a' * 129):
+    check(f'a Voicebox voice id {vid[:12]!r} is refused before any request', refused(lambda: voicebox._profile_ref(vid)))
+check('plain Voicebox voice ids are kept', voicebox._profile_ref('3f2b9c1e-7a4d-4e1b-9c2a-0d8e6f5a1b2c') == '3f2b9c1e-7a4d-4e1b-9c2a-0d8e6f5a1b2c')
+
+
+class _EL:
+    name, base_url, secret_ref, model = 'elevenlabs', '', '', None
+
+
+from app.providers import speech_http
+for vid in ('../../v1/user', 'a/b', 'x?y', 'a' * 65):
+    try:
+        speech_http.synthesize_with_alignment(_EL(), 'hi', vid, 'en', 1.0); ok = False
+    except ValueError as e:
+        ok = 'Select an ElevenLabs voice' in str(e)
+    check(f'an ElevenLabs voice id {vid[:14]!r} is refused before any request', ok)
+
 check('the diagnostic voice refuses unknown names (nothing from the request reaches the command line)',
       refused(lambda: local_offline_tts.synthesize('hello', str(pathlib.Path(work.name) / 'x.wav'), voice='--help')))
+
+import re as _re, shutil, subprocess
+main_cjs = (ROOT / 'desktop' / 'main.cjs').read_text(encoding='utf-8')
+zip_fn = _re.search(r'const isDiagnosticsZip=.*', main_cjs).group(0)
+check('the desktop app only saves the diagnostics report when it is a zip', 'isDiagnosticsZip(zip)' in main_cjs)
+if shutil.which('node'):
+    js = zip_fn + ("\nconst z=Buffer.concat([Buffer.from([0x50,0x4b,3,4]),Buffer.alloc(40)]);"
+                   "console.log([isDiagnosticsZip(z),isDiagnosticsZip(Buffer.from('<html>error</html>')),"
+                   "isDiagnosticsZip(Buffer.alloc(51*1024*1024)),isDiagnosticsZip(null)].join(','))")
+    out = subprocess.run(['node', '-e', js], capture_output=True, text=True).stdout.strip()
+    check(f'diagnostics zip check accepts a zip and refuses html, oversize and nothing ({out})', out == 'true,false,false,false')
 
 api_ts = (ROOT / 'frontend' / 'src' / 'api.ts').read_text(encoding='utf-8')
 check('asset stream URLs encode the id', 'assets/${encodeURIComponent(assetId)}/stream' in api_ts)

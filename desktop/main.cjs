@@ -10,6 +10,8 @@ let versionChanged=false;
 let window,backend,quitting=false,origin,workspaceMode='home';
 const smoke=process.argv.includes('--smoke-test');
 let failedStartup=false;
+// The backend's diagnostics report: a zip file (PK signature), at most 50 MB.
+const isDiagnosticsZip=b=>Buffer.isBuffer(b)&&b.length>=22&&b.length<=50*1024*1024&&b[0]===0x50&&b[1]===0x4b&&b[2]===0x03&&b[3]===0x04;
 const requestClose=createCloseController({
  confirm:async()=>{
   if(smoke||failedStartup)return 'discard';
@@ -82,7 +84,9 @@ async function boot(){
    workspace:dataDir,appState:(()=>{try{return JSON.parse(fs.readFileSync(path.join(dataDir,'app-state.json'),'utf8'))}catch{return null}})()};
   fs.writeFileSync(path.join(out,'system.json'),JSON.stringify(info,null,2));
   // 0.9.1: include the backend's report too (recent render errors, settings without keys, model status).
-  try{const r=await fetch(origin+'/api/diagnostics.zip',{headers:{'X-SceneForge-Token':ready.token}});if(r.ok)fs.writeFileSync(path.join(out,'backend-report.zip'),Buffer.from(await r.arrayBuffer()));}catch{}
+  // It comes from SceneForge's own local backend (loopback, per-launch token); only a zip of a sane size is saved.
+  try{const r=await fetch(origin+'/api/diagnostics.zip',{headers:{'X-SceneForge-Token':ready.token}});const zip=r.ok?Buffer.from(await r.arrayBuffer()):null;
+   if(zip&&isDiagnosticsZip(zip))fs.writeFileSync(path.join(out,'backend-report.zip'),zip);}catch{}
   await dialog.showMessageBox(window,{type:'info',message:'Diagnostics collected',detail:`A folder was created on your Desktop:\n${path.basename(out)}\n\nIt contains logs and system details only (no API keys or media). Attach its files to a GitHub issue or send them to the developer.`});
   shell.openPath(out);
  }
