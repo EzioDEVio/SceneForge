@@ -47,6 +47,30 @@ SceneForge updates itself on Windows and Linux (AppImage); **Help → Receive be
 
 The full list is in the [changelog](docs/CHANGELOG.md).
 
+## Trending effects in action
+
+Every clip below is a single part rendered by SceneForge with one effect from *Effects → More effects → Trending* switched on.
+
+<table>
+  <tr>
+    <td width="33%" align="center"><img src="docs/images/effects/before-after.webp" alt="Before & after: Black & white to colour with a sweeping line" width="100%"><br><b>Before & after</b><br><sub>Black & white to colour with a sweeping line</sub></td>
+    <td width="33%" align="center"><img src="docs/images/effects/rgb-split.webp" alt="RGB split: Colours snap apart on the beat" width="100%"><br><b>RGB split</b><br><sub>Colours snap apart on the beat</sub></td>
+    <td width="33%" align="center"><img src="docs/images/effects/cinematic-fade-zoom.webp" alt="Cinematic fade & zoom: Fade from black while pushing in" width="100%"><br><b>Cinematic fade & zoom</b><br><sub>Fade from black while pushing in</sub></td>
+  </tr>
+  <tr>
+    <td width="33%" align="center"><img src="docs/images/effects/intro-spin.webp" alt="Intro move: spin: The shot spins into place" width="100%"><br><b>Intro move: spin</b><br><sub>The shot spins into place</sub></td>
+    <td width="33%" align="center"><img src="docs/images/effects/intro-swipe.webp" alt="Intro move: swipe: A fast swipe with motion blur" width="100%"><br><b>Intro move: swipe</b><br><sub>A fast swipe with motion blur</sub></td>
+    <td width="33%" align="center"><img src="docs/images/effects/speed-blur.webp" alt="Speed blur: A whoosh that clears up" width="100%"><br><b>Speed blur</b><br><sub>A whoosh that clears up</sub></td>
+  </tr>
+  <tr>
+    <td width="33%" align="center"><img src="docs/images/effects/beat-zoom-flash.webp" alt="Beat zoom + flash: Punch-in and flash on every beat" width="100%"><br><b>Beat zoom + flash</b><br><sub>Punch-in and flash on every beat</sub></td>
+    <td width="33%" align="center"><img src="docs/images/effects/mirror.webp" alt="Mirror: One half reflected onto the other" width="100%"><br><b>Mirror</b><br><sub>One half reflected onto the other</sub></td>
+    <td width="33%" align="center"><img src="docs/images/effects/motion-trails.webp" alt="Motion trails: Movement leaves fading copies" width="100%"><br><b>Motion trails</b><br><sub>Movement leaves fading copies</sub></td>
+  </tr>
+</table>
+
+Settings for each effect, the new transitions and the looks are in the **[feature guide](docs/FEATURES.md#trending-effects-transitions-and-looks)**.
+
 ## A look inside
 
 ![The SceneForge editor: seven named parts in the project bin, a rendered coastal scene with its narration line, scene settings, and the timeline](docs/images/editor-overview.png)
@@ -62,7 +86,7 @@ The full list is in the [changelog](docs/CHANGELOG.md).
   </tr>
 </table>
 
-**Also inside:** a multitrack timeline with pro edit tools (ripple, roll, slip, slide, blade), script-to-scenes and project templates, beat markers and beat sync, keyframes, 35+ film looks and LUT import, AI voice isolation, silence and filler-word removal, auto-reframe to 9:16, GPU export, and exports for YouTube, Shorts/Reels/TikTok, Instagram, ProRes, GIF and SRT/VTT. See the **[feature guide](docs/FEATURES.md)**, with a short clip of every trending effect.
+**Also inside:** a multitrack timeline with pro edit tools (ripple, roll, slip, slide, blade), script-to-scenes and project templates, beat markers and beat sync, keyframes, 35+ film looks and LUT import, AI voice isolation, silence and filler-word removal, auto-reframe to 9:16, GPU export, and exports for YouTube, Shorts/Reels/TikTok, Instagram, ProRes, GIF and SRT/VTT. See the **[feature guide](docs/FEATURES.md)**.
 
 ## AI is optional
 
