@@ -77,6 +77,8 @@ def voicebox_address(body: VoiceboxAddress, db: Session = Depends(get_db)):
     parsed = urlparse(url or voicebox.DEFAULT_URL)
     if parsed.scheme not in ('http', 'https') or not parsed.hostname or parsed.path not in ('', '/'):
         raise HTTPException(400, 'Enter an address like http://127.0.0.1:17493.')
+    if parsed.hostname not in ('127.0.0.1', 'localhost', '::1'):
+        raise HTTPException(400, 'Voicebox must run on this computer: use an address like http://127.0.0.1:17493.')
     profile = _built_in_profile(db, 'voicebox', voicebox.DEFAULT_URL, 'voicebox')
     profile.base_url = url or voicebox.DEFAULT_URL; db.commit()
     return voicebox.status(profile.base_url)

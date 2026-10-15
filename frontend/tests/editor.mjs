@@ -670,7 +670,7 @@ check('the timeline stays usable while an effect change is saving (no flicker)',
  await waitFor(()=>assert.equal(project.finishing_json.audio_clips.length,rc6ClipsBefore));
  fireEvent.contextMenu(screen.getByRole('button',{name:'Select audio clip music-a.mp3'}),{clientX:40,clientY:40});
  const menu=screen.getByRole('menu',{name:'Timeline clip actions'});
- check('right-clicking an audio clip offers split, cut, copy, paste, duplicate, mute, move and delete',['Split at playhead','Cut','Copy','Duplicate','Mute','Delete (keep video)','Ripple delete'].every(n=>within(menu).getByRole('menuitem',{name:new RegExp('^'+n.replace(/[()]/g,'\\$&'))})));
+ check('right-clicking an audio clip offers split, cut, copy, paste, duplicate, mute, move and delete',['Split at playhead','Cut','Copy','Duplicate','Mute','Delete (keep video)','Ripple delete'].every(n=>within(menu).getByRole('menuitem',{name:new RegExp('^'+n.replace(/[.*+?^${}()|[\]\\]/g,'\\$&'))})));
  await user.click(within(menu).getByRole('menuitem',{name:/^Copy/}));
  fireEvent.contextMenu(screen.getByRole('button',{name:'Select audio clip music-a.mp3'}),{clientX:40,clientY:40});
  await user.click(within(screen.getByRole('menu',{name:'Timeline clip actions'})).getByRole('menuitem',{name:/^Paste at playhead/}));

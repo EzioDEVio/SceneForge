@@ -2,7 +2,7 @@
 
 Downloads u2netp (4.6 MB) from GitHub releases on first run into SCENEFORGE_CUTOUT_MODEL_DIR
 (or a temp folder). Skips with a message only when github.com is unreachable."""
-import os,pathlib,sys,tempfile,subprocess,time
+import os,pathlib,re,sys,tempfile,subprocess,time
 import numpy as np
 from PIL import Image,ImageDraw
 root=pathlib.Path(__file__).resolve().parents[2]
@@ -48,7 +48,7 @@ person,clip=up('person.png'),up('clip.mp4')
 saved_dir,saved_url=os.environ['SCENEFORGE_CUTOUT_MODEL_DIR'],cutout.MODELS['isnet']['url']
 os.environ['SCENEFORGE_CUTOUT_MODEL_DIR']=str(t/'empty-models');cutout.MODELS['isnet']['url']='http://127.0.0.1:9/isnet-general-use.onnx'
 r=client.post(f"/api/assets/{person['id']}/cutout",json={'model':'isnet'})
-check('offline download fails with a clear message naming github.com and the folder',r.status_code==503 and 'github.com' in r.json()['detail'] and str(t/'empty-models') in r.json()['detail'])
+check('offline download fails with a clear message naming github.com and the folder',r.status_code==503 and re.search(r'\bgithub\.com\b', r.json()['detail']) is not None and str(t/'empty-models') in r.json()['detail'])
 check('failed download leaves no partial or model file',not list((t/'empty-models').glob('*')))
 os.environ['SCENEFORGE_CUTOUT_MODEL_DIR']=saved_dir;cutout.MODELS['isnet']['url']=saved_url
 

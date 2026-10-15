@@ -25,6 +25,7 @@ from app.db.database import get_db
 from app.db.models import Asset, Project
 from app.domain import schemas
 from app.domain.constants import AssetOrigin
+from app.security.paths import safe_join
 
 router = APIRouter(tags=["stickers"])
 TWEMOJI_LICENSE = "CC-BY 4.0 (Twemoji by Twitter, Inc. and contributors)"
@@ -86,9 +87,8 @@ def import_sticker(project_id: str, sticker_id: str, db: Session = Depends(get_d
         if (a.generation_metadata_json or {}).get("library_sticker") == sticker_id and Path(_resolve_asset_path(a)).is_file():
             return a
     data = src.read_bytes()
-    folder = Path(MEDIA_DIR) / project_id
-    folder.mkdir(parents=True, exist_ok=True)
-    dest = folder / f"sticker_{sticker_id}_{hashlib.sha256(data).hexdigest()[:8]}.png"
+    dest = safe_join(MEDIA_DIR, project_id, f"sticker_{item['id']}_{hashlib.sha256(data).hexdigest()[:8]}.png")
+    dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(src, dest)
     with Image.open(dest) as im:
         w, h = im.size

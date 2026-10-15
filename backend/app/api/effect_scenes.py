@@ -16,6 +16,7 @@ from app.db.models import Asset, Project, Scene, Shot, VoiceTake
 from app.domain import schemas
 from app.domain.constants import AssetOrigin, AssetType, VoiceTakeSource
 from app.render import countdowns
+from app.security.paths import safe_join
 
 router = APIRouter(prefix="/api/projects", tags=["effect scenes"])
 
@@ -33,11 +34,10 @@ def insert_countdown(project_id: str, body: dict, db: Session = Depends(get_db))
         src = countdowns.render(opts, project.width, project.height, project.fps)
     except countdowns.CountdownError as e:
         raise HTTPException(400, str(e))
-    folder = Path(MEDIA_DIR) / project_id
-    folder.mkdir(parents=True, exist_ok=True)
     tag = uuid.uuid4().hex[:10]
-    video = folder / f"countdown_{opts['style']}_{tag}.mp4"
-    audio = folder / f"countdown_{opts['style']}_{tag}.wav"
+    video = safe_join(MEDIA_DIR, project_id, f"countdown_{opts['style']}_{tag}.mp4")
+    audio = safe_join(MEDIA_DIR, project_id, f"countdown_{opts['style']}_{tag}.wav")
+    video.parent.mkdir(parents=True, exist_ok=True)
     shutil.copyfile(src, video)
     subprocess.run([FFMPEG_BIN, "-y", "-v", "error", "-i", str(video), "-vn", "-ar", "48000", "-ac", "2", str(audio)],
                    check=True, capture_output=True, timeout=120)

@@ -324,7 +324,7 @@ export const api = {
   beatSync: (projectId: string) => req<{bpm: number; beats: number[]; scenes_changed: number; scenes_kept: number}>(`/api/projects/${projectId}/beat-sync`, {method: 'POST'}),
   /** Rendered scene with the timeline audio (A3–A8) and music under it; `v` refreshes the cached mix. */
   scenePreviewUrl: (sceneId: string, v: string) => `/api/scenes/${sceneId}/preview-media?v=${encodeURIComponent(v)}`,
-  assetStreamUrl: (assetId: string) => `/api/assets/${assetId}/stream`,
+  assetStreamUrl: (assetId: string) => `/api/assets/${encodeURIComponent(assetId)}/stream`,
   assetThumbUrl: (assetId: string, width = 320, timeMs = 0) => `/api/assets/${assetId}/thumbnail?w=${width}${timeMs > 0 ? `&time_ms=${Math.round(timeMs)}` : ''}`,
   gradedFrameUrl: (sceneId: string, key: string, width = 1280, shotId?: string) => `/api/scenes/${sceneId}/graded-frame?w=${width}&k=${key}${shotId ? `&shot_id=${shotId}` : ''}`,
   assetDownloadUrl: (assetId: string) => `/api/assets/${assetId}/stream?download=1`,

@@ -195,6 +195,8 @@ with TestClient(app) as c:
         t = c.post(f'/api/scenes/{sid}/voice-takes/service', json={'provider_id': vb['profile']['id'], 'voice': 'k1', 'language': 'en-US', 'speed': 1.0})
         bad = c.put('/api/local-speech/voicebox/address', json={'url': 'ftp://x'})
         check('a wrong Voicebox address is refused with an example', bad.status_code == 400 and '17493' in bad.text)
+        remote = c.put('/api/local-speech/voicebox/address', json={'url': 'http://192.168.1.20:17493'})
+        check('a Voicebox address on another machine is refused (requests stay on this computer)', remote.status_code == 400 and 'this computer' in remote.text)
         moved = c.put('/api/local-speech/voicebox/address', json={'url': f'127.0.0.1:{srv.server_address[1]}'}).json()
         check('Voicebox on another address can be set and is found', moved['running'] and moved['profiles'] == 3)
         check("a preset voice is generated with its own engine, not Voicebox's Qwen default",

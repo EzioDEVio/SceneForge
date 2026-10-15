@@ -21,6 +21,10 @@
     "electron": "44.4.3",
     "electron-builder": "26.15.3"
   },
+  "overrides": {
+    "global-agent": "4.1.3",
+    "http-cache-semantics": "4.3.0"
+  },
   "build": {
     "appId": "io.eziodevio.sceneforge",
     "productName": "SceneForge Studio",

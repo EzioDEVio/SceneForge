@@ -9,6 +9,7 @@ from app.domain import schemas
 from app.domain.constants import ASPECT_DIMENSIONS, AspectRatio
 from app.domain.import_parser import parse_script, parse_paragraphs
 from app.render.timeline import is_stale
+from app.security.paths import safe_join
 
 router = APIRouter(prefix="/api/projects", tags=["projects"])
 
@@ -293,9 +294,8 @@ def music_fit(project_id: str, body: dict | None = None, db: Session = Depends(g
         raise HTTPException(422, "The music could not be analysed.")
     if not beats:
         raise HTTPException(422, "No steady beat was found in this music, so it cannot be re-edited on the beat.")
-    folder = Path(MEDIA_DIR) / project_id
-    folder.mkdir(parents=True, exist_ok=True)
-    out = folder / f"musicfit_{uuid.uuid4().hex[:10]}.wav"
+    out = safe_join(MEDIA_DIR, project_id, f"musicfit_{uuid.uuid4().hex[:10]}.wav")
+    out.parent.mkdir(parents=True, exist_ok=True)
     try:
         render_fit(src, str(out), dur_ms / 1000, target / 1000, beats)
     except MusicFitError as e:

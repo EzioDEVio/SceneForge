@@ -32,8 +32,24 @@ class VoiceboxError(ValueError):
     pass
 
 
+_LOCAL_HOSTS = ("127.0.0.1", "localhost", "::1")
+
+
 def _base(url: str | None) -> str:
-    return (url or DEFAULT_URL).rstrip("/")
+    """Voicebox runs on this computer: only loopback addresses are used, so a stored or edited
+    address cannot point SceneForge's requests at another machine or service."""
+    from urllib.parse import urlsplit
+    parts = urlsplit((url or DEFAULT_URL).rstrip("/"))
+    host = next((h for h in _LOCAL_HOSTS if h == (parts.hostname or "")), None)
+    try:
+        port = parts.port
+    except ValueError:
+        port = None
+    if parts.scheme not in ("http", "https") or host is None or parts.username or parts.password or parts.path not in ("", "/"):
+        raise VoiceboxError(f"Voicebox must be on this computer, for example {DEFAULT_URL}.")
+    scheme = "https" if parts.scheme == "https" else "http"
+    netloc = f"[{host}]" if host == "::1" else host
+    return f"{scheme}://{netloc}" + (f":{int(port)}" if port else "")
 
 
 def _detail(res: requests.Response) -> str:
@@ -66,7 +82,11 @@ def running(url: str | None = None) -> bool:
 def status(url: str | None = None) -> dict:
     """For the Voices card: is Voicebox answering, how many voices does it have, and if it
     is not answering, why (in words the user can act on)."""
-    base = _base(url)
+    try:
+        base = _base(url)
+    except VoiceboxError:   # an address saved by an earlier version that is not on this computer
+        return {"running": False, "profiles": 0, "url": DEFAULT_URL, "stuck": 0,
+                "reason": f"Voicebox must be on this computer, for example {DEFAULT_URL}. Set the address below."}
     out = {"running": False, "profiles": 0, "url": base, "reason": "", "stuck": 0}
     try:
         rows = _profiles(url, timeout=(3, 10))

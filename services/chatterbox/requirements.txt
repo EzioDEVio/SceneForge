@@ -1,9 +1,9 @@
 # torch/torchaudio are installed first from the CPU-only index in the Dockerfile
 # (the default PyPI torch wheel bundles several GB of CUDA libraries).
 chatterbox-tts==0.1.7
-fastapi
-uvicorn
-soundfile
+fastapi==0.143.2
+uvicorn==0.54.0
+soundfile==0.14.0
 # resemble-perth (Chatterbox's audio watermark) imports pkg_resources, which comes with setuptools
 # (removed in setuptools 81). Without it Chatterbox fails with "'NoneType' object is not callable".
 setuptools<81

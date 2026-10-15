@@ -26,6 +26,7 @@ from sqlalchemy.orm import Session
 from app.config import DATA_DIR
 from app.db.models import Asset, Project, Scene, Shot, VoiceTake
 from app.domain.project_copy import _remap
+from app.security.paths import safe_join
 
 SNAP_DIR = Path(DATA_DIR) / "snapshots"
 KEEP_AUTO = 20       # automatic restore points kept per project
@@ -64,7 +65,7 @@ def _content_hash(rows: dict) -> str:
 def _folder(project_id: str) -> Path:
     if not project_id or "/" in project_id or "\\" in project_id or ".." in project_id:
         raise SnapshotError("Invalid project id.")
-    return SNAP_DIR / project_id
+    return safe_join(SNAP_DIR, project_id)
 
 
 def list_snapshots(project_id: str) -> list[dict]:
@@ -93,9 +94,9 @@ def save_snapshot(db: Session, project: Project, reason: str = "manual", label: 
     meta = {"created_at": now.isoformat(timespec="seconds"), "reason": "auto" if reason == "auto" else "manual",
             "label": str(label or "")[:80], "title": project.title, "scenes": len(rows["scenes"]),
             "hash": digest, "version": 1, "seq": time.time_ns()}
-    tmp = folder / f".{snap_id}.{os.getpid()}.tmp"
+    tmp = safe_join(folder, f".{snap_id}.{os.getpid()}.tmp")
     tmp.write_text(json.dumps({"meta": meta, "rows": rows}, default=str), encoding="utf-8")
-    tmp.replace(folder / f"{snap_id}.json")
+    tmp.replace(safe_join(folder, f"{snap_id}.json"))
     _prune(project.id)
     return {"id": snap_id, **meta}
 
@@ -105,14 +106,16 @@ def _prune(project_id: str) -> None:
     for kind, keep in (("auto", KEEP_AUTO), ("manual", KEEP_MANUAL)):
         for old in [s for s in snaps if s.get("reason") == kind][keep:]:
             try:
-                (_folder(project_id) / f"{old['id']}.json").unlink()
+                safe_join(_folder(project_id), f"{old['id']}.json").unlink()
             except OSError:
                 pass
 
 
 def delete_snapshot(project_id: str, snap_id: str) -> bool:
-    path = _folder(project_id) / f"{snap_id}.json"
-    if "/" in snap_id or "\\" in snap_id or not path.is_file():
+    if "/" in snap_id or "\\" in snap_id:
+        return False
+    path = safe_join(_folder(project_id), f"{snap_id}.json")
+    if not path.is_file():
         return False
     path.unlink()
     return True
@@ -128,8 +131,10 @@ def delete_all(project_id: str) -> None:
 
 
 def restore_snapshot(db: Session, project_id: str, snap_id: str) -> Project:
-    path = _folder(project_id) / f"{snap_id}.json"
-    if "/" in snap_id or "\\" in snap_id or not path.is_file():
+    if "/" in snap_id or "\\" in snap_id:
+        raise SnapshotError("That restore point no longer exists.")
+    path = safe_join(_folder(project_id), f"{snap_id}.json")
+    if not path.is_file():
         raise SnapshotError("That restore point no longer exists.")
     try:
         data = json.loads(path.read_text(encoding="utf-8"))

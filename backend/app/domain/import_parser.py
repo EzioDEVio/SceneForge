@@ -145,8 +145,9 @@ def _strip_non_narration(text: str) -> str:
     """Narration must not read image prompts, timestamps, stage directions
     or headings aloud (spec section 6). This trims common stage-direction
     bracket notations like (pause) / [music] left over in narration text."""
-    text = re.sub(r"\((?:pause|beat|music|sfx)[^)]*\)", "", text, flags=re.IGNORECASE)
-    text = re.sub(r"\[(?:music|sfx)[^\]]*\]", "", text, flags=re.IGNORECASE)
+    # Bounded ({0,200}): an unclosed "(pause" in a long script must not make this slow (ReDoS).
+    text = re.sub(r"\((?:pause|beat|music|sfx)[^)\n]{0,200}\)", "", text, flags=re.IGNORECASE)
+    text = re.sub(r"\[(?:music|sfx)[^\]\n]{0,200}\]", "", text, flags=re.IGNORECASE)
     return text.strip()
 
 

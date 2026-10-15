@@ -2,6 +2,16 @@
 
 ## Unreleased
 
+- **Security: GitHub's 42 Dependabot alerts and 53 code-scanning alerts reviewed and fixed.** Details and the reason for each remaining alert are in [`dev-notes/reviews/SECURITY_REVIEW_2026-10-15.md`](dev-notes/reviews/SECURITY_REVIEW_2026-10-15.md).
+  - Stable Diffusion engine: diffusers 0.32 → 0.41, transformers 4.49 → 5.17, accelerate 1.4 → 1.15, Pillow 11.1 → 12.3, safetensors, FastAPI and Uvicorn updated (most of the critical and high alerts). transformers 5.18 and later crash with torch 2.6 on computers without a working NVIDIA GPU, so 5.17 is used; checked by running the real engine server on a small model with the same parts as SD 1.5. Installed engines update their packages on the next start.
+  - Backend: Pillow pinned to 12.3.0 (it allowed 10.x). Chatterbox engine: FastAPI, Uvicorn and soundfile pinned.
+  - Desktop build tools: http-cache-semantics and global-agent (which pulled in roarr and sprintf-js) updated through npm overrides; the frontend's source-map-js updated. `npm audit` now reports 0 for frontend, desktop and browser tests.
+  - Paths built from request values (project media, stickers, music fit, countdowns, restore points, ComfyUI workflows) go through one `safe_join` check that refuses anything outside its folder.
+  - Voicebox requests only go to this computer (an address on another machine is refused).
+  - Script import: the pattern that removes "(pause …)" notes took about 5 seconds on a hostile 280 KB script; it now takes 0.04 s.
+  - The diagnostic espeak voice only accepts known voice names; asset stream links encode the id.
+  - New `test_security_hardening.py` (in CI).
+
 - **Trending effects showed as Off after reopening a part** (0.9.4-beta.9): RGB split, Cinematic fade & zoom, Intro move, Before & after and Speed blur were saved and rendered, but the Effects panel showed them switched off when you came back to the part, and switching one on again reset its settings. The panel now reads every effect in the effect stack; a unit test checks that each effect-stack effect is kept, so a new effect can't be missed again.
 - **AI help:** the "Local voices" card no longer says SceneForge sets up Docker Desktop (it hasn't since 0.9.4-beta.3).
 - **Repository:** a new README with a demo reel edited in SceneForge from real photos, fresh screenshots, a banner and a social preview image, and a clip of every trending effect on the front page and in the feature guide; the long reference moved to [`FEATURES.md`](FEATURES.md), [`AI_PROVIDERS.md`](AI_PROVIDERS.md) and [`DEVELOPMENT.md`](DEVELOPMENT.md). Issue forms, a pull request template, a code of conduct, and an updated security policy (keys are in the OS credential store). Internal handoffs, reviews and test evidence moved to [`dev-notes/`](dev-notes/README.md); the Docker-era voice launchers moved to `scripts/legacy-docker/`. Tests now write their screenshots and evidence to `tests/output/` (ignored by git) instead of `docs/`.

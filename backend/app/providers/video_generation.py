@@ -15,6 +15,7 @@ from urllib.parse import urlparse
 import requests
 
 from app.config import DATA_DIR
+from app.security.paths import safe_join
 
 
 class VideoGenerationError(RuntimeError):
@@ -197,7 +198,7 @@ def validate_request(data: dict) -> tuple[dict, int, int]:
 
 def workflow_path(model_id: str) -> Path:
     model_for("local_comfy", model_id)
-    return VIDEO_WORKFLOWS_DIR / f"{model_id}.json"
+    return safe_join(VIDEO_WORKFLOWS_DIR, f"{model_id}.json")
 
 
 def parse_workflow(raw: bytes) -> dict:

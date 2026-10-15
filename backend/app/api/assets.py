@@ -18,6 +18,7 @@ from app.domain.constants import AssetOrigin
 from app.render.ffmpeg_utils import FFmpegError, probe
 from app.render.thumbnails import ThumbnailError, thumbnail_path
 from app.security.uploads import UploadValidationError, classify_extension, safe_generated_filename
+from app.security.paths import safe_join
 
 router = APIRouter(prefix="/api/assets", tags=["assets"])
 
@@ -33,9 +34,8 @@ def upload_asset(project_id: str, file: UploadFile, db: Session = Depends(get_db
         raise HTTPException(400, str(e))
 
     dest_name = safe_generated_filename(file.filename or "upload.bin")
-    project_dir = Path(MEDIA_DIR) / project_id
-    project_dir.mkdir(parents=True, exist_ok=True)
-    dest_path = project_dir / dest_name
+    dest_path = safe_join(MEDIA_DIR, project.id, dest_name)
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
 
     hasher = hashlib.sha256()
     size = 0
@@ -208,9 +208,9 @@ def import_lut(project_id: str, file: UploadFile, db: Session = Depends(get_db))
     if existing:
         return existing
     dest_name = safe_generated_filename(file.filename or "look.cube")
-    project_dir = Path(MEDIA_DIR) / project_id
-    project_dir.mkdir(parents=True, exist_ok=True)
-    (project_dir / dest_name).write_bytes(data)
+    dest_path = safe_join(MEDIA_DIR, project_id, dest_name)
+    dest_path.parent.mkdir(parents=True, exist_ok=True)
+    dest_path.write_bytes(data)
     asset = Asset(project_id=project_id, type="lut", content_hash=digest, storage_key=f"{project_id}/{dest_name}",
                   mime="text/plain", original_filename=Path(file.filename or "look.cube").name[:255],
                   width=lut.size, origin=AssetOrigin.UPLOAD)

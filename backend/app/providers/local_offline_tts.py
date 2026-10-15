@@ -19,7 +19,8 @@ from pathlib import Path
 
 from app.render.ffmpeg_utils import FFmpegError
 
-_LANG_MAP = {"ar": "ar", "en": "en-us"}
+# Only these espeak-ng voices are passed on the command line (no request value reaches it).
+_LANG_MAP = {"ar": "ar", "en": "en-us", "en-us": "en-us", "en-gb": "en-gb", "fr": "fr", "es": "es", "de": "de", "it": "it", "pt": "pt", "tr": "tr", "fa": "fa", "ur": "ur", "hi": "hi"}
 
 
 def synthesize(text: str, out_path: str, voice: str = "ar", rate_wpm: int = 160) -> None:
@@ -27,7 +28,9 @@ def synthesize(text: str, out_path: str, voice: str = "ar", rate_wpm: int = 160)
         raise FFmpegError("Cannot synthesize empty narration text.")
     if any('\u0600' <= c <= '\u06ff' for c in text) and voice != 'ar':
         raise FFmpegError('Arabic narration requires Arabic language. Select Arabic or use Chatterbox Multilingual.')
-    lang = _LANG_MAP.get(voice, voice)
+    lang = _LANG_MAP.get(voice)
+    if lang is None:
+        raise FFmpegError(f"Unknown diagnostic voice {voice!r}. Use one of: {', '.join(sorted(_LANG_MAP))}.")
     args = [
         "espeak-ng",
         "-v", lang,

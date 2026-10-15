@@ -23,6 +23,12 @@ from fastapi.responses import JSONResponse
 async def font_runtime_error(request, exc):
     return JSONResponse(status_code=503, content={"detail": str(exc)})
 
+from app.security.paths import UnsafePathError
+
+@app.exception_handler(UnsafePathError)
+async def unsafe_path_error(request, exc):
+    return JSONResponse(status_code=400, content={"detail": "Invalid name or id in the request."})
+
 # Local-first: bind loopback by default (see scripts/start.*), but still
 # validate allowed origins rather than treating "runs on localhost" alone
 # as a security boundary.
