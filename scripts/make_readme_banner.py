@@ -4,8 +4,8 @@ of a SceneForge export.
 
     python scripts/make_readme_banner.py FRAME1.png FRAME2.png FRAME3.png FRAME4.png
 
-The frames used for the committed images come from the demo project that
-scripts/capture_readme_screenshots.py builds (generated pictures only), exported by SceneForge.
+The committed images use four Pixabay photos (Brooklyn skyline, Colosseum, Asturias coast, coffee),
+cropped to 16:9. The photos themselves are not in the repository.
 """
 from __future__ import annotations
 

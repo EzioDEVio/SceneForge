@@ -4,14 +4,15 @@ Everything the editor does, area by area. New to SceneForge? Start with the [REA
 Version labels in *italics* say when a feature arrived; the full record is in the
 [changelog](CHANGELOG.md) and the [release notes](../desktop/RELEASE_NOTES.md).
 
-Screenshots show a demo project made only from generated pictures, video and sound
-([`scripts/capture_readme_screenshots.py`](../scripts/capture_readme_screenshots.py) rebuilds it).
+Most screenshots show a demo project made from generated pictures, video and sound
+([`scripts/capture_readme_screenshots.py`](../scripts/capture_readme_screenshots.py) rebuilds it); the demo reel and the
+trending-effects screenshot use photos from Pixabay.
 
 ## Trending effects, transitions and looks
 
-<p align="center"><img src="images/demo-transitions.webp" alt="Exported SceneForge video: a whip pan from a city skyline to mountains, a spin into a neon title with RGB split, and a zoom punch onto a presenter" width="800"></p>
+<p align="center"><img src="images/demo-reel.webp" alt="A SceneForge edit of travel and food photos with whip pans, a zoom punch, a before and after reveal on the Colosseum, a spin and cinematic fades" width="720"><br><sub>Photos from Pixabay.</sub></p>
 
-![Effects tab, More effects, Trending group: RGB split switched on, on every beat, with strength and beats per minute, above Cinematic fade and zoom](images/trending-effects.png)
+![Effects tab, More effects, Trending group: Before and after on the Colosseum, half black and white, half colour, with the before look, start and sweep length](images/trending-effects.png)
 
 Short-video effects after CapCut's 2026 trend list, all rendered by FFmpeg on your computer.
 

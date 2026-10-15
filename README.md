@@ -21,8 +21,8 @@
 **SceneForge Studio turns a script, your photos and clips, and a voice into a finished, captioned video, one scene at a time.** Write the narration, drop in pictures, pick a look, and SceneForge times everything to the voice. It renders on your own computer with FFmpeg: no account, no watermark, no subscription. AI is optional, and much of it runs free on your machine. Arabic and English are first-class, right down to right-to-left captions.
 
 <p align="center">
-  <img src="docs/images/demo-transitions.webp" alt="A SceneForge export: a whip pan from a city skyline to mountains, a spin into a neon title with an RGB split on the beat, and a zoom punch onto a presenter" width="800">
-  <br><sub>Straight out of SceneForge: whip pan, spin with RGB split, zoom punch. All demo media is generated; nothing is stock.</sub>
+  <img src="docs/images/demo-reel.webp" alt="A 14-second SceneForge edit of travel and food photos: a Brooklyn skyline at dusk with the title Every place has a story, a whip pan to a New York street, a zoom punch onto the Colosseum revealed from black and white to colour, a zoom fade to a coastal town, a spin onto a cup of coffee, a Greek salad, and a forest walk with the title SceneForge Studio" width="720">
+  <br><sub>Made in SceneForge from eight still photos: camera moves, whip pans, zoom punch, a before &amp; after reveal, spin and cinematic fades. Photos from Pixabay.</sub>
 </p>
 
 ## Download
@@ -49,11 +49,11 @@ The full list is in the [changelog](docs/CHANGELOG.md).
 
 ## A look inside
 
-![The SceneForge editor: the scene list, a rendered "Night City" scene with a caption, scene settings, and the multitrack timeline](docs/images/editor-overview.png)
+![The SceneForge editor: seven named parts in the project bin, a rendered coastal scene with its narration line, scene settings, and the timeline](docs/images/editor-overview.png)
 
 <table>
   <tr>
-    <td width="50%"><img src="docs/images/trending-effects.png" alt="More effects, Trending: RGB split on every beat, with strength and beats per minute"><br><b>Trending effects.</b> Beat-synced zooms, flashes, RGB split, intro moves and more, each with its own settings and an effect stack you can reorder.</td>
+    <td width="50%"><img src="docs/images/trending-effects.png" alt="More effects, Trending: Before and after on the Colosseum, half black and white, half colour, with the sweep settings"><br><b>Trending effects.</b> Before &amp; after reveals, beat-synced zooms, flashes, RGB split, intro moves and more, each with its own settings and an effect stack you can reorder.</td>
     <td width="50%"><img src="docs/images/caption-styles.png" alt="Caption styles: 71 styles in Social, Cinematic, Karaoke, Fun, Minimal and Arabic groups next to a neon title"><br><b>71 caption styles.</b> Word-by-word timing, karaoke highlights and proper Arabic right-to-left layout, generated from the narration by local Whisper.</td>
   </tr>
   <tr>
@@ -117,4 +117,5 @@ SceneForge Studio is free software under the **[GNU General Public License v3.0 
 - Emoji: [Twemoji](https://github.com/jdecked/twemoji) v17.0.3 graphics, Copyright Twitter, Inc. and other contributors, **CC-BY 4.0** (`assets/stickers/LICENSE-TWEMOJI-GRAPHICS.txt`). The 78 graphic stickers were drawn for SceneForge.
 - Cutout models are ONNX files published with rembg (MIT); IS-Net general use and U²-Net small are Apache-2.0. The source does not state the People model's licence.
 - The voice isolation model (MDX-Net Kim_Vocal_2, from the Ultimate Vocal Remover repository) has **no explicit licence from its author**; check it before relying on the feature commercially.
+- The demo photos at the top of this page are from [Pixabay](https://pixabay.com) under the Pixabay Content License; they are not covered by SceneForge's licence.
 - AI models and services you add (Whisper, Kokoro, Chatterbox, Stable Diffusion, ComfyUI models, cloud providers) are not part of SceneForge and have their own terms, which may restrict commercial use.
