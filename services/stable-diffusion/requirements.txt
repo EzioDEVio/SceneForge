@@ -5,4 +5,4 @@ transformers==4.49.0
 accelerate==1.4.0
 safetensors==0.5.3
 numpy==1.26.4
-Pillow==11.1.0
+Pillow==12.3.0
